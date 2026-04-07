@@ -1,4 +1,4 @@
-import { toJpeg } from 'html-to-image';
+import { toJpeg, toPng } from 'html-to-image';
 import jsPDF from 'jspdf';
 
 /**
@@ -98,9 +98,10 @@ export const exportToPDF = async (elementId: string, filename: string = 'roadmap
 };
 
 /**
- * Exports the timeline element as a JPG file download.
+ * Exports the timeline element as a PNG file download.
+ * Starts at 1× pixel ratio and steps down by 0.25 until the file is ≤ 2MB.
  */
-export const exportToJPG = async (elementId: string, filename: string = 'roadmap.jpg') => {
+export const exportToPNG = async (elementId: string, filename: string = 'roadmap.png') => {
   const element = document.getElementById(elementId);
   if (!element) {
     console.error(`Element with id ${elementId} not found`);
@@ -108,26 +109,31 @@ export const exportToJPG = async (elementId: string, filename: string = 'roadmap
   }
 
   const scrollableArea = (element.querySelector('.overflow-auto') as HTMLElement) || element;
+  const MAX_BYTES = 2 * 1024 * 1024;
 
-  const dataUrl = await toJpeg(scrollableArea, {
-    quality: 0.92,
-    backgroundColor: '#ffffff',
-    width: scrollableArea.scrollWidth,
-    height: scrollableArea.scrollHeight,
-    style: {
-      transform: 'scale(1)',
-      transformOrigin: 'top left',
-      width: scrollableArea.scrollWidth + 'px',
-      height: scrollableArea.scrollHeight + 'px',
-      overflow: 'visible',
-    },
-  });
+  let dataUrl = '';
+  for (let pixelRatio = 1.0; pixelRatio > 0; pixelRatio -= 0.25) {
+    dataUrl = await toPng(scrollableArea, {
+      backgroundColor: '#ffffff',
+      pixelRatio,
+      width: scrollableArea.scrollWidth,
+      height: scrollableArea.scrollHeight,
+      style: {
+        transform: 'scale(1)',
+        transformOrigin: 'top left',
+        width: scrollableArea.scrollWidth + 'px',
+        height: scrollableArea.scrollHeight + 'px',
+        overflow: 'visible',
+      },
+    });
+    if (atob(dataUrl.split(',')[1]).length <= MAX_BYTES) break;
+  }
 
   // Convert data URL to blob URL — Chrome blocks large data URL downloads.
   const bstr = atob(dataUrl.split(',')[1]);
   const u8arr = new Uint8Array(bstr.length);
   for (let i = 0; i < bstr.length; i++) u8arr[i] = bstr.charCodeAt(i);
-  const blob = new Blob([u8arr], { type: 'image/jpeg' });
+  const blob = new Blob([u8arr], { type: 'image/png' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;

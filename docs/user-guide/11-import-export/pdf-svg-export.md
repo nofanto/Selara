@@ -1,10 +1,10 @@
-# PDF & JPG Export
+# PDF & PNG Export
 
-PDF and JPG export capture the current Visualiser view as a file you can share, embed in a presentation, or archive. Both formats preserve the visual layout of the timeline exactly as displayed on screen.
+PDF and PNG export capture the current Visualiser view as a file you can share, embed in a presentation, or archive. Both formats preserve the visual layout of the timeline exactly as displayed on screen.
 
 ## Where to find the export buttons
 
-The **Export PDF** and **Export JPG** buttons are available in the **Visualiser** view. Navigate to the Visualiser and configure the view — applying any filters, zoom level, or display settings you want captured — before exporting.
+The **PDF** and **PNG** buttons are available in the **Visualiser** view. Navigate to the Visualiser and configure the view — applying any filters, zoom level, or display settings you want captured — before exporting.
 
 ## Exporting as PDF
 
@@ -14,13 +14,13 @@ The **Export PDF** and **Export JPG** buttons are available in the **Visualiser*
 
 PDF is the best choice for sharing with stakeholders who need a fixed, printable document.
 
-## Exporting as JPG
+## Exporting as PNG
 
 1. Open the Visualiser.
-2. Click **JPG**.
-3. The `.jpg` file generates and downloads automatically.
+2. Click **PNG**.
+3. The `.png` file generates and downloads automatically.
 
-JPG is the best choice when you need a widely-compatible raster image to embed in documents, presentations, or share via email.
+PNG is a lossless format that produces sharp, high-quality images suitable for embedding in documents, presentations, or sharing via email. The export targets a file size of 2 MB or less — if the rendered timeline is very large, the pixel ratio is automatically reduced until the file fits within that limit.
 
 ## Legend in PDF exports
 
