@@ -6,18 +6,28 @@ The Budget report summarises total spend across your portfolio, broken down by p
 
 ## What the Report Shows
 
-Spend figures are derived from the **CapEx** and **OpEx** fields recorded on each initiative in Data Manager. Each initiative has two separate budget inputs — Capital Expenditure (CapEx) and Operational Expenditure (OpEx) — and the report aggregates their combined total into four views:
+Spend figures are derived from the **CapEx** and **OpEx** fields recorded on each initiative in Data Manager. The report displays a CapEx subtotal, OpEx subtotal, and combined total for each grouping, so you can see the capital vs operational expense split at a glance.
+
+The header shows the portfolio-wide **CapEx total**, **OpEx total**, and **Grand Total**.
+
+Each group row shows three columns to the right of the bar:
+
+| Column | Description |
+|--------|-------------|
+| **CapEx** (blue) | Sum of all initiative CapEx in this group |
+| **OpEx** (amber) | Sum of all initiative OpEx in this group |
+| **Total** | CapEx + OpEx combined |
+
+The report includes four groupings:
 
 - **By programme** — total budget across all initiatives belonging to each programme
 - **By strategy** — total budget grouped by the strategic theme each initiative is tagged to
 - **By asset category** — total budget grouped by the category of the asset each initiative belongs to
-- **By DTS Phase** — total budget grouped by DTS adoption phase (Phase 1 – Register & Expose, Phase 2 – Integrate DPI, Phase 3 – AI & Legacy Exit, Back-Office Consolidation, Not DTS). This breakdown is only shown in DTS and Mixed workspaces.
-
-The grand total displayed in the report equals the sum of all initiative CapEx + OpEx values in Data Manager. If a figure looks unexpected, check that both CapEx and OpEx fields are entered in Data Manager before investigating further.
+- **By DTS Phase** — total budget grouped by DTS adoption phase. This breakdown is only shown in DTS and Mixed workspaces.
 
 ## Verifying Totals
 
-If you need to reconcile a figure, open Data Manager and filter by the programme, strategy, or asset category in question. Sum the CapEx and OpEx fields for the filtered initiatives — the combined sum should match the corresponding line in this report.
+If you need to reconcile a figure, open Data Manager and filter by the programme, strategy, or asset category in question. Sum the CapEx and OpEx fields for the filtered initiatives — the totals should match the corresponding CapEx and OpEx columns in this report.
 
 ## Limitations
 

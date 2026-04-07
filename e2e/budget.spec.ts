@@ -16,6 +16,30 @@ test.describe('Budget Reports (Summary & Breakdown)', () => {
     await expect(page.getByTestId('budget-by-category')).toBeVisible();
   });
 
+  test('grand total header shows capex and opex split', async ({ page }) => {
+    await expect(page.getByTestId('budget-grand-total-capex')).toBeVisible();
+    await expect(page.getByTestId('budget-grand-total-opex')).toBeVisible();
+    await expect(page.getByTestId('budget-grand-total')).toBeVisible();
+  });
+
+  test('programme rows show capex and opex subtotals', async ({ page }) => {
+    const section = page.getByTestId('budget-by-programme');
+    await expect(section).toBeVisible();
+    const firstRow = section.locator('[data-testid^="budget-row-programme-"]').first();
+    await expect(firstRow.getByTestId('row-capex')).toBeVisible();
+    await expect(firstRow.getByTestId('row-opex')).toBeVisible();
+    await expect(firstRow.getByTestId('row-total')).toBeVisible();
+  });
+
+  test('strategy rows show capex and opex subtotals', async ({ page }) => {
+    const section = page.getByTestId('budget-by-strategy');
+    await expect(section).toBeVisible();
+    const firstRow = section.locator('[data-testid^="budget-row-strategy-"]').first();
+    await expect(firstRow.getByTestId('row-capex')).toBeVisible();
+    await expect(firstRow.getByTestId('row-opex')).toBeVisible();
+    await expect(firstRow.getByTestId('row-total')).toBeVisible();
+  });
+
   test('grand total matches sum of all initiative budgets', async ({ page }) => {
     await page.goto('/');
     await page.waitForSelector('[data-testid="asset-row-content"]', { timeout: 10000 });

@@ -48,15 +48,23 @@ function BudgetBar({ total, max, color }: { total: number; max: number; color?: 
   );
 }
 
-function BudgetSection({ testId, title, rows, max }: { testId: string; title: string; rows: { id: string; name: string; total: number; color?: string }[]; max: number }) {
+function BudgetSection({ testId, title, rows, max }: { testId: string; title: string; rows: { id: string; name: string; capex: number; opex: number; total: number; color?: string }[]; max: number }) {
   return (
     <div data-testid={testId} className="space-y-2">
-      <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">{title}</h3>
+      <div className="flex items-center gap-3">
+        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider w-44 flex-shrink-0">{title}</h3>
+        <div className="flex-1" />
+        <span className="text-xs font-semibold text-blue-500 w-16 text-right flex-shrink-0">CapEx</span>
+        <span className="text-xs font-semibold text-amber-500 w-16 text-right flex-shrink-0">OpEx</span>
+        <span className="text-xs font-semibold text-slate-500 w-16 text-right flex-shrink-0">Total</span>
+      </div>
       {rows.map(row => (
         <div key={row.id} data-testid={`budget-row-${testId.replace('budget-by-', '')}-${row.id}`} className="flex items-center gap-3">
           <span className="text-sm text-slate-700 w-44 truncate flex-shrink-0">{row.name}</span>
           <BudgetBar total={row.total} max={max} color={row.color} />
-          <span className="text-sm font-semibold text-slate-800 w-16 text-right flex-shrink-0">{fmt(row.total)}</span>
+          <span data-testid="row-capex" className="text-xs text-blue-600 w-16 text-right flex-shrink-0">{fmt(row.capex)}</span>
+          <span data-testid="row-opex" className="text-xs text-amber-600 w-16 text-right flex-shrink-0">{fmt(row.opex)}</span>
+          <span data-testid="row-total" className="text-sm font-semibold text-slate-800 w-16 text-right flex-shrink-0">{fmt(row.total)}</span>
         </div>
       ))}
     </div>
@@ -330,21 +338,32 @@ export function ReportsView({ assets, initiatives, milestones, dependencies, cur
   // ── Budget Report ────────────────────────────────────────────────────────────
   if (selectedReport === 'budget') {
     const realInitiatives = initiatives.filter(i => !i.isPlaceholder);
-    const totalOf = (inits: typeof realInitiatives) => inits.reduce((sum, i) => sum + (i.capex || 0) + (i.opex || 0), 0);
-    const grandTotal = totalOf(realInitiatives);
+    const capexOf = (inits: typeof realInitiatives) => inits.reduce((sum, i) => sum + (i.capex || 0), 0);
+    const opexOf  = (inits: typeof realInitiatives) => inits.reduce((sum, i) => sum + (i.opex  || 0), 0);
+    const totalOf = (inits: typeof realInitiatives) => capexOf(inits) + opexOf(inits);
+    const grandCapex = capexOf(realInitiatives);
+    const grandOpex  = opexOf(realInitiatives);
+    const grandTotal = grandCapex + grandOpex;
 
     const byProgramme = programmes
-      .map(p => ({ id: p.id, name: p.name, color: p.color, total: totalOf(realInitiatives.filter(i => i.programmeId === p.id)) }))
+      .map(p => {
+        const inits = realInitiatives.filter(i => i.programmeId === p.id);
+        return { id: p.id, name: p.name, color: p.color, capex: capexOf(inits), opex: opexOf(inits), total: totalOf(inits) };
+      })
       .filter(r => r.total > 0).sort((a, b) => b.total - a.total);
 
     const byStrategy = strategies
-      .map(s => ({ id: s.id, name: s.name, color: s.color, total: totalOf(realInitiatives.filter(i => i.strategyId === s.id)) }))
+      .map(s => {
+        const inits = realInitiatives.filter(i => i.strategyId === s.id);
+        return { id: s.id, name: s.name, color: s.color, capex: capexOf(inits), opex: opexOf(inits), total: totalOf(inits) };
+      })
       .filter(r => r.total > 0).sort((a, b) => b.total - a.total);
 
     const byCategory = assetCategories
       .map(c => {
         const catAssets = assets.filter(a => a.categoryId === c.id).map(a => a.id);
-        return { id: c.id, name: c.name, total: totalOf(realInitiatives.filter(i => catAssets.includes(i.assetId))) };
+        const inits = realInitiatives.filter(i => catAssets.includes(i.assetId));
+        return { id: c.id, name: c.name, capex: capexOf(inits), opex: opexOf(inits), total: totalOf(inits) };
       })
       .filter(r => r.total > 0).sort((a, b) => b.total - a.total);
 
@@ -360,7 +379,10 @@ export function ReportsView({ assets, initiatives, milestones, dependencies, cur
 
     const byDtsPhase = hasDtsAssets
       ? DTS_PHASE_DEFS
-          .map(p => ({ id: p.id, name: p.name, total: totalOf(realInitiatives.filter(i => i.dtsPhase === p.id)) }))
+          .map(p => {
+            const inits = realInitiatives.filter(i => i.dtsPhase === p.id);
+            return { id: p.id, name: p.name, capex: capexOf(inits), opex: opexOf(inits), total: totalOf(inits) };
+          })
           .filter(r => r.total > 0)
       : [];
 
@@ -371,7 +393,11 @@ export function ReportsView({ assets, initiatives, milestones, dependencies, cur
           <div data-testid="report-budget-summary" className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
               <h2 className="text-base font-semibold text-slate-800">Budget Summary</h2>
-              <span data-testid="budget-grand-total" className="text-sm font-bold text-slate-700">{fmt(grandTotal)} total</span>
+              <div className="flex items-center gap-3 text-sm">
+                <span data-testid="budget-grand-total-capex" className="text-blue-600"><span className="font-medium">CapEx</span> {fmt(grandCapex)}</span>
+                <span data-testid="budget-grand-total-opex" className="text-amber-600"><span className="font-medium">OpEx</span> {fmt(grandOpex)}</span>
+                <span data-testid="budget-grand-total" className="font-bold text-slate-700">{fmt(grandTotal)} total</span>
+              </div>
             </div>
             <div className="p-4 space-y-6">
               <BudgetSection testId="budget-by-programme" title="By Programme" rows={byProgramme} max={byProgramme[0]?.total ?? 0} />
