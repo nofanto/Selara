@@ -47,4 +47,23 @@ test.describe('Sharable Links - Failure Paths', () => {
     // 5. Verify error notification
     await expect(page.locator(ERROR_NOTIFICATION)).toBeVisible({ timeout: 20000 });
   });
+
+  test('US-SL-03: Handle Expired Link (410)', async ({ page }) => {
+    // Mock API failure with 410 Gone
+    await page.route('**/handleShare*', async route => {
+      await route.fulfill({
+        status: 410,
+        contentType: 'text/plain',
+        body: 'This link has expired'
+      });
+    });
+
+    // Visit with an ID and Key
+    await page.goto('/?id=expired-id#key=expired-key');
+
+    // Verify error banner shows the expiry message (App.tsx uses db-error-banner for mount errors)
+    const errorBanner = page.locator('[data-testid="db-error-banner"]');
+    await expect(errorBanner).toBeVisible({ timeout: 20000 });
+    await expect(errorBanner).toContainText('This share link has expired or does not exist');
+  });
 });

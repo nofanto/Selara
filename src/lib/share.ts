@@ -44,7 +44,7 @@ export async function importSharedWorkspace(id: string, key: string): Promise<un
   const response = await fetch(`${API_URL}?id=${id}`);
 
   if (!response.ok) {
-    if (response.status === 404) {
+    if (response.status === 404 || response.status === 410) {
       throw new Error('This share link has expired or does not exist.');
     }
     throw new Error(`Failed to fetch shared workspace: ${response.statusText}`);

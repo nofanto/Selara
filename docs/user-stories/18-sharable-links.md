@@ -12,8 +12,10 @@
 - The modal includes a mandatory checkbox for granting consent.
 - The "Generate share link" button is disabled until consent is granted.
 - Clicking "Generate share link" triggers client-side encryption of the full IndexedDB workspace payload.
+- **Technical Constraint:** The payload must be less than 1MB (encrypted ciphertext).
 - The encryption key is **never** sent to the server.
 - A unique URL is generated containing the storage ID as a query parameter and the encryption key as a URL hash fragment.
+- **Technical Constraint:** The storage ID must be a high-entropy 32-character hex string (16 random bytes).
 - The generated link is automatically copied to the user's clipboard.
 - **A "Link Copied!" in-app modal is displayed, explicitly stating that the link will expire in 1 week.**
 

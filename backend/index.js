@@ -9,7 +9,13 @@ const COLLECTION = 'shared_workspaces';
  */
 exports.handleShare = async (req, res) => {
   // Set CORS headers
-  res.set('Access-Control-Allow-Origin', '*');
+  const origin = req.get('origin');
+  const allowedOrigin = 'https://scenia.website';
+  
+  if (origin === allowedOrigin || !origin) {
+    res.set('Access-Control-Allow-Origin', allowedOrigin);
+  }
+  
   res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.set('Access-Control-Allow-Headers', 'Content-Type');
 
@@ -25,8 +31,13 @@ exports.handleShare = async (req, res) => {
         return res.status(400).send('Missing ciphertext or iv');
       }
 
-      // Generate a short, unique ID (8 characters)
-      const id = crypto.randomBytes(4).toString('hex');
+      // Payload size limit: 1MB (string length check is sufficient for base64/JSON)
+      if (ciphertext.length > 1024 * 1024) {
+        return res.status(413).send('Payload too large (max 1MB)');
+      }
+
+      // Generate a strong, unique ID (16 bytes = 32 hex chars)
+      const id = crypto.randomBytes(16).toString('hex');
       
       // Set TTL for 7 days (168 hours)
       const expiresAt = new Date();
@@ -56,6 +67,12 @@ exports.handleShare = async (req, res) => {
       }
 
       const data = doc.data();
+
+      // Explicitly check TTL (in case Firestore TTL policy hasn't run)
+      if (data.expiresAt && data.expiresAt.toDate() < new Date()) {
+        return res.status(410).send('This link has expired');
+      }
+
       return res.status(200).json({
         ciphertext: data.ciphertext,
         iv: data.iv
