@@ -230,11 +230,10 @@ export const saveAppData = async (data: {
   timelineSettings: TimelineSettings;
   resources: Resource[];
   applicationStatuses: ApplicationStatus[];
-  versions?: Version[];
   dtsPhases?: DtsPhaseRecord[];
 }) => {
   const db = await initDB();
-  const stores: ("assets" | "applications" | "applicationSegments" | "applicationStatuses" | "dtsPhases" | "initiatives" | "milestones" | "programmes" | "strategies" | "dependencies" | "assetCategories" | "settings" | "resources" | "versions")[] = [
+  const stores: ("assets" | "applications" | "applicationSegments" | "applicationStatuses" | "dtsPhases" | "initiatives" | "milestones" | "programmes" | "strategies" | "dependencies" | "assetCategories" | "settings" | "resources")[] = [
     'assets', 'initiatives', 'milestones', 'programmes', 'strategies', 'dependencies', 'assetCategories'
   ];
   if (db.objectStoreNames.contains('settings')) {
@@ -254,9 +253,6 @@ export const saveAppData = async (data: {
   }
   if (db.objectStoreNames.contains('dtsPhases')) {
     stores.push('dtsPhases');
-  }
-  if (data.versions && db.objectStoreNames.contains('versions')) {
-    stores.push('versions');
   }
   const tx = db.transaction(stores, 'readwrite');
 
@@ -309,13 +305,8 @@ export const saveAppData = async (data: {
       allPromises.push(tx.objectStore('dtsPhases').clear());
       (data.dtsPhases || []).forEach(item => allPromises.push(tx.objectStore('dtsPhases').put(item)));
     }
-    if (data.versions && db.objectStoreNames.contains('versions')) {
-      allPromises.push(tx.objectStore('versions').clear());
-      data.versions.forEach(v => allPromises.push(tx.objectStore('versions').put(v)));
-    }
 
     await Promise.all(allPromises);
-
     await tx.done;
 
     // Check for transaction errors that may not have thrown

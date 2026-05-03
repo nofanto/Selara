@@ -21,16 +21,12 @@ Upload a `.xlsx` file. The importer reads the following sheets by name: **Initia
 1. Open the **Data Manager** panel.
 2. Click **Import Excel**.
 3. Select your `.xlsx` file. The **Import Preview** modal opens.
-| **Dependencies** | All initiative dependency relationships |
-| **Versions** | Historical snapshots |
 
 ## Reviewing the preview
+
 The preview shows the parsed data before anything is written to your portfolio. Check the row counts and sample values to confirm the file was read correctly.
 
-If the file was exported from Scenia, the preview will also show the number of **History Snapshots** found. Importing these snapshots allows you to restore the full version history of the portfolio.
-
 If any required fields are missing or unrecognised column names are found, a **Schema Warnings** panel appears above the preview listing each issue by sheet and column. Address the warnings in your spreadsheet and re-upload, or proceed if the warnings are acceptable (for example, optional fields you intentionally omitted).
-
 
 A missing `startDate` value on an initiative will not crash the timeline; the initiative will appear without a start position until the field is populated.
 

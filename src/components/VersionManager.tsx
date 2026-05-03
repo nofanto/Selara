@@ -1,18 +1,15 @@
-import React, { useState, useMemo } from 'react';
-import { Version, Asset, Application, ApplicationSegment, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource, ApplicationStatus, DtsPhaseRecord } from '../types';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Version, Asset, Application, ApplicationSegment, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource, ApplicationStatus } from '../types';
 import { X, Save, History, Trash2, ArrowRight, FileText, AlertCircle, LayoutGrid, Check } from 'lucide-react';
-import { saveVersion, deleteVersion } from '../lib/db';
+import { getAllVersions, saveVersion, deleteVersion } from '../lib/db';
 import { ConfirmModal } from './ConfirmModal';
 import { computeDiff } from '../lib/diff';
 import { useFocusTrap } from '../lib/useFocusTrap';
-
 
 interface VersionManagerProps {
   isOpen: boolean;
   onClose: () => void;
   onRestore: (version: Version) => void;
-  versions: Version[];
-  onUpdateVersions: (versions: Version[]) => void;
   currentData: {
     assets: Asset[];
     applications: Application[];
@@ -26,11 +23,11 @@ interface VersionManagerProps {
     timelineSettings: TimelineSettings;
     resources: Resource[];
     applicationStatuses?: ApplicationStatus[];
-    dtsPhases?: DtsPhaseRecord[];
   };
 }
 
-export function VersionManager({ isOpen, onClose, onRestore, versions, onUpdateVersions, currentData }: VersionManagerProps) {
+export function VersionManager({ isOpen, onClose, onRestore, currentData }: VersionManagerProps) {
+  const [versions, setVersions] = useState<Version[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [newName, setNewName] = useState('');
   const [newDescription, setNewDescription] = useState('');
@@ -39,9 +36,18 @@ export function VersionManager({ isOpen, onClose, onRestore, versions, onUpdateV
   const [pendingConfirm, setPendingConfirm] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
   const panelRef = useFocusTrap(isOpen, onClose);
 
-  const sortedVersions = useMemo(() => 
-    [...versions].sort((a, b) => b.timestamp.localeCompare(a.timestamp)),
-  [versions]);
+  const loadVersions = async () => {
+    const loaded = await getAllVersions();
+    setVersions(loaded.sort((a, b) => b.timestamp.localeCompare(a.timestamp)));
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      getAllVersions().then(loaded => {
+        setVersions(loaded.sort((a, b) => b.timestamp.localeCompare(a.timestamp)));
+      });
+    }
+  }, [isOpen]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,18 +58,14 @@ export function VersionManager({ isOpen, onClose, onRestore, versions, onUpdateV
       name: newName,
       timestamp: new Date().toISOString(),
       description: newDescription,
-      data: structuredClone({
-        ...currentData,
-        applicationStatuses: currentData.applicationStatuses || [],
-        dtsPhases: currentData.dtsPhases || [],
-      }),
+      data: structuredClone(currentData),
     };
 
     await saveVersion(version);
-    onUpdateVersions([...versions, version]);
     setNewName('');
     setNewDescription('');
     setIsSaving(false);
+    loadVersions();
   };
 
   const handleDelete = (id: string) => {
@@ -73,7 +75,7 @@ export function VersionManager({ isOpen, onClose, onRestore, versions, onUpdateV
       onConfirm: async () => {
         setPendingConfirm(null);
         await deleteVersion(id);
-        onUpdateVersions(versions.filter(v => v.id !== id));
+        loadVersions();
         if (selectedVersionId === id) setSelectedVersionId(null);
         if (comparisonVersionId === id) setComparisonVersionId(null);
       },
@@ -118,13 +120,13 @@ export function VersionManager({ isOpen, onClose, onRestore, versions, onUpdateV
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-2 space-y-1">
-              {sortedVersions.length === 0 ? (
+              {versions.length === 0 ? (
                 <div className="p-8 text-center">
                   <History className="w-12 h-12 text-slate-200 mx-auto mb-3" />
                   <p className="text-sm text-slate-400">No versions saved yet</p>
                 </div>
               ) : (
-                sortedVersions.map((v) => (
+                versions.map((v) => (
                   <div
                     key={v.id}
                     onClick={() => setSelectedVersionId(v.id)}
@@ -213,10 +215,10 @@ export function VersionManager({ isOpen, onClose, onRestore, versions, onUpdateV
                 <div className="flex justify-between items-start border-b border-slate-100 pb-4">
                   <div>
                     <h3 className="text-xl font-bold text-slate-900 mb-1">
-                      {sortedVersions.find(v => v.id === selectedVersionId)?.name}
+                      {versions.find(v => v.id === selectedVersionId)?.name}
                     </h3>
                     <p className="text-sm text-slate-500">
-                      {sortedVersions.find(v => v.id === selectedVersionId)?.description || 'No description provided'}
+                      {versions.find(v => v.id === selectedVersionId)?.description || 'No description provided'}
                     </p>
                   </div>
                   <div className="text-right font-mono text-xs text-slate-400">
@@ -255,7 +257,7 @@ export function VersionManager({ isOpen, onClose, onRestore, versions, onUpdateV
                     </p>
                     <button
                       onClick={() => {
-                        const v = sortedVersions.find(v => v.id === selectedVersionId);
+                        const v = versions.find(v => v.id === selectedVersionId);
                         if (v) {
                           setPendingConfirm({
                             title: 'Restore Version',
@@ -277,13 +279,13 @@ export function VersionManager({ isOpen, onClose, onRestore, versions, onUpdateV
                   <div className="grid grid-cols-3 gap-4">
                     <div>
                       <p className="text-2xl font-bold">
-                        {sortedVersions.find(v => v.id === selectedVersionId)?.data.initiatives.length}
+                        {versions.find(v => v.id === selectedVersionId)?.data.initiatives.length}
                       </p>
                       <p className="text-[10px] text-indigo-300 uppercase font-bold">Initiatives</p>
                     </div>
                     <div>
                       <p className="text-2xl font-bold">
-                        {sortedVersions.find(v => v.id === selectedVersionId)?.data.dependencies.length}
+                        {versions.find(v => v.id === selectedVersionId)?.data.dependencies.length}
                       </p>
                       <p className="text-[10px] text-indigo-300 uppercase font-bold">Relationships</p>
                     </div>
@@ -317,7 +319,7 @@ export function VersionManager({ isOpen, onClose, onRestore, versions, onUpdateV
       
       {/* Comparison Modal Overlay */}
       {comparisonVersionId && (() => {
-        const baseVersion = sortedVersions.find(v => v.id === selectedVersionId);
+        const baseVersion = versions.find(v => v.id === selectedVersionId);
         if (!baseVersion) return null;
         return (
           <VersionComparisonReport
