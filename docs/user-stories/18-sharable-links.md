@@ -11,9 +11,9 @@
 - Encryption uses the native Web Crypto API (AES-GCM) with a randomly generated 256-bit key.
 - The encrypted ciphertext is sent to a serverless storage endpoint (e.g., Cloudflare Worker + KV).
 - The encryption key is **never** sent to the server.
-- A unique URL is generated containing the storage ID as a query parameter and the encryption key as a URL hash fragment (e.g., `https://scenia.website/import?id=abc-123#key=xyz-789`).
+- A unique URL is generated containing the storage ID as a query parameter and the encryption key as a URL hash fragment.
 - The generated link is automatically copied to the user's clipboard.
-- A success notification is displayed to the user.
+- **A "Link Copied!" in-app modal is displayed, explicitly stating that the link will expire in 1 week.**
 
 ---
 
@@ -25,11 +25,13 @@
 
 **Acceptance Criteria:**
 - When the application loads a URL containing a share ID and a hash key, it automatically initiates the import process.
+- **The landing page is skipped, and the user is taken directly into the application.**
+- **A "Restoring Data" in-app modal is displayed while the data is being fetched and decrypted.**
 - The application fetches the encrypted ciphertext from the serverless endpoint using the provided ID.
 - The application extracts the encryption key from the URL hash fragment.
 - The ciphertext is decrypted client-side using the extracted key via the Web Crypto API.
 - The decrypted JSON payload is validated and then imported into the recipient's local IndexedDB.
-- Existing local data is overwritten (or the user is prompted to confirm if data exists).
+- Existing local data is overwritten.
 - A success notification is shown, and the UI refreshes to display the imported data.
 
 ---
@@ -41,7 +43,7 @@
 **so that** I understand why the data failed to load.
 
 **Acceptance Criteria:**
-- If the serverless endpoint returns an error (e.g., 404 Not Found) because the TTL has expired (e.g., after 24-48 hours), a clear error message is displayed.
+- If the serverless endpoint returns an error because the TTL has expired (after 1 week), a clear error message is displayed.
 - If the decryption fails (e.g., due to a corrupted or missing key in the URL), a clear "Decryption Failed" error is displayed.
 - The error message explains that shared links are temporary and suggests requesting a new link from the sender.
 

@@ -75,11 +75,16 @@ export default function App() {
   const isMobile = useMediaQuery('(max-width: 767px)');
   const [view, setView] = useState<'visualiser' | 'data' | 'reports' | 'guide'>('visualiser');
   const [isLoading, setIsLoading] = useState(true);
+  const [isImportingShare, setIsImportingShare] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
   const [showFeatures, setShowFeatures] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
+  
+  // Check for share link in URL to skip landing page
+  const hasShareId = new URLSearchParams(window.location.search).has('id');
+
   const [showLandingPage, setShowLandingPage] = useState(
-    !localStorage.getItem('scenia_has_seen_landing') && !localStorage.getItem('scenia-e2e')
+    !hasShareId && !localStorage.getItem('scenia_has_seen_landing') && !localStorage.getItem('scenia-e2e')
   );
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
   const [templatePickerIsReset, setTemplatePickerIsReset] = useState(false);
@@ -140,7 +145,7 @@ export default function App() {
         const shareKey = keyMatch ? keyMatch[1] : null;
 
         if (shareId && shareKey) {
-          setIsLoading(true);
+          setIsImportingShare(true);
           try {
             const sharedData = await importSharedWorkspace(shareId, shareKey) as AppState;
             await saveAppData(sharedData);
@@ -163,10 +168,13 @@ export default function App() {
             setDtsPhases((dbData as any).dtsPhases || []);
             setTimelineSettings({ ...defaultTimelineSettings, ...(dbData.timelineSettings || {}) });
             setVersions(await getAllVersions());
+            setIsImportingShare(false);
+            setIsLoading(false);
             return;
           } catch (error) {
             console.error('Failed to import shared workspace:', error);
             setDbSaveError(error instanceof Error ? error.message : 'Failed to import shared workspace.');
+            setIsImportingShare(false);
             // Continue to normal load if share fails
           }
         }
@@ -553,8 +561,22 @@ export default function App() {
       <div className="h-screen w-full flex items-center justify-center bg-slate-100">
         <div className="flex flex-col items-center gap-2 text-slate-500">
           <Loader2 className="animate-spin" size={32} />
-          <p>Loading data...</p>
+          <p>{isImportingShare ? 'Restoring shared workspace...' : 'Loading data...'}</p>
         </div>
+
+        {isImportingShare && (
+          <div data-testid="restoring-data-modal" className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[200]">
+            <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full mx-4 flex flex-col items-center text-center animate-in fade-in zoom-in duration-300">
+              <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mb-4">
+                <Loader2 className="animate-spin text-blue-600" size={32} />
+              </div>
+              <h2 className="text-xl font-bold text-slate-900 mb-2">Restoring Data</h2>
+              <p className="text-slate-600">
+                Please wait while we securely decrypt and load the shared workspace...
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     );
   }

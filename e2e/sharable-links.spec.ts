@@ -2,49 +2,64 @@ import { test, expect } from '@playwright/test';
 
 // Selectors
 const SHARE_BTN = '[data-testid="share-button"]';
-const SUCCESS_NOTIFICATION = '[data-testid="import-success-notification"]';
-const ERROR_NOTIFICATION = '[data-testid="import-error-notification"]'; // In DataControls
-const DB_ERROR_BANNER = '[data-testid="db-error-banner"]'; // In App.tsx
+const SHARE_SUCCESS_MODAL = '[data-testid="share-success-modal"]';
+const RESTORING_DATA_MODAL = '[data-testid="restoring-data-modal"]';
 
 test.describe('Sharable Links', () => {
-  test('US-SL-01: Generate a Sharable Link', async ({ page, context }) => {
-    // Inject E2E flag
+  test.beforeEach(async ({ page }) => {
+    // Force a desktop viewport to ensure header controls are visible
+    await page.setViewportSize({ width: 1280, height: 800 });
+  });
+
+  test('US-SL-01: Generate a Sharable Link shows success modal', async ({ page, context }) => {
     await page.addInitScript(() => {
       localStorage.setItem('scenia-e2e', 'true');
     });
     await page.goto('/');
 
-    // Grant clipboard permissions
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
 
-    // Find the share button
-    const shareBtn = page.locator(SHARE_BTN);
-    await expect(shareBtn).toBeVisible();
-
-    // Click share (it will fail because backend is not deployed, should show error)
-    await shareBtn.click();
-
-    // Verify error notification (from DataControls)
-    await expect(page.locator(ERROR_NOTIFICATION)).toBeVisible({ timeout: 20000 });
-  });
-
-  test('US-SL-02: Import Data from a Sharable Link', async ({ page }) => {
-    const mockId = 'test-share-id';
-    const mockKey = 'invalid-key';
-
-    // Inject E2E flag
-    await page.addInitScript(() => {
-      localStorage.setItem('scenia-e2e', 'true');
+    // Mock successful share
+    await page.route('**/handleShare', async route => {
+      if (route.request().method() === 'POST') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ id: 'mock-id' })
+        });
+      } else {
+        await route.continue();
+      }
     });
 
-    // Mock the fetch to return something that will fail decryption
+    const shareBtn = page.locator(SHARE_BTN);
+    await expect(shareBtn).toBeVisible({ timeout: 20000 });
+    await shareBtn.click();
+
+    // Verify Success Modal
+    const modal = page.locator(SHARE_SUCCESS_MODAL);
+    await expect(modal).toBeVisible({ timeout: 15000 });
+    await expect(modal).toContainText('Link Copied!');
+    await expect(modal).toContainText('This link will expire in 1 week');
+    
+    // Check clipboard
+    const clipboardText = await page.evaluate(() => navigator.clipboard.readText());
+    expect(clipboardText).toContain('?id=mock-id');
+  });
+
+  test('US-SL-02: Import shows Restoring Data modal and skips landing page', async ({ page }) => {
+    const mockId = 'test-share-id';
+    const mockKey = 'test-key';
+
+    // Mock successful fetch with delay
     await page.route('**/handleShare*', async route => {
+      await new Promise(resolve => setTimeout(resolve, 3000));
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
-          ciphertext: 'dGVzdA==',
-          iv: 'dGVzdA=='
+          ciphertext: 'YTM0YTU2',
+          iv: 'YTM0YTU2'
         })
       });
     });
@@ -52,7 +67,11 @@ test.describe('Sharable Links', () => {
     // Go directly to the share link
     await page.goto(`/?id=${mockId}#key=${mockKey}`);
     
-    // Decryption or fetch should fail, App-level error banner should appear
-    await expect(page.locator(DB_ERROR_BANNER)).toBeVisible({ timeout: 20000 });
+    // Should show "Restoring Data" modal
+    await expect(page.locator(RESTORING_DATA_MODAL)).toBeVisible({ timeout: 15000 });
+    
+    // Landing page should NOT be visible
+    const landingHeading = page.getByRole('heading', { name: /strategic portfolio planning/i });
+    await expect(landingHeading).not.toBeVisible();
   });
 });

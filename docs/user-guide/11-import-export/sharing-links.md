@@ -23,6 +23,6 @@ We take your data privacy seriously. Scenia uses a **Zero-Knowledge Architecture
 
 *   **Client-Side Encryption:** Your plan is encrypted in your browser using the **Web Crypto API (AES-GCM)** before it is ever sent to our servers.
 *   **Private Keys:** The encryption key is stored in the URL hash fragment (`#key=...`). Browsers **never** send this hash fragment to any server. 
-*   **Temporary Storage:** Shared plans are stored on our servers in an encrypted format and are automatically deleted after **24 hours**.
+*   **Temporary Storage:** Shared plans are stored on our servers in an encrypted format and are automatically deleted after **1 week**.
 
 Only people with the full link (including the part after the `#`) can ever view your data. Even Scenia's administrators cannot decrypt or read your shared plans.

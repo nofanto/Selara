@@ -28,9 +28,9 @@ exports.handleShare = async (req, res) => {
       // Generate a short, unique ID (8 characters)
       const id = crypto.randomBytes(4).toString('hex');
       
-      // Set TTL for 24 hours
+      // Set TTL for 7 days (168 hours)
       const expiresAt = new Date();
-      expiresAt.setHours(expiresAt.getHours() + 24);
+      expiresAt.setHours(expiresAt.getHours() + 168);
 
       await firestore.collection(COLLECTION).doc(id).set({
         ciphertext,

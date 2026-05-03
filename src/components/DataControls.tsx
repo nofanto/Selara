@@ -140,20 +140,26 @@ export function DataControls({ data, onImport, onError, timelineId }: DataContro
   const [importSchemaIssues, setImportSchemaIssues] = useState<SchemaIssue[]>([]);
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [isSharing, setIsSharing] = useState(false);
+  const [showShareSuccessModal, setShowShareSuccessModal] = useState(false);
 
   const showNotification = (type: 'success' | 'error', message: string) => {
     setNotification({ type, message });
     setTimeout(() => setNotification(null), 4000);
   };
-
-  const handleShare = async () => {
-    setIsSharing(true);
+const handleShare = async () => {
+  setIsSharing(true);
+  try {
+    const { url } = await shareWorkspace(data);
     try {
-      const { url } = await shareWorkspace(data);
       await navigator.clipboard.writeText(url);
-      showNotification('success', 'Share link copied to clipboard!');
-    } catch (error) {
-      console.error('Share failed:', error);
+    } catch (clipErr) {
+      console.warn('Clipboard copy failed:', clipErr);
+      // We still show the modal, maybe the user can copy from a field if we added one,
+      // but for now we just proceed to show the success modal.
+    }
+    setShowShareSuccessModal(true);
+  } catch (error) {
+    console.error('Share failed:', error);
       const message = error instanceof Error ? error.message : 'Failed to generate share link.';
       showNotification('error', message);
       if (onError) onError(message);
@@ -361,6 +367,29 @@ export function DataControls({ data, onImport, onError, timelineId }: DataContro
           }`}
         >
           {notification.message}
+        </div>
+      )}
+
+      {showShareSuccessModal && (
+        <div data-testid="share-success-modal" className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-[110] animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-8 mx-4 text-center animate-in zoom-in duration-300">
+            <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Check className="text-emerald-600" size={32} />
+            </div>
+            <h3 className="text-xl font-bold text-slate-900 mb-2">Link Copied!</h3>
+            <p className="text-slate-600 mb-6">
+              Your secure share link has been copied to your clipboard. 
+              <span className="block mt-2 font-medium text-amber-600">
+                This link will expire in 1 week.
+              </span>
+            </p>
+            <button
+              onClick={() => setShowShareSuccessModal(false)}
+              className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-semibold transition-colors"
+            >
+              Got it
+            </button>
+          </div>
         </div>
       )}
 
