@@ -1,15 +1,17 @@
 # User Stories — Sharable Links
 
-## US-SL-01: Generate a Sharable Link
+## US-SL-01: Generate a Sharable Link (with Consent)
 
 **As an** IT portfolio manager,
-**I want** to generate a secure, temporary link to my current workspace,
-**so that** I can share my plan with colleagues without them needing to create an account or manually export/import files.
+**I want** to be informed about how my data is protected before generating a share link,
+**so that** I can confidently and securely share my plan.
 
 **Acceptance Criteria:**
-- Clicking the "Share" button triggers client-side encryption of the full IndexedDB workspace payload.
-- Encryption uses the native Web Crypto API (AES-GCM) with a randomly generated 256-bit key.
-- The encrypted ciphertext is sent to a serverless storage endpoint (e.g., Cloudflare Worker + KV).
+- Clicking the "Share" button opens a **Sharing Consent Modal**.
+- The modal explains that data is encrypted in the browser (AES-GCM) and then uploaded to the server.
+- The modal includes a mandatory checkbox for granting consent.
+- The "Generate share link" button is disabled until consent is granted.
+- Clicking "Generate share link" triggers client-side encryption of the full IndexedDB workspace payload.
 - The encryption key is **never** sent to the server.
 - A unique URL is generated containing the storage ID as a query parameter and the encryption key as a URL hash fragment.
 - The generated link is automatically copied to the user's clipboard.

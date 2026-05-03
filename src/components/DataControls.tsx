@@ -141,25 +141,31 @@ export function DataControls({ data, onImport, onError, timelineId }: DataContro
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [isSharing, setIsSharing] = useState(false);
   const [showShareSuccessModal, setShowShareSuccessModal] = useState(false);
+  const [showShareConsentModal, setShowShareConsentModal] = useState(false);
+  const [hasConsented, setHasConsented] = useState(false);
 
   const showNotification = (type: 'success' | 'error', message: string) => {
     setNotification({ type, message });
     setTimeout(() => setNotification(null), 4000);
   };
-const handleShare = async () => {
-  setIsSharing(true);
-  try {
-    const { url } = await shareWorkspace(data);
+  const handleShare = async () => {
+    setHasConsented(false);
+    setShowShareConsentModal(true);
+  };
+
+  const handleGenerateShareLink = async () => {
+    setShowShareConsentModal(false);
+    setIsSharing(true);
     try {
-      await navigator.clipboard.writeText(url);
-    } catch (clipErr) {
-      console.warn('Clipboard copy failed:', clipErr);
-      // We still show the modal, maybe the user can copy from a field if we added one,
-      // but for now we just proceed to show the success modal.
-    }
-    setShowShareSuccessModal(true);
-  } catch (error) {
-    console.error('Share failed:', error);
+      const { url } = await shareWorkspace(data);
+      try {
+        await navigator.clipboard.writeText(url);
+      } catch (clipErr) {
+        console.warn('Clipboard copy failed:', clipErr);
+      }
+      setShowShareSuccessModal(true);
+    } catch (error) {
+      console.error('Share failed:', error);
       const message = error instanceof Error ? error.message : 'Failed to generate share link.';
       showNotification('error', message);
       if (onError) onError(message);
@@ -370,9 +376,63 @@ const handleShare = async () => {
         </div>
       )}
 
+      {showShareConsentModal && (
+        <div data-testid="share-consent-modal" className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-[110] animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 mx-4 text-center animate-in zoom-in duration-300">
+            <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Share className="text-blue-600" size={32} />
+            </div>
+            <h3 className="text-xl font-bold text-slate-900 mb-4">Share Workspace</h3>
+            
+            <div className="text-left space-y-4 mb-8 text-slate-600 text-sm">
+              <p>
+                By generating a share link, a copy of your current workspace data will be:
+              </p>
+              <ul className="list-disc pl-5 space-y-2">
+                <li><strong>Encrypted locally</strong> in your browser using AES-GCM (Zero-Knowledge).</li>
+                <li><strong>Uploaded</strong> to our secure server in its encrypted format.</li>
+                <li><strong>Stored temporarily</strong> and automatically deleted after 1 week.</li>
+              </ul>
+              <p>
+                The decryption key stays in your URL and is never sent to the server. Only people with the full link can view your data.
+              </p>
+            </div>
+
+            <label className="flex items-center gap-3 mb-8 cursor-pointer group">
+              <input
+                type="checkbox"
+                checked={hasConsented}
+                onChange={(e) => setHasConsented(e.target.checked)}
+                className="w-5 h-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+              />
+              <span className="text-sm font-medium text-slate-700 group-hover:text-slate-900 transition-colors">
+                I understand and consent to sharing my data securely.
+              </span>
+            </label>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowShareConsentModal(false)}
+                className="flex-1 py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                data-testid="generate-share-link-button"
+                onClick={handleGenerateShareLink}
+                disabled={!hasConsented}
+                className="flex-[2] py-3 px-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:bg-slate-300 text-white rounded-xl font-semibold transition-colors"
+              >
+                Generate share link
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showShareSuccessModal && (
-        <div data-testid="share-success-modal" className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-[110] animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-8 mx-4 text-center animate-in zoom-in duration-300">
+        <div data-testid="share-success-modal" className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-[110]">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-8 mx-4 text-center">
             <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-4">
               <Check className="text-emerald-600" size={32} />
             </div>
