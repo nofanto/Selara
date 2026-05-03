@@ -134,6 +134,7 @@ Internal reference document. Plain-language master list of everything Scenia can
 - The import preview warns about schema issues or missing required fields, flagged by severity.
 - Export the timeline visualiser as a PDF using the browser's print pipeline for crisp, searchable output.
 - Export the timeline visualiser as an SVG vector file for use in presentations or design tools.
+- **Zero-Knowledge Sharable Links:** Generate a secure, temporary URL to share your workspace. Data is encrypted client-side using AES-GCM; the server has no access to your key. Links expire automatically after 24 hours.
 
 ---
 

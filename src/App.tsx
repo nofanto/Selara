@@ -57,6 +57,7 @@ type AppState = {
 import { cn } from './lib/utils';
 import { getAppData, saveAppData, getAllVersions } from './lib/db';
 import { importFromExcel } from './lib/excel';
+import { importSharedWorkspace } from './lib/share';
 import { useRef } from 'react';
 
 function LoadingFallback() {
@@ -131,6 +132,45 @@ export default function App() {
   useEffect(() => {
     const loadData = async () => {
       try {
+        // Check for share link in URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const shareId = urlParams.get('id');
+        const hash = window.location.hash;
+        const keyMatch = hash.match(/key=([^&]*)/);
+        const shareKey = keyMatch ? keyMatch[1] : null;
+
+        if (shareId && shareKey) {
+          setIsLoading(true);
+          try {
+            const sharedData = await importSharedWorkspace(shareId, shareKey) as AppState;
+            await saveAppData(sharedData);
+            // Clear the URL params without refreshing
+            window.history.replaceState({}, document.title, window.location.pathname);
+            
+            // Re-load the data from DB to ensure it's properly initialized
+            const dbData = await getAppData();
+            setAssets(dbData.assets);
+            setApplications(dbData.applications || []);
+            setApplicationSegments((dbData as any).applicationSegments || []);
+            setInitiatives(dbData.initiatives.map(i => ({ ...i, capex: Number(i.capex) || 0, opex: Number(i.opex) || 0 })));
+            setMilestones(dbData.milestones);
+            setProgrammes(dbData.programmes);
+            setStrategies(dbData.strategies || []);
+            setDependencies(dbData.dependencies || []);
+            setAssetCategories(dbData.assetCategories || []);
+            setResources(dbData.resources || []);
+            setApplicationStatuses((dbData as any).applicationStatuses || []);
+            setDtsPhases((dbData as any).dtsPhases || []);
+            setTimelineSettings({ ...defaultTimelineSettings, ...(dbData.timelineSettings || {}) });
+            setVersions(await getAllVersions());
+            return;
+          } catch (error) {
+            console.error('Failed to import shared workspace:', error);
+            setDbSaveError(error instanceof Error ? error.message : 'Failed to import shared workspace.');
+            // Continue to normal load if share fails
+          }
+        }
+
         const dbData = await getAppData();
         const loadedVersions = await getAllVersions();
         setVersions(loadedVersions);
@@ -1074,6 +1114,7 @@ export default function App() {
         <DataControls
           data={{ assets, applications, applicationSegments, applicationStatuses, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, versions, dtsPhases }}
           onImport={handleUpdate}
+          onError={setDbSaveError}
           timelineId={view === 'visualiser' ? 'timeline-visualiser' : undefined}
         />
 

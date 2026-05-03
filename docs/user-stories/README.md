@@ -19,6 +19,7 @@ the Playwright E2E test suite (`e2e/`) and `PLAYWRIGHT_TODO.md`.
 | [09-display-settings.md](09-display-settings.md) | Display Settings & Visualisation Modes | US-DS-01 → US-DS-06 |
 | [10-mobile.md](10-mobile.md) | Mobile Experience | US-MB-01 → US-MB-06 |
 | [11-navigation-ux.md](11-navigation-ux.md) | Navigation, UX & Accessibility | US-UX-01 → US-UX-09 |
+| [18-sharable-links.md](18-sharable-links.md) | Sharable Links | US-SL-01 → US-SL-04 |
 
 ## Story ID Convention
 

@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Upload, FileSpreadsheet, FileText, AlertCircle, Check, TriangleAlert, ImageDown } from 'lucide-react';
+import { Upload, FileSpreadsheet, FileText, AlertCircle, Check, TriangleAlert, ImageDown, Share } from 'lucide-react';
 
 interface SchemaIssue {
   entity: string;
@@ -93,6 +93,7 @@ function validateImportSchema(data: Record<string, unknown[]>): SchemaIssue[] {
 }
 import { exportToExcel, importFromExcel } from '../lib/excel';
 import { exportToPDF, exportToPNG } from '../lib/pdf';
+import { shareWorkspace } from '../lib/share';
 import { Asset, Application, ApplicationSegment, ApplicationStatus, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource, Version, DtsPhaseRecord } from '../types';
 
 interface DataControlsProps {
@@ -128,19 +129,37 @@ interface DataControlsProps {
     versions?: Version[];
     dtsPhases?: DtsPhaseRecord[];
   }) => void;
+  onError?: (message: string | null) => void;
   timelineId?: string; // ID of the element to capture for PDF
 }
 
-export function DataControls({ data, onImport, timelineId }: DataControlsProps) {
+export function DataControls({ data, onImport, onError, timelineId }: DataControlsProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importPreviewData, setImportPreviewData] = useState<Partial<typeof data> | null>(null);
   const [showImportModal, setShowImportModal] = useState(false);
   const [importSchemaIssues, setImportSchemaIssues] = useState<SchemaIssue[]>([]);
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [isSharing, setIsSharing] = useState(false);
 
   const showNotification = (type: 'success' | 'error', message: string) => {
     setNotification({ type, message });
     setTimeout(() => setNotification(null), 4000);
+  };
+
+  const handleShare = async () => {
+    setIsSharing(true);
+    try {
+      const { url } = await shareWorkspace(data);
+      await navigator.clipboard.writeText(url);
+      showNotification('success', 'Share link copied to clipboard!');
+    } catch (error) {
+      console.error('Share failed:', error);
+      const message = error instanceof Error ? error.message : 'Failed to generate share link.';
+      showNotification('error', message);
+      if (onError) onError(message);
+    } finally {
+      setIsSharing(false);
+    }
   };
 
   const handleExportExcel = () => {
@@ -273,6 +292,17 @@ export function DataControls({ data, onImport, timelineId }: DataControlsProps) 
 
   return (
     <div className="flex items-center gap-1.5 relative">
+      <button
+        data-testid="share-button"
+        onClick={handleShare}
+        disabled={isSharing}
+        className="flex items-center gap-1.5 px-2.5 py-1.5 bg-blue-50 border border-blue-200 rounded-lg text-xs font-medium text-blue-700 hover:bg-blue-100 transition-colors disabled:opacity-50"
+        title="Generate a temporary, secure share link"
+      >
+        <Share size={14} className={isSharing ? 'animate-pulse' : ''} />
+        {isSharing ? 'Sharing...' : 'Share'}
+      </button>
+
       <button
         onClick={handleExportPDF}
         className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-100 transition-colors"

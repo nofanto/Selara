@@ -1,0 +1,9 @@
+{
+  "name": "scenia-share-backend",
+  "version": "1.0.0",
+  "description": "Zero-knowledge storage for Scenia",
+  "main": "index.js",
+  "dependencies": {
+    "@google-cloud/firestore": "^7.0.0"
+  }
+}
