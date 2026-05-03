@@ -93,7 +93,7 @@ function validateImportSchema(data: Record<string, unknown[]>): SchemaIssue[] {
 }
 import { exportToExcel, importFromExcel } from '../lib/excel';
 import { exportToPDF, exportToPNG } from '../lib/pdf';
-import { Asset, Application, ApplicationSegment, ApplicationStatus, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource } from '../types';
+import { Asset, Application, ApplicationSegment, ApplicationStatus, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource, Version, DtsPhaseRecord } from '../types';
 
 interface DataControlsProps {
   data: {
@@ -109,6 +109,8 @@ interface DataControlsProps {
     assetCategories: AssetCategory[];
     timelineSettings: TimelineSettings;
     resources: Resource[];
+    versions?: Version[];
+    dtsPhases?: DtsPhaseRecord[];
   };
   onImport: (data: {
     assets: Asset[];
@@ -123,6 +125,8 @@ interface DataControlsProps {
     assetCategories: AssetCategory[];
     timelineSettings: TimelineSettings;
     resources: Resource[];
+    versions?: Version[];
+    dtsPhases?: DtsPhaseRecord[];
   }) => void;
   timelineId?: string; // ID of the element to capture for PDF
 }
@@ -188,7 +192,7 @@ export function DataControls({ data, onImport, timelineId }: DataControlsProps) 
         }
 
         setImportSchemaIssues(schemaIssues);
-        setImportPreviewData(importedData);
+        setImportPreviewData(importedData as Partial<typeof data>);
         setShowImportModal(true);
       } else {
         showNotification('error', 'No valid data found in the Excel file.');
@@ -217,8 +221,10 @@ export function DataControls({ data, onImport, timelineId }: DataControlsProps) 
       strategies: importPreviewData.strategies || [],
       dependencies: importPreviewData.dependencies || [],
       assetCategories: importPreviewData.assetCategories || [],
-      timelineSettings: data.timelineSettings,
+      timelineSettings: importPreviewData.timelineSettings || data.timelineSettings,
       resources: importPreviewData.resources || [],
+      versions: importPreviewData.versions || [],
+      dtsPhases: importPreviewData.dtsPhases || [],
     });
     setShowImportModal(false);
     setImportPreviewData(null);
@@ -254,8 +260,10 @@ export function DataControls({ data, onImport, timelineId }: DataControlsProps) 
       strategies: mergeArrays(data.strategies, importPreviewData.strategies),
       dependencies: mergeArrays(data.dependencies, importPreviewData.dependencies),
       assetCategories: mergeArrays(data.assetCategories, importPreviewData.assetCategories),
-      timelineSettings: data.timelineSettings,
+      timelineSettings: importPreviewData.timelineSettings || data.timelineSettings,
       resources: mergeArrays(data.resources, importPreviewData.resources),
+      versions: mergeArrays(data.versions || [], importPreviewData.versions || []),
+      dtsPhases: mergeArrays(data.dtsPhases || [], importPreviewData.dtsPhases || []),
     });
     setShowImportModal(false);
     setImportPreviewData(null);
@@ -350,7 +358,9 @@ export function DataControls({ data, onImport, timelineId }: DataControlsProps) 
               {importPreviewData.milestones && <li><span className="font-semibold">{importPreviewData.milestones.length}</span> Milestones</li>}
               {importPreviewData.dependencies && <li><span className="font-semibold">{importPreviewData.dependencies.length}</span> Dependencies</li>}
               {importPreviewData.assetCategories && <li><span className="font-semibold">{importPreviewData.assetCategories.length}</span> Categories</li>}
+              {importPreviewData.versions && importPreviewData.versions.length > 0 && <li><span className="font-semibold text-indigo-600">{importPreviewData.versions.length}</span> History Snapshots</li>}
             </ul>
+
 
             {importSchemaIssues.length > 0 && (
               <div className="mb-6">

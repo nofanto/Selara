@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx';
-import { Asset, Application, ApplicationSegment, ApplicationStatus, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, DtsAdoptionStatus, TimelineSettings, Resource } from '../types';
+import { Asset, Application, ApplicationSegment, ApplicationStatus, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, DtsAdoptionStatus, TimelineSettings, Resource, Version, DtsPhaseRecord } from '../types';
 
 interface AppData {
   assets: Asset[];
@@ -14,6 +14,8 @@ interface AppData {
   assetCategories: AssetCategory[];
   timelineSettings?: TimelineSettings;
   resources?: Resource[];
+  versions?: Version[];
+  dtsPhases?: DtsPhaseRecord[];
 }
 
 const DTS_ADOPTION_STATUS_LABEL: Record<DtsAdoptionStatus, string> = {
@@ -28,51 +30,76 @@ const DTS_ADOPTION_STATUS_LABEL: Record<DtsAdoptionStatus, string> = {
 export const exportToExcel = (data: AppData) => {
   const wb = XLSX.utils.book_new();
 
+  // Helper to add versionId to a list of items
+  const withVersion = <T>(items: T[], versionId: string = ''): (T & { versionId: string })[] => {
+    return items.map(item => ({ ...item, versionId }));
+  };
+
+  // Helper to flatten current + all versions into a single list
+  const flatten = <T>(current: T[] | undefined, key: keyof Version['data']): (T & { versionId: string })[] => {
+    const list = withVersion(current || []);
+    (data.versions || []).forEach(v => {
+      const vItems = (v.data[key] as T[]) || [];
+      list.push(...withVersion(vItems, v.id));
+    });
+    return list;
+  };
+
   // 1. Initiatives
-  const initiativesWs = XLSX.utils.json_to_sheet(data.initiatives);
-  XLSX.utils.book_append_sheet(wb, initiativesWs, 'Initiatives');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(flatten(data.initiatives, 'initiatives')), 'Initiatives');
 
   // 2. Assets
-  const assetsWs = XLSX.utils.json_to_sheet(data.assets);
-  XLSX.utils.book_append_sheet(wb, assetsWs, 'Assets');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(flatten(data.assets, 'assets')), 'Assets');
 
   // 3. Asset Categories
-  const categoriesWs = XLSX.utils.json_to_sheet(data.assetCategories || []);
-  XLSX.utils.book_append_sheet(wb, categoriesWs, 'AssetCategories');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(flatten(data.assetCategories, 'assetCategories')), 'AssetCategories');
 
   // 4. Programmes
-  const programmesWs = XLSX.utils.json_to_sheet(data.programmes);
-  XLSX.utils.book_append_sheet(wb, programmesWs, 'Programmes');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(flatten(data.programmes, 'programmes')), 'Programmes');
 
   // 5. Strategies
-  const strategiesWs = XLSX.utils.json_to_sheet(data.strategies || []);
-  XLSX.utils.book_append_sheet(wb, strategiesWs, 'Strategies');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(flatten(data.strategies, 'strategies')), 'Strategies');
 
   // 6. Milestones
-  const milestonesWs = XLSX.utils.json_to_sheet(data.milestones);
-  XLSX.utils.book_append_sheet(wb, milestonesWs, 'Milestones');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(flatten(data.milestones, 'milestones')), 'Milestones');
 
   // 7. Dependencies
-  const dependenciesWs = XLSX.utils.json_to_sheet(data.dependencies || []);
-  XLSX.utils.book_append_sheet(wb, dependenciesWs, 'Dependencies');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(flatten(data.dependencies, 'dependencies')), 'Dependencies');
 
   // 8. Applications
-  const applicationsWs = XLSX.utils.json_to_sheet(data.applications || []);
-  XLSX.utils.book_append_sheet(wb, applicationsWs, 'Applications');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(flatten(data.applications, 'applications')), 'Applications');
 
   // 9. Application Segments
-  const appSegmentsWs = XLSX.utils.json_to_sheet(data.applicationSegments || []);
-  XLSX.utils.book_append_sheet(wb, appSegmentsWs, 'ApplicationSegments');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(flatten(data.applicationSegments, 'applicationSegments')), 'ApplicationSegments');
 
   // 10. Application Statuses
-  const appStatusesWs = XLSX.utils.json_to_sheet(data.applicationStatuses || []);
-  XLSX.utils.book_append_sheet(wb, appStatusesWs, 'ApplicationStatuses');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(flatten(data.applicationStatuses, 'applicationStatuses')), 'ApplicationStatuses');
 
   // 11. Resources
-  const resourcesWs = XLSX.utils.json_to_sheet(data.resources || []);
-  XLSX.utils.book_append_sheet(wb, resourcesWs, 'Resources');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(flatten(data.resources, 'resources')), 'Resources');
 
-  // 12. DTS Summary — only for workspaces that have DTS assets (alias starts with "DTS.")
+  // 12. DTS Phases
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(flatten(data.dtsPhases, 'dtsPhases')), 'DtsPhases');
+
+  // 13. Timeline Settings (versioned)
+  const settingsList = [];
+  if (data.timelineSettings) settingsList.push({ ...data.timelineSettings, versionId: '' });
+  (data.versions || []).forEach(v => {
+    if (v.data.timelineSettings) settingsList.push({ ...v.data.timelineSettings, versionId: v.id });
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(settingsList), 'TimelineSettings');
+
+  // 14. Versions (Metadata)
+  const versionsMetadata = (data.versions || []).map(v => ({
+    id: v.id,
+    name: v.name,
+    timestamp: v.timestamp,
+    description: v.description || '',
+  }));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(versionsMetadata), 'Versions');
+
+  // 15. DTS Summary — only for workspaces that have DTS assets (alias starts with "DTS.")
+  // Note: DTS Summary is a presentation sheet for CURRENT data only
   const dtsAssets = data.assets.filter(a => a.alias?.startsWith('DTS.'));
   if (dtsAssets.length > 0) {
     const activeInitiatives = data.initiatives.filter(i => !i.isPlaceholder);
@@ -132,7 +159,9 @@ export const importFromExcel = async (file: File): Promise<Partial<AppData>> => 
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
         const wb = XLSX.read(data, { type: 'array' });
         
-        const result: Partial<AppData> = {};
+        const result: Partial<AppData> = {
+          versions: []
+        };
 
         // Helper to safely get sheet data
         const getSheetData = <T>(name: string): T[] => {
@@ -141,21 +170,114 @@ export const importFromExcel = async (file: File): Promise<Partial<AppData>> => 
           return XLSX.utils.sheet_to_json(ws);
         };
 
-        result.initiatives = getSheetData<Initiative>('Initiatives').map((init: any) => ({
+        // Read all sheets into raw arrays
+        const raw = {
+          initiatives: getSheetData<any>('Initiatives'),
+          assets: getSheetData<any>('Assets'),
+          assetCategories: getSheetData<any>('AssetCategories'),
+          programmes: getSheetData<any>('Programmes'),
+          strategies: getSheetData<any>('Strategies'),
+          milestones: getSheetData<any>('Milestones'),
+          dependencies: getSheetData<any>('Dependencies'),
+          applications: getSheetData<any>('Applications'),
+          applicationSegments: getSheetData<any>('ApplicationSegments'),
+          applicationStatuses: getSheetData<any>('ApplicationStatuses'),
+          resources: getSheetData<any>('Resources'),
+          dtsPhases: getSheetData<any>('DtsPhases'),
+          timelineSettings: getSheetData<any>('TimelineSettings'),
+          versions: getSheetData<any>('Versions'),
+        };
+
+        // Separate current data from versioned data
+        const split = <T>(list: (T & { versionId?: string })[]): { current: T[], byVersion: Record<string, T[]> } => {
+          const current: T[] = [];
+          const byVersion: Record<string, T[]> = {};
+          list.forEach(item => {
+            const { versionId, ...rest } = item;
+            if (!versionId) {
+              current.push(rest as T);
+            } else {
+              if (!byVersion[versionId]) byVersion[versionId] = [];
+              byVersion[versionId].push(rest as T);
+            }
+          });
+          return { current, byVersion };
+        };
+
+        const initsSplit = split<Initiative>(raw.initiatives);
+        result.initiatives = initsSplit.current.map(init => ({
           ...init,
-          capex: Number(init.capex) || Number(init.budget) || 0,  // backward compat: fall back to budget
+          capex: Number(init.capex) || Number((init as any).budget) || 0,
           opex: Number(init.opex) || 0,
         }));
-        result.assets = getSheetData<Asset>('Assets');
-        result.assetCategories = getSheetData<AssetCategory>('AssetCategories');
-        result.programmes = getSheetData<Programme>('Programmes');
-        result.strategies = getSheetData<Strategy>('Strategies');
-        result.milestones = getSheetData<Milestone>('Milestones');
-        result.dependencies = getSheetData<Dependency>('Dependencies');
-        result.applications = getSheetData<Application>('Applications');
-        result.applicationSegments = getSheetData<ApplicationSegment>('ApplicationSegments');
-        result.applicationStatuses = getSheetData<ApplicationStatus>('ApplicationStatuses');
-        result.resources = getSheetData<Resource>('Resources');
+
+        const assetsSplit = split<Asset>(raw.assets);
+        result.assets = assetsSplit.current;
+
+        const catSplit = split<AssetCategory>(raw.assetCategories);
+        result.assetCategories = catSplit.current;
+
+        const progSplit = split<Programme>(raw.programmes);
+        result.programmes = progSplit.current;
+
+        const stratSplit = split<Strategy>(raw.strategies);
+        result.strategies = stratSplit.current;
+
+        const mileSplit = split<Milestone>(raw.milestones);
+        result.milestones = mileSplit.current;
+
+        const depSplit = split<Dependency>(raw.dependencies);
+        result.dependencies = depSplit.current;
+
+        const appSplit = split<Application>(raw.applications);
+        result.applications = appSplit.current;
+
+        const segSplit = split<ApplicationSegment>(raw.applicationSegments);
+        result.applicationSegments = segSplit.current;
+
+        const statSplit = split<ApplicationStatus>(raw.applicationStatuses);
+        result.applicationStatuses = statSplit.current;
+
+        const resSplit = split<Resource>(raw.resources);
+        result.resources = resSplit.current;
+
+        const dtsPhaseSplit = split<DtsPhaseRecord>(raw.dtsPhases);
+        result.dtsPhases = dtsPhaseSplit.current;
+
+        const settingsSplit = split<TimelineSettings>(raw.timelineSettings);
+        result.timelineSettings = settingsSplit.current[0];
+
+        // Reconstruct versions
+        if (raw.versions.length > 0) {
+          result.versions = raw.versions.map((v: any) => {
+            const vid = v.id;
+            return {
+              id: vid,
+              name: v.name,
+              timestamp: v.timestamp,
+              description: v.description,
+              data: {
+                initiatives: (initsSplit.byVersion[vid] || []).map(init => ({
+                  ...init,
+                  capex: Number(init.capex) || Number((init as any).budget) || 0,
+                  opex: Number(init.opex) || 0,
+                })),
+                assets: assetsSplit.byVersion[vid] || [],
+                assetCategories: catSplit.byVersion[vid] || [],
+                programmes: progSplit.byVersion[vid] || [],
+                strategies: stratSplit.byVersion[vid] || [],
+                milestones: mileSplit.byVersion[vid] || [],
+                dependencies: depSplit.byVersion[vid] || [],
+                applications: appSplit.byVersion[vid] || [],
+                applicationSegments: segSplit.byVersion[vid] || [],
+                applicationStatuses: statSplit.byVersion[vid] || [],
+                resources: resSplit.byVersion[vid] || [],
+                dtsPhases: dtsPhaseSplit.byVersion[vid] || [],
+                timelineSettings: settingsSplit.byVersion[vid]?.[0] || {},
+              }
+            };
+          });
+        }
 
         resolve(result);
       } catch (error) {
@@ -167,3 +289,4 @@ export const importFromExcel = async (file: File): Promise<Partial<AppData>> => 
     reader.readAsArrayBuffer(file);
   });
 };
+
