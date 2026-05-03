@@ -377,8 +377,8 @@ export function DataControls({ data, onImport, onError, timelineId }: DataContro
       )}
 
       {showShareConsentModal && (
-        <div data-testid="share-consent-modal" className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-[110] animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 mx-4 text-center animate-in zoom-in duration-300">
+        <div data-testid="share-consent-modal" className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-[110]">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 mx-4 text-center">
             <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4">
               <Share className="text-blue-600" size={32} />
             </div>
