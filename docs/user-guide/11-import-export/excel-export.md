@@ -28,9 +28,17 @@ The exported workbook contains one sheet per data type:
 | **ApplicationSegments** | All application lifecycle segments |
 | **ApplicationStatuses** | All named status labels for segments |
 | **Resources** | All people and roles in the resources roster |
+| **Versions** | Metadata for all saved history snapshots |
+| **TimelineSettings** | Configuration settings (zoom, start date, toggles) for the current state and snapshots |
 | **DTS Summary** | One row per DTS asset showing adoption status, active initiative count, and total CapEx/OpEx. Only included when exporting from a DTS or Mixed workspace. |
 
-Each sheet (except DTS Summary) uses column headers that match the field names expected by the [Excel Import](excel-import.md) process. This means an exported file can be edited and re-imported without reformatting.
+### Version History Preservation
+
+Unlike simple backups, Scenia's Excel export preserves your entire **Version History**. When you export:
+- The **Versions** sheet captures the name, timestamp, and description of every snapshot you've saved.
+- All other data sheets include a **`versionId`** column. Rows where this is blank represent your current "live" data; rows with an ID correspond to data from a specific historical snapshot.
+
+This allows you to move your entire project history between browsers or share a complete time-travel enabled portfolio with a colleague.
 
 ## Keeping exports current
 

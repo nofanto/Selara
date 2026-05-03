@@ -54,3 +54,18 @@
 - An empty state is shown in the report when no versions have been saved
 - A version selector appears once at least one version exists
 - An appropriate error message is shown if versions fail to load
+
+---
+
+## US-VH-05: Preserve Version History in Excel Export/Import
+
+**As an** IT portfolio manager,
+**I want** my version history to be included when I export or import an Excel file,
+**so that** I can move my complete time-travel enabled portfolio between devices or backup the full history offline.
+
+**Acceptance Criteria:**
+- Excel export includes a "Versions" sheet with metadata for all snapshots
+- All data sheets in the export include a `versionId` column to distinguish snapshots from live data
+- Import preview displays the count of "History Snapshots" found in the file
+- Both "Merge" and "Overwrite" import modes correctly restore the version history array to IndexedDB
+- Importer maintains backward compatibility for files without versioning information

@@ -52,9 +52,10 @@ type AppState = {
   resources: Resource[];
   applicationStatuses: ApplicationStatus[];
   dtsPhases: DtsPhaseRecord[];
+  versions?: Version[];
 };
 import { cn } from './lib/utils';
-import { getAppData, saveAppData } from './lib/db';
+import { getAppData, saveAppData, getAllVersions } from './lib/db';
 import { importFromExcel } from './lib/excel';
 import { useRef } from 'react';
 
@@ -95,6 +96,7 @@ export default function App() {
   const [applicationSegments, setApplicationSegments] = useState<ApplicationSegment[]>([]);
   const [applicationStatuses, setApplicationStatuses] = useState<ApplicationStatus[]>([]);
   const [dtsPhases, setDtsPhases] = useState<DtsPhaseRecord[]>([]);
+  const [versions, setVersions] = useState<Version[]>([]);
 
   const [undoStack, setUndoStack] = useState<AppState[]>([]);
   const [redoStack, setRedoStack] = useState<AppState[]>([]);
@@ -130,12 +132,14 @@ export default function App() {
     const loadData = async () => {
       try {
         const dbData = await getAppData();
+        const loadedVersions = await getAllVersions();
+        setVersions(loadedVersions);
 
         // If DB is empty (first run), show the template picker (or auto-load GEANZ in E2E mode)
         if (dbData.assets.length === 0 && dbData.initiatives.length === 0) {
           if (localStorage.getItem('scenia-e2e')) {
             // E2E mode: auto-load GEANZ template so existing tests keep working
-            const defaults = {
+            const defaults: AppState = {
               assets: initialAssets,
               applications: initialApplications,
               applicationSegments: initialApplicationSegments,
@@ -148,6 +152,7 @@ export default function App() {
               timelineSettings: defaultTimelineSettings,
               resources: initialResources,
               applicationStatuses: initialApplicationStatuses,
+              dtsPhases: [],
             };
             await saveAppData(defaults);
             setAssets(defaults.assets);
@@ -216,8 +221,9 @@ export default function App() {
 
   const handleSelectTemplate = useCallback(async (templateId: TemplateId, withDemoData: boolean) => {
     const data = getTemplateData(templateId, withDemoData);
+    const dataWithEmptyVersions = { ...data, versions: [] };
     try {
-      await saveAppData(data);
+      await saveAppData(dataWithEmptyVersions);
     } catch (error) {
       console.error('Failed to save template data to DB:', error instanceof Error ? `${error.name}: ${error.message}` : error);
       setDbSaveError('Failed to save the selected template. Your data may not persist after a reload.');
@@ -235,6 +241,7 @@ export default function App() {
     setResources(data.resources);
     setApplicationStatuses(data.applicationStatuses);
     setDtsPhases(data.dtsPhases || []);
+    setVersions([]);
     setShowTemplatePicker(false);
     setTemplatePickerIsReset(false);
     if (!data.timelineSettings.hasSeenTutorial && !localStorage.getItem('scenia-e2e')) {
@@ -246,7 +253,7 @@ export default function App() {
     try {
       const imported = await importFromExcel(file);
       const blank = getTemplateData('viewer', false);
-      const data: typeof blank = {
+      const data: AppState = {
         assetCategories: imported.assetCategories ?? blank.assetCategories,
         assets: imported.assets ?? blank.assets,
         initiatives: imported.initiatives ?? blank.initiatives,
@@ -260,6 +267,7 @@ export default function App() {
         applicationStatuses: imported.applicationStatuses ?? blank.applicationStatuses,
         dtsPhases: (imported as any).dtsPhases ?? blank.dtsPhases,
         timelineSettings: { ...blank.timelineSettings, ...(imported.timelineSettings ?? {}) },
+        versions: imported.versions ?? [],
       };
       await saveAppData(data);
       setAssets(data.assets);
@@ -275,6 +283,7 @@ export default function App() {
       setResources(data.resources);
       setApplicationStatuses(data.applicationStatuses);
       setDtsPhases(data.dtsPhases || []);
+      setVersions(data.versions || []);
       setShowTemplatePicker(false);
       setTemplatePickerIsReset(false);
     } catch (error) {
@@ -306,6 +315,7 @@ export default function App() {
     setResources(data.resources || []);
     setApplicationStatuses(data.applicationStatuses || []);
     setDtsPhases((data as any).dtsPhases || []);
+    if (data.versions) setVersions(data.versions);
 
     // Persist to DB
     try {
@@ -1062,7 +1072,7 @@ export default function App() {
 
         {/* Data Controls (PDF, Export, Import) */}
         <DataControls
-          data={{ assets, applications, applicationSegments, applicationStatuses, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources }}
+          data={{ assets, applications, applicationSegments, applicationStatuses, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, versions, dtsPhases }}
           onImport={handleUpdate}
           timelineId={view === 'visualiser' ? 'timeline-visualiser' : undefined}
         />
@@ -1404,6 +1414,8 @@ export default function App() {
           isOpen={isVersionManagerOpen}
           onClose={() => setIsVersionManagerOpen(false)}
           onRestore={handleRestoreVersion}
+          versions={versions}
+          onUpdateVersions={setVersions}
           currentData={{
             assets,
             applications,
@@ -1417,6 +1429,7 @@ export default function App() {
             timelineSettings,
             resources,
             applicationStatuses,
+            dtsPhases,
           }}
         />
       </ModalErrorBoundary>
