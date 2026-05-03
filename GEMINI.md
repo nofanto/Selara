@@ -1,22 +1,34 @@
-# Scenia — Project Instructions & Architecture
+# Scenia Development Standards
 
-This file contains team-shared architecture, conventions, and security mandates for the Scenia project.
+This document defines the foundational mandates for all automated engineering tasks within the **Scenia** repository.
 
-## Security Architecture — Zero-Knowledge Sharable Links
+## 1. CI/CD Development Lifecycle
 
-The "Sharable Links" feature uses a Zero-Knowledge model to ensure that user data remains private, even from Scenia's own servers and administrators.
+All feature development and bug fixes must follow this strict sequence:
 
-### Core Mandates
-1.  **Client-Side Encryption:** All workspace data MUST be encrypted in the browser using the Web Crypto API (AES-GCM 256-bit) before being transmitted.
-2.  **Key Isolation:** The encryption key MUST NEVER be sent to the server. It is stored exclusively in the URL hash fragment (`#key=...`), which browsers do not include in HTTP requests.
-3.  **High-Entropy IDs:** Storage IDs for shared links MUST be at least 16 random bytes (32 hex characters) to prevent unguessable ID brute-forcing.
-4.  **Payload Limits:** The server MUST enforce a strict 1MB size limit on encrypted payloads to prevent resource abuse.
-5.  **CORS Restriction:** The backend sharing service MUST only allow requests from the production domain `https://scenia.website`.
-6.  **Explicit TTL:** Shared links expire after 1 week (168 hours). The backend MUST explicitly check the `expiresAt` timestamp and return `410 Gone` if the link has expired.
+1. **Define Requirements:** Create a User Story with clear Acceptance Criteria.
+2. **Test-Driven Development (TDD):**
+   - Write a **Playwright E2E test** in the `e2e/` directory that reproduces the bug or validates the new feature.
+   - Confirm the test fails (Red).
+3. **Implementation:**
+   - Write the minimal code necessary to fulfill the requirements.
+   - Adhere to established patterns (React, Tailwind, IndexedDB).
+4. **Verification:**
+   - Run the specific test to confirm it passes (Green).
+   - **Run the full test suite** (`npx playwright test`) to ensure no regressions. All tests must pass before committing.
+5. **Documentation:** Update the relevant user guide pages in `docs/user-guide/` and any relevant README sections.
+6. **Commit & Push:** Only commit and push once the full suite is green. Google Cloud Build is configured with a 1st Gen GitHub trigger that automatically detects the push and executes the `cloudbuild.yaml` pipeline. No manual deployment steps or direct interaction with the GCP console are required.
 
-## Engineering Standards
+## 2. Technical Stack
 
-- **Tech Stack:** React (TypeScript), Tailwind CSS, Vite, Playwright for E2E testing.
-- **Persistence:** Primary local storage is IndexedDB (using the `idb` library).
-- **Testing:** Follow the SDLC guide in `docs/scenia-sdlc-guide.md`. Every feature MUST have a corresponding user story in `docs/user-stories/` and passing E2E tests in `e2e/`.
-- **Accessibility:** All UI components should follow WCAG 2.1 AA standards where possible. Use `data-testid` for test selectors.
+- **Frontend:** React (TypeScript) + Vite
+- **Styling:** Tailwind CSS
+- **State/Persistence:** IndexedDB (via `idb` library)
+- **Testing:** Playwright
+- **Deployment:** Docker + Google Cloud Run + Google Cloud Build
+
+## 3. Deployment Targets
+
+- **Production URL:** https://scenia.website
+- **CI/CD Configuration:** `cloudbuild.yaml`
+- **Environment:** Containerised via `Dockerfile` (Nginx on port 8080)
