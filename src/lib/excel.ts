@@ -42,6 +42,20 @@ export const exportToExcel = (data: AppData) => {
       const vItems = (v.data[key] as T[]) || [];
       list.push(...withVersion(vItems, v.id));
     });
+
+    // Special handling for Initiative.resourceIds — convert array to string
+    if (key === 'initiatives') {
+      return list.map(item => {
+        if ((item as any).resourceIds && Array.isArray((item as any).resourceIds)) {
+          return {
+            ...item,
+            resourceIds: (item as any).resourceIds.join(', ')
+          };
+        }
+        return item;
+      });
+    }
+
     return list;
   };
 
@@ -209,6 +223,9 @@ export const importFromExcel = async (file: File): Promise<Partial<AppData>> => 
           ...init,
           capex: Number(init.capex) || Number((init as any).budget) || 0,
           opex: Number(init.opex) || 0,
+          resourceIds: typeof (init as any).resourceIds === 'string' 
+            ? (init as any).resourceIds.split(',').map((s: string) => s.trim()).filter(Boolean)
+            : init.resourceIds,
         }));
 
         const assetsSplit = split<Asset>(raw.assets);
@@ -261,6 +278,9 @@ export const importFromExcel = async (file: File): Promise<Partial<AppData>> => 
                   ...init,
                   capex: Number(init.capex) || Number((init as any).budget) || 0,
                   opex: Number(init.opex) || 0,
+                  resourceIds: typeof (init as any).resourceIds === 'string' 
+                    ? (init as any).resourceIds.split(',').map((s: string) => s.trim()).filter(Boolean)
+                    : init.resourceIds,
                 })),
                 assets: assetsSplit.byVersion[vid] || [],
                 assetCategories: catSplit.byVersion[vid] || [],

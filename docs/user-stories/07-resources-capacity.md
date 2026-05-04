@@ -38,3 +38,18 @@
 - The Capacity report shows allocation per resource across the timeline period
 - Allocation reflects the resource assignments on all current initiatives
 - The report updates when initiatives or resource assignments change
+
+---
+
+## US-RC-04: Resource Assignment Persistence in Export/Import
+
+**As an** IT portfolio manager,
+**I want** my resource assignments to be preserved when I export to Excel and re-import,
+**so that** I don't lose resourcing data when sharing via files or backing up my plan.
+
+**Acceptance Criteria:**
+- Exporting to Excel includes a "resourceIds" column in the Initiatives sheet
+- Resource assignments are stored as a comma-separated string of IDs in the Excel file
+- Importing an Excel file correctly parses the "resourceIds" string back into an array
+- Assignments are correctly restored in the InitiativePanel and Capacity report after import
+- The "ownerId" field is also correctly preserved during export/import
