@@ -60,6 +60,25 @@ import { importFromExcel } from './lib/excel';
 import { importSharedWorkspace } from './lib/share';
 import { useRef } from 'react';
 
+function isValidSharedAppState(data: unknown): data is AppState {
+  if (!data || typeof data !== 'object') return false;
+  const record = data as Record<string, unknown>;
+  return Array.isArray(record.assets)
+    && Array.isArray(record.applications)
+    && Array.isArray(record.applicationSegments)
+    && Array.isArray(record.initiatives)
+    && Array.isArray(record.milestones)
+    && Array.isArray(record.programmes)
+    && Array.isArray(record.strategies)
+    && Array.isArray(record.dependencies)
+    && Array.isArray(record.assetCategories)
+    && Array.isArray(record.resources)
+    && Array.isArray(record.applicationStatuses)
+    && Array.isArray(record.dtsPhases)
+    && !!record.timelineSettings
+    && typeof record.timelineSettings === 'object';
+}
+
 function LoadingFallback() {
   return (
     <div className="flex items-center justify-center h-full min-h-[200px]">
@@ -147,7 +166,21 @@ export default function App() {
         if (shareId && shareKey) {
           setIsImportingShare(true);
           try {
-            const sharedData = await importSharedWorkspace(shareId, shareKey) as AppState;
+            const importedData = await importSharedWorkspace(shareId, shareKey);
+            if (!isValidSharedAppState(importedData)) {
+              throw new Error('Shared workspace data is invalid or incomplete.');
+            }
+
+            const shouldImport = window.confirm(
+              'This share link will replace your current local workspace. Do you want to continue?'
+            );
+
+            if (!shouldImport) {
+              window.history.replaceState({}, document.title, window.location.pathname);
+              setIsImportingShare(false);
+              // Continue to normal load path without importing.
+            } else {
+              const sharedData = importedData as AppState;
             await saveAppData(sharedData);
             // Clear the URL params without refreshing
             window.history.replaceState({}, document.title, window.location.pathname);
@@ -171,6 +204,7 @@ export default function App() {
             setIsImportingShare(false);
             setIsLoading(false);
             return;
+            }
           } catch (error) {
             console.error('Failed to import shared workspace:', error);
             setDbSaveError(error instanceof Error ? error.message : 'Failed to import shared workspace.');
