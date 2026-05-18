@@ -18,6 +18,30 @@ interface AppData {
   dtsPhases?: DtsPhaseRecord[];
 }
 
+
+const ALLOWED_MONTHS_TO_SHOW: TimelineSettings['monthsToShow'][] = [3, 6, 12, 24, 36];
+
+const sanitizeTimelineSettings = (raw: unknown): TimelineSettings | undefined => {
+  if (!raw || typeof raw !== 'object') return undefined;
+
+  const candidate = raw as Partial<TimelineSettings>;
+  const startDate = typeof candidate.startDate === 'string' ? candidate.startDate.trim() : '';
+  const isIsoDate = /^\d{4}-\d{2}-\d{2}$/.test(startDate) && !Number.isNaN(Date.parse(startDate));
+
+  const parsedMonths = Number((candidate as any).monthsToShow);
+  const monthsToShow = ALLOWED_MONTHS_TO_SHOW.includes(parsedMonths as TimelineSettings['monthsToShow'])
+    ? (parsedMonths as TimelineSettings['monthsToShow'])
+    : undefined;
+
+  if (!isIsoDate || !monthsToShow) return undefined;
+
+  return {
+    ...candidate,
+    startDate,
+    monthsToShow,
+  } as TimelineSettings;
+};
+
 const DTS_ADOPTION_STATUS_LABEL: Record<DtsAdoptionStatus, string> = {
   'not-started':    'Not Started',
   'scoping':        'Scoping',
@@ -262,7 +286,7 @@ export const importFromExcel = async (file: File): Promise<Partial<AppData>> => 
         result.dtsPhases = dtsPhaseSplit.current;
 
         const settingsSplit = split<TimelineSettings>(raw.timelineSettings);
-        result.timelineSettings = settingsSplit.current[0];
+        result.timelineSettings = sanitizeTimelineSettings(settingsSplit.current[0]);
 
         // Reconstruct versions
         if (raw.versions.length > 0) {
@@ -293,7 +317,7 @@ export const importFromExcel = async (file: File): Promise<Partial<AppData>> => 
                 applicationStatuses: statSplit.byVersion[vid] || [],
                 resources: resSplit.byVersion[vid] || [],
                 dtsPhases: dtsPhaseSplit.byVersion[vid] || [],
-                timelineSettings: settingsSplit.byVersion[vid]?.[0] || {},
+                timelineSettings: sanitizeTimelineSettings(settingsSplit.byVersion[vid]?.[0]) || {},
               }
             };
           });
