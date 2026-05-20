@@ -2593,6 +2593,7 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
 
       <ApplicationSegmentPanel
         isOpen={segmentPanelId !== null || creatingSegmentParams !== null}
+        isNew={creatingSegmentParams !== null}
         segment={
           segmentPanelId
             ? localSegments.find(s => s.id === segmentPanelId) || null
