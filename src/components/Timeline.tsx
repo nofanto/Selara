@@ -368,7 +368,12 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
 
     // minTimelineEnd ensures we AT LEAST render the requested duration (3/6/12/24/36 months)
     const minTimelineEnd = addMonths(timelineStart, ms);
-    const timelineEnd = maxEndDate > minTimelineEnd ? maxEndDate : minTimelineEnd;
+    const uncappedTimelineEnd = maxEndDate > minTimelineEnd ? maxEndDate : minTimelineEnd;
+
+    // Cap timeline horizon to prevent rendering unbounded columns from malformed or malicious dates
+    const MAX_TIMELINE_MONTHS = 120;
+    const maxTimelineEnd = addMonths(timelineStart, MAX_TIMELINE_MONTHS);
+    const timelineEnd = uncappedTimelineEnd > maxTimelineEnd ? maxTimelineEnd : uncappedTimelineEnd;
 
     if (ms === 3) {
       // Weekly columns — snap to the Monday of the week containing timelineStart
