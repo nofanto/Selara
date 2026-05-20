@@ -66,7 +66,6 @@ export function EditableTable<T extends { [key: string]: any }>({
   const [resizing, setResizing] = useState<{ key: string; startX: number; startWidth: number } | null>(null);
   const tableRef = useRef<HTMLTableElement>(null);
   const scrollWrapperRef = useRef<HTMLDivElement>(null);
-  const rowIdCounter = useRef(0);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
