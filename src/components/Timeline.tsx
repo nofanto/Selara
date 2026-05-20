@@ -99,6 +99,10 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
   // ── Stable lookup maps (O(1) instead of O(N) .find() per initiative) ─────
   const programmeMap = useMemo(() => new Map(programmes.map(p => [p.id, p])), [programmes]);
   const strategyMap  = useMemo(() => new Map(strategies.map(s => [s.id, s])), [strategies]);
+  const initiativeAssetIdMap = useMemo(
+    () => new Map(initiatives.map(init => [init.id, init.assetId])),
+    [initiatives]
+  );
 
   // ── Shared colour + subtitle helpers (single source of truth) ────────────
   const dtsPhaseMap = useMemo(() => new Map(dtsPhases.map(p => [p.id, p])), [dtsPhases]);
@@ -1437,8 +1441,8 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
                 if (!source || !target) return null;
 
                 // Determine if same asset
-                const _sourceInit = isMilestoneSource ? null : initiatives.find(i => i.id === dep.sourceId);
-                const _targetInit = initiatives.find(i => i.id === dep.targetId);
+                const _sourceAssetId = isMilestoneSource ? undefined : initiativeAssetIdMap.get(dep.sourceId);
+                const _targetAssetId = initiativeAssetIdMap.get(dep.targetId);
 
                 const sStartX = source.x;
                 const sEndX = source.x + source.width;
