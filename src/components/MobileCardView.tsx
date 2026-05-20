@@ -165,9 +165,12 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 function StatusBadge({ status }: { status: string }) {
+  const badgeClass = Object.hasOwn(STATUS_STYLES, status) ? STATUS_STYLES[status] : STATUS_STYLES.planned;
+  const badgeLabel = Object.hasOwn(STATUS_LABELS, status) ? STATUS_LABELS[status] : String(status);
+
   return (
-    <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0 ${STATUS_STYLES[status] ?? STATUS_STYLES.planned}`}>
-      {STATUS_LABELS[status] ?? status}
+    <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0 ${badgeClass}`}>
+      {badgeLabel}
     </span>
   );
 }
