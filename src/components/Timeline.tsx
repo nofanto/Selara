@@ -84,6 +84,9 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
     done: 'Done',
     cancelled: 'Cancelled',
   };
+  const normalizeInitiativeStatus = (status: Initiative['status'] | string | undefined): Initiative['status'] => {
+    return Object.hasOwn(STATUS_LABELS, status ?? '') ? (status as Initiative['status']) : 'planned';
+  };
   const RAG_COLORS: Record<string, string> = {
     green: 'bg-green-500',
     amber: 'bg-amber-400',
@@ -109,7 +112,7 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
 
   function getInitiativeColor(init: Initiative, prog: Programme | undefined, strat: Strategy | undefined): string {
     if (colorBy === 'rag')       return RAG_COLORS[init.ragStatus || 'none'];
-    if (colorBy === 'status')    return STATUS_COLORS[init.status || 'planned'];
+    if (colorBy === 'status')    return STATUS_COLORS[normalizeInitiativeStatus(init.status)];
     if (colorBy === 'dts-phase') return dtsPhaseMap.get(init.dtsPhase as string)?.color || 'bg-slate-400';
     if (colorBy === 'programme') return prog?.color || 'bg-slate-500';
     return strat?.color || 'bg-slate-400';
@@ -124,7 +127,7 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
     groupStrategyNames?: string,
   ): string | undefined {
     if (colorBy === 'rag')       return init.ragStatus ? RAG_LABELS[init.ragStatus] : undefined;
-    if (colorBy === 'status')    return STATUS_LABELS[init.status || 'planned'];
+    if (colorBy === 'status')    return STATUS_LABELS[normalizeInitiativeStatus(init.status)];
     if (colorBy === 'dts-phase') return dtsPhaseMap.get(init.dtsPhase as string)?.name;
     if (isGroup)                 return colorBy === 'programme' ? groupProgrammeNames : groupStrategyNames;
     return colorBy === 'programme' ? prog?.name : strat?.name;
