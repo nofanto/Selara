@@ -66,6 +66,12 @@ const normalizeResourceIds = (value: unknown): string[] | undefined => {
   return undefined;
 };
 
+const normalizeInitiativeStatus = (value: unknown): Initiative['status'] => {
+  return value === 'planned' || value === 'active' || value === 'done' || value === 'cancelled'
+    ? value
+    : 'planned';
+};
+
 export const exportToExcel = (data: AppData) => {
   const wb = XLSX.utils.book_new();
 
@@ -262,6 +268,7 @@ export const importFromExcel = async (file: File): Promise<Partial<AppData>> => 
           ...init,
           capex: Number(init.capex) || Number((init as any).budget) || 0,
           opex: Number(init.opex) || 0,
+          status: normalizeInitiativeStatus(init.status),
           resourceIds: normalizeResourceIds((init as any).resourceIds),
         }));
 
