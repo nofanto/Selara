@@ -99,6 +99,10 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
   // ── Stable lookup maps (O(1) instead of O(N) .find() per initiative) ─────
   const programmeMap = useMemo(() => new Map(programmes.map(p => [p.id, p])), [programmes]);
   const strategyMap  = useMemo(() => new Map(strategies.map(s => [s.id, s])), [strategies]);
+  const initiativeAssetIdMap = useMemo(
+    () => new Map(initiatives.map(init => [init.id, init.assetId])),
+    [initiatives]
+  );
 
   // ── Shared colour + subtitle helpers (single source of truth) ────────────
   const dtsPhaseMap = useMemo(() => new Map(dtsPhases.map(p => [p.id, p])), [dtsPhases]);
@@ -964,10 +968,17 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
     const finalItems: any[] = [];
     const placedRects: any[] = [];
 
-    const hasIntraAssetDependencies = dependencies.some(dep =>
-      assetInitiatives.some(i => i.id === dep.sourceId) &&
-      assetInitiatives.some(i => i.id === dep.targetId)
-    );
+    const assetInitiativeIds = new Set(assetInitiatives.map(i => i.id));
+    const intraAssetDependencies = new Set<string>();
+    dependencies.forEach(dep => {
+      if (!assetInitiativeIds.has(dep.sourceId) || !assetInitiativeIds.has(dep.targetId)) return;
+      const pairKey = dep.sourceId < dep.targetId
+        ? `${dep.sourceId}|${dep.targetId}`
+        : `${dep.targetId}|${dep.sourceId}`;
+      intraAssetDependencies.add(pairKey);
+    });
+
+    const hasIntraAssetDependencies = intraAssetDependencies.size > 0;
     const dynamicGap = hasIntraAssetDependencies ? 32 : BAR_GAP;
 
     sorted.forEach(entity => {
@@ -1006,9 +1017,13 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
           const entityIds = isGroup ? groupIds : [init.id];
           const targetIds = rect.isGroup ? rect.groupIds : [rect.id];
           
-          const hasDep = dependencies.some(d => 
-            (entityIds.includes(d.sourceId) && targetIds.includes(d.targetId)) ||
-            (targetIds.includes(d.sourceId) && entityIds.includes(d.targetId))
+          const hasDep = entityIds.some(entityId =>
+            targetIds.some(targetId => {
+              const pairKey = entityId < targetId
+                ? `${entityId}|${targetId}`
+                : `${targetId}|${entityId}`;
+              return intraAssetDependencies.has(pairKey);
+            })
           );
 
           const xOverlap = hasDep || !(rect.end <= left || rect.start >= right);
@@ -1415,8 +1430,8 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
                 if (!source || !target) return null;
 
                 // Determine if same asset
-                const _sourceInit = isMilestoneSource ? null : initiatives.find(i => i.id === dep.sourceId);
-                const _targetInit = initiatives.find(i => i.id === dep.targetId);
+                const _sourceAssetId = isMilestoneSource ? undefined : initiativeAssetIdMap.get(dep.sourceId);
+                const _targetAssetId = initiativeAssetIdMap.get(dep.targetId);
 
                 const sStartX = source.x;
                 const sEndX = source.x + source.width;
