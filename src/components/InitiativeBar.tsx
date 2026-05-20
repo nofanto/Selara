@@ -139,7 +139,9 @@ export function InitiativeBar({
       {/* Owner badge — absolutely positioned top-right */}
       {!init.isPlaceholder && !isGroup && width > 6 && (() => {
         const ownerResource = init.ownerId ? resources.find(r => r.id === init.ownerId) : null;
-        const ownerName = ownerResource?.name || init.owner;
+        const ownerNameSource = ownerResource?.name ?? init.owner;
+        if (typeof ownerNameSource !== 'string') return null;
+        const ownerName = ownerNameSource.trim();
         if (!ownerName) return null;
         return (
           <div
