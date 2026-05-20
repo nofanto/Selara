@@ -139,8 +139,9 @@ export function InitiativeBar({
       {/* Owner badge — absolutely positioned top-right */}
       {!init.isPlaceholder && !isGroup && width > 6 && (() => {
         const ownerResource = init.ownerId ? resources.find(r => r.id === init.ownerId) : null;
-        const ownerNameRaw = ownerResource?.name ?? init.owner;
-        const ownerName = typeof ownerNameRaw === 'string' ? ownerNameRaw.trim() : '';
+        const ownerNameSource = ownerResource?.name ?? init.owner;
+        if (typeof ownerNameSource !== 'string') return null;
+        const ownerName = ownerNameSource.trim();
         if (!ownerName) return null;
         return (
           <div
@@ -218,7 +219,7 @@ export function InitiativeBar({
 
         {/* Resource names row */}
         {settings.showResources === 'on' && !isGroup && width > 8 && (() => {
-          const assignedNames = (init.resourceIds || [])
+          const assignedNames = (Array.isArray(init.resourceIds) ? init.resourceIds : [])
             .map(rid => resources.find(r => r.id === rid)?.name)
             .filter(Boolean);
           if (assignedNames.length === 0) return null;
