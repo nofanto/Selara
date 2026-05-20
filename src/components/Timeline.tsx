@@ -169,8 +169,6 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
   const [selectedSegmentId, setSelectedSegmentId] = useState<string | null>(null);
   const [creatingSegmentParams, setCreatingSegmentParams] = useState<{ id: string; assetId: string; startDate: string; endDate: string; row: number } | null>(null);
   const [segmentPanelId, setSegmentPanelId] = useState<string | null>(null); // separate from selectedSegmentId — panel only opens when this is set
-  const segIdCounter = useRef(0);
-  const initIdCounter = useRef(0);
   const [drawingDependency, setDrawingDependency] = useState<{
     sourceId: string;
     sourceType: 'initiative' | 'milestone' | 'segment';
@@ -463,16 +461,8 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
     const calculatedStartDate = format(addDays(startDate, daysFromStart), 'yyyy-MM-dd');
     const calculatedEndDate = format(addDays(startDate, daysFromStart + 90), 'yyyy-MM-dd'); // 90 days default duration
 
-    // Generate unique ID by checking existing initiatives
-    let newId = `init-new-${initIdCounter.current}`;
-    while (initiatives.some(init => init.id === newId)) {
-      initIdCounter.current++;
-      newId = `init-new-${initIdCounter.current}`;
-    }
-    initIdCounter.current++;
-
     setCreatingInitiativeParams({
-      id: newId,
+      id: crypto.randomUUID(),
       assetId,
       startDate: calculatedStartDate,
       endDate: calculatedEndDate
@@ -2058,7 +2048,7 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
                                 const newStart = format(addDays(startDate, daysFromStart), 'yyyy-MM-dd');
                                 const newEnd = format(addDays(startDate, daysFromStart + 90), 'yyyy-MM-dd');
                                 const autoRow = computeAutoRow(newStart, newEnd, assetSegments);
-                                setCreatingSegmentParams({ id: `seg-new-${segIdCounter.current++}`, assetId: asset.id, startDate: newStart, endDate: newEnd, row: autoRow });
+                                setCreatingSegmentParams({ id: crypto.randomUUID(), assetId: asset.id, startDate: newStart, endDate: newEnd, row: autoRow });
                                 setSelectedSegmentId(null);
                               }}
                             >
