@@ -51,6 +51,35 @@ const DTS_ADOPTION_STATUS_LABEL: Record<DtsAdoptionStatus, string> = {
   'not-applicable': 'Not Applicable',
 };
 
+const normalizeResourceIds = (value: unknown): string[] | undefined => {
+  if (typeof value === 'string') {
+    const parsed = value.split(',').map(s => s.trim()).filter(Boolean);
+    return parsed.length > 0 ? parsed : undefined;
+  }
+  if (Array.isArray(value)) {
+    const parsed = value
+      .filter((id): id is string => typeof id === 'string')
+      .map(id => id.trim())
+      .filter(Boolean);
+    return parsed.length > 0 ? parsed : undefined;
+  }
+  return undefined;
+};
+
+const normalizeInitiativeStatus = (value: unknown): Initiative['status'] => {
+  return value === 'planned' || value === 'active' || value === 'done' || value === 'cancelled'
+    ? value
+    : 'planned';
+};
+
+const normalizeImportedInitiative = (init: any): Initiative => ({
+  ...init,
+  capex: Number(init.capex) || Number(init.budget) || 0,
+  opex: Number(init.opex) || 0,
+  status: normalizeInitiativeStatus(init.status),
+  resourceIds: normalizeResourceIds(init.resourceIds) ?? init.resourceIds,
+});
+
 export const exportToExcel = (data: AppData) => {
   const wb = XLSX.utils.book_new();
 
@@ -243,14 +272,7 @@ export const importFromExcel = async (file: File): Promise<Partial<AppData>> => 
         };
 
         const initsSplit = split<Initiative>(raw.initiatives);
-        result.initiatives = initsSplit.current.map(init => ({
-          ...init,
-          capex: Number(init.capex) || Number((init as any).budget) || 0,
-          opex: Number(init.opex) || 0,
-          resourceIds: typeof (init as any).resourceIds === 'string' 
-            ? (init as any).resourceIds.split(',').map((s: string) => s.trim()).filter(Boolean)
-            : init.resourceIds,
-        }));
+        result.initiatives = initsSplit.current.map(normalizeImportedInitiative);
 
         const assetsSplit = split<Asset>(raw.assets);
         result.assets = assetsSplit.current;
@@ -298,14 +320,7 @@ export const importFromExcel = async (file: File): Promise<Partial<AppData>> => 
               timestamp: v.timestamp,
               description: v.description,
               data: {
-                initiatives: (initsSplit.byVersion[vid] || []).map(init => ({
-                  ...init,
-                  capex: Number(init.capex) || Number((init as any).budget) || 0,
-                  opex: Number(init.opex) || 0,
-                  resourceIds: typeof (init as any).resourceIds === 'string' 
-                    ? (init as any).resourceIds.split(',').map((s: string) => s.trim()).filter(Boolean)
-                    : init.resourceIds,
-                })),
+                initiatives: (initsSplit.byVersion[vid] || []).map(normalizeImportedInitiative),
                 assets: assetsSplit.byVersion[vid] || [],
                 assetCategories: catSplit.byVersion[vid] || [],
                 programmes: progSplit.byVersion[vid] || [],
