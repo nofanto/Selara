@@ -93,6 +93,27 @@ function validateImportSchema(data: Record<string, unknown[]>): SchemaIssue[] {
     }
   }
 
+  const timelineSettings = (data.timelineSettings as Record<string, unknown> | undefined);
+  if (timelineSettings) {
+    const startDate = timelineSettings.startDate;
+    if (typeof startDate !== 'string' || Number.isNaN(new Date(startDate).getTime())) {
+      issues.push({
+        entity: 'timelineSettings',
+        issue: 'Invalid timeline setting "startDate" (expected YYYY-MM-DD)',
+        severity: 'error',
+      });
+    }
+
+    const monthsToShow = Number(timelineSettings.monthsToShow);
+    if (![3, 6, 12, 24, 36].includes(monthsToShow)) {
+      issues.push({
+        entity: 'timelineSettings',
+        issue: 'Invalid timeline setting "monthsToShow" (expected one of 3, 6, 12, 24, 36)',
+        severity: 'error',
+      });
+    }
+  }
+
   return issues;
 }
 import { exportToExcel, importFromExcel } from '../lib/excel';
