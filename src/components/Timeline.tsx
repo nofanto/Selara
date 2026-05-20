@@ -137,10 +137,15 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
     | { type: 'remove-area'; areaAlias: string; areaName: string; assetCount: number };
   const [pendingConfirm, setPendingConfirm] = useState<PendingConfirm | null>(null);
 
+  const isGeanzCatalogueEnabled = settings.showGeanzCatalogue !== false;
+  const isGeanzAsset = (asset: Asset) => (
+    isGeanzCatalogueEnabled && !!asset.alias && /^TAP\.\d+\.\d+/.test(asset.alias)
+  );
+
   // Separate GEANZ assets (have alias starting TAP.XX.XX) from user assets
   const geanzAssets = useMemo(
-    () => assets.filter(a => a.alias && /^TAP\.\d+\.\d+/.test(a.alias)),
-    [assets]
+    () => assets.filter(isGeanzAsset),
+    [assets, isGeanzCatalogueEnabled]
   );
   const geanzAssetsByArea = useMemo(() => {
     const map: Record<string, Asset[]> = {};
@@ -261,7 +266,7 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
     const grouped: Record<string, Asset[]> = {};
     assets.forEach(a => {
       // GEANZ assets are rendered in the dedicated GEANZ section, not here
-      if (a.alias && /^TAP\.\d+\.\d+/.test(a.alias)) return;
+      if (isGeanzAsset(a)) return;
 
       // Hide assets with no matching initiatives when searching
       if (searchQuery) {
@@ -274,7 +279,7 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
       grouped[catId].push(a);
     });
     return grouped;
-  }, [assets, searchQuery, filteredInitiatives]);
+  }, [assets, searchQuery, filteredInitiatives, isGeanzCatalogueEnabled]);
 
   const sortedCategoryIds = useMemo(() => {
     const categoryIds = Object.keys(assetsByCategory);
