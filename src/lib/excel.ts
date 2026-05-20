@@ -51,21 +51,6 @@ const DTS_ADOPTION_STATUS_LABEL: Record<DtsAdoptionStatus, string> = {
   'not-applicable': 'Not Applicable',
 };
 
-const normalizeResourceIds = (value: unknown): string[] | undefined => {
-  if (typeof value === 'string') {
-    const parsed = value.split(',').map(s => s.trim()).filter(Boolean);
-    return parsed.length > 0 ? parsed : undefined;
-  }
-  if (Array.isArray(value)) {
-    const parsed = value
-      .filter((id): id is string => typeof id === 'string')
-      .map(id => id.trim())
-      .filter(Boolean);
-    return parsed.length > 0 ? parsed : undefined;
-  }
-  return undefined;
-};
-
 export const exportToExcel = (data: AppData) => {
   const wb = XLSX.utils.book_new();
 
@@ -153,33 +138,23 @@ export const exportToExcel = (data: AppData) => {
 
   // 15. DTS Summary — only for workspaces that have DTS assets (alias starts with "DTS.")
   // Note: DTS Summary is a presentation sheet for CURRENT data only
-  const dtsAssets = data.assets.filter(a => a.alias?.startsWith('DTS.'));
+  const dtsAssets = data.assets.filter(a => typeof a.alias === 'string' && a.alias.startsWith('DTS.'));
   if (dtsAssets.length > 0) {
-    const categoriesById = new Map(data.assetCategories.map(category => [category.id, category]));
-    const initiativesByAssetId = new Map<string, { count: number; totalCapex: number; totalOpex: number }>();
-
-    data.initiatives.forEach(initiative => {
-      if (initiative.isPlaceholder || !initiative.assetId) return;
-
-      const existing = initiativesByAssetId.get(initiative.assetId) ?? { count: 0, totalCapex: 0, totalOpex: 0 };
-      existing.count += 1;
-      existing.totalCapex += initiative.capex || 0;
-      existing.totalOpex += initiative.opex || 0;
-      initiativesByAssetId.set(initiative.assetId, existing);
-    });
-
+    const activeInitiatives = data.initiatives.filter(i => !i.isPlaceholder);
     const dtsSummaryRows = dtsAssets
       .sort((a, b) => {
-        const catA = categoriesById.get(a.categoryId);
-        const catB = categoriesById.get(b.categoryId);
+        const catA = data.assetCategories.find(c => c.id === a.categoryId);
+        const catB = data.assetCategories.find(c => c.id === b.categoryId);
         const orderA = catA?.order ?? 999;
         const orderB = catB?.order ?? 999;
         if (orderA !== orderB) return orderA - orderB;
         return (a.alias ?? '').localeCompare(b.alias ?? '');
       })
       .map(asset => {
-        const category = categoriesById.get(asset.categoryId);
-        const summary = initiativesByAssetId.get(asset.id) ?? { count: 0, totalCapex: 0, totalOpex: 0 };
+        const category = data.assetCategories.find(c => c.id === asset.categoryId);
+        const assetInits = activeInitiatives.filter(i => i.assetId === asset.id);
+        const totalCapex = assetInits.reduce((sum, i) => sum + (i.capex || 0), 0);
+        const totalOpex = assetInits.reduce((sum, i) => sum + (i.opex || 0), 0);
         return {
           'Layer': category?.name ?? '',
           'Asset Name': asset.name,
@@ -187,9 +162,9 @@ export const exportToExcel = (data: AppData) => {
           'Adoption Status': asset.dtsAdoptionStatus
             ? DTS_ADOPTION_STATUS_LABEL[asset.dtsAdoptionStatus] ?? asset.dtsAdoptionStatus
             : '',
-          'Initiative Count': summary.count,
-          'Total CapEx ($)': summary.totalCapex,
-          'Total OpEx ($)': summary.totalOpex,
+          'Initiative Count': assetInits.length,
+          'Total CapEx ($)': totalCapex,
+          'Total OpEx ($)': totalOpex,
         };
       });
 
@@ -272,7 +247,9 @@ export const importFromExcel = async (file: File): Promise<Partial<AppData>> => 
           ...init,
           capex: Number(init.capex) || Number((init as any).budget) || 0,
           opex: Number(init.opex) || 0,
-          resourceIds: normalizeResourceIds((init as any).resourceIds),
+          resourceIds: typeof (init as any).resourceIds === 'string' 
+            ? (init as any).resourceIds.split(',').map((s: string) => s.trim()).filter(Boolean)
+            : init.resourceIds,
         }));
 
         const assetsSplit = split<Asset>(raw.assets);
@@ -297,13 +274,7 @@ export const importFromExcel = async (file: File): Promise<Partial<AppData>> => 
         result.applications = appSplit.current;
 
         const segSplit = split<ApplicationSegment>(raw.applicationSegments);
-        result.applicationSegments = segSplit.current.map(seg => ({
-          ...seg,
-          startDate: seg.startDate != null ? String(seg.startDate) : '',
-          endDate: seg.endDate != null ? String(seg.endDate) : '',
-          row: Number.isInteger(seg.row) && (seg.row as number) >= 0 ? seg.row : undefined,
-          rowSpan: Number.isInteger(seg.rowSpan) && (seg.rowSpan as number) > 0 ? seg.rowSpan : undefined,
-        }));
+        result.applicationSegments = segSplit.current;
 
         const statSplit = split<ApplicationStatus>(raw.applicationStatuses);
         result.applicationStatuses = statSplit.current;
@@ -331,7 +302,9 @@ export const importFromExcel = async (file: File): Promise<Partial<AppData>> => 
                   ...init,
                   capex: Number(init.capex) || Number((init as any).budget) || 0,
                   opex: Number(init.opex) || 0,
-                  resourceIds: normalizeResourceIds((init as any).resourceIds),
+                  resourceIds: typeof (init as any).resourceIds === 'string' 
+                    ? (init as any).resourceIds.split(',').map((s: string) => s.trim()).filter(Boolean)
+                    : init.resourceIds,
                 })),
                 assets: assetsSplit.byVersion[vid] || [],
                 assetCategories: catSplit.byVersion[vid] || [],
@@ -360,3 +333,4 @@ export const importFromExcel = async (file: File): Promise<Partial<AppData>> => 
     reader.readAsArrayBuffer(file);
   });
 };
+
