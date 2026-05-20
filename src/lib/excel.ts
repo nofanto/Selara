@@ -274,7 +274,13 @@ export const importFromExcel = async (file: File): Promise<Partial<AppData>> => 
         result.applications = appSplit.current;
 
         const segSplit = split<ApplicationSegment>(raw.applicationSegments);
-        result.applicationSegments = segSplit.current;
+        result.applicationSegments = segSplit.current.map(seg => ({
+          ...seg,
+          startDate: seg.startDate != null ? String(seg.startDate) : '',
+          endDate: seg.endDate != null ? String(seg.endDate) : '',
+          row: Number.isInteger(seg.row) && (seg.row as number) >= 0 ? seg.row : undefined,
+          rowSpan: Number.isInteger(seg.rowSpan) && (seg.rowSpan as number) > 0 ? seg.rowSpan : undefined,
+        }));
 
         const statSplit = split<ApplicationStatus>(raw.applicationStatuses);
         result.applicationStatuses = statSplit.current;
