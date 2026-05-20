@@ -217,7 +217,7 @@ export function InitiativeBar({
 
         {/* Resource names row */}
         {settings.showResources === 'on' && !isGroup && width > 8 && (() => {
-          const assignedNames = (init.resourceIds || [])
+          const assignedNames = (Array.isArray(init.resourceIds) ? init.resourceIds : [])
             .map(rid => resources.find(r => r.id === rid)?.name)
             .filter(Boolean);
           if (assignedNames.length === 0) return null;

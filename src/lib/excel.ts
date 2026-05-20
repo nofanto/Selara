@@ -27,6 +27,21 @@ const DTS_ADOPTION_STATUS_LABEL: Record<DtsAdoptionStatus, string> = {
   'not-applicable': 'Not Applicable',
 };
 
+const normalizeResourceIds = (value: unknown): string[] | undefined => {
+  if (typeof value === 'string') {
+    const parsed = value.split(',').map(s => s.trim()).filter(Boolean);
+    return parsed.length > 0 ? parsed : undefined;
+  }
+  if (Array.isArray(value)) {
+    const parsed = value
+      .filter((id): id is string => typeof id === 'string')
+      .map(id => id.trim())
+      .filter(Boolean);
+    return parsed.length > 0 ? parsed : undefined;
+  }
+  return undefined;
+};
+
 export const exportToExcel = (data: AppData) => {
   const wb = XLSX.utils.book_new();
 
@@ -223,9 +238,7 @@ export const importFromExcel = async (file: File): Promise<Partial<AppData>> => 
           ...init,
           capex: Number(init.capex) || Number((init as any).budget) || 0,
           opex: Number(init.opex) || 0,
-          resourceIds: typeof (init as any).resourceIds === 'string' 
-            ? (init as any).resourceIds.split(',').map((s: string) => s.trim()).filter(Boolean)
-            : init.resourceIds,
+          resourceIds: normalizeResourceIds((init as any).resourceIds),
         }));
 
         const assetsSplit = split<Asset>(raw.assets);
@@ -278,9 +291,7 @@ export const importFromExcel = async (file: File): Promise<Partial<AppData>> => 
                   ...init,
                   capex: Number(init.capex) || Number((init as any).budget) || 0,
                   opex: Number(init.opex) || 0,
-                  resourceIds: typeof (init as any).resourceIds === 'string' 
-                    ? (init as any).resourceIds.split(',').map((s: string) => s.trim()).filter(Boolean)
-                    : init.resourceIds,
+                  resourceIds: normalizeResourceIds((init as any).resourceIds),
                 })),
                 assets: assetsSplit.byVersion[vid] || [],
                 assetCategories: catSplit.byVersion[vid] || [],
@@ -309,4 +320,3 @@ export const importFromExcel = async (file: File): Promise<Partial<AppData>> => 
     reader.readAsArrayBuffer(file);
   });
 };
-
