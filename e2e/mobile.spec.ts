@@ -233,6 +233,17 @@ test.describe('Mobile card view — core', () => {
     expect(await page.locator('[data-testid^="card-category-header-"]').count()).toBeGreaterThan(0);
   });
 
+  test('shows initiatives that overlap the visible window even when they extend past the end date', async ({ page }) => {
+    const year = new Date().getFullYear();
+
+    await openSettings(page);
+    await setStartDate(page, `${year}-03-01`);
+    await setMonths(page, 3);
+    await closeSettings(page);
+
+    await expect(page.locator('[data-testid="initiative-row-i-ciam-passkey"]')).toBeVisible({ timeout: 5000 });
+  });
+
   test('default bucket mode shows timeline-style labels (Now/Starting soon/Upcoming)', async ({ page }) => {
     const texts = await page.locator('[data-testid^="bucket-label-"]').allTextContents();
     const valid = ['Now', 'Starting soon', 'Upcoming', 'Completed'];
