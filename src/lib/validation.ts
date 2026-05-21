@@ -9,7 +9,7 @@ export function validateInitiative(
 ): ValidationErrors {
     const errors: ValidationErrors = {};
 
-    if (typeof init.name !== 'string' || init.name.trim() === '') {
+    if (!init.name || init.name.trim() === '') {
         errors.name = 'Name is required';
     }
 

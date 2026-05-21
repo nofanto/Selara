@@ -18,7 +18,7 @@ interface ApplicationSegmentPanelProps {
   application: Application | null;
   applications?: Application[];
   isOpen: boolean;
-  isNew?: boolean;
+  isNew: boolean;
   onClose: () => void;
   onSave: (segment: ApplicationSegment) => void;
   onDelete?: (segment: ApplicationSegment) => void;
@@ -30,7 +30,7 @@ export function ApplicationSegmentPanel({
   application,
   applications = [],
   isOpen,
-  isNew = false,
+  isNew,
   onClose,
   onSave,
   onDelete,
