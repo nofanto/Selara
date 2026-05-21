@@ -328,6 +328,40 @@ export function EditableTable<T extends { [key: string]: any }>({
   const handlePasteCsv = () => {
     if (!csvText.trim()) return;
 
+    const isValidDateInput = (value: string) => {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+      const [year, month, day] = value.split('-').map(Number);
+      const parsed = new Date(Date.UTC(year, month - 1, day));
+      return (
+        parsed.getUTCFullYear() === year &&
+        parsed.getUTCMonth() === month - 1 &&
+        parsed.getUTCDate() === day
+      );
+    };
+
+    const getDefaultValueForColumn = (col: Column<T>) => {
+      if (col.type === 'number') return 0;
+      if (col.type === 'boolean') return false;
+      return '';
+    };
+
+    const parseCsvCell = (raw: string, col: Column<T>): { valid: boolean; value: string | number | boolean } => {
+      if (col.type === 'number') return { valid: true, value: parseFloat(raw) || 0 };
+      if (col.type === 'boolean') return { valid: true, value: raw.toLowerCase() === 'true' || raw === '1' };
+      if (col.type === 'select') {
+        if (!raw) return { valid: true, value: '' };
+        return {
+          valid: !!col.options?.some(option => option.value === raw),
+          value: raw
+        };
+      }
+      if (col.type === 'date') {
+        if (!raw) return { valid: true, value: '' };
+        return { valid: isValidDateInput(raw), value: raw };
+      }
+      return { valid: true, value: raw };
+    };
+
     const lines = csvText.trim().split('\n');
     const updatedRows = [...rows];
     let hasHeader = false;
@@ -363,18 +397,19 @@ export function EditableTable<T extends { [key: string]: any }>({
 
       const values = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(v => v.trim().replace(/^"|"$/g, ''));
       const rowData = {} as T;
+      let rowIsValid = true;
 
       if (hasHeader) {
         headerMapping.forEach((key, valIdx) => {
           if (key && valIdx < values.length) {
             const raw = values[valIdx];
             const col = columns.find(c => c.key === key);
-            const value: string | number | boolean =
-              col?.type === 'number' ? (parseFloat(raw) || 0) :
-              col?.type === 'boolean' ? (raw.toLowerCase() === 'true' || raw === '1') :
-              col?.type === 'select'
-                ? (col.options?.some(option => option.value === raw) ? raw : (col.options?.[0]?.value ?? ''))
-                : raw;
+            if (!col) return;
+            const { valid, value } = parseCsvCell(raw, col);
+            if (!valid) {
+              rowIsValid = false;
+              return;
+            }
             rowData[key] = value as T[keyof T];
           }
         });
@@ -382,16 +417,19 @@ export function EditableTable<T extends { [key: string]: any }>({
         columns.forEach((col, colIdx) => {
           if (colIdx < values.length) {
             const raw = values[colIdx];
-            const value: string | number | boolean =
-              col.type === 'number' ? (parseFloat(raw) || 0) :
-              col.type === 'boolean' ? (raw.toLowerCase() === 'true' || raw === '1') :
-              raw;
+            const { valid, value } = parseCsvCell(raw, col);
+            if (!valid) {
+              rowIsValid = false;
+              return;
+            }
             rowData[col.key] = value as T[keyof T];
           } else if (rowData[col.key] === undefined) {
-            rowData[col.key] = (col.type === 'number' ? 0 : (col.type === 'boolean' ? false : '')) as T[keyof T];
+            rowData[col.key] = getDefaultValueForColumn(col) as T[keyof T];
           }
         });
       }
+
+      if (!rowIsValid) continue;
 
       const targetId = rowData[idField] || crypto.randomUUID();
       rowData[idField] = targetId as T[keyof T];
