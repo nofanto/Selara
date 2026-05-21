@@ -965,9 +965,10 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
     const finalItems: any[] = [];
     const placedRects: any[] = [];
 
+    const assetInitiativeIds = new Set(assetInitiatives.map(i => i.id));
     const hasIntraAssetDependencies = dependencies.some(dep =>
-      assetInitiatives.some(i => i.id === dep.sourceId) &&
-      assetInitiatives.some(i => i.id === dep.targetId)
+      assetInitiativeIds.has(dep.sourceId) &&
+      assetInitiativeIds.has(dep.targetId)
     );
     const dynamicGap = hasIntraAssetDependencies ? 32 : BAR_GAP;
 
