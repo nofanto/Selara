@@ -172,6 +172,12 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
     return map;
   }, [geanzAssets]);
   const depSegmentsRef = useRef<Map<string, number[][]>>(new Map()); // depId → [[x1,y1,x2,y2], ...]
+  useEffect(() => {
+    const liveIds = new Set(dependencies.map(d => d.id));
+    for (const depId of depSegmentsRef.current.keys()) {
+      if (!liveIds.has(depId)) depSegmentsRef.current.delete(depId);
+    }
+  }, [dependencies]);
   const isDraggingRef = useRef(false);
   const milestoneDepDirectRef = useRef(false); // true when direct listener is handling milestone dep creation
   const [labelTooltip, setLabelTooltip] = useState<{ x: number; y: number; text: string } | null>(null);
@@ -1545,6 +1551,7 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
                 const depColor = dep.type === 'blocks' ? '#ef4444' : dep.type === 'requires' ? '#3b82f6' : '#475569';
                 const depLabelBorder = dep.type === 'blocks' ? '#fecaca' : dep.type === 'requires' ? '#bfdbfe' : '#cbd5e1';
                 const depMarker = dep.type === 'blocks' ? 'url(#arrowhead-red)' : dep.type === 'requires' ? 'url(#arrowhead-blue)' : undefined;
+                const hitStrokeWidth = Math.abs(dep.midXOffset ?? 0) > 0 ? 6 : 16;
 
                 const handleDependencyClick = (e: React.MouseEvent) => {
                   e.stopPropagation();
@@ -1589,8 +1596,9 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
                     <path
                       d={path}
                       stroke="transparent"
-                      strokeWidth="16"
+                      strokeWidth={hitStrokeWidth}
                       fill="none"
+                      style={{ pointerEvents: 'stroke' }}
                     />
                     <path
                       d={path}
