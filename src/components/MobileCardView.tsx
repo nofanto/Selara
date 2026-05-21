@@ -540,8 +540,8 @@ export function MobileCardView({
   const visibleInitiatives = initiatives.filter(i => {
     const start = new Date(i.startDate);
     const end = new Date(i.endDate);
-    // Must start on or after windowStart, and end on or before windowEnd
-    return start >= windowStart && end <= windowEnd;
+    // Include any initiative that overlaps the visible window.
+    return start <= windowEnd && end >= windowStart;
   });
 
   // Group assets by category, preserving category order
