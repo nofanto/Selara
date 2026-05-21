@@ -3,6 +3,7 @@ import { Initiative, Resource, TimelineSettings } from '../types';
 import { cn } from '../lib/utils';
 
 const ICON_BTN = "w-5 h-5 bg-white hover:bg-slate-100 rounded shadow-sm text-slate-700 text-[10px] flex items-center justify-center leading-none";
+const MAX_DESCRIPTION_CHARS = 600;
 
 function formatBudget(amount: number): string {
   return amount >= 1_000_000
@@ -73,10 +74,13 @@ export function InitiativeBar({
   const capex = init.capex || 0;
   const opex = init.opex || 0;
   const hasBudget = (capex + opex) > 0;
+  const safeDescription = typeof init.description === 'string'
+    ? init.description.slice(0, MAX_DESCRIPTION_CHARS)
+    : '';
 
   const hoverTitle = isGroup
-    ? `Group: ${init.name}\n${init.description ?? ''}`
-    : `${init.isPlaceholder ? '[Placeholder] ' : ''}${init.name}\nProgramme: ${progName ?? ''}\nStrategy: ${stratName ?? ''}\nCapEx: $${capex.toLocaleString()}\nOpEx: $${opex.toLocaleString()}${init.description ? `\n${init.description}` : ''}`;
+    ? `Group: ${init.name}\n${safeDescription}`
+    : `${init.isPlaceholder ? '[Placeholder] ' : ''}${init.name}\nProgramme: ${progName ?? ''}\nStrategy: ${stratName ?? ''}\nCapEx: $${capex.toLocaleString()}\nOpEx: $${opex.toLocaleString()}${safeDescription ? `\n${safeDescription}` : ''}`;
 
   return (
     <div
@@ -231,7 +235,7 @@ export function InitiativeBar({
         })()}
 
         {/* Description row — full width; capped at 2 lines for individual bars, uncapped for group bars */}
-        {settings.descriptionDisplay === 'on' && init.description && (
+        {settings.descriptionDisplay === 'on' && safeDescription && (
           (isGroup || width > 8) ? (
             <div
               draggable="false"
@@ -242,7 +246,7 @@ export function InitiativeBar({
                 !init.isPlaceholder && 'drop-shadow-md',
               )}
             >
-              {init.description}
+              {safeDescription}
             </div>
           ) : null
         )}
