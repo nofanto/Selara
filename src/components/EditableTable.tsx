@@ -372,7 +372,9 @@ export function EditableTable<T extends { [key: string]: any }>({
             const value: string | number | boolean =
               col?.type === 'number' ? (parseFloat(raw) || 0) :
               col?.type === 'boolean' ? (raw.toLowerCase() === 'true' || raw === '1') :
-              raw;
+              col?.type === 'select'
+                ? (col.options?.some(option => option.value === raw) ? raw : '')
+                : raw;
             rowData[key] = value as T[keyof T];
           }
         });
