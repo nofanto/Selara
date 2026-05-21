@@ -24,7 +24,7 @@ The active bucket mode is shown in the mobile settings sheet. See [Mobile Settin
 
 ## Filtering by date range
 
-Card View respects the start date and months window configured in mobile settings. Only initiatives whose start date falls within that window are shown. When initiatives exist in the portfolio but all fall outside the configured range, the card displays a distinct "outside date range" message rather than a generic empty state — this tells you the filter is hiding results, not that no initiatives exist.
+Card View respects the start date and months window configured in mobile settings. Initiatives are shown when any part of their date range overlaps the configured window, so work that starts before the window or finishes after it still appears if it is active during that range. When initiatives exist in the portfolio but none overlap the configured range, the card displays a distinct "outside date range" message rather than a generic empty state — this tells you the filter is hiding results, not that no initiatives exist.
 
 ## Opening an initiative
 
