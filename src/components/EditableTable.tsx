@@ -325,6 +325,37 @@ export function EditableTable<T extends { [key: string]: any }>({
     onUpdate([]);
   };
 
+  const parseCsvLine = (line: string): string[] => {
+    const values: string[] = [];
+    let current = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+
+      if (char === '"') {
+        if (inQuotes && line[i + 1] === '"') {
+          current += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+        continue;
+      }
+
+      if (char === ',' && !inQuotes) {
+        values.push(current.trim());
+        current = '';
+        continue;
+      }
+
+      current += char;
+    }
+
+    values.push(current.trim());
+    return values;
+  };
+
   const handlePasteCsv = () => {
     if (!csvText.trim()) return;
 
@@ -334,7 +365,7 @@ export function EditableTable<T extends { [key: string]: any }>({
     let headerMapping: (keyof T | null)[] = [];
 
     if (lines.length > 0) {
-      const firstLineValues = lines[0].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(v => v.trim().toLowerCase().replace(/^"|"$/g, ''));
+      const firstLineValues = parseCsvLine(lines[0]).map(v => v.toLowerCase().replace(/^"|"$/g, ''));
       const colLabels = columns.map(c => c.label.toLowerCase());
       const colKeys = columns.map(c => String(c.key).toLowerCase());
 
@@ -361,7 +392,7 @@ export function EditableTable<T extends { [key: string]: any }>({
       const line = lines[i].trim();
       if (!line) continue;
 
-      const values = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(v => v.trim().replace(/^"|"$/g, ''));
+      const values = parseCsvLine(line).map(v => v.replace(/^"|"$/g, ''));
       const rowData = {} as T;
 
       if (hasHeader) {
