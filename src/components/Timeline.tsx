@@ -996,6 +996,7 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
 
     const assetInitiativeIds = new Set(assetInitiatives.map(i => i.id));
     const intraAssetDependencies = new Set<string>();
+
     dependencies.forEach(dep => {
       if (!assetInitiativeIds.has(dep.sourceId) || !assetInitiativeIds.has(dep.targetId)) return;
       const pairKey = dep.sourceId < dep.targetId
