@@ -135,6 +135,56 @@ test.describe('Arrow Selection — stagger & disambiguation', () => {
     expect(disambiguatorVisible || editPanelVisible).toBe(true);
   });
 
+  test('moved arrow should not intercept clicks in a different corridor', async ({ page }) => {
+    test.setTimeout(60000);
+    await loadArrowScenario(page);
+
+    const depAbGroup = page.locator('g[data-dep-id="dep-ab"]');
+    const depAcGroup = page.locator('g[data-dep-id="dep-ac"]');
+    const depAbVisiblePath = depAbGroup.locator('path[stroke]:not([stroke="transparent"])').first();
+    const depAcVisiblePath = depAcGroup.locator('path[stroke]:not([stroke="transparent"])').first();
+
+    await expect(depAbVisiblePath).toBeVisible({ timeout: 10000 });
+    await expect(depAcVisiblePath).toBeVisible({ timeout: 10000 });
+
+    const parsePathMid = async (locator: ReturnType<typeof page.locator>) => {
+      const d = await locator.getAttribute('d');
+      if (!d) throw new Error('Path d attribute is empty');
+      const nums = Array.from(d.matchAll(/-?\d+(?:\.\d+)?/g)).map(m => Number(m[0]));
+      if (nums.length < 6) throw new Error(`Unexpected path format: ${d}`);
+      const x = nums[2];
+      const y = (nums[1] + nums[3]) / 2;
+      return { x, y };
+    };
+
+    // Move dep-ab away horizontally.
+    const depAbBox = await depAbGroup.boundingBox();
+    if (!depAbBox) throw new Error('No bounding box for dep-ab');
+    await page.mouse.move(depAbBox.x + depAbBox.width / 2, depAbBox.y + depAbBox.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(depAbBox.x + depAbBox.width / 2 + 140, depAbBox.y + depAbBox.height / 2, { steps: 12 });
+    await page.mouse.up();
+
+    // Click on dep-ac path's mid vertical segment in its own corridor.
+    const depAcMid = await parsePathMid(depAcVisiblePath);
+    const svgBox = await page.locator('[data-testid="dependencies-svg"]').boundingBox();
+    if (!svgBox) throw new Error('No bounding box for dependencies svg');
+
+    await page.mouse.click(svgBox.x + depAcMid.x, svgBox.y + depAcMid.y);
+
+    const disambiguator = page.locator('[data-testid="arrow-disambiguator"]');
+    const panel = page.locator('[data-testid="dependency-panel"]');
+
+    if (await disambiguator.isVisible().catch(() => false)) {
+      const options = disambiguator.locator('[data-testid="disambiguator-item"]');
+      await expect(options).toHaveCount(1);
+      await options.first().click();
+    }
+
+    await expect(panel).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('[data-testid="dep-target-name"]')).toContainText('Arrow Target Two');
+  });
+
   test('clicking a specific arrow opens the correct dependency panel', async ({ page }) => {
     test.setTimeout(60000);
     await loadArrowScenario(page);
