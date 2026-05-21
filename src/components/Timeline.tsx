@@ -172,6 +172,12 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
     return map;
   }, [geanzAssets]);
   const depSegmentsRef = useRef<Map<string, number[][]>>(new Map()); // depId → [[x1,y1,x2,y2], ...]
+  useEffect(() => {
+    const liveIds = new Set(dependencies.map(d => d.id));
+    for (const depId of depSegmentsRef.current.keys()) {
+      if (!liveIds.has(depId)) depSegmentsRef.current.delete(depId);
+    }
+  }, [dependencies]);
   const isDraggingRef = useRef(false);
   const milestoneDepDirectRef = useRef(false); // true when direct listener is handling milestone dep creation
   const [labelTooltip, setLabelTooltip] = useState<{ x: number; y: number; text: string } | null>(null);
@@ -1546,36 +1552,8 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
                 const depLabelBorder = dep.type === 'blocks' ? '#fecaca' : dep.type === 'requires' ? '#bfdbfe' : '#cbd5e1';
                 const depMarker = dep.type === 'blocks' ? 'url(#arrowhead-red)' : dep.type === 'requires' ? 'url(#arrowhead-blue)' : undefined;
 
-                const handleDependencyClick = (e: React.MouseEvent) => {
-                  e.stopPropagation();
-                  if (isDraggingRef.current) { isDraggingRef.current = false; return; }
-                  if (disambiguateAt) { setDisambiguateAt(null); return; }
-                  const svgEl = (e.currentTarget as SVGGElement).ownerSVGElement;
-                  if (!svgEl) { setSelectedDependencyId(dep.id); return; }
-                  const rect = svgEl.getBoundingClientRect();
-                  const px = e.clientX - rect.left;
-                  const py = e.clientY - rect.top;
-                  const THRESHOLD = 8;
-                  const distToSegment = (x1: number, y1: number, x2: number, y2: number) => {
-                    const dx = x2 - x1, dy = y2 - y1;
-                    const len2 = dx * dx + dy * dy;
-                    if (len2 === 0) return Math.hypot(px - x1, py - y1);
-                    const t = Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / len2));
-                    return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
-                  };
-                  const nearby = dependencies.filter(d => {
-                    const segs = depSegmentsRef.current.get(d.id);
-                    return segs?.some(([x1, y1, x2, y2]) => distToSegment(x1, y1, x2, y2) < THRESHOLD);
-                  });
-                  if (nearby.length > 1) {
-                    setDisambiguateAt({ x: e.clientX, y: e.clientY, candidates: nearby });
-                  } else {
-                    setSelectedDependencyId(dep.id);
-                  }
-                };
-
                 return (
-                  <g key={dep.id} data-dep-id={dep.id} onMouseDown={handleDependencyMouseDown} onClick={handleDependencyClick} className="cursor-pointer group" style={{ pointerEvents: 'all' }}>
+                  <g key={dep.id} data-dep-id={dep.id} onMouseDown={handleDependencyMouseDown} className="cursor-pointer group" style={{ pointerEvents: 'all' }}>
                     {isMilestoneSource && (
                       <circle
                         data-testid="milestone-dep-source"
@@ -1588,18 +1566,39 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
                     )}
                     <path
                       d={path}
-                      stroke="transparent"
-                      strokeWidth="16"
-                      fill="none"
-                    />
-                    <path
-                      d={path}
                       stroke={isDepOnCriticalPath ? '#f59e0b' : depColor}
                       strokeWidth={isDepOnCriticalPath ? "3.5" : "2"}
                       fill="none"
                       markerEnd={depMarker}
                       opacity={isDepOnCriticalPath ? "1" : "0.8"}
                       strokeDasharray={dep.type === 'related' ? "4 2" : "none"}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (isDraggingRef.current) { isDraggingRef.current = false; return; }
+                        const svgEl = (e.currentTarget as SVGPathElement).ownerSVGElement;
+                        if (!svgEl) { setSelectedDependencyId(dep.id); return; }
+                        const rect = svgEl.getBoundingClientRect();
+                        const px = e.clientX - rect.left;
+                        const py = e.clientY - rect.top;
+                        const THRESHOLD = 8;
+                        const distToSegment = (x1: number, y1: number, x2: number, y2: number) => {
+                          const dx = x2 - x1, dy = y2 - y1;
+                          const len2 = dx * dx + dy * dy;
+                          if (len2 === 0) return Math.hypot(px - x1, py - y1);
+                          const t = Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / len2));
+                          return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+                        };
+                        const nearby = dependencies.filter(d => {
+                          const segs = depSegmentsRef.current.get(d.id);
+                          return segs?.some(([x1, y1, x2, y2]) => distToSegment(x1, y1, x2, y2) < THRESHOLD);
+                        });
+                        if (nearby.length > 1) {
+                          setDisambiguateAt({ x: e.clientX, y: e.clientY, candidates: nearby });
+                        } else {
+                          setDisambiguateAt(null);
+                          setSelectedDependencyId(dep.id);
+                        }
+                      }}
                     />
                     <rect
                       data-testid="dep-label-rect"
