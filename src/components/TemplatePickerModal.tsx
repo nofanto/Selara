@@ -57,6 +57,7 @@ export function TemplatePickerModal({ onSelect, onViewerImport, isReset = false 
                     onChange={(e) => {
                       const file = e.target.files?.[0];
                       if (file) onViewerImport(file);
+                      e.currentTarget.value = '';
                     }}
                   />
                   <button
