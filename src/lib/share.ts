@@ -56,6 +56,8 @@ export async function importSharedWorkspace(id: string, key: string): Promise<un
     return await decryptData(ciphertext, iv, key);
   } catch (error) {
     console.error('Decryption failed:', error);
-    throw new Error('Failed to decrypt data. The link might be corrupted.');
+    throw new Error(
+      'Decryption Failed: This shared link could not be decrypted. It may be corrupted or the key is missing. Shared links are temporary, so please request a new link from the sender.'
+    );
   }
 }
