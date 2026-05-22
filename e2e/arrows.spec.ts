@@ -147,16 +147,6 @@ test.describe('Arrow Selection — stagger & disambiguation', () => {
     await expect(depAbVisiblePath).toBeVisible({ timeout: 10000 });
     await expect(depAcVisiblePath).toBeVisible({ timeout: 10000 });
 
-    const parsePathMid = async (locator: ReturnType<typeof page.locator>) => {
-      const d = await locator.getAttribute('d');
-      if (!d) throw new Error('Path d attribute is empty');
-      const nums = Array.from(d.matchAll(/-?\d+(?:\.\d+)?/g)).map(m => Number(m[0]));
-      if (nums.length < 6) throw new Error(`Unexpected path format: ${d}`);
-      const x = nums[2];
-      const y = (nums[1] + nums[3]) / 2;
-      return { x, y };
-    };
-
     // Move dep-ab away horizontally.
     const depAbBox = await depAbGroup.boundingBox();
     if (!depAbBox) throw new Error('No bounding box for dep-ab');
@@ -165,12 +155,26 @@ test.describe('Arrow Selection — stagger & disambiguation', () => {
     await page.mouse.move(depAbBox.x + depAbBox.width / 2 + 140, depAbBox.y + depAbBox.height / 2, { steps: 12 });
     await page.mouse.up();
 
-    // Click on dep-ac path's mid vertical segment in its own corridor.
-    const depAcMid = await parsePathMid(depAcVisiblePath);
-    const svgBox = await page.locator('[data-testid="dependencies-svg"]').boundingBox();
-    if (!svgBox) throw new Error('No bounding box for dependencies svg');
+    const depAcScreenPoint = await depAcVisiblePath.evaluate(el => {
+      const pathEl = el as unknown as SVGPathElement;
+      const d = pathEl.getAttribute('d');
+      if (!d) throw new Error('Missing dependency path d attribute');
+      const nums = Array.from(d.matchAll(/-?\d+(?:\.\d+)?/g)).map(m => Number(m[0]));
+      if (nums.length < 8) throw new Error(`Unexpected path format: ${d}`);
+      const localPoint = { x: (nums[4] + nums[6]) / 2, y: nums[5] };
+      const ctm = (pathEl as unknown as SVGGraphicsElement).getScreenCTM();
+      if (!ctm) throw new Error('Missing screen CTM for dependency path');
+      const screenPoint = new DOMPoint(localPoint.x, localPoint.y).matrixTransform(ctm);
+      return { x: screenPoint.x, y: screenPoint.y };
+    });
 
-    await page.mouse.click(svgBox.x + depAcMid.x, svgBox.y + depAcMid.y);
+    const depAcGroupBox = await depAcGroup.boundingBox();
+    if (!depAcGroupBox) throw new Error('Missing dep-ac group bounding box');
+
+    await depAcGroup.click({ position: {
+      x: depAcScreenPoint.x - depAcGroupBox.x,
+      y: depAcScreenPoint.y - depAcGroupBox.y,
+    } });
 
     const disambiguator = page.locator('[data-testid="arrow-disambiguator"]');
     const panel = page.locator('[data-testid="dependency-panel"]');
