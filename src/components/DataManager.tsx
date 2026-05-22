@@ -4,6 +4,7 @@ import { EditableTable, Column } from './EditableTable';
 import { cn } from '../lib/utils';
 import { Database, Layers, Calendar, Flag, Target, Link2, FolderTree, LayoutTemplate, Users, Box } from 'lucide-react';
 import { ConfirmModal } from './ConfirmModal';
+import { clearApplicationsAndSegments, removeApplicationAndSegments } from '../lib/applicationCascade';
 
 interface DataManagerProps {
   data: {
@@ -306,6 +307,32 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery 
     },
   ];
 
+  const handleDeleteApplication = (application: Application): boolean => {
+    const affectedSegments = data.applicationSegments.filter(segment => segment.applicationId === application.id);
+    const parts = affectedSegments.length ? [`${affectedSegments.length} segment(s)`] : [];
+    const msg = affectedSegments.length
+      ? `Deleting "${application.name}" will also remove ${affectedSegments.length} segment(s). Continue?`
+      : undefined;
+    return cascadeDelete('Delete Application', application.name, parts, {
+      ...removeApplicationAndSegments(
+        { applications: data.applications || [], applicationSegments: data.applicationSegments || [] },
+        application.id,
+      ),
+    }, msg);
+  };
+
+  const handleClearApplications = (): boolean => {
+    const segmentCount = data.applicationSegments.length;
+    const parts = [];
+    if ((data.applications || []).length) parts.push(`${(data.applications || []).length} application(s)`);
+    if (segmentCount) parts.push(`${segmentCount} segment(s)`);
+    return cascadeDelete('Delete All Applications', 'all applications', parts, {
+      ...clearApplicationsAndSegments(),
+    }, parts.length
+      ? `Deleting all applications will also remove ${parts.join(', ')}. Continue?`
+      : 'Delete all applications?');
+  };
+
   const appStatusColumns: Column<ApplicationStatus>[] = [
     { key: 'name', label: 'Status Name', type: 'text', width: '60%' },
     { key: 'color', label: 'Color', type: 'color', width: '40%' },
@@ -449,6 +476,8 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery 
             data={data.applications || []}
             columns={getColumnsWithWidths('applications', applicationColumns)}
             onUpdate={(newData) => updateData('applications', newData)}
+            onDelete={handleDeleteApplication}
+            onClearAll={handleClearApplications}
             idField="id"
             searchQuery={searchQuery}
             tableId="applications"

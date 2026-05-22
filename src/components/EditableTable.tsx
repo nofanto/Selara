@@ -37,6 +37,7 @@ interface EditableTableProps<T> {
   columns: Column<T>[];
   onUpdate: (newData: T[]) => void;
   onDelete?: (deletedRow: T) => boolean; // If returns true, delete was handled externally
+  onClearAll?: () => boolean; // If returns true, clear-all was handled externally
   idField: keyof T;
   searchQuery?: string;
   tableId?: string;
@@ -79,6 +80,7 @@ export function EditableTable<T extends { [key: string]: any }>({
   columns,
   onUpdate,
   onDelete,
+  onClearAll,
   idField,
   searchQuery,
   tableId = 'default',
@@ -352,6 +354,9 @@ export function EditableTable<T extends { [key: string]: any }>({
   const handleClearAll = () => setConfirmClearAll(true);
   const executeClearAll = () => {
     setConfirmClearAll(false);
+    if (onClearAll && onClearAll()) {
+      return;
+    }
     setRows([]);
     onUpdate([]);
   };

@@ -123,6 +123,25 @@ The refactor below consolidates all groupBy modes into a single rendering path.
 ### Completed
 - [x] Fix newly-created initiative showing "Create Initiative" title and no Delete button when re-opened (US-BUG-01)
 - [x] Fix Data Manager initiatives table not scrollable with many rows (missing min-h-0)
+- [x] Scenia review bug: mobile card view hides overlapping initiatives (PR #61)
+- [x] Scenia review bug: viewer file input is not reset after selection (PR #62)
+- [x] Scenia review bug: dependency rendering silently deduplicates/truncates records (PR #51)
+- [x] Scenia review bug: arrow corridor click reliability / brittle selection test (PR #63)
+- [x] Scenia review bug: shared link decryption message clarity (PR #64)
+- [x] Scenia review bug: Playwright tests using hard-coded localhost URLs (PR #65)
+- [x] Scenia review bug: timeline sidebar resize + persistence (PR #66)
+- [x] Scenia review bug: DataManager deletes cascade application records and applicationSegments
+
+### Remaining Scenia review bugs
+- [ ] Save race in App.tsx can allow stale IndexedDB writes to win during rapid edits
+- [ ] Empty-workspace detection is too narrow and can show the first-run picker incorrectly
+- [ ] Import validation accepts structurally broken initiatives as warnings instead of errors
+- [ ] Version diffing misses major categories of workspace changes
+- [ ] Explicit timeline rows can still collide in layout
+- [ ] Auto-row placement gives up after row 20
+- [ ] Disambiguation popover can render off-screen on narrow viewports
+- [ ] Clipboard copy failure still shows success
+- [ ] Keyboard shortcuts modal reads navigator.userAgent at module scope
 
 #### P2 — Coverage
 - [x] Add search & filter edge case tests
