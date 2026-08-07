@@ -128,6 +128,13 @@ Follow these three pages to get up and running quickly:
 | [Recording a Decision](13-decisions/recording-a-decision.md) | Creating, editing, and changing the status of a portfolio decision |
 | [Linking Decisions to Portfolio Items](13-decisions/linking-decisions.md) | Attaching a decision to an initiative, programme, or asset |
 
+### 14 RPTI Report
+
+| Page | Description |
+|------|-------------|
+| [Recording an RPTI Row](14-rpti-report/recording-an-rpti-row.md) | Building the Indonesian OJK IT Development Plan Report from your portfolio data |
+| [Auto-Suggested Quarters and Exporting](14-rpti-report/exporting-the-rpti-report.md) | How planned implementation quarters are suggested, and exporting to Excel |
+
 ---
 
 ## Feature Reference
@@ -152,6 +159,7 @@ An alphabetical index of capabilities and where to find them.
 | PDF Export | [PDF & SVG Export](11-import-export/pdf-svg-export.md) |
 | Reports | [Reports Overview](09-reports/overview.md) |
 | Resources | [Resource Roster](08-resources/resource-roster.md) |
+| RPTI Report | [Recording an RPTI Row](14-rpti-report/recording-an-rpti-row.md) |
 | SVG Export | [PDF & SVG Export](11-import-export/pdf-svg-export.md) |
 | Undo/Redo | [Navigating the App](01-getting-started/navigating-the-app.md) |
 | Version History | [Saving a Version](10-version-history/saving-a-version.md) |

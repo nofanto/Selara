@@ -4,7 +4,7 @@ import { exportToExcel, importFromExcel } from '../lib/excel';
 import { SchemaIssue, validateImportSchema } from '../lib/importValidation';
 import { exportToPDF, exportToPNG } from '../lib/pdf';
 import { shareWorkspace } from '../lib/share';
-import { Asset, Application, ApplicationSegment, ApplicationStatus, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource, Version, DtsPhaseRecord, Decision } from '../types';
+import { Asset, Application, ApplicationSegment, ApplicationStatus, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource, Version, DtsPhaseRecord, Decision, RptiDetail } from '../types';
 
 interface DataControlsProps {
   data: {
@@ -23,6 +23,7 @@ interface DataControlsProps {
     versions?: Version[];
     dtsPhases?: DtsPhaseRecord[];
     decisions?: Decision[];
+    rptiDetails?: RptiDetail[];
   };
   onImport: (data: {
     assets: Asset[];
@@ -40,6 +41,7 @@ interface DataControlsProps {
     versions?: Version[];
     dtsPhases?: DtsPhaseRecord[];
     decisions?: Decision[];
+    rptiDetails?: RptiDetail[];
   }) => void;
   onError?: (message: string | null) => void;
   timelineId?: string; // ID of the element to capture for PDF

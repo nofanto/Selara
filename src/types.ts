@@ -49,6 +49,7 @@ export interface ApplicationStatus {
   id: string;
   name: string;
   color: string;
+  isLiveStatus?: boolean; // Marks this status as "live/in production" — used to auto-derive RPTI planned implementation quarter
 }
 
 /**
@@ -154,13 +155,16 @@ export interface Asset {
   dtsAdoptionStatus?: DtsAdoptionStatus; // Only relevant for DTS assets (alias starts with "DTS.")
 }
 
+export type ApplicationType = 'application' | 'infrastructure' | 'document' | 'procedure' | 'other';
+
 /**
- * An application or technology component that makes up an IT asset.
+ * An application, infrastructure item, document, or other deliverable that makes up an IT asset.
  */
 export interface Application {
   id: string;
   assetId: string;
   name: string;
+  type?: ApplicationType; // Undefined is treated as 'application' (legacy records predate this field)
 }
 
 /**
@@ -174,8 +178,48 @@ export interface ApplicationSegment {
   startDate: string; // ISO format: YYYY-MM-DD
   endDate: string;   // ISO format: YYYY-MM-DD
   status: string;
+  initiativeId?: string; // Optionally attributes this lifecycle phase to the Initiative driving it
   row?: number;      // Which row within the swimlane (0-indexed). Auto-assigned if absent.
   rowSpan?: number;  // How many rows tall this segment is (default 1). Controlled by bottom-edge drag.
+}
+
+export type RptiTargetType = 'application' | 'asset';
+export type RptiDevelopmentType = 'new' | 'upgrade';
+export type RptiDeveloper = 'inhouse' | 'PPJTI';
+export type RptiRelatedParty = 'yes' | 'no' | 'n/a';
+export type RptiQuarter = 'Q1' | 'Q2' | 'Q3' | 'Q4';
+export type RptiCategoryCode =
+  | '01' | '02' | '03' | '04' | '05' | '06' | '07' | '08' | '09' | '10' | '11' | '12'
+  | '49' | '51' | '52' | '53' | '54' | '99';
+
+/**
+ * One row of the RPTI (IT Development Plan Report) regulatory report — an
+ * Initiative's planned development activity on a specific Application or
+ * Asset. One Initiative may back multiple RptiDetail rows, one per affected
+ * target, without changing Initiative's own single-asset targeting.
+ */
+export interface RptiDetail {
+  id: string;
+  initiativeId: string;
+  targetType: RptiTargetType;
+  targetId: string; // Application.id or Asset.id, per targetType
+  categoryCode: RptiCategoryCode;
+  developmentType: RptiDevelopmentType;
+  developer: RptiDeveloper;
+  ppjtiRelatedParty: RptiRelatedParty;
+  location?: {
+    dataCenter?: { city?: string; country?: string };
+    disasterRecoveryCenter?: { city?: string; country?: string };
+  };
+  capexAmount?: number; // Defaults to the linked Initiative's capex when unset
+  capexCurrency?: string;
+  capexIdrEquivalent?: number;
+  opexAmount?: number; // Defaults to the linked Initiative's opex when unset
+  opexCurrency?: string;
+  opexIdrEquivalent?: number;
+  plannedImplementationQuarter?: RptiQuarter;
+  applicationSegmentId?: string; // Set when the quarter is auto-derived (targetType 'application' only)
+  remarks?: string;
 }
 
 /**
@@ -240,5 +284,6 @@ export interface Version {
     applicationStatuses?: ApplicationStatus[];
     dtsPhases?: DtsPhaseRecord[];
     decisions?: Decision[];
+    rptiDetails?: RptiDetail[];
   };
 }

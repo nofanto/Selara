@@ -28,7 +28,7 @@ import {
   demoApplicationSegments as initialApplicationSegments,
   demoApplicationStatuses as initialApplicationStatuses,
 } from './demoData';
-import { Asset, Application, ApplicationSegment, ApplicationStatus, DtsPhaseRecord, Decision, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource, Version } from './types';
+import { Asset, Application, ApplicationSegment, ApplicationStatus, DtsPhaseRecord, Decision, RptiDetail, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource, Version } from './types';
 import { cn } from './lib/utils';
 import { getAppData, saveAppData, getAllVersions } from './lib/db';
 import { importFromExcel } from './lib/excel';
@@ -61,6 +61,7 @@ type AppState = {
   applicationStatuses: ApplicationStatus[];
   dtsPhases: DtsPhaseRecord[];
   decisions: Decision[];
+  rptiDetails: RptiDetail[];
   versions?: Version[];
 };
 
@@ -80,6 +81,7 @@ function isValidSharedAppState(data: unknown): data is AppState {
     && Array.isArray(record.applicationStatuses)
     && Array.isArray(record.dtsPhases)
     && Array.isArray(record.decisions)
+    && Array.isArray(record.rptiDetails)
     && !!record.timelineSettings
     && typeof record.timelineSettings === 'object';
 }
@@ -127,6 +129,7 @@ export default function App() {
   const [applicationStatuses, setApplicationStatuses] = useState<ApplicationStatus[]>([]);
   const [dtsPhases, setDtsPhases] = useState<DtsPhaseRecord[]>([]);
   const [decisions, setDecisions] = useState<Decision[]>([]);
+  const [rptiDetails, setRptiDetails] = useState<RptiDetail[]>([]);
   const [selectedDecisionId, setSelectedDecisionId] = useState<string | null>(null);
   const [versions, setVersions] = useState<Version[]>([]);
 
@@ -154,7 +157,7 @@ export default function App() {
   const redoRef = useRef<() => void>(() => {});
 
   const getCurrentState = (): AppState => ({
-    assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions
+    assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions, rptiDetails
   });
 
   const getCurrentStateRef = useRef(getCurrentState);
@@ -207,6 +210,7 @@ export default function App() {
             setApplicationStatuses((dbData as any).applicationStatuses || []);
             setDtsPhases((dbData as any).dtsPhases || []);
             setDecisions((dbData as any).decisions || []);
+            setRptiDetails((dbData as any).rptiDetails || []);
             setTimelineSettings({ ...defaultTimelineSettings, ...(dbData.timelineSettings || {}) });
             setVersions(await getAllVersions());
             setIsImportingShare(false);
@@ -245,6 +249,7 @@ export default function App() {
               applicationStatuses: initialApplicationStatuses,
               dtsPhases: [],
               decisions: [],
+              rptiDetails: [],
             };
             await saveAppData(defaults);
             setAssets(defaults.assets);
@@ -259,6 +264,8 @@ export default function App() {
             setTimelineSettings(defaults.timelineSettings);
             setResources(defaults.resources);
             setApplicationStatuses(defaults.applicationStatuses);
+            setDecisions(defaults.decisions);
+            setRptiDetails(defaults.rptiDetails);
           } else {
             // First real run: let the user pick a template
             setShowTemplatePicker(true);
@@ -277,6 +284,7 @@ export default function App() {
           setApplicationStatuses((dbData as any).applicationStatuses || []);
           setDtsPhases((dbData as any).dtsPhases || []);
           setDecisions((dbData as any).decisions || []);
+          setRptiDetails((dbData as any).rptiDetails || []);
           const rawSettings = dbData.timelineSettings || {};
           // Migration: if we have legacy startYear but no startDate, convert it
           const migratedSettings = ('startYear' in rawSettings && !('startDate' in rawSettings))
@@ -335,6 +343,7 @@ export default function App() {
     setApplicationStatuses(data.applicationStatuses);
     setDtsPhases(data.dtsPhases || []);
     setDecisions(data.decisions || []);
+    setRptiDetails(data.rptiDetails || []);
     setVersions([]);
     setShowTemplatePicker(false);
     setTemplatePickerIsReset(false);
@@ -376,6 +385,7 @@ export default function App() {
         applicationStatuses: imported.applicationStatuses ?? blank.applicationStatuses,
         dtsPhases: (imported as any).dtsPhases ?? blank.dtsPhases,
         decisions: (imported as any).decisions ?? blank.decisions,
+        rptiDetails: (imported as any).rptiDetails ?? blank.rptiDetails,
         timelineSettings: { ...blank.timelineSettings, ...(imported.timelineSettings ?? {}) },
         versions: imported.versions ?? [],
       };
@@ -394,6 +404,7 @@ export default function App() {
       setApplicationStatuses(data.applicationStatuses);
       setDtsPhases(data.dtsPhases || []);
       setDecisions(data.decisions || []);
+      setRptiDetails(data.rptiDetails || []);
       setVersions(data.versions || []);
       setShowTemplatePicker(false);
       setTemplatePickerIsReset(false);
@@ -427,6 +438,7 @@ export default function App() {
     setApplicationStatuses(data.applicationStatuses || []);
     setDtsPhases((data as any).dtsPhases || []);
     setDecisions((data as any).decisions || []);
+    setRptiDetails((data as any).rptiDetails || []);
     if (data.versions) setVersions(data.versions);
 
     // Persist to DB
@@ -483,55 +495,55 @@ export default function App() {
 
   const handleAddInitiative = useCallback((newInit: Initiative) => {
     if (initiatives.some(i => i.id === newInit.id)) return;
-    handleUpdate({ assets, applications, applicationSegments, initiatives: [...initiatives, newInit], milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions });
-  }, [assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions, handleUpdate]);
+    handleUpdate({ assets, applications, applicationSegments, initiatives: [...initiatives, newInit], milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions, rptiDetails });
+  }, [assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions, rptiDetails, handleUpdate]);
 
   const handleUpdateInitiative = useCallback((updatedInit: Initiative) => {
-    handleUpdate({ assets, applications, applicationSegments, initiatives: initiatives.map(i => i.id === updatedInit.id ? updatedInit : i), milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions });
-  }, [assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions, handleUpdate]);
+    handleUpdate({ assets, applications, applicationSegments, initiatives: initiatives.map(i => i.id === updatedInit.id ? updatedInit : i), milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions, rptiDetails });
+  }, [assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions, rptiDetails, handleUpdate]);
 
   const handleUpdateAssets = useCallback((updatedAssets: Asset[]) => {
-    handleUpdate({ assets: updatedAssets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions });
-  }, [applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions, handleUpdate]);
+    handleUpdate({ assets: updatedAssets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions, rptiDetails });
+  }, [applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions, rptiDetails, handleUpdate]);
 
   const handleUpdateAsset = useCallback((updatedAsset: Asset) => {
-    handleUpdate({ assets: assets.map(a => a.id === updatedAsset.id ? updatedAsset : a), applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions });
-  }, [assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions, handleUpdate]);
+    handleUpdate({ assets: assets.map(a => a.id === updatedAsset.id ? updatedAsset : a), applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions, rptiDetails });
+  }, [assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions, rptiDetails, handleUpdate]);
 
   const handleUpdateDependencies = useCallback((updatedDependencies: Dependency[]) => {
-    handleUpdate({ assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies: updatedDependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions });
-  }, [assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions, handleUpdate]);
+    handleUpdate({ assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies: updatedDependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions, rptiDetails });
+  }, [assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions, rptiDetails, handleUpdate]);
 
   const handleUpdateMilestone = useCallback((updatedMilestone: Milestone) => {
-    handleUpdate({ assets, applications, applicationSegments, initiatives, milestones: milestones.map(m => m.id === updatedMilestone.id ? updatedMilestone : m), programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions });
-  }, [assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions, handleUpdate]);
+    handleUpdate({ assets, applications, applicationSegments, initiatives, milestones: milestones.map(m => m.id === updatedMilestone.id ? updatedMilestone : m), programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions, rptiDetails });
+  }, [assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions, rptiDetails, handleUpdate]);
 
   const handleDeleteInitiative = useCallback((deletedInit: Initiative) => {
-    handleUpdate({ assets, applications, applicationSegments, initiatives: initiatives.filter(i => i.id !== deletedInit.id), milestones, programmes, strategies, dependencies: dependencies.filter(d => d.sourceId !== deletedInit.id && d.targetId !== deletedInit.id), assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions });
-  }, [assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions, handleUpdate]);
+    handleUpdate({ assets, applications, applicationSegments, initiatives: initiatives.filter(i => i.id !== deletedInit.id), milestones, programmes, strategies, dependencies: dependencies.filter(d => d.sourceId !== deletedInit.id && d.targetId !== deletedInit.id), assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions, rptiDetails });
+  }, [assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions, rptiDetails, handleUpdate]);
 
   const handleUpdateSettings = useCallback((updatedSettings: TimelineSettings) => {
-    handleUpdate({ assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: updatedSettings, resources, applicationStatuses, dtsPhases, decisions });
-  }, [assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, resources, applicationStatuses, dtsPhases, decisions, handleUpdate]);
+    handleUpdate({ assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: updatedSettings, resources, applicationStatuses, dtsPhases, decisions, rptiDetails });
+  }, [assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, resources, applicationStatuses, dtsPhases, decisions, rptiDetails, handleUpdate]);
 
   const handleRestoreVersion = useCallback((version: import('./types').Version) => {
-    handleUpdate({ ...version.data, applicationStatuses: version.data.applicationStatuses ?? [], dtsPhases: version.data.dtsPhases ?? [], decisions: version.data.decisions ?? [] });
+    handleUpdate({ ...version.data, applicationStatuses: version.data.applicationStatuses ?? [], dtsPhases: version.data.dtsPhases ?? [], decisions: version.data.decisions ?? [], rptiDetails: version.data.rptiDetails ?? [] });
   }, [handleUpdate]);
 
   const handleSaveApplicationSegment = useCallback((seg: import('./types').ApplicationSegment) => {
     const exists = applicationSegments.some(s => s.id === seg.id);
     const savedSeg = exists ? seg : { ...seg, id: `seg-${Date.now()}` };
     const next = exists ? applicationSegments.map(s => s.id === seg.id ? savedSeg : s) : [...applicationSegments, savedSeg];
-    handleUpdate({ assets, applications, applicationSegments: next, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions });
-  }, [assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions, handleUpdate]);
+    handleUpdate({ assets, applications, applicationSegments: next, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions, rptiDetails });
+  }, [assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions, rptiDetails, handleUpdate]);
 
   const handleDeleteApplicationSegment = useCallback((seg: import('./types').ApplicationSegment) => {
-    handleUpdate({ assets, applications, applicationSegments: applicationSegments.filter(s => s.id !== seg.id), initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions });
-  }, [assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions, handleUpdate]);
+    handleUpdate({ assets, applications, applicationSegments: applicationSegments.filter(s => s.id !== seg.id), initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions, rptiDetails });
+  }, [assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions, rptiDetails, handleUpdate]);
 
   const handleUpdateApplicationSegments = useCallback((segs: import('./types').ApplicationSegment[]) => {
-    handleUpdate({ assets, applications, applicationSegments: segs, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions });
-  }, [assets, applications, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions, handleUpdate]);
+    handleUpdate({ assets, applications, applicationSegments: segs, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions, rptiDetails });
+  }, [assets, applications, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions, rptiDetails, handleUpdate]);
 
   const handleDeleteAsset = useCallback((assetId: string) => {
     const assetAppIds = new Set(applications.filter(a => a.assetId === assetId).map(a => a.id));
@@ -546,9 +558,9 @@ export default function App() {
         const deletedInitIds = new Set(initiatives.filter(i => i.assetId === assetId).map(i => i.id));
         return !deletedInitIds.has(d.sourceId) && !deletedInitIds.has(d.targetId);
       }),
-      assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions,
+      assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions, rptiDetails,
     });
-  }, [assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions, handleUpdate]);
+  }, [assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions, rptiDetails, handleUpdate]);
 
   const handleBulkDeleteAssets = useCallback((assetIds: string[]) => {
     const idSet = new Set(assetIds);
@@ -568,34 +580,46 @@ export default function App() {
       dependencies: dependencies.filter(d =>
         !deletedInitIds.has(d.sourceId) && !deletedInitIds.has(d.targetId)
       ),
-      assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions,
+      assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions, rptiDetails,
     });
-  }, [assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions, handleUpdate]);
+  }, [assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions, rptiDetails, handleUpdate]);
 
   const handleAddAssets = useCallback((newAssets: Asset[]) => {
     // Skip any assets already present (matched by externalId to prevent duplicates)
     const existingExternalIds = new Set(assets.map(a => a.externalId).filter(Boolean));
     const toAdd = newAssets.filter(a => !a.externalId || !existingExternalIds.has(a.externalId));
     if (toAdd.length === 0) return;
-    handleUpdate({ assets: [...assets, ...toAdd], applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions });
-  }, [assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions, handleUpdate]);
+    handleUpdate({ assets: [...assets, ...toAdd], applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions, rptiDetails });
+  }, [assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions, rptiDetails, handleUpdate]);
 
   const handleAddDecision = useCallback((newDecision: Decision) => {
-    handleUpdate({ assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions: [...decisions, newDecision] });
-  }, [assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions, handleUpdate]);
+    handleUpdate({ assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions: [...decisions, newDecision], rptiDetails });
+  }, [assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions, rptiDetails, handleUpdate]);
 
   const handleUpdateDecision = useCallback((updatedDecision: Decision) => {
-    handleUpdate({ assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions: decisions.map(d => d.id === updatedDecision.id ? updatedDecision : d) });
-  }, [assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions, handleUpdate]);
+    handleUpdate({ assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions: decisions.map(d => d.id === updatedDecision.id ? updatedDecision : d), rptiDetails });
+  }, [assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions, rptiDetails, handleUpdate]);
 
   const handleDeleteDecision = useCallback((deletedDecision: Decision) => {
-    handleUpdate({ assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions: decisions.filter(d => d.id !== deletedDecision.id) });
-  }, [assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions, handleUpdate]);
+    handleUpdate({ assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions: decisions.filter(d => d.id !== deletedDecision.id), rptiDetails });
+  }, [assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions, rptiDetails, handleUpdate]);
 
   const handleOpenDecision = useCallback((decisionId: string) => {
     setSelectedDecisionId(decisionId);
     setView('decisions');
   }, []);
+
+  const handleAddRptiDetail = useCallback((newDetail: RptiDetail) => {
+    handleUpdate({ assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions, rptiDetails: [...rptiDetails, newDetail] });
+  }, [assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions, rptiDetails, handleUpdate]);
+
+  const handleUpdateRptiDetail = useCallback((updatedDetail: RptiDetail) => {
+    handleUpdate({ assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions, rptiDetails: rptiDetails.map(r => r.id === updatedDetail.id ? updatedDetail : r) });
+  }, [assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions, rptiDetails, handleUpdate]);
+
+  const handleDeleteRptiDetail = useCallback((deletedDetail: RptiDetail) => {
+    handleUpdate({ assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions, rptiDetails: rptiDetails.filter(r => r.id !== deletedDetail.id) });
+  }, [assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions, rptiDetails, handleUpdate]);
 
   useEffect(() => {
     if (!showMoreSettingsPanel && !showViewOptionsPanel) return;
@@ -800,7 +824,7 @@ export default function App() {
               handleUpdate({
                 assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories,
                 timelineSettings: { ...timelineSettings, startDate: e.target.value },
-                resources, applicationStatuses, dtsPhases, decisions,
+                resources, applicationStatuses, dtsPhases, decisions, rptiDetails,
               });
             }}
             className="px-1.5 py-1 bg-slate-50 border border-slate-200 rounded text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -815,7 +839,7 @@ export default function App() {
               handleUpdate({
                 assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories,
                 timelineSettings: { ...timelineSettings, monthsToShow: parseInt(e.target.value) as 3 | 6 | 12 | 24 | 36 },
-                resources, applicationStatuses, dtsPhases, decisions,
+                resources, applicationStatuses, dtsPhases, decisions, rptiDetails,
               });
             }}
             className="px-1.5 py-1 bg-slate-50 border border-slate-200 rounded text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -853,7 +877,7 @@ export default function App() {
                 data-active={conflictsOn ? 'true' : 'false'}
                 aria-label="Conflict Detection"
                 aria-pressed={conflictsOn}
-                onClick={() => handleUpdate({ assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, conflictDetection: conflictsOn ? 'off' : 'on' }, resources, applicationStatuses, dtsPhases, decisions })}
+                onClick={() => handleUpdate({ assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, conflictDetection: conflictsOn ? 'off' : 'on' }, resources, applicationStatuses, dtsPhases, decisions, rptiDetails })}
                 className={toggleClass(conflictsOn)}
                 title="Conflict Detection"
               >
@@ -864,7 +888,7 @@ export default function App() {
                 data-active={relationshipsOn ? 'true' : 'false'}
                 aria-label="Relationship Lines"
                 aria-pressed={relationshipsOn}
-                onClick={() => handleUpdate({ assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, showRelationships: relationshipsOn ? 'off' : 'on' }, resources, applicationStatuses, dtsPhases, decisions })}
+                onClick={() => handleUpdate({ assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, showRelationships: relationshipsOn ? 'off' : 'on' }, resources, applicationStatuses, dtsPhases, decisions, rptiDetails })}
                 className={toggleClass(relationshipsOn)}
                 title="Relationship Lines"
               >
@@ -875,7 +899,7 @@ export default function App() {
                 data-active={descriptionsOn ? 'true' : 'false'}
                 aria-label="Descriptions"
                 aria-pressed={descriptionsOn}
-                onClick={() => handleUpdate({ assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, descriptionDisplay: descriptionsOn ? 'off' : 'on' }, resources, applicationStatuses, dtsPhases, decisions })}
+                onClick={() => handleUpdate({ assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, descriptionDisplay: descriptionsOn ? 'off' : 'on' }, resources, applicationStatuses, dtsPhases, decisions, rptiDetails })}
                 className={toggleClass(descriptionsOn)}
                 title="Descriptions"
               >
@@ -886,7 +910,7 @@ export default function App() {
                 data-mode={budgetMode}
                 aria-label={`Budget visualisation: ${budgetMode}`}
                 aria-pressed={budgetMode !== 'off'}
-                onClick={() => handleUpdate({ assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, budgetVisualisation: nextBudget }, resources, applicationStatuses, dtsPhases, decisions })}
+                onClick={() => handleUpdate({ assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, budgetVisualisation: nextBudget }, resources, applicationStatuses, dtsPhases, decisions, rptiDetails })}
                 className={toggleClass(budgetMode !== 'off')}
                 title={`Budget: ${budgetMode}`}
               >
@@ -897,7 +921,7 @@ export default function App() {
                 data-active={criticalPathOn ? 'true' : 'false'}
                 aria-label="Critical Path"
                 aria-pressed={criticalPathOn}
-                onClick={() => handleUpdate({ assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, criticalPath: criticalPathOn ? 'off' : 'on' }, resources, applicationStatuses, dtsPhases, decisions })}
+                onClick={() => handleUpdate({ assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, criticalPath: criticalPathOn ? 'off' : 'on' }, resources, applicationStatuses, dtsPhases, decisions, rptiDetails })}
                 className={toggleClass(criticalPathOn)}
                 title="Critical Path"
               >
@@ -908,7 +932,7 @@ export default function App() {
                 data-active={showResourcesOn ? 'true' : 'false'}
                 aria-label="Show Resources"
                 aria-pressed={showResourcesOn}
-                onClick={() => handleUpdate({ assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, showResources: showResourcesOn ? 'off' : 'on' }, resources, applicationStatuses, dtsPhases, decisions })}
+                onClick={() => handleUpdate({ assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, showResources: showResourcesOn ? 'off' : 'on' }, resources, applicationStatuses, dtsPhases, decisions, rptiDetails })}
                 className={toggleClass(showResourcesOn)}
                 title="Show Resources"
               >
@@ -930,7 +954,7 @@ export default function App() {
                       data-testid="zoom-out"
                       aria-label="Zoom out"
                       disabled={!canZoomOut}
-                      onClick={() => handleUpdate({ assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, columnZoom: ZOOM_STEPS[idx - 1] }, resources, applicationStatuses, dtsPhases, decisions })}
+                      onClick={() => handleUpdate({ assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, columnZoom: ZOOM_STEPS[idx - 1] }, resources, applicationStatuses, dtsPhases, decisions, rptiDetails })}
                       className={cn(toggleClass(false), !canZoomOut && 'opacity-30 cursor-not-allowed')}
                       title="Zoom out"
                     >
@@ -940,7 +964,7 @@ export default function App() {
                       data-testid="zoom-in"
                       aria-label="Zoom in"
                       disabled={!canZoomIn}
-                      onClick={() => handleUpdate({ assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, columnZoom: ZOOM_STEPS[idx + 1] }, resources, applicationStatuses, dtsPhases, decisions })}
+                      onClick={() => handleUpdate({ assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, columnZoom: ZOOM_STEPS[idx + 1] }, resources, applicationStatuses, dtsPhases, decisions, rptiDetails })}
                       className={cn(toggleClass(false), !canZoomIn && 'opacity-30 cursor-not-allowed')}
                       title="Zoom in"
                     >
@@ -984,7 +1008,7 @@ export default function App() {
                               handleUpdate({
                                 assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories,
                                 timelineSettings: { ...timelineSettings, [key]: e.target.value },
-                                resources, applicationStatuses, dtsPhases, decisions,
+                                resources, applicationStatuses, dtsPhases, decisions, rptiDetails,
                               });
                             }}
                             className="px-1.5 py-1 bg-slate-50 border border-slate-200 rounded text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -1006,7 +1030,7 @@ export default function App() {
                             handleUpdate({
                               assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories,
                               timelineSettings: { ...timelineSettings, clusterName: e.target.value || undefined },
-                              resources, applicationStatuses, dtsPhases, decisions,
+                              resources, applicationStatuses, dtsPhases, decisions, rptiDetails,
                             });
                           }}
                           placeholder="e.g. Digital First Cluster"
@@ -1229,7 +1253,7 @@ export default function App() {
 
         {/* Data Controls (PDF, Export, Import) */}
         <DataControls
-          data={{ assets, applications, applicationSegments, applicationStatuses, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, versions, dtsPhases, decisions }}
+          data={{ assets, applications, applicationSegments, applicationStatuses, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, versions, dtsPhases, decisions, rptiDetails }}
           onImport={handleUpdate}
           onError={setDbSaveError}
           timelineId={view === 'visualiser' ? 'timeline-visualiser' : undefined}
@@ -1320,7 +1344,7 @@ export default function App() {
               <input
                 type="date"
                 value={timelineSettings.startDate}
-                onChange={(e) => handleUpdate({ assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, startDate: e.target.value }, resources, applicationStatuses, dtsPhases, decisions })}
+                onChange={(e) => handleUpdate({ assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, startDate: e.target.value }, resources, applicationStatuses, dtsPhases, decisions, rptiDetails })}
                 className="px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
             </label>
@@ -1328,7 +1352,7 @@ export default function App() {
               Months
               <select
                 value={timelineSettings.monthsToShow || 36}
-                onChange={(e) => handleUpdate({ assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, monthsToShow: parseInt(e.target.value) as 3 | 6 | 12 | 24 | 36 }, resources, applicationStatuses, dtsPhases, decisions })}
+                onChange={(e) => handleUpdate({ assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, monthsToShow: parseInt(e.target.value) as 3 | 6 | 12 | 24 | 36 }, resources, applicationStatuses, dtsPhases, decisions, rptiDetails })}
                 className="px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
               >
                 <option value="3">3</option>
@@ -1349,7 +1373,7 @@ export default function App() {
                     <button
                       key={mode}
                       data-testid={`bucket-mode-${mode}`}
-                      onClick={() => handleUpdate({ assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, mobileBucketMode: mode }, resources, applicationStatuses, dtsPhases, decisions })}
+                      onClick={() => handleUpdate({ assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, mobileBucketMode: mode }, resources, applicationStatuses, dtsPhases, decisions, rptiDetails })}
                       className={cn(
                         'px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors',
                         active ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-slate-50 border-slate-200 text-slate-500'
@@ -1362,7 +1386,7 @@ export default function App() {
                 {hasDtsAssets && (
                   <button
                     data-testid="bucket-mode-dts-phase"
-                    onClick={() => handleUpdate({ assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, mobileBucketMode: 'dts-phase' }, resources, applicationStatuses, dtsPhases, decisions })}
+                    onClick={() => handleUpdate({ assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, mobileBucketMode: 'dts-phase' }, resources, applicationStatuses, dtsPhases, decisions, rptiDetails })}
                     className={cn(
                       'px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors',
                       (timelineSettings.mobileBucketMode as string) === 'dts-phase' ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-slate-50 border-slate-200 text-slate-500'
@@ -1388,12 +1412,12 @@ export default function App() {
               );
               return (
                 <div className="flex flex-wrap gap-2">
-                  <button data-testid="mobile-toggle-conflicts" aria-pressed={conflictsOn} className={sheetToggleClass(conflictsOn)} onClick={() => handleUpdate({ assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, conflictDetection: conflictsOn ? 'off' : 'on' }, resources, applicationStatuses, dtsPhases, decisions })}>Conflicts</button>
-                  <button data-testid="mobile-toggle-relationships" aria-pressed={relationshipsOn} className={sheetToggleClass(relationshipsOn)} onClick={() => handleUpdate({ assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, showRelationships: relationshipsOn ? 'off' : 'on' }, resources, applicationStatuses, dtsPhases, decisions })}>Relationships</button>
-                  <button data-testid="mobile-toggle-descriptions" aria-pressed={descriptionsOn} className={sheetToggleClass(descriptionsOn)} onClick={() => handleUpdate({ assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, descriptionDisplay: descriptionsOn ? 'off' : 'on' }, resources, applicationStatuses, dtsPhases, decisions })}>Descriptions</button>
-                  <button data-testid="mobile-toggle-budget" aria-pressed={budgetMode !== 'off'} className={sheetToggleClass(budgetMode !== 'off')} onClick={() => handleUpdate({ assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, budgetVisualisation: nextBudget }, resources, applicationStatuses, dtsPhases, decisions })}>Budget: {budgetMode}</button>
+                  <button data-testid="mobile-toggle-conflicts" aria-pressed={conflictsOn} className={sheetToggleClass(conflictsOn)} onClick={() => handleUpdate({ assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, conflictDetection: conflictsOn ? 'off' : 'on' }, resources, applicationStatuses, dtsPhases, decisions, rptiDetails })}>Conflicts</button>
+                  <button data-testid="mobile-toggle-relationships" aria-pressed={relationshipsOn} className={sheetToggleClass(relationshipsOn)} onClick={() => handleUpdate({ assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, showRelationships: relationshipsOn ? 'off' : 'on' }, resources, applicationStatuses, dtsPhases, decisions, rptiDetails })}>Relationships</button>
+                  <button data-testid="mobile-toggle-descriptions" aria-pressed={descriptionsOn} className={sheetToggleClass(descriptionsOn)} onClick={() => handleUpdate({ assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, descriptionDisplay: descriptionsOn ? 'off' : 'on' }, resources, applicationStatuses, dtsPhases, decisions, rptiDetails })}>Descriptions</button>
+                  <button data-testid="mobile-toggle-budget" aria-pressed={budgetMode !== 'off'} className={sheetToggleClass(budgetMode !== 'off')} onClick={() => handleUpdate({ assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, budgetVisualisation: nextBudget }, resources, applicationStatuses, dtsPhases, decisions, rptiDetails })}>Budget: {budgetMode}</button>
                   {hasDtsAssets && (
-                    <button data-testid="mobile-toggle-dts-adoption" className={sheetToggleClass(dtsAdoptionOn)} onClick={() => handleUpdate({ assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, showDtsAdoptionStatus: dtsAdoptionOn ? 'off' : 'on' }, resources, applicationStatuses, dtsPhases, decisions })}>Adoption Status</button>
+                    <button data-testid="mobile-toggle-dts-adoption" className={sheetToggleClass(dtsAdoptionOn)} onClick={() => handleUpdate({ assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, showDtsAdoptionStatus: dtsAdoptionOn ? 'off' : 'on' }, resources, applicationStatuses, dtsPhases, decisions, rptiDetails })}>Adoption Status</button>
                   )}
                 </div>
               );
@@ -1478,7 +1502,7 @@ export default function App() {
         ) : view === 'data' ? (
           <Suspense fallback={<LoadingFallback />}>
             <DataManager
-              data={{ assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions }}
+              data={{ assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions, rptiDetails }}
               onUpdate={handleUpdate}
               onOpenTemplatePicker={() => { setTemplatePickerIsReset(true); setShowTemplatePicker(true); }}
               searchQuery={searchQuery}
@@ -1486,7 +1510,27 @@ export default function App() {
           </Suspense>
         ) : view === 'reports' ? (
           <Suspense fallback={<LoadingFallback />}>
-            <ReportsView assets={assets} initiatives={initiatives} milestones={milestones} dependencies={dependencies} currentData={getCurrentState()} programmes={programmes} strategies={strategies} assetCategories={assetCategories} resources={resources} dtsPhases={dtsPhases} onSaveAsset={handleUpdateAsset} onNavigateToAsset={(assetId, assetName) => { setView('visualiser'); setSearchQuery(assetName); }} />
+            <ReportsView
+              assets={assets}
+              initiatives={initiatives}
+              milestones={milestones}
+              dependencies={dependencies}
+              currentData={getCurrentState()}
+              programmes={programmes}
+              strategies={strategies}
+              assetCategories={assetCategories}
+              resources={resources}
+              dtsPhases={dtsPhases}
+              applications={applications}
+              applicationSegments={applicationSegments}
+              applicationStatuses={applicationStatuses}
+              rptiDetails={rptiDetails}
+              onAddRptiDetail={handleAddRptiDetail}
+              onUpdateRptiDetail={handleUpdateRptiDetail}
+              onDeleteRptiDetail={handleDeleteRptiDetail}
+              onSaveAsset={handleUpdateAsset}
+              onNavigateToAsset={(assetId, assetName) => { setView('visualiser'); setSearchQuery(assetName); }}
+            />
           </Suspense>
         ) : view === 'decisions' ? (
           <Suspense fallback={<LoadingFallback />}>
@@ -1563,7 +1607,7 @@ export default function App() {
                   handleUpdate({
                     assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories,
                     timelineSettings: { ...timelineSettings, hasSeenTutorial: true },
-                    resources, applicationStatuses, dtsPhases, decisions,
+                    resources, applicationStatuses, dtsPhases, decisions, rptiDetails,
                   });
                 }
               }} 
@@ -1607,6 +1651,7 @@ export default function App() {
             applicationStatuses,
             dtsPhases,
             decisions,
+            rptiDetails,
           }}
         />
       </ModalErrorBoundary>

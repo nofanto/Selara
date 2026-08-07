@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Asset, Initiative, Dependency, Milestone, Version, Programme, Strategy, AssetCategory, Resource, DtsAdoptionStatus, DtsPhase, DtsPhaseRecord } from '../types';
+import { Asset, Initiative, Dependency, Milestone, Version, Programme, Strategy, AssetCategory, Resource, DtsAdoptionStatus, DtsPhase, DtsPhaseRecord, Application, ApplicationSegment, ApplicationStatus, RptiDetail } from '../types';
 import { getAllVersions } from '../lib/db';
 import { computeDiff, DiffResult } from '../lib/diff';
-import { History, DollarSign, GitBranch, Users, ChevronLeft, Grid, Download } from 'lucide-react';
+import { History, DollarSign, GitBranch, Users, ChevronLeft, Grid, Download, ClipboardList } from 'lucide-react';
 import { MaturityHeatmap } from './MaturityHeatmap';
 import { AssetPanel } from './AssetPanel';
+import { RptiReportView } from './RptiReportView';
 import { cn } from '../lib/utils';
 
 interface ReportsViewProps {
@@ -18,11 +19,18 @@ interface ReportsViewProps {
   assetCategories: AssetCategory[];
   resources?: Resource[];
   dtsPhases?: DtsPhaseRecord[];
+  applications?: Application[];
+  applicationSegments?: ApplicationSegment[];
+  applicationStatuses?: ApplicationStatus[];
+  rptiDetails?: RptiDetail[];
+  onAddRptiDetail?: (detail: RptiDetail) => void;
+  onUpdateRptiDetail?: (detail: RptiDetail) => void;
+  onDeleteRptiDetail?: (detail: RptiDetail) => void;
   onSaveAsset?: (asset: Asset) => void;
   onNavigateToAsset?: (assetId: string, assetName: string) => void;
 }
 
-type ReportSlug = 'version-history' | 'budget' | 'initiatives-dependencies' | 'capacity' | 'maturity-heatmap' | 'dts-alignment';
+type ReportSlug = 'version-history' | 'budget' | 'initiatives-dependencies' | 'capacity' | 'maturity-heatmap' | 'dts-alignment' | 'rpti';
 
 
 function startsWithPrefix(value: unknown, prefix: string): boolean {
@@ -117,7 +125,7 @@ const DTS_STATUS_LABEL: Record<DtsAdoptionStatus, string> = {
   'not-applicable': 'N/A',
 };
 
-export function ReportsView({ assets, initiatives, milestones, dependencies, currentData, programmes, strategies, assetCategories, resources = [], dtsPhases = [], onSaveAsset, onNavigateToAsset }: ReportsViewProps) {
+export function ReportsView({ assets, initiatives, milestones, dependencies, currentData, programmes, strategies, assetCategories, resources = [], dtsPhases = [], applications = [], applicationSegments = [], applicationStatuses = [], rptiDetails = [], onAddRptiDetail, onUpdateRptiDetail, onDeleteRptiDetail, onSaveAsset, onNavigateToAsset }: ReportsViewProps) {
   const [selectedReport, setSelectedReport] = useState<ReportSlug | null>(null);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [assetPanelOpen, setAssetPanelOpen] = useState(false);
@@ -185,6 +193,12 @@ export function ReportsView({ assets, initiatives, milestones, dependencies, cur
       title: 'DTS Alignment',
       description: 'View your agency\'s alignment to the NZ Digital Target State — all 20 DTS assets coloured by adoption status.',
     }] : []),
+    {
+      slug: 'rpti',
+      icon: <ClipboardList size={28} className="text-teal-500" />,
+      title: 'RPTI Report',
+      description: 'Indonesian OJK IT Development Plan Report (Format 3.1) — track planned application and infrastructure development.',
+    },
   ];
 
   // ── Home screen ──────────────────────────────────────────────────────────────
@@ -710,6 +724,35 @@ export function ReportsView({ assets, initiatives, milestones, dependencies, cur
               );
             })}
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── RPTI Report ───────────────────────────────────────────────────────────────
+  if (selectedReport === 'rpti') {
+    return (
+      <div data-testid="report-view-rpti" className="h-full overflow-y-auto p-6 bg-slate-50">
+        <div className="max-w-6xl mx-auto">
+          <BackButton onBack={() => setSelectedReport(null)} />
+          <div className="mb-6">
+            <h1 className="text-xl font-bold text-slate-800">RPTI Report</h1>
+            <p className="text-sm text-slate-500 mt-1">
+              Indonesian OJK IT Development Plan Report (Format 3.1) — planned application and infrastructure development.
+            </p>
+          </div>
+          <RptiReportView
+            rptiDetails={rptiDetails}
+            initiatives={initiatives}
+            applications={applications}
+            assets={assets}
+            applicationSegments={applicationSegments}
+            applicationStatuses={applicationStatuses}
+            milestones={milestones}
+            onAdd={onAddRptiDetail ?? (() => {})}
+            onUpdate={onUpdateRptiDetail ?? (() => {})}
+            onDelete={onDeleteRptiDetail ?? (() => {})}
+          />
         </div>
       </div>
     );

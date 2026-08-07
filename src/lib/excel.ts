@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx';
-import { Asset, Application, ApplicationSegment, ApplicationStatus, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, DtsAdoptionStatus, TimelineSettings, Resource, Version, DtsPhaseRecord } from '../types';
+import { Asset, Application, ApplicationSegment, ApplicationStatus, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, DtsAdoptionStatus, TimelineSettings, Resource, Version, DtsPhaseRecord, RptiDetail } from '../types';
 
 interface AppData {
   assets: Asset[];
@@ -16,6 +16,7 @@ interface AppData {
   resources?: Resource[];
   versions?: Version[];
   dtsPhases?: DtsPhaseRecord[];
+  rptiDetails?: RptiDetail[];
 }
 
 
@@ -148,6 +149,9 @@ export const exportToExcel = (data: AppData) => {
   // 12. DTS Phases
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(flatten(data.dtsPhases, 'dtsPhases')), 'DtsPhases');
 
+  // 12b. RPTI Details (raw backup copy — the pretty Format 3.1 export is a separate, report-scoped export)
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(flatten(data.rptiDetails, 'rptiDetails')), 'RptiDetails');
+
   // 13. Timeline Settings (versioned)
   const settingsList = [];
   if (data.timelineSettings) settingsList.push({ ...data.timelineSettings, versionId: '' });
@@ -251,6 +255,7 @@ export const importFromExcel = async (file: File): Promise<Partial<AppData>> => 
           applicationStatuses: getSheetData<any>('ApplicationStatuses'),
           resources: getSheetData<any>('Resources'),
           dtsPhases: getSheetData<any>('DtsPhases'),
+          rptiDetails: getSheetData<any>('RptiDetails'),
           timelineSettings: getSheetData<any>('TimelineSettings'),
           versions: getSheetData<any>('Versions'),
         };
@@ -307,6 +312,9 @@ export const importFromExcel = async (file: File): Promise<Partial<AppData>> => 
         const dtsPhaseSplit = split<DtsPhaseRecord>(raw.dtsPhases);
         result.dtsPhases = dtsPhaseSplit.current;
 
+        const rptiDetailSplit = split<RptiDetail>(raw.rptiDetails);
+        result.rptiDetails = rptiDetailSplit.current;
+
         const settingsSplit = split<TimelineSettings>(raw.timelineSettings);
         result.timelineSettings = sanitizeTimelineSettings(settingsSplit.current[0]);
 
@@ -332,6 +340,7 @@ export const importFromExcel = async (file: File): Promise<Partial<AppData>> => 
                 applicationStatuses: statSplit.byVersion[vid] || [],
                 resources: resSplit.byVersion[vid] || [],
                 dtsPhases: dtsPhaseSplit.byVersion[vid] || [],
+                rptiDetails: rptiDetailSplit.byVersion[vid] || [],
                 timelineSettings: sanitizeTimelineSettings(settingsSplit.byVersion[vid]?.[0]) || {},
               }
             };

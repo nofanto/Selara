@@ -34,3 +34,4 @@ An ADR is never edited to reverse its outcome — if circumstances change, write
 |----|-------|--------|
 | [0001](0001-record-architecture-decisions.md) | Record architecture decisions with ADRs | Accepted |
 | [0002](0002-in-app-decision-log.md) | Add an in-app portfolio decision log | Accepted |
+| [0003](0003-rpti-report-and-application-type.md) | Add an RPTI report, a typed Application field, and an Initiative→target join | Accepted |

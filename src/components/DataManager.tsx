@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { Asset, Application, ApplicationSegment, ApplicationStatus, DtsPhaseRecord, Decision, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource } from '../types';
+import { Asset, Application, ApplicationSegment, ApplicationStatus, ApplicationType, DtsPhaseRecord, Decision, RptiDetail, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource } from '../types';
 import { EditableTable, Column } from './EditableTable';
 import { cn } from '../lib/utils';
 import { Database, Layers, Calendar, Flag, Target, Link2, FolderTree, LayoutTemplate, Users, Box } from 'lucide-react';
 import { ConfirmModal } from './ConfirmModal';
 import { clearApplicationsAndSegments, removeApplicationAndSegments } from '../lib/applicationCascade';
+import { rptiCascadeOnInitiativeDelete, rptiCascadeOnApplicationDelete, rptiCascadeOnAssetDelete } from '../lib/rpti';
 
 interface DataManagerProps {
   data: {
@@ -22,6 +23,7 @@ interface DataManagerProps {
     applicationStatuses: ApplicationStatus[];
     dtsPhases: DtsPhaseRecord[];
     decisions: Decision[];
+    rptiDetails: RptiDetail[];
   };
   onUpdate: (data: {
     assets: Asset[];
@@ -38,6 +40,7 @@ interface DataManagerProps {
     applicationStatuses: ApplicationStatus[];
     dtsPhases: DtsPhaseRecord[];
     decisions: Decision[];
+    rptiDetails: RptiDetail[];
   }) => void;
   onOpenTemplatePicker: () => void;
   searchQuery?: string;
@@ -81,15 +84,23 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery 
     const affectedMiles = data.milestones.filter(m => m.assetId === asset.id);
     const affectedInitIds = new Set(affectedInits.map(i => i.id));
     const affectedDeps = data.dependencies.filter(d => affectedInitIds.has(d.sourceId) || affectedInitIds.has(d.targetId));
+    const affectedRptiFromInits = data.rptiDetails.filter(r => affectedInitIds.has(r.initiativeId)).length;
+    const affectedRptiFromAsset = data.rptiDetails.filter(r => r.targetType === 'asset' && r.targetId === asset.id).length;
+    const affectedRpti = affectedRptiFromInits + affectedRptiFromAsset;
     const parts = [];
     if (affectedInits.length) parts.push(`${affectedInits.length} initiative(s)`);
     if (affectedMiles.length) parts.push(`${affectedMiles.length} milestone(s)`);
     if (affectedDeps.length) parts.push(`${affectedDeps.length} dependency(ies)`);
+    if (affectedRpti) parts.push(`${affectedRpti} RPTI report row(s)`);
     return cascadeDelete('Delete Asset', asset.name, parts, {
       assets: data.assets.filter(a => a.id !== asset.id),
       initiatives: data.initiatives.filter(i => i.assetId !== asset.id),
       milestones: data.milestones.filter(m => m.assetId !== asset.id),
       dependencies: data.dependencies.filter(d => !affectedInitIds.has(d.sourceId) && !affectedInitIds.has(d.targetId)),
+      rptiDetails: rptiCascadeOnAssetDelete(
+        data.rptiDetails.filter(r => !affectedInitIds.has(r.initiativeId)),
+        asset.id
+      ),
     });
   };
 
@@ -120,10 +131,14 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery 
 
   const handleDeleteInitiative = (init: Initiative): boolean => {
     const affectedDeps = data.dependencies.filter(d => d.sourceId === init.id || d.targetId === init.id);
-    const parts = affectedDeps.length ? [`${affectedDeps.length} dependency(ies)`] : [];
+    const affectedRpti = data.rptiDetails.filter(r => r.initiativeId === init.id).length;
+    const parts = [];
+    if (affectedDeps.length) parts.push(`${affectedDeps.length} dependency(ies)`);
+    if (affectedRpti) parts.push(`${affectedRpti} RPTI report row(s)`);
     return cascadeDelete('Delete Initiative', init.name, parts, {
       initiatives: data.initiatives.filter(i => i.id !== init.id),
       dependencies: data.dependencies.filter(d => d.sourceId !== init.id && d.targetId !== init.id),
+      rptiDetails: rptiCascadeOnInitiativeDelete(data.rptiDetails, init.id),
     });
   };
 
@@ -302,34 +317,46 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery 
   ];
 
   const applicationColumns: Column<Application>[] = [
-    { key: 'name', label: 'Name', type: 'text', width: '60%' },
+    { key: 'name', label: 'Name', type: 'text', width: '40%' },
     {
-      key: 'assetId', label: 'Asset', type: 'select', width: '40%',
+      key: 'type', label: 'Type', type: 'select', width: '25%',
+      options: (['application', 'infrastructure', 'document', 'procedure', 'other'] as ApplicationType[])
+        .map(t => ({ value: t, label: t.charAt(0).toUpperCase() + t.slice(1) })),
+    },
+    {
+      key: 'assetId', label: 'Asset', type: 'select', width: '35%',
       options: data.assets.map(a => ({ value: a.id, label: a.name })),
     },
   ];
 
   const handleDeleteApplication = (application: Application): boolean => {
     const affectedSegments = data.applicationSegments.filter(segment => segment.applicationId === application.id);
-    const parts = affectedSegments.length ? [`${affectedSegments.length} segment(s)`] : [];
-    const msg = affectedSegments.length
-      ? `Deleting "${application.name}" will also remove ${affectedSegments.length} segment(s). Continue?`
+    const affectedRpti = data.rptiDetails.filter(r => r.targetType === 'application' && r.targetId === application.id).length;
+    const parts = [];
+    if (affectedSegments.length) parts.push(`${affectedSegments.length} segment(s)`);
+    if (affectedRpti) parts.push(`${affectedRpti} RPTI report row(s)`);
+    const msg = parts.length
+      ? `Deleting "${application.name}" will also remove ${parts.join(', ')}. Continue?`
       : undefined;
     return cascadeDelete('Delete Application', application.name, parts, {
       ...removeApplicationAndSegments(
         { applications: data.applications || [], applicationSegments: data.applicationSegments || [] },
         application.id,
       ),
+      rptiDetails: rptiCascadeOnApplicationDelete(data.rptiDetails, application.id),
     }, msg);
   };
 
   const handleClearApplications = (): boolean => {
     const segmentCount = data.applicationSegments.length;
+    const affectedRpti = data.rptiDetails.filter(r => r.targetType === 'application').length;
     const parts = [];
     if ((data.applications || []).length) parts.push(`${(data.applications || []).length} application(s)`);
     if (segmentCount) parts.push(`${segmentCount} segment(s)`);
+    if (affectedRpti) parts.push(`${affectedRpti} RPTI report row(s)`);
     return cascadeDelete('Delete All Applications', 'all applications', parts, {
       ...clearApplicationsAndSegments(),
+      rptiDetails: data.rptiDetails.filter(r => r.targetType !== 'application'),
     }, parts.length
       ? `Deleting all applications will also remove ${parts.join(', ')}. Continue?`
       : 'Delete all applications?');

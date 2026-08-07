@@ -5,7 +5,7 @@
  * Templates correspond to different NZ government IT taxonomy / reference architecture choices.
  */
 
-import { Asset, AssetCategory, Decision, DtsPhaseRecord, Initiative, Milestone, ApplicationSegment, Programme, Strategy, Dependency, Resource, ApplicationStatus, TimelineSettings, Application } from '../types';
+import { Asset, AssetCategory, Decision, RptiDetail, DtsPhaseRecord, Initiative, Milestone, ApplicationSegment, Programme, Strategy, Dependency, Resource, ApplicationStatus, TimelineSettings, Application } from '../types';
 import { DTS_CATEGORIES, DTS_ASSETS } from './dtsCatalogue';
 import { defaultDtsPhases, dtsDemoInitiatives, dtsDemoMilestones, dtsDemoApplicationSegments, dtsDemoApplications, dtsDemoProgrammes, dtsDemoStrategies, dtsDemoAdoptionStatuses, dtsDemoInitiativePhases, dtsDemoDependencies } from './dtsDemoData';
 import {
@@ -73,6 +73,7 @@ export interface TemplateAppData {
   applicationStatuses: ApplicationStatus[];
   dtsPhases: DtsPhaseRecord[];
   decisions: Decision[];
+  rptiDetails: RptiDetail[];
   timelineSettings: TimelineSettings;
 }
 
@@ -100,6 +101,7 @@ export function getTemplateData(templateId: TemplateId | string, withDemoData = 
         applicationStatuses: demoApplicationStatuses,
         dtsPhases: defaultDtsPhases,
         decisions: [],
+        rptiDetails: [],
         timelineSettings: { ...baseSettings, showGeanzCatalogue: false },
       };
 
@@ -120,6 +122,7 @@ export function getTemplateData(templateId: TemplateId | string, withDemoData = 
         applicationStatuses: [],
         dtsPhases: [],
         decisions: [],
+        rptiDetails: [],
         timelineSettings: { ...baseSettings, showGeanzCatalogue: false },
       };
 
@@ -138,6 +141,7 @@ export function getTemplateData(templateId: TemplateId | string, withDemoData = 
         applicationStatuses: [],
         dtsPhases: [],
         decisions: [],
+        rptiDetails: [],
         timelineSettings: { ...baseSettings, showGeanzCatalogue: false },
       };
 
@@ -157,6 +161,7 @@ export function getTemplateData(templateId: TemplateId | string, withDemoData = 
         applicationStatuses: demoApplicationStatuses,
         dtsPhases: [],
         decisions: [],
+        rptiDetails: [],
         timelineSettings: { ...baseSettings, showGeanzCatalogue: true },
       };
   }

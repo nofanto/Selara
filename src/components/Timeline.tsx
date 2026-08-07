@@ -2727,6 +2727,7 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
           setSelectedSegmentId(null);
         }}
         applicationStatuses={applicationStatuses}
+        initiatives={initiatives}
       />
 
       <DependencyPanel

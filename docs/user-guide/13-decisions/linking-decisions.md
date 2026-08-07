@@ -21,4 +21,4 @@ Programmes and assets don't yet have their own detail panel in Scenia, so decisi
 ---
 
 - Previous: [Recording a Decision](recording-a-decision.md)
-- This is the last page in the guide.
+- Next: [Recording an RPTI Row](../14-rpti-report/recording-an-rpti-row.md)

@@ -1,5 +1,5 @@
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
-import { Asset, Application, ApplicationSegment, ApplicationStatus, DtsPhaseRecord, Decision, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Version, Resource } from '../types';
+import { Asset, Application, ApplicationSegment, ApplicationStatus, DtsPhaseRecord, Decision, RptiDetail, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Version, Resource } from '../types';
 import { createSerialAsyncRunner } from './serialAsync';
 
 interface ITMapDB extends DBSchema {
@@ -63,10 +63,14 @@ interface ITMapDB extends DBSchema {
     key: string;
     value: Decision;
   };
+  rptiDetails: {
+    key: string;
+    value: RptiDetail;
+  };
 }
 
 const DB_NAME = 'it-initiative-visualiser';
-const DB_VERSION = 14;
+const DB_VERSION = 15;
 
 let dbPromise: Promise<IDBPDatabase<ITMapDB>>;
 
@@ -182,6 +186,11 @@ export const initDB = () => {
             db.createObjectStore('decisions', { keyPath: 'id' });
           }
         }
+        if (oldVersion < 15) {
+          if (!db.objectStoreNames.contains('rptiDetails')) {
+            db.createObjectStore('rptiDetails', { keyPath: 'id' });
+          }
+        }
       },
     });
   }
@@ -203,6 +212,7 @@ export const getAppData = async () => {
   const applicationStatuses = db.objectStoreNames.contains('applicationStatuses') ? await db.getAll('applicationStatuses') : [];
   const dtsPhases = db.objectStoreNames.contains('dtsPhases') ? await db.getAll('dtsPhases') : [];
   const decisions = db.objectStoreNames.contains('decisions') ? await db.getAll('decisions') : [];
+  const rptiDetails = db.objectStoreNames.contains('rptiDetails') ? await db.getAll('rptiDetails') : [];
 
   // Settings is not a standard list of entities, it's just one config object
   let settingsFromDb = null;
@@ -226,6 +236,7 @@ export const getAppData = async () => {
     applicationStatuses,
     dtsPhases,
     decisions,
+    rptiDetails,
   };
 };
 
@@ -245,9 +256,10 @@ const saveAppDataImpl = async (data: {
   versions?: Version[];
   dtsPhases?: DtsPhaseRecord[];
   decisions?: Decision[];
+  rptiDetails?: RptiDetail[];
 }) => {
   const db = await initDB();
-  const stores: ("assets" | "applications" | "applicationSegments" | "applicationStatuses" | "dtsPhases" | "decisions" | "initiatives" | "milestones" | "programmes" | "strategies" | "dependencies" | "assetCategories" | "settings" | "resources" | "versions")[] = [
+  const stores: ("assets" | "applications" | "applicationSegments" | "applicationStatuses" | "dtsPhases" | "decisions" | "rptiDetails" | "initiatives" | "milestones" | "programmes" | "strategies" | "dependencies" | "assetCategories" | "settings" | "resources" | "versions")[] = [
     'assets', 'initiatives', 'milestones', 'programmes', 'strategies', 'dependencies', 'assetCategories'
   ];
   if (db.objectStoreNames.contains('settings')) {
@@ -270,6 +282,9 @@ const saveAppDataImpl = async (data: {
   }
   if (db.objectStoreNames.contains('decisions')) {
     stores.push('decisions');
+  }
+  if (db.objectStoreNames.contains('rptiDetails')) {
+    stores.push('rptiDetails');
   }
   if (data.versions && db.objectStoreNames.contains('versions')) {
     stores.push('versions');
@@ -328,6 +343,10 @@ const saveAppDataImpl = async (data: {
     if (db.objectStoreNames.contains('decisions')) {
       allPromises.push(tx.objectStore('decisions').clear());
       (data.decisions || []).forEach(item => allPromises.push(tx.objectStore('decisions').put(item)));
+    }
+    if (db.objectStoreNames.contains('rptiDetails')) {
+      allPromises.push(tx.objectStore('rptiDetails').clear());
+      (data.rptiDetails || []).forEach(item => allPromises.push(tx.objectStore('rptiDetails').put(item)));
     }
     if (data.versions && db.objectStoreNames.contains('versions')) {
       allPromises.push(tx.objectStore('versions').clear());

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ApplicationSegment, Application, ApplicationStatus } from '../types';
+import { ApplicationSegment, Application, ApplicationStatus, Initiative } from '../types';
 import { X, Trash2 } from 'lucide-react';
 import { ConfirmModal } from './ConfirmModal';
 import { useFocusTrap } from '../lib/useFocusTrap';
@@ -23,6 +23,7 @@ interface ApplicationSegmentPanelProps {
   onSave: (segment: ApplicationSegment) => void;
   onDelete?: (segment: ApplicationSegment) => void;
   applicationStatuses?: ApplicationStatus[];
+  initiatives?: Initiative[];
 }
 
 export function ApplicationSegmentPanel({
@@ -35,6 +36,7 @@ export function ApplicationSegmentPanel({
   onSave,
   onDelete,
   applicationStatuses,
+  initiatives = [],
 }: ApplicationSegmentPanelProps) {
   const [formData, setFormData] = useState<ApplicationSegment | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -127,6 +129,19 @@ export function ApplicationSegmentPanel({
                 </select>
               )}
 
+              {initiatives.length > 0 && field('Initiative (optional)',
+                <select
+                  data-testid="segment-initiative"
+                  value={formData.initiativeId ?? ''}
+                  onChange={e => setFormData({ ...formData, initiativeId: e.target.value || undefined })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">— None —</option>
+                  {initiatives.map(i => (
+                    <option key={i.id} value={i.id}>{i.name}</option>
+                  ))}
+                </select>
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 {field('Start Date',
