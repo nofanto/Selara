@@ -51,4 +51,4 @@ Turning off Conflicts hides the badge count from card headers. The other three t
 ---
 
 - Previous: [Card View](card-view.md)
-- This is the last page in the guide.
+- Next: [Recording a Decision](../13-decisions/recording-a-decision.md)

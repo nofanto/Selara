@@ -1,5 +1,5 @@
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
-import { Asset, Application, ApplicationSegment, ApplicationStatus, DtsPhaseRecord, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Version, Resource } from '../types';
+import { Asset, Application, ApplicationSegment, ApplicationStatus, DtsPhaseRecord, Decision, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Version, Resource } from '../types';
 import { createSerialAsyncRunner } from './serialAsync';
 
 interface ITMapDB extends DBSchema {
@@ -59,10 +59,14 @@ interface ITMapDB extends DBSchema {
     key: string;
     value: DtsPhaseRecord;
   };
+  decisions: {
+    key: string;
+    value: Decision;
+  };
 }
 
 const DB_NAME = 'it-initiative-visualiser';
-const DB_VERSION = 13;
+const DB_VERSION = 14;
 
 let dbPromise: Promise<IDBPDatabase<ITMapDB>>;
 
@@ -173,6 +177,11 @@ export const initDB = () => {
             }
           }
         }
+        if (oldVersion < 14) {
+          if (!db.objectStoreNames.contains('decisions')) {
+            db.createObjectStore('decisions', { keyPath: 'id' });
+          }
+        }
       },
     });
   }
@@ -193,6 +202,7 @@ export const getAppData = async () => {
   const resources = db.objectStoreNames.contains('resources') ? await db.getAll('resources') : [];
   const applicationStatuses = db.objectStoreNames.contains('applicationStatuses') ? await db.getAll('applicationStatuses') : [];
   const dtsPhases = db.objectStoreNames.contains('dtsPhases') ? await db.getAll('dtsPhases') : [];
+  const decisions = db.objectStoreNames.contains('decisions') ? await db.getAll('decisions') : [];
 
   // Settings is not a standard list of entities, it's just one config object
   let settingsFromDb = null;
@@ -215,6 +225,7 @@ export const getAppData = async () => {
     resources,
     applicationStatuses,
     dtsPhases,
+    decisions,
   };
 };
 
@@ -233,9 +244,10 @@ const saveAppDataImpl = async (data: {
   applicationStatuses: ApplicationStatus[];
   versions?: Version[];
   dtsPhases?: DtsPhaseRecord[];
+  decisions?: Decision[];
 }) => {
   const db = await initDB();
-  const stores: ("assets" | "applications" | "applicationSegments" | "applicationStatuses" | "dtsPhases" | "initiatives" | "milestones" | "programmes" | "strategies" | "dependencies" | "assetCategories" | "settings" | "resources" | "versions")[] = [
+  const stores: ("assets" | "applications" | "applicationSegments" | "applicationStatuses" | "dtsPhases" | "decisions" | "initiatives" | "milestones" | "programmes" | "strategies" | "dependencies" | "assetCategories" | "settings" | "resources" | "versions")[] = [
     'assets', 'initiatives', 'milestones', 'programmes', 'strategies', 'dependencies', 'assetCategories'
   ];
   if (db.objectStoreNames.contains('settings')) {
@@ -255,6 +267,9 @@ const saveAppDataImpl = async (data: {
   }
   if (db.objectStoreNames.contains('dtsPhases')) {
     stores.push('dtsPhases');
+  }
+  if (db.objectStoreNames.contains('decisions')) {
+    stores.push('decisions');
   }
   if (data.versions && db.objectStoreNames.contains('versions')) {
     stores.push('versions');
@@ -309,6 +324,10 @@ const saveAppDataImpl = async (data: {
     if (db.objectStoreNames.contains('dtsPhases')) {
       allPromises.push(tx.objectStore('dtsPhases').clear());
       (data.dtsPhases || []).forEach(item => allPromises.push(tx.objectStore('dtsPhases').put(item)));
+    }
+    if (db.objectStoreNames.contains('decisions')) {
+      allPromises.push(tx.objectStore('decisions').clear());
+      (data.decisions || []).forEach(item => allPromises.push(tx.objectStore('decisions').put(item)));
     }
     if (data.versions && db.objectStoreNames.contains('versions')) {
       allPromises.push(tx.objectStore('versions').clear());

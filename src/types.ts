@@ -120,6 +120,27 @@ export interface DtsPhaseRecord {
   color: string;
 }
 
+export type DecisionStatus = 'proposed' | 'accepted' | 'deprecated' | 'superseded';
+
+/**
+ * A portfolio decision record (MADR-style) — captures why a decision was
+ * made about an initiative, programme, or asset. Stored in the decisions
+ * IndexedDB store, independent of the git-tracked docs/adr/ engineering log.
+ */
+export interface Decision {
+  id: string;
+  title: string;
+  status: DecisionStatus;
+  supersededBy?: string; // Decision.id, set when status === 'superseded'
+  createdAt: string; // ISO datetime, same convention as Version.timestamp
+  context?: string;
+  consideredOptions?: string; // free text, one option per line
+  decisionOutcome?: string;
+  consequences?: string;
+  linkedEntityType?: 'initiative' | 'programme' | 'asset';
+  linkedEntityId?: string;
+}
+
 /**
  * Represents a specific system, team, or resource area.
  */
@@ -218,5 +239,6 @@ export interface Version {
     resources: Resource[];
     applicationStatuses?: ApplicationStatus[];
     dtsPhases?: DtsPhaseRecord[];
+    decisions?: Decision[];
   };
 }

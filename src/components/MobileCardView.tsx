@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Asset, Initiative, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource, DtsAdoptionStatus, DtsPhaseRecord } from '../types';
+import { Asset, Initiative, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource, DtsAdoptionStatus, DtsPhaseRecord, Decision } from '../types';
 import { ChevronDown, ChevronRight, AlertTriangle, DollarSign, AlignLeft, GitBranch } from 'lucide-react';
 import { InitiativePanel } from './InitiativePanel';
 
@@ -13,6 +13,8 @@ interface MobileCardViewProps {
   settings: TimelineSettings;
   resources?: Resource[];
   dtsPhases?: DtsPhaseRecord[];
+  decisions?: Decision[];
+  onOpenDecision?: (decisionId: string) => void;
   onSaveInitiative: (initiative: Initiative) => void;
   onDeleteInitiative?: (initiative: Initiative) => void;
   onOpenSettings: () => void;
@@ -512,6 +514,8 @@ export function MobileCardView({
   settings,
   resources = [],
   dtsPhases = [],
+  decisions = [],
+  onOpenDecision,
   onSaveInitiative,
   onDeleteInitiative,
   onOpenSettings,
@@ -645,6 +649,8 @@ export function MobileCardView({
         initiatives={initiatives}
         resources={resources}
         dtsPhases={dtsPhases}
+        decisions={decisions}
+        onOpenDecision={onOpenDecision}
         onClose={() => setIsPanelOpen(false)}
         onSave={handleSave}
         onDelete={handleDelete}

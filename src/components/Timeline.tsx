@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { useMediaQuery } from '../lib/useMediaQuery';
-import { Asset, Application, ApplicationSegment, ApplicationStatus, DtsPhaseRecord, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource } from '../types';
+import { Asset, Application, ApplicationSegment, ApplicationStatus, DtsPhaseRecord, Decision, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource } from '../types';
 import { differenceInDays, format, parseISO, isValid, addQuarters, getYear, getQuarter, addDays, startOfMonth, lastDayOfMonth, addMonths, addWeeks } from 'date-fns';
 import { cn, reorder } from '../lib/utils';
 import { AlertTriangle, Star, Info, ChevronRight, ChevronDown, ChevronUp, Boxes, Trash2 } from 'lucide-react';
@@ -50,6 +50,8 @@ interface TimelineProps {
   onUpdateApplicationSegments?: (segments: ApplicationSegment[]) => void;
   applicationStatuses?: ApplicationStatus[];
   dtsPhases?: DtsPhaseRecord[];
+  decisions?: Decision[];
+  onOpenDecision?: (decisionId: string) => void;
   onDeleteAsset?: (assetId: string) => void;
   onBulkDeleteAssets?: (assetIds: string[]) => void;
   onAddAssets?: (assets: Asset[]) => void;
@@ -60,7 +62,7 @@ const SIDEBAR_WIDTH_MOBILE = 120; // 7.5rem
 const MAX_RENDERED_DEPENDENCIES = 2000;
 
 
-export function Timeline({ assets, applications = [], initiatives, milestones, programmes, strategies, dependencies, assetCategories, resources = [], settings, onAddInitiative, onUpdateInitiative, onUpdateAssets, onUpdateDependencies, onUpdateMilestone, onDeleteInitiative, onUpdateSettings, searchQuery, applicationSegments: applicationSegmentsProp = [], onSaveApplicationSegment, onDeleteApplicationSegment, onUpdateApplicationSegments, applicationStatuses = [], dtsPhases = [], onDeleteAsset, onBulkDeleteAssets, onAddAssets }: TimelineProps) {
+export function Timeline({ assets, applications = [], initiatives, milestones, programmes, strategies, dependencies, assetCategories, resources = [], settings, onAddInitiative, onUpdateInitiative, onUpdateAssets, onUpdateDependencies, onUpdateMilestone, onDeleteInitiative, onUpdateSettings, searchQuery, applicationSegments: applicationSegmentsProp = [], onSaveApplicationSegment, onDeleteApplicationSegment, onUpdateApplicationSegments, applicationStatuses = [], dtsPhases = [], decisions = [], onOpenDecision, onDeleteAsset, onBulkDeleteAssets, onAddAssets }: TimelineProps) {
   const isMobile = useMediaQuery('(max-width: 767px)');
   const defaultSidebarWidth = isMobile ? SIDEBAR_WIDTH_MOBILE : (settings.sidebarWidth ?? SIDEBAR_WIDTH_DESKTOP);
   const [sidebarWidth, setSidebarWidth] = useState(defaultSidebarWidth);
@@ -2662,6 +2664,8 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
         resources={resources}
         hasDtsAssets={hasDtsAssets}
         dtsPhases={dtsPhases}
+        decisions={decisions}
+        onOpenDecision={onOpenDecision}
         isNew={creatingInitiativeParams !== null}
         onSave={(initiative) => {
           if (initiativePanelId) {

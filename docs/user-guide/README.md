@@ -121,6 +121,13 @@ Follow these three pages to get up and running quickly:
 | [Card View](12-mobile/card-view.md) | The asset card layout shown on phones and tablets |
 | [Mobile Settings](12-mobile/mobile-settings.md) | The mobile settings sheet and display toggles |
 
+### 13 Decisions
+
+| Page | Description |
+|------|-------------|
+| [Recording a Decision](13-decisions/recording-a-decision.md) | Creating, editing, and changing the status of a portfolio decision |
+| [Linking Decisions to Portfolio Items](13-decisions/linking-decisions.md) | Attaching a decision to an initiative, programme, or asset |
+
 ---
 
 ## Feature Reference
@@ -133,6 +140,7 @@ An alphabetical index of capabilities and where to find them.
 | Conflict Detection | [Conflict Detection](02-timeline/conflict-detection.md) |
 | Critical Path | [Critical Path](04-dependencies/critical-path.md) |
 | CSV Import | [CSV Paste](07-data-manager/csv-paste.md) |
+| Decisions | [Recording a Decision](13-decisions/recording-a-decision.md) |
 | Dependencies | [Drawing Dependencies](04-dependencies/drawing-dependencies.md) |
 | Display Modes | [Display Mode](05-applications/display-mode.md) |
 | Excel Export | [Excel Export](11-import-export/excel-export.md) |

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Initiative, Asset, Application, Programme, Strategy, Dependency, Resource, DtsPhase, DtsPhaseRecord } from '../types';
-import { X, Save, Trash2 } from 'lucide-react';
+import { Initiative, Asset, Application, Programme, Strategy, Dependency, Resource, DtsPhase, DtsPhaseRecord, Decision } from '../types';
+import { X, Save, Trash2, ExternalLink } from 'lucide-react';
 import { validateInitiative, ValidationErrors } from '../lib/validation';
 import { ConfirmModal } from './ConfirmModal';
 import { useFocusTrap } from '../lib/useFocusTrap';
@@ -20,10 +20,12 @@ interface InitiativePanelProps {
     isOpen: boolean;
     hasDtsAssets?: boolean;
     dtsPhases?: DtsPhaseRecord[];
+    decisions?: Decision[];
+    onOpenDecision?: (decisionId: string) => void;
     isNew?: boolean;
 }
 
-export function InitiativePanel({ initiative, assets, applications = [], programmes, strategies, dependencies = [], initiatives = [], resources = [], onClose, onSave, onDelete, isOpen, hasDtsAssets = false, dtsPhases = [], isNew = false }: InitiativePanelProps) {
+export function InitiativePanel({ initiative, assets, applications = [], programmes, strategies, dependencies = [], initiatives = [], resources = [], onClose, onSave, onDelete, isOpen, hasDtsAssets = false, dtsPhases = [], decisions = [], onOpenDecision, isNew = false }: InitiativePanelProps) {
     const [formData, setFormData] = useState<Initiative | null>(null);
     const [errors, setErrors] = useState<ValidationErrors>({});
     const [confirmDelete, setConfirmDelete] = useState(false);
@@ -445,6 +447,43 @@ export function InitiativePanel({ initiative, assets, applications = [], program
                                                 </li>
                                             );
                                         })}
+                                    </ul>
+                                </div>
+                            );
+                        })()}
+
+                        {(() => {
+                            const linked = decisions.filter(
+                                d => d.linkedEntityType === 'initiative' && d.linkedEntityId === formData.id
+                            );
+                            if (linked.length === 0) return null;
+                            const statusBadgeClass = (status: Decision['status']) => ({
+                                proposed: 'bg-slate-100 text-slate-600',
+                                accepted: 'bg-emerald-100 text-emerald-700',
+                                deprecated: 'bg-amber-100 text-amber-700',
+                                superseded: 'bg-slate-200 text-slate-500',
+                            })[status];
+                            return (
+                                <div data-testid="initiative-linked-decisions-section" className="pt-4 border-t border-slate-200 mt-2">
+                                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Linked Decisions</p>
+                                    <ul className="space-y-1.5">
+                                        {linked.map(d => (
+                                            <li key={d.id}>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => onOpenDecision?.(d.id)}
+                                                    className="w-full flex items-center justify-between gap-2 text-sm text-left px-2 py-1.5 rounded-md hover:bg-slate-50 transition-colors"
+                                                >
+                                                    <span className="font-medium text-slate-700 truncate">{d.title}</span>
+                                                    <span className="flex items-center gap-1.5 shrink-0">
+                                                        <span className={`text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded ${statusBadgeClass(d.status)}`}>
+                                                            {d.status}
+                                                        </span>
+                                                        <ExternalLink size={12} className="text-slate-400" />
+                                                    </span>
+                                                </button>
+                                            </li>
+                                        ))}
                                     </ul>
                                 </div>
                             );

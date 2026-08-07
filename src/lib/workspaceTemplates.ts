@@ -5,7 +5,7 @@
  * Templates correspond to different NZ government IT taxonomy / reference architecture choices.
  */
 
-import { Asset, AssetCategory, DtsPhaseRecord, Initiative, Milestone, ApplicationSegment, Programme, Strategy, Dependency, Resource, ApplicationStatus, TimelineSettings, Application } from '../types';
+import { Asset, AssetCategory, Decision, DtsPhaseRecord, Initiative, Milestone, ApplicationSegment, Programme, Strategy, Dependency, Resource, ApplicationStatus, TimelineSettings, Application } from '../types';
 import { DTS_CATEGORIES, DTS_ASSETS } from './dtsCatalogue';
 import { defaultDtsPhases, dtsDemoInitiatives, dtsDemoMilestones, dtsDemoApplicationSegments, dtsDemoApplications, dtsDemoProgrammes, dtsDemoStrategies, dtsDemoAdoptionStatuses, dtsDemoInitiativePhases, dtsDemoDependencies } from './dtsDemoData';
 import {
@@ -72,6 +72,7 @@ export interface TemplateAppData {
   applications: Application[];
   applicationStatuses: ApplicationStatus[];
   dtsPhases: DtsPhaseRecord[];
+  decisions: Decision[];
   timelineSettings: TimelineSettings;
 }
 
@@ -98,6 +99,7 @@ export function getTemplateData(templateId: TemplateId | string, withDemoData = 
         applications: withDemoData ? dtsDemoApplications : [],
         applicationStatuses: demoApplicationStatuses,
         dtsPhases: defaultDtsPhases,
+        decisions: [],
         timelineSettings: { ...baseSettings, showGeanzCatalogue: false },
       };
 
@@ -117,6 +119,7 @@ export function getTemplateData(templateId: TemplateId | string, withDemoData = 
         applications: [],
         applicationStatuses: [],
         dtsPhases: [],
+        decisions: [],
         timelineSettings: { ...baseSettings, showGeanzCatalogue: false },
       };
 
@@ -134,6 +137,7 @@ export function getTemplateData(templateId: TemplateId | string, withDemoData = 
         applications: [],
         applicationStatuses: [],
         dtsPhases: [],
+        decisions: [],
         timelineSettings: { ...baseSettings, showGeanzCatalogue: false },
       };
 
@@ -152,6 +156,7 @@ export function getTemplateData(templateId: TemplateId | string, withDemoData = 
         applications: withDemoData ? demoApplications : [],
         applicationStatuses: demoApplicationStatuses,
         dtsPhases: [],
+        decisions: [],
         timelineSettings: { ...baseSettings, showGeanzCatalogue: true },
       };
   }

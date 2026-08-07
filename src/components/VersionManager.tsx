@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Version, Asset, Application, ApplicationSegment, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource, ApplicationStatus, DtsPhaseRecord } from '../types';
+import { Version, Asset, Application, ApplicationSegment, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource, ApplicationStatus, DtsPhaseRecord, Decision } from '../types';
 import { X, Save, History, Trash2, ArrowRight, FileText, AlertCircle, LayoutGrid, Check, Users, GitBranch } from 'lucide-react';
 import { saveVersion, deleteVersion } from '../lib/db';
 import { ConfirmModal } from './ConfirmModal';
@@ -27,6 +27,7 @@ interface VersionManagerProps {
     resources: Resource[];
     applicationStatuses?: ApplicationStatus[];
     dtsPhases?: DtsPhaseRecord[];
+    decisions?: Decision[];
   };
 }
 
@@ -56,6 +57,7 @@ export function VersionManager({ isOpen, onClose, onRestore, versions, onUpdateV
         ...currentData,
         applicationStatuses: currentData.applicationStatuses || [],
         dtsPhases: currentData.dtsPhases || [],
+        decisions: currentData.decisions || [],
       }),
     };
 

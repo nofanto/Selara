@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Asset, Application, ApplicationSegment, ApplicationStatus, DtsPhaseRecord, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource } from '../types';
+import { Asset, Application, ApplicationSegment, ApplicationStatus, DtsPhaseRecord, Decision, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource } from '../types';
 import { EditableTable, Column } from './EditableTable';
 import { cn } from '../lib/utils';
 import { Database, Layers, Calendar, Flag, Target, Link2, FolderTree, LayoutTemplate, Users, Box } from 'lucide-react';
@@ -21,6 +21,7 @@ interface DataManagerProps {
     resources: Resource[];
     applicationStatuses: ApplicationStatus[];
     dtsPhases: DtsPhaseRecord[];
+    decisions: Decision[];
   };
   onUpdate: (data: {
     assets: Asset[];
@@ -36,6 +37,7 @@ interface DataManagerProps {
     resources: Resource[];
     applicationStatuses: ApplicationStatus[];
     dtsPhases: DtsPhaseRecord[];
+    decisions: Decision[];
   }) => void;
   onOpenTemplatePicker: () => void;
   searchQuery?: string;
