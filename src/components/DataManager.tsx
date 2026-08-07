@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import { Asset, Application, ApplicationSegment, ApplicationStatus, ApplicationType, Decision, RptiDetail, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource } from '../types';
 import { EditableTable, Column } from './EditableTable';
 import { cn } from '../lib/utils';
-import { Database, Layers, Calendar, Flag, Target, Link2, FolderTree, LayoutTemplate, Users, Box } from 'lucide-react';
+import { Database, Layers, Calendar, Flag, Target, Link2, FolderTree, LayoutTemplate, Users, Box, ClipboardList } from 'lucide-react';
 import { ConfirmModal } from './ConfirmModal';
 import { clearApplicationsAndSegments, removeApplicationAndSegments } from '../lib/applicationCascade';
-import { rptiCascadeOnInitiativeDelete, rptiCascadeOnApplicationDelete, rptiCascadeOnAssetDelete } from '../lib/rpti';
+import { rptiCascadeOnInitiativeDelete, rptiCascadeOnApplicationDelete, rptiCascadeOnAssetDelete, RPTI_CATEGORY_LABELS } from '../lib/rpti';
 
 interface DataManagerProps {
   data: {
@@ -44,7 +44,7 @@ interface DataManagerProps {
   searchQuery?: string;
 }
 
-type Tab = 'initiatives' | 'dependencies' | 'assets' | 'assetCategories' | 'programmes' | 'strategies' | 'milestones' | 'resources' | 'applications' | 'appStatuses';
+type Tab = 'initiatives' | 'dependencies' | 'assets' | 'assetCategories' | 'programmes' | 'strategies' | 'milestones' | 'resources' | 'applications' | 'appStatuses' | 'rpti';
 
 export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery }: DataManagerProps) {
   const [activeTab, setActiveTab] = useState<Tab>('initiatives');
@@ -166,6 +166,22 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery 
   const strategyOptions = data.strategies.map(s => ({ value: s.id, label: s.name }));
   const initiativeOptions = data.initiatives.map(i => ({ value: i.id, label: i.name }));
   const categoryOptions = data.assetCategories.map(c => ({ value: c.id, label: c.name }));
+  const applicationOptions = (data.applications || []).map(a => ({ value: a.id, label: a.name }));
+  const rptiTargetOptions = [
+    ...applicationOptions.map(o => ({ value: o.value, label: `App: ${o.label}` })),
+    ...assetOptions.map(o => ({ value: o.value, label: `Asset: ${o.label}` })),
+  ];
+
+  // Recomputes each row's targetType from whichever list (applications vs assets)
+  // its current targetId is actually found in, so targetId is the single source
+  // of truth and the two fields can never fall out of sync via inline editing.
+  const deriveRptiTargetTypes = (rows: RptiDetail[]): RptiDetail[] => {
+    return rows.map(row => {
+      if ((data.applications || []).some(a => a.id === row.targetId)) return { ...row, targetType: 'application' as const };
+      if (data.assets.some(a => a.id === row.targetId)) return { ...row, targetType: 'asset' as const };
+      return row;
+    });
+  };
 
   const initiativeColumns: Column<Initiative>[] = [
     { key: 'name', label: 'Initiative Name', type: 'text', width: '180px' },
@@ -329,6 +345,46 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery 
     { key: 'color', label: 'Color', type: 'color', width: '40%' },
   ];
 
+  const rptiColumns: Column<RptiDetail>[] = [
+    { key: 'initiativeId', label: 'Initiative', type: 'select', options: initiativeOptions, width: '150px' },
+    { key: 'targetId', label: 'Target', type: 'select', options: rptiTargetOptions, width: '160px' },
+    {
+      key: 'categoryCode', label: 'Category', type: 'select', width: '220px',
+      options: (Object.keys(RPTI_CATEGORY_LABELS) as (keyof typeof RPTI_CATEGORY_LABELS)[])
+        .map(code => ({ value: code, label: `${code} — ${RPTI_CATEGORY_LABELS[code]}` })),
+    },
+    {
+      key: 'developmentType', label: 'Dev Type', type: 'select', width: '110px',
+      options: [{ value: 'new', label: 'New' }, { value: 'upgrade', label: 'Upgrade' }],
+    },
+    {
+      key: 'developer', label: 'Developer', type: 'select', width: '110px',
+      options: [{ value: 'inhouse', label: 'In-house' }, { value: 'PPJTI', label: 'PPJTI' }],
+    },
+    {
+      key: 'ppjtiRelatedParty', label: 'PPJTI Related Party', type: 'select', width: '150px',
+      options: [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }, { value: 'n/a', label: 'N/A' }],
+    },
+    {
+      key: 'plannedImplementationQuarter', label: 'Quarter', type: 'select', width: '100px',
+      options: [
+        { value: '', label: '— Not set —' },
+        { value: 'Q1', label: 'Q1' }, { value: 'Q2', label: 'Q2' }, { value: 'Q3', label: 'Q3' }, { value: 'Q4', label: 'Q4' },
+      ],
+    },
+    { key: 'capexAmount', label: 'CapEx Override ($)', type: 'number', width: '140px' },
+    { key: 'capexCurrency', label: 'CapEx Currency', type: 'text', width: '110px' },
+    { key: 'capexIdrEquivalent', label: 'CapEx IDR Equiv.', type: 'number', width: '140px' },
+    { key: 'opexAmount', label: 'OpEx Override ($)', type: 'number', width: '140px' },
+    { key: 'opexCurrency', label: 'OpEx Currency', type: 'text', width: '110px' },
+    { key: 'opexIdrEquivalent', label: 'OpEx IDR Equiv.', type: 'number', width: '140px' },
+    { key: 'dcCity', label: 'DC City', type: 'text', width: '110px' },
+    { key: 'dcCountry', label: 'DC Country', type: 'text', width: '110px' },
+    { key: 'drCity', label: 'DR City', type: 'text', width: '110px' },
+    { key: 'drCountry', label: 'DR Country', type: 'text', width: '110px' },
+    { key: 'remarks', label: 'Remarks', type: 'textarea', width: '200px' },
+  ];
+
   const tabs = [
     { id: 'initiatives', label: 'Initiatives', icon: Layers, count: data.initiatives.length },
     { id: 'dependencies', label: 'Dependencies', icon: Link2, count: data.dependencies.length },
@@ -340,6 +396,7 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery 
     { id: 'milestones', label: 'Milestones', icon: Flag, count: data.milestones.length },
     { id: 'resources', label: 'Resources', icon: Users, count: (data.resources || []).length },
     { id: 'appStatuses', label: 'App Statuses', icon: Layers, count: (data.applicationStatuses || []).length },
+    { id: 'rpti', label: 'RPTI', icon: ClipboardList, count: (data.rptiDetails || []).length },
   ];
 
   return (
@@ -483,6 +540,17 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery 
             idField="id"
             tableId="appStatuses"
             onColumnResize={(col, w) => handleColumnResize('appStatuses', col, w)}
+          />
+        )}
+        {activeTab === 'rpti' && (
+          <EditableTable
+            data={data.rptiDetails || []}
+            columns={getColumnsWithWidths('rpti', rptiColumns)}
+            onUpdate={(newData) => updateData('rptiDetails', deriveRptiTargetTypes(newData))}
+            onDelete={(row) => { updateData('rptiDetails', (data.rptiDetails || []).filter(r => r.id !== row.id)); return true; }}
+            idField="id"
+            tableId="rpti"
+            onColumnResize={(col, w) => handleColumnResize('rpti', col, w)}
           />
         )}
       </div>

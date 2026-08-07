@@ -185,10 +185,10 @@ export interface RptiDetail {
   developmentType: RptiDevelopmentType;
   developer: RptiDeveloper;
   ppjtiRelatedParty: RptiRelatedParty;
-  location?: {
-    dataCenter?: { city?: string; country?: string };
-    disasterRecoveryCenter?: { city?: string; country?: string };
-  };
+  dcCity?: string;
+  dcCountry?: string;
+  drCity?: string;
+  drCountry?: string;
   capexAmount?: number; // Defaults to the linked Initiative's capex when unset
   capexCurrency?: string;
   capexIdrEquivalent?: number;

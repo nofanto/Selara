@@ -132,8 +132,8 @@ Follow these three pages to get up and running quickly:
 
 | Page | Description |
 |------|-------------|
-| [Recording an RPTI Row](14-rpti-report/recording-an-rpti-row.md) | Building the Indonesian OJK IT Development Plan Report from your portfolio data |
-| [Auto-Suggested Quarters and Exporting](14-rpti-report/exporting-the-rpti-report.md) | How planned implementation quarters are suggested, and exporting to Excel |
+| [Recording an RPTI Row](14-rpti-report/recording-an-rpti-row.md) | Managing RPTI rows in Data Manager to build the Indonesian OJK IT Development Plan Report |
+| [Exporting the RPTI Report](14-rpti-report/exporting-the-rpti-report.md) | How a missing quarter is filled in at export time, and exporting to Excel |
 
 ---
 

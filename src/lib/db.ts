@@ -66,7 +66,7 @@ interface ITMapDB extends DBSchema {
 }
 
 const DB_NAME = 'it-initiative-visualiser';
-const DB_VERSION = 15;
+const DB_VERSION = 16;
 
 let dbPromise: Promise<IDBPDatabase<ITMapDB>>;
 
@@ -165,6 +165,23 @@ export const initDB = () => {
         if (oldVersion < 15) {
           if (!db.objectStoreNames.contains('rptiDetails')) {
             db.createObjectStore('rptiDetails', { keyPath: 'id' });
+          }
+        }
+        if (oldVersion < 16) {
+          // Flatten RptiDetail.location into top-level dcCity/dcCountry/drCity/drCountry.
+          const allRptiDetails = await tx.objectStore('rptiDetails').getAll();
+          for (const detail of allRptiDetails) {
+            const loc = (detail as any).location;
+            if (loc) {
+              const { location: _location, ...rest } = detail as any;
+              await tx.objectStore('rptiDetails').put({
+                ...rest,
+                dcCity: loc.dataCenter?.city,
+                dcCountry: loc.dataCenter?.country,
+                drCity: loc.disasterRecoveryCenter?.city,
+                drCountry: loc.disasterRecoveryCenter?.country,
+              });
+            }
           }
         }
       },

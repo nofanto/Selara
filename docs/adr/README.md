@@ -36,3 +36,4 @@ An ADR is never edited to reverse its outcome — if circumstances change, write
 | [0002](0002-in-app-decision-log.md) | Add an in-app portfolio decision log | Accepted |
 | [0003](0003-rpti-report-and-application-type.md) | Add an RPTI report, a typed Application field, and an Initiative→target join | Accepted |
 | [0004](0004-remove-dts.md) | Remove the DTS (NZ Digital Target State) workspace feature | Accepted |
+| [0005](0005-rpti-data-manager-tab.md) | Make RPTI rows first-class via a Data Manager tab | Accepted |

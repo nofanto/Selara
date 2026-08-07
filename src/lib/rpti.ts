@@ -68,27 +68,6 @@ export function resolveCost(detail: RptiDetail, initiative: Initiative | undefin
   };
 }
 
-/**
- * Soft warning when an initiative's row-level cost overrides sum above its
- * own total capex/opex — only counts rows that explicitly set an override,
- * so an initiative with a single (or every) row left at the default doesn't
- * spuriously trigger this.
- */
-export function checkBudgetAllocation(
-  initiativeId: string,
-  rptiDetails: RptiDetail[],
-  initiative: Initiative,
-): { capexOver: boolean; opexOver: boolean; capexSum: number; opexSum: number } | null {
-  const overriddenRows = rptiDetails.filter(r => r.initiativeId === initiativeId && (r.capexAmount !== undefined || r.opexAmount !== undefined));
-  if (overriddenRows.length === 0) return null;
-  const capexSum = overriddenRows.reduce((sum, r) => sum + (r.capexAmount ?? 0), 0);
-  const opexSum = overriddenRows.reduce((sum, r) => sum + (r.opexAmount ?? 0), 0);
-  const capexOver = capexSum > initiative.capex;
-  const opexOver = opexSum > initiative.opex;
-  if (!capexOver && !opexOver) return null;
-  return { capexOver, opexOver, capexSum, opexSum };
-}
-
 export function rptiCascadeOnInitiativeDelete(rptiDetails: RptiDetail[], initiativeId: string): RptiDetail[] {
   return rptiDetails.filter(r => r.initiativeId !== initiativeId);
 }
@@ -105,11 +84,8 @@ export function rptiCascadeOnSegmentDelete(rptiDetails: RptiDetail[], segmentId:
   return rptiDetails.map(r => r.applicationSegmentId === segmentId ? { ...r, applicationSegmentId: undefined } : r);
 }
 
-function formatLocation(loc?: RptiDetail['location'], key?: 'dataCenter' | 'disasterRecoveryCenter'): string {
-  if (!loc || !key) return '';
-  const place = loc[key];
-  if (!place || (!place.city && !place.country)) return '';
-  return [place.city, place.country].filter(Boolean).join(', ');
+function formatPlace(city?: string, country?: string): string {
+  return [city, country].filter(Boolean).join(', ');
 }
 
 /**
@@ -158,8 +134,8 @@ export function exportRptiReportToExcel(
       detail.developmentType,
       detail.developer,
       detail.ppjtiRelatedParty,
-      formatLocation(detail.location, 'dataCenter'),
-      formatLocation(detail.location, 'disasterRecoveryCenter'),
+      formatPlace(detail.dcCity, detail.dcCountry),
+      formatPlace(detail.drCity, detail.drCountry),
       suggestion,
       capexAmount,
       opexAmount,

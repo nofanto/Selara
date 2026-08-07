@@ -21,9 +21,6 @@ interface ReportsViewProps {
   applicationSegments?: ApplicationSegment[];
   applicationStatuses?: ApplicationStatus[];
   rptiDetails?: RptiDetail[];
-  onAddRptiDetail?: (detail: RptiDetail) => void;
-  onUpdateRptiDetail?: (detail: RptiDetail) => void;
-  onDeleteRptiDetail?: (detail: RptiDetail) => void;
   onSaveAsset?: (asset: Asset) => void;
 }
 
@@ -90,7 +87,7 @@ function depSentence(dep: Dependency, src: Initiative, tgt: Initiative, perspect
   return `${src.name} and ${tgt.name} are related.`;
 }
 
-export function ReportsView({ assets, initiatives, milestones, dependencies, currentData, programmes, strategies, assetCategories, resources = [], applications = [], applicationSegments = [], applicationStatuses = [], rptiDetails = [], onAddRptiDetail, onUpdateRptiDetail, onDeleteRptiDetail, onSaveAsset }: ReportsViewProps) {
+export function ReportsView({ assets, initiatives, milestones, dependencies, currentData, programmes, strategies, assetCategories, resources = [], applications = [], applicationSegments = [], applicationStatuses = [], rptiDetails = [], onSaveAsset }: ReportsViewProps) {
   const [selectedReport, setSelectedReport] = useState<ReportSlug | null>(null);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [assetPanelOpen, setAssetPanelOpen] = useState(false);
@@ -595,10 +592,6 @@ export function ReportsView({ assets, initiatives, milestones, dependencies, cur
             assets={assets}
             applicationSegments={applicationSegments}
             applicationStatuses={applicationStatuses}
-            milestones={milestones}
-            onAdd={onAddRptiDetail ?? (() => {})}
-            onUpdate={onUpdateRptiDetail ?? (() => {})}
-            onDelete={onDeleteRptiDetail ?? (() => {})}
           />
         </div>
       </div>

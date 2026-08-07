@@ -1,24 +1,22 @@
-# Auto-Suggested Quarters and Exporting
+# Exporting the RPTI Report
 
-The **Planned Implementation Time** column in RPTI reports which quarter a development is expected to go live. Scenia can suggest this automatically for application rows, based on the application's lifecycle segments.
+The **Planned Implementation Time** column in RPTI reports which quarter a development is expected to go live. If you leave the **Quarter** column blank for an application-target row in Data Manager, Scenia fills it in automatically at export time, based on the application's lifecycle segments.
 
-## How auto-suggestion works
+## How the export-time quarter fallback works
 
-An application's lifecycle is tracked through **Lifecycle Segments** (see [Lifecycle Segments](../05-applications/lifecycle-segments.md)) — phases like Planned, Funded, In Production, and Sunset. When a segment is linked to the same initiative as an RPTI row and its status represents "live" (In Production by default, or any status your workspace has marked as the live status), Scenia suggests that segment's start date as the row's quarter.
+An application's lifecycle is tracked through **Lifecycle Segments** (see [Lifecycle Segments](../05-applications/lifecycle-segments.md)) — phases like Planned, Funded, In Production, and Sunset. When a segment is linked to the same initiative as an RPTI row and its status represents "live" (In Production by default, or any status your workspace has marked as the live status), that segment's start date is used as the row's quarter wherever the row's own **Quarter** column is empty — both on the read-only RPTI Report screen and in the Excel export.
 
-To make a segment eligible for suggestion:
+To make a segment eligible:
 
 1. Open the application's lifecycle segment (double-click its swimlane, or click an existing segment bar).
 2. Set its **Initiative** field to the initiative driving that phase.
 3. Save.
 
-Back on the RPTI row form, once both the same Initiative and Application are selected, a suggestion banner appears if a matching segment is found — click **Use this** to accept it, or leave the quarter dropdown to enter one manually.
-
-Asset/infrastructure rows don't have a lifecycle segment concept, so their quarter is always entered manually. The form offers a **Copy date from an existing milestone** shortcut if the target asset already has a relevant milestone recorded.
+Asset/infrastructure rows don't have a lifecycle segment concept, so their quarter always needs to be entered directly in the **Quarter** column in Data Manager.
 
 ## Exporting to Excel
 
-Click **Export to Excel** on the RPTI Report screen to download a spreadsheet matching the exact Format 3.1 layout — one row per RPTI record, with all 11 required columns. This is separate from the general workspace Excel export (which includes a raw backup copy of your RPTI data alongside every other entity type, for full round-trip import/export).
+Go to **Reports → RPTI Report** and click **Export to Excel** to download a spreadsheet matching the exact Format 3.1 layout — one row per RPTI record, with all 11 required columns. This is separate from the general workspace Excel export (which includes a raw backup copy of your RPTI data alongside every other entity type, for full round-trip import/export).
 
 ---
 

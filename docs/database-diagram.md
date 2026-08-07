@@ -3,7 +3,7 @@
 Scenia persists all application data client-side in **IndexedDB**, accessed via the `idb` library. The database is defined in a single location: [`src/lib/db.ts`](../src/lib/db.ts).
 
 - **Database name:** `it-initiative-visualiser`
-- **Current schema version:** `14`
+- **Current schema version:** `16`
 - **Object stores:** 15 (all key-path stores except `settings`, which uses an explicit out-of-line key)
 - **Indexes:** none — all lookups are done via `getAll()` with in-memory filtering/joining on foreign-key-like fields (there is no `createIndex` usage anywhere in the codebase)
 
@@ -184,6 +184,7 @@ erDiagram
 | `applicationStatuses` | `id` | `ApplicationStatus` | v10 |
 | `dtsPhases` | `id` | `DtsPhaseRecord` | v13 — orphaned; see Migration Notes |
 | `decisions` | `id` | `Decision` | v14 |
+| `rptiDetails` | `id` | `RptiDetail` | v15 |
 
 ## Relationships
 
@@ -203,7 +204,10 @@ Since IndexedDB has no native foreign-key enforcement, all relationships below a
 - `Dependency.sourceId` / `Dependency.targetId` → polymorphic; resolved via `sourceType`/`targetType` (`'initiative' | 'milestone' | 'segment'`) to `Initiative.id`, `Milestone.id`, or `ApplicationSegment.id`
 - `Decision.linkedEntityId` (optional) → polymorphic; resolved via `linkedEntityType` (`'initiative' | 'programme' | 'asset'`) to `Initiative.id`, `Programme.id`, or `Asset.id`. Unlike `Dependency`, a decision links to at most one item.
 - `Decision.supersededBy` (optional) → `Decision.id` — set when a later decision replaces this one.
-- `Version.data` embeds a denormalized, point-in-time snapshot of every other store (assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, decisions) — this is how backup/restore and version history are implemented. `dtsPhases` is not included — it was dropped from `Version.data` when DTS was removed (see Migration Notes). The `versions` store itself is not part of the regular `getAppData`/`saveAppData` load-save cycle; it's managed separately via `saveVersion`/`getAllVersions`/`deleteVersion`.
+- `RptiDetail.initiativeId` → `Initiative.id`
+- `RptiDetail.targetId` (with `targetType: 'application' | 'asset'`) → polymorphic; resolved to `Application.id` or `Asset.id`. In Data Manager, `targetType` is not directly editable — it's re-derived automatically from whichever list (`applications` or `assets`) the current `targetId` is found in, so the two fields can never fall out of sync via inline editing.
+- `RptiDetail.applicationSegmentId` (optional) → `ApplicationSegment.id` — set when the row's quarter was auto-derived from a lifecycle segment at export time (see [ADR-0005](adr/0005-rpti-data-manager-tab.md)).
+- `Version.data` embeds a denormalized, point-in-time snapshot of every other store (assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, decisions, rptiDetails) — this is how backup/restore and version history are implemented. `dtsPhases` is not included — it was dropped from `Version.data` when DTS was removed (see Migration Notes). The `versions` store itself is not part of the regular `getAppData`/`saveAppData` load-save cycle; it's managed separately via `saveVersion`/`getAllVersions`/`deleteVersion`.
 
 ## Migration Notes
 
@@ -213,6 +217,8 @@ Schema evolution is handled in the `upgrade()` callback of `openDB<ITMapDB>()` i
 - **v12:** `Initiative.budget` (single field) was split into separate `capex` and `opex` fields, defaulting `opex` to `0`.
 - **v13:** Added the `dtsPhases` store and seeded 5 default `DtsPhaseRecord`s (`phase-1`, `phase-2`, `phase-3`, `back-office`, `not-dts`) for workspaces that already contained assets whose `alias` starts with `"DTS."`. **This store is now orphaned:** the DTS workspace feature was removed (see [ADR-0004](adr/0004-remove-dts.md)), and all application code that read or wrote `dtsPhases` was deleted along with it. Per this app's additive-only migration history, the store's creation logic was simply not carried forward for new databases — no `deleteObjectStore` was called, so any database that already reached v13+ keeps its (now-inert) `dtsPhases` store forever. `DB_VERSION` was not bumped for this removal.
 - **v14:** Added the `decisions` store (no seeding — always empty on creation) to support the in-app portfolio decision log. See [ADR-0002](adr/0002-in-app-decision-log.md).
+- **v15:** Added the `rptiDetails` store (no seeding) and a `type` field on `Application`, to support the RPTI regulatory report. See [ADR-0003](adr/0003-rpti-report-and-application-type.md).
+- **v16:** Flattened `RptiDetail.location` (a nested `{ dataCenter: {city, country}, disasterRecoveryCenter: {city, country} }` object) into four top-level fields — `dcCity`, `dcCountry`, `drCity`, `drCountry` — so the field could be edited inline in Data Manager, whose `EditableTable` component only supports flat columns. Existing `rptiDetails` records with a `location` value are rewritten in place: their nested fields are copied to the new top-level fields and `location` is removed. See [ADR-0005](adr/0005-rpti-data-manager-tab.md).
 
 ## Source of Truth
 

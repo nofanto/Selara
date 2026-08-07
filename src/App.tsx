@@ -610,18 +610,6 @@ export default function App() {
     setView('decisions');
   }, []);
 
-  const handleAddRptiDetail = useCallback((newDetail: RptiDetail) => {
-    handleUpdate({ assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, decisions, rptiDetails: [...rptiDetails, newDetail] });
-  }, [assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, decisions, rptiDetails, handleUpdate]);
-
-  const handleUpdateRptiDetail = useCallback((updatedDetail: RptiDetail) => {
-    handleUpdate({ assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, decisions, rptiDetails: rptiDetails.map(r => r.id === updatedDetail.id ? updatedDetail : r) });
-  }, [assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, decisions, rptiDetails, handleUpdate]);
-
-  const handleDeleteRptiDetail = useCallback((deletedDetail: RptiDetail) => {
-    handleUpdate({ assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, decisions, rptiDetails: rptiDetails.filter(r => r.id !== deletedDetail.id) });
-  }, [assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, decisions, rptiDetails, handleUpdate]);
-
   useEffect(() => {
     if (!showMoreSettingsPanel && !showViewOptionsPanel) return;
     const handleClickOutside = (e: MouseEvent) => {
@@ -1467,9 +1455,6 @@ export default function App() {
               applicationSegments={applicationSegments}
               applicationStatuses={applicationStatuses}
               rptiDetails={rptiDetails}
-              onAddRptiDetail={handleAddRptiDetail}
-              onUpdateRptiDetail={handleUpdateRptiDetail}
-              onDeleteRptiDetail={handleDeleteRptiDetail}
               onSaveAsset={handleUpdateAsset}
             />
           </Suspense>
