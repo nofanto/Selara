@@ -56,9 +56,6 @@ export function computeDiff(baseVersion: Version, currentData: Version['data']):
       if ((b.maturity ?? null) !== (c.maturity ?? null)) {
         changes.push(`Maturity: ${b.maturity ?? 'Unrated'} → ${c.maturity ?? 'Unrated'}`);
       }
-      if ((b.dtsAdoptionStatus ?? null) !== (c.dtsAdoptionStatus ?? null)) {
-        changes.push(`DTS adoption status: ${b.dtsAdoptionStatus ?? 'Unset'} → ${c.dtsAdoptionStatus ?? 'Unset'}`);
-      }
       return changes;
     }
   );

@@ -6,7 +6,6 @@ import { test, expect } from '@playwright/test';
  * All ApplicationSegment records link via an Application record (applicationId)
  * rather than directly to an asset (assetId). After unification:
  *  - GEANZ demo data: gz-* assets have Application records visible in Data Manager
- *  - DTS template checks are covered in dts-segment-labels.spec.ts
  */
 
 test.describe('US-30: Unified segment model — GEANZ Application records', () => {

@@ -1,10 +1,10 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { useMediaQuery } from '../lib/useMediaQuery';
-import { Asset, Application, ApplicationSegment, ApplicationStatus, DtsPhaseRecord, Decision, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource } from '../types';
+import { Asset, Application, ApplicationSegment, ApplicationStatus, Decision, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource } from '../types';
 import { differenceInDays, format, parseISO, isValid, addQuarters, getYear, getQuarter, addDays, startOfMonth, lastDayOfMonth, addMonths, addWeeks } from 'date-fns';
 import { cn, reorder } from '../lib/utils';
 import { AlertTriangle, Star, Info, ChevronRight, ChevronDown, ChevronUp, Boxes, Trash2 } from 'lucide-react';
-import { geanzAreas, GEANZ_CATEGORY_ID, GEANZ_TO_DTS_MAP, GeanzArea } from '../lib/geanzCatalogue';
+import { geanzAreas, GEANZ_CATEGORY_ID, GeanzArea } from '../lib/geanzCatalogue';
 import { InitiativePanel } from './InitiativePanel';
 import { InitiativeBar } from './InitiativeBar';
 import { ApplicationSegmentPanel } from './ApplicationSegmentPanel';
@@ -49,7 +49,6 @@ interface TimelineProps {
   onDeleteApplicationSegment?: (segment: ApplicationSegment) => void;
   onUpdateApplicationSegments?: (segments: ApplicationSegment[]) => void;
   applicationStatuses?: ApplicationStatus[];
-  dtsPhases?: DtsPhaseRecord[];
   decisions?: Decision[];
   onOpenDecision?: (decisionId: string) => void;
   onDeleteAsset?: (assetId: string) => void;
@@ -62,7 +61,7 @@ const SIDEBAR_WIDTH_MOBILE = 120; // 7.5rem
 const MAX_RENDERED_DEPENDENCIES = 2000;
 
 
-export function Timeline({ assets, applications = [], initiatives, milestones, programmes, strategies, dependencies, assetCategories, resources = [], settings, onAddInitiative, onUpdateInitiative, onUpdateAssets, onUpdateDependencies, onUpdateMilestone, onDeleteInitiative, onUpdateSettings, searchQuery, applicationSegments: applicationSegmentsProp = [], onSaveApplicationSegment, onDeleteApplicationSegment, onUpdateApplicationSegments, applicationStatuses = [], dtsPhases = [], decisions = [], onOpenDecision, onDeleteAsset, onBulkDeleteAssets, onAddAssets }: TimelineProps) {
+export function Timeline({ assets, applications = [], initiatives, milestones, programmes, strategies, dependencies, assetCategories, resources = [], settings, onAddInitiative, onUpdateInitiative, onUpdateAssets, onUpdateDependencies, onUpdateMilestone, onDeleteInitiative, onUpdateSettings, searchQuery, applicationSegments: applicationSegmentsProp = [], onSaveApplicationSegment, onDeleteApplicationSegment, onUpdateApplicationSegments, applicationStatuses = [], decisions = [], onOpenDecision, onDeleteAsset, onBulkDeleteAssets, onAddAssets }: TimelineProps) {
   const isMobile = useMediaQuery('(max-width: 767px)');
   const defaultSidebarWidth = isMobile ? SIDEBAR_WIDTH_MOBILE : (settings.sidebarWidth ?? SIDEBAR_WIDTH_DESKTOP);
   const [sidebarWidth, setSidebarWidth] = useState(defaultSidebarWidth);
@@ -115,12 +114,9 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
   );
 
   // ── Shared colour + subtitle helpers (single source of truth) ────────────
-  const dtsPhaseMap = useMemo(() => new Map(dtsPhases.map(p => [p.id, p])), [dtsPhases]);
-
   function getInitiativeColor(init: Initiative, prog: Programme | undefined, strat: Strategy | undefined): string {
     if (colorBy === 'rag')       return RAG_COLORS[init.ragStatus || 'none'];
     if (colorBy === 'status')    return STATUS_COLORS[normalizeInitiativeStatus(init.status)];
-    if (colorBy === 'dts-phase') return dtsPhaseMap.get(init.dtsPhase as string)?.color || 'bg-slate-400';
     if (colorBy === 'programme') return prog?.color || 'bg-slate-500';
     return strat?.color || 'bg-slate-400';
   }
@@ -135,7 +131,6 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
   ): string | undefined {
     if (colorBy === 'rag')       return init.ragStatus ? RAG_LABELS[init.ragStatus] : undefined;
     if (colorBy === 'status')    return STATUS_LABELS[normalizeInitiativeStatus(init.status)];
-    if (colorBy === 'dts-phase') return dtsPhaseMap.get(init.dtsPhase as string)?.name;
     if (isGroup)                 return colorBy === 'programme' ? groupProgrammeNames : groupStrategyNames;
     return colorBy === 'programme' ? prog?.name : strat?.name;
   }
@@ -1366,17 +1361,6 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
   const isCurrentTimeVisible = currentPos >= 0 && currentPos <= 100;
   const groupBy = settings.groupBy || 'asset';
   const display = settings.display || 'both';
-  const hasDtsAssets = assets.some(a => typeof a.alias === 'string' && a.alias.startsWith('DTS.'));
-
-  const DTS_PHASE_GROUPS = dtsPhases.length > 0
-    ? dtsPhases.map(p => ({ id: p.id, name: p.name }))
-    : [
-        { id: 'phase-1', name: 'Phase 1 — Register & Expose' },
-        { id: 'phase-2', name: 'Phase 2 — Integrate DPI' },
-        { id: 'phase-3', name: 'Phase 3 — AI & Legacy Exit' },
-        { id: 'back-office', name: 'Back-Office Consolidation' },
-        { id: 'not-dts', name: 'Not DTS' },
-      ];
 
   const groupedReferenceIds = new Set((groupBy === 'programme' ? programmes : strategies).map(group => group.id));
   const orphanedSwimlaneInitiatives = (groupBy === 'programme' || groupBy === 'strategy')
@@ -1404,7 +1388,7 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
         <div className="relative w-max min-w-full">
           <div className="flex sticky top-0 z-40 bg-white shadow-sm border-b border-slate-200">
             <div data-testid="timeline-sidebar-header" className="sticky left-0 flex-shrink-0 p-4 font-bold text-slate-700 border-r border-slate-200 bg-slate-50 z-50 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.1)] relative" style={{ width: SIDEBAR_WIDTH }}>
-              {groupBy === 'programme' ? 'Programme' : groupBy === 'strategy' ? 'Strategy' : groupBy === 'dts-phase' ? 'DTS Phase' : 'Asset'}
+              {groupBy === 'programme' ? 'Programme' : groupBy === 'strategy' ? 'Strategy' : 'Asset'}
               {!isMobile && (
                 <button
                   type="button"
@@ -1855,63 +1839,6 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
               );
             })()}
 
-            {/* Swimlane view: group by DTS Phase */}
-            {groupBy === 'dts-phase' && DTS_PHASE_GROUPS.map(group => {
-              const groupInits = localInitiatives.filter(i => i.dtsPhase === group.id && !i.isPlaceholder);
-              if (groupInits.length === 0) return null;
-              const { items: swimlaneItems, height: swimlaneHeight } = layoutAsset(groupInits);
-              return (
-                <div key={group.id} data-testid={`swimlane-row-dts-phase-${group.id}`}>
-                  <div className="flex z-30 bg-slate-100 border-y border-slate-200 w-max">
-                    <div className="sticky left-0 flex-shrink-0 px-4 py-1.5 text-xs font-bold text-slate-500 uppercase tracking-wider bg-slate-100 z-40 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.1)]" style={{ width: SIDEBAR_WIDTH }}>
-                      {group.name}
-                      <span className="ml-2 text-[10px] font-medium tracking-normal normal-case text-slate-400">({groupInits.length})</span>
-                    </div>
-                    <div className="flex-shrink-0" style={{ width: totalWidth }} />
-                  </div>
-                  <div className="flex border-b border-slate-200 hover:bg-slate-50 transition-colors">
-                    <div className="sticky left-0 flex-shrink-0 bg-white border-r border-slate-200 px-3 flex items-center z-20 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.06)]" style={{ width: SIDEBAR_WIDTH, height: swimlaneHeight }}>
-                      <span className="text-xs text-slate-400 truncate">{groupInits.length} initiative{groupInits.length !== 1 ? 's' : ''}</span>
-                    </div>
-                    <div className="relative bg-white" style={{ width: totalWidth, height: swimlaneHeight }}>
-                      {isCurrentTimeVisible && (
-                        <div className="absolute top-0 bottom-0 w-0.5 bg-emerald-400/80 z-10 pointer-events-none" style={{ left: `${currentPos}%` }} />
-                      )}
-                      {swimlaneItems.map(({ init, top, height: barH, left, width: barW }: any) => {
-                        if (left + barW < 0 || left > 100) return null;
-                        const prog = programmeMap.get(init.programmeId);
-                        const strat = strategyMap.get(init.strategyId);
-                        return (
-                          <InitiativeBar
-                            key={init.id}
-                            init={init}
-                            left={left}
-                            width={barW}
-                            height={barH}
-                            top={top}
-                            colorClass={getInitiativeColor(init, prog, strat)}
-                            isSelected={selectedInitiativeId === init.id}
-                            resources={resources}
-                            settings={settings}
-                            progName={prog?.name}
-                            stratName={strat?.name}
-                            isDraggingRef={isDraggingRef}
-                            onSelect={() => setSelectedInitiativeId(init.id)}
-                            onOpenPanel={() => setInitiativePanelId(init.id)}
-                            onMoveStart={(e) => {
-                              isDraggingRef.current = false;
-                              setMoving({ id: init.id, initialX: e.clientX, initialY: e.clientY, initialStart: init.startDate, initialEnd: init.endDate });
-                            }}
-                            onResizeStart={(e, edge) => handleResizeStart(e, init.id, edge, edge === 'start' ? init.startDate : init.endDate)}
-                          />
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-
             {/* Default view: group by Asset/Category */}
             {/* eslint-disable-next-line react-hooks/refs */}
             {groupBy === 'asset' && sortedCategoryIds.map((catId) => {
@@ -1960,9 +1887,6 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
                         <span className="text-[10px] font-medium text-slate-400 tracking-normal normal-case">
                           ({categoryAssets.length} asset{categoryAssets.length !== 1 ? 's' : ''})
                         </span>
-                        {catId.startsWith('cat-dts-') && (
-                          <span className="text-[9px] font-normal text-slate-300 normal-case tracking-normal">© Crown copyright, CC BY 4.0</span>
-                        )}
                       </button>
                     </div>
                     <div className="flex-shrink-0" style={{ width: totalWidth }} />
@@ -2010,32 +1934,6 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
                               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="5" r="1" /><circle cx="9" cy="12" r="1" /><circle cx="9" cy="19" r="1" /><circle cx="15" cy="5" r="1" /><circle cx="15" cy="12" r="1" /><circle cx="15" cy="19" r="1" /></svg>
                             </div>}
                             <div className="font-semibold text-slate-800 min-w-0 flex-1">{asset.name}</div>
-                            {settings.showDtsAdoptionStatus === 'on' && typeof asset.alias === 'string' && asset.alias.startsWith('DTS.') && asset.dtsAdoptionStatus && (() => {
-                              const statusColors: Record<string, string> = {
-                                'not-started': 'bg-slate-200 text-slate-600',
-                                'scoping': 'bg-yellow-100 text-yellow-700',
-                                'in-delivery': 'bg-blue-100 text-blue-700',
-                                'adopted': 'bg-emerald-100 text-emerald-700',
-                                'decommissioning': 'bg-orange-100 text-orange-700',
-                                'not-applicable': 'bg-slate-100 text-slate-400',
-                              };
-                              const statusLabels: Record<string, string> = {
-                                'not-started': 'Not Started',
-                                'scoping': 'Scoping',
-                                'in-delivery': 'In Delivery',
-                                'adopted': 'Adopted',
-                                'decommissioning': 'Decommissioning',
-                                'not-applicable': 'N/A',
-                              };
-                              return (
-                                <span
-                                  data-testid={`dts-adoption-badge-${asset.id}`}
-                                  className={cn('flex-shrink-0 text-[9px] font-semibold px-1.5 py-0.5 rounded-full', statusColors[asset.dtsAdoptionStatus] || 'bg-slate-100 text-slate-500')}
-                                >
-                                  {statusLabels[asset.dtsAdoptionStatus] || asset.dtsAdoptionStatus}
-                                </span>
-                              );
-                            })()}
                             {onDeleteAsset && (
                               <button
                                 data-testid="asset-swimlane-delete-btn"
@@ -2427,15 +2325,6 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
                           >
                             <div className="flex-1">
                               <div className="text-xs font-semibold text-slate-600">{area.name}</div>
-                              {GEANZ_TO_DTS_MAP[area.alias] && (
-                                <span
-                                  data-testid="geanz-dts-map-badge"
-                                  className="inline-block mt-0.5 text-[9px] font-mono font-semibold text-indigo-600 bg-indigo-50 border border-indigo-200 rounded px-1 py-0.5 leading-none"
-                                  title={`Maps to DTS component ${GEANZ_TO_DTS_MAP[area.alias]}`}
-                                >
-                                  {GEANZ_TO_DTS_MAP[area.alias]}
-                                </span>
-                              )}
                             </div>
                             {area.assets.length > 0 ? (
                               <button
@@ -2662,8 +2551,6 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
         dependencies={dependencies}
         initiatives={initiatives}
         resources={resources}
-        hasDtsAssets={hasDtsAssets}
-        dtsPhases={dtsPhases}
         decisions={decisions}
         onOpenDecision={onOpenDecision}
         isNew={creatingInitiativeParams !== null}

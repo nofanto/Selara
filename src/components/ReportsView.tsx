@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Asset, Initiative, Dependency, Milestone, Version, Programme, Strategy, AssetCategory, Resource, DtsAdoptionStatus, DtsPhase, DtsPhaseRecord, Application, ApplicationSegment, ApplicationStatus, RptiDetail } from '../types';
+import { Asset, Initiative, Dependency, Milestone, Version, Programme, Strategy, AssetCategory, Resource, Application, ApplicationSegment, ApplicationStatus, RptiDetail } from '../types';
 import { getAllVersions } from '../lib/db';
 import { computeDiff, DiffResult } from '../lib/diff';
-import { History, DollarSign, GitBranch, Users, ChevronLeft, Grid, Download, ClipboardList } from 'lucide-react';
+import { History, DollarSign, GitBranch, Users, ChevronLeft, Grid, ClipboardList } from 'lucide-react';
 import { MaturityHeatmap } from './MaturityHeatmap';
 import { AssetPanel } from './AssetPanel';
 import { RptiReportView } from './RptiReportView';
-import { cn } from '../lib/utils';
 
 interface ReportsViewProps {
   assets: Asset[];
@@ -18,7 +17,6 @@ interface ReportsViewProps {
   strategies: Strategy[];
   assetCategories: AssetCategory[];
   resources?: Resource[];
-  dtsPhases?: DtsPhaseRecord[];
   applications?: Application[];
   applicationSegments?: ApplicationSegment[];
   applicationStatuses?: ApplicationStatus[];
@@ -27,15 +25,9 @@ interface ReportsViewProps {
   onUpdateRptiDetail?: (detail: RptiDetail) => void;
   onDeleteRptiDetail?: (detail: RptiDetail) => void;
   onSaveAsset?: (asset: Asset) => void;
-  onNavigateToAsset?: (assetId: string, assetName: string) => void;
 }
 
-type ReportSlug = 'version-history' | 'budget' | 'initiatives-dependencies' | 'capacity' | 'maturity-heatmap' | 'dts-alignment' | 'rpti';
-
-
-function startsWithPrefix(value: unknown, prefix: string): boolean {
-  return typeof value === 'string' && value.startsWith(prefix);
-}
+type ReportSlug = 'version-history' | 'budget' | 'initiatives-dependencies' | 'capacity' | 'maturity-heatmap' | 'rpti';
 
 
 function BackButton({ onBack }: { onBack: () => void }) {
@@ -98,34 +90,7 @@ function depSentence(dep: Dependency, src: Initiative, tgt: Initiative, perspect
   return `${src.name} and ${tgt.name} are related.`;
 }
 
-const DTS_STATUS_BG: Record<DtsAdoptionStatus, string> = {
-  'not-started':    'bg-slate-100 border-slate-200',
-  'scoping':        'bg-yellow-50 border-yellow-200',
-  'in-delivery':    'bg-blue-50 border-blue-200',
-  'adopted':        'bg-emerald-50 border-emerald-200',
-  'decommissioning':'bg-orange-50 border-orange-200',
-  'not-applicable': 'bg-slate-50 border-slate-100',
-};
-
-const DTS_STATUS_BADGE: Record<DtsAdoptionStatus, string> = {
-  'not-started':    'bg-slate-200 text-slate-600',
-  'scoping':        'bg-yellow-100 text-yellow-700',
-  'in-delivery':    'bg-blue-100 text-blue-700',
-  'adopted':        'bg-emerald-100 text-emerald-700',
-  'decommissioning':'bg-orange-100 text-orange-700',
-  'not-applicable': 'bg-slate-100 text-slate-400',
-};
-
-const DTS_STATUS_LABEL: Record<DtsAdoptionStatus, string> = {
-  'not-started':    'Not Started',
-  'scoping':        'Scoping',
-  'in-delivery':    'In Delivery',
-  'adopted':        'Adopted',
-  'decommissioning':'Decommissioning',
-  'not-applicable': 'N/A',
-};
-
-export function ReportsView({ assets, initiatives, milestones, dependencies, currentData, programmes, strategies, assetCategories, resources = [], dtsPhases = [], applications = [], applicationSegments = [], applicationStatuses = [], rptiDetails = [], onAddRptiDetail, onUpdateRptiDetail, onDeleteRptiDetail, onSaveAsset, onNavigateToAsset }: ReportsViewProps) {
+export function ReportsView({ assets, initiatives, milestones, dependencies, currentData, programmes, strategies, assetCategories, resources = [], applications = [], applicationSegments = [], applicationStatuses = [], rptiDetails = [], onAddRptiDetail, onUpdateRptiDetail, onDeleteRptiDetail, onSaveAsset }: ReportsViewProps) {
   const [selectedReport, setSelectedReport] = useState<ReportSlug | null>(null);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [assetPanelOpen, setAssetPanelOpen] = useState(false);
@@ -153,8 +118,6 @@ export function ReportsView({ assets, initiatives, milestones, dependencies, cur
     if (!base) return;
     setDiffResult(computeDiff(base, currentData));
   };
-
-  const hasDtsAssets = assets.some(a => startsWithPrefix(a.alias, 'DTS.'));
 
   const cards: { slug: ReportSlug; icon: React.ReactNode; title: string; description: string }[] = [
     {
@@ -187,12 +150,6 @@ export function ReportsView({ assets, initiatives, milestones, dependencies, cur
       title: 'Maturity Heatmap',
       description: 'View all IT assets arranged by capability group and coloured by their maturity level.',
     },
-    ...(hasDtsAssets ? [{
-      slug: 'dts-alignment' as ReportSlug,
-      icon: <Grid size={28} className="text-indigo-500" />,
-      title: 'DTS Alignment',
-      description: 'View your agency\'s alignment to the NZ Digital Target State — all 20 DTS assets coloured by adoption status.',
-    }] : []),
     {
       slug: 'rpti',
       icon: <ClipboardList size={28} className="text-teal-500" />,
@@ -486,25 +443,6 @@ export function ReportsView({ assets, initiatives, milestones, dependencies, cur
       })
       .filter(r => r.total > 0).sort((a, b) => b.total - a.total);
 
-    const DTS_PHASE_DEFS: { id: DtsPhase; name: string }[] = dtsPhases.length > 0
-      ? dtsPhases.map(p => ({ id: p.id, name: p.name }))
-      : [
-          { id: 'phase-1',     name: 'Phase 1 — Register & Expose' },
-          { id: 'phase-2',     name: 'Phase 2 — Integrate DPI' },
-          { id: 'phase-3',     name: 'Phase 3 — AI & Legacy Exit' },
-          { id: 'back-office', name: 'Back-Office Consolidation' },
-          { id: 'not-dts',     name: 'Not DTS' },
-        ];
-
-    const byDtsPhase = hasDtsAssets
-      ? DTS_PHASE_DEFS
-          .map(p => {
-            const inits = realInitiatives.filter(i => i.dtsPhase === p.id);
-            return { id: p.id, name: p.name, capex: capexOf(inits), opex: opexOf(inits), total: totalOf(inits) };
-          })
-          .filter(r => r.total > 0)
-      : [];
-
     return (
       <div data-testid="report-view-budget" className="h-full overflow-y-auto p-6 bg-slate-50">
         <div className="max-w-3xl mx-auto">
@@ -522,9 +460,6 @@ export function ReportsView({ assets, initiatives, milestones, dependencies, cur
               <BudgetSection testId="budget-by-programme" title="By Programme" rows={byProgramme} max={byProgramme[0]?.total ?? 0} />
               <BudgetSection testId="budget-by-strategy" title="By Strategy" rows={byStrategy} max={byStrategy[0]?.total ?? 0} />
               <BudgetSection testId="budget-by-category" title="By Category" rows={byCategory} max={byCategory[0]?.total ?? 0} />
-              {hasDtsAssets && byDtsPhase.length > 0 && (
-                <BudgetSection testId="budget-by-dts-phase" title="By DTS Phase" rows={byDtsPhase} max={byDtsPhase[0]?.total ?? 0} />
-              )}
             </div>
           </div>
         </div>
@@ -637,94 +572,6 @@ export function ReportsView({ assets, initiatives, milestones, dependencies, cur
           onClose={handleAssetPanelClose}
           onSave={handleAssetSave}
         />
-      </div>
-    );
-  }
-
-  // ── DTS Alignment Coverage ───────────────────────────────────────────────────
-  if (selectedReport === 'dts-alignment') {
-    const dtsCategories = assetCategories
-      .filter(c => startsWithPrefix(c.id, 'cat-dts-'))
-      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-
-    return (
-      <div data-testid="report-view-dts-alignment" className="h-full overflow-y-auto p-6 bg-slate-50">
-        <div className="max-w-5xl mx-auto">
-          <BackButton onBack={() => setSelectedReport(null)} />
-          <div className="flex items-start justify-between mb-6">
-            <div>
-              <h1 className="text-xl font-bold text-slate-800">DTS Alignment Coverage</h1>
-              <p className="text-sm text-slate-500 mt-1">
-                Agency alignment to the NZ Digital Target State — 20 assets across 6 layers
-              </p>
-            </div>
-            <button
-              data-testid="dts-alignment-export-btn"
-              onClick={() => window.print()}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors shrink-0"
-            >
-              <Download size={13} />
-              Export
-            </button>
-          </div>
-
-          <div className="space-y-6">
-            {dtsCategories.map(cat => {
-              const layerAssets = assets
-                .filter(a => a.categoryId === cat.id && startsWithPrefix(a.alias, 'DTS.'))
-                .sort((a, b) => (a.alias ?? '').localeCompare(b.alias ?? ''));
-              return (
-                <div key={cat.id} data-testid={`dts-alignment-layer-${cat.id}`}>
-                  <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">{cat.name}</h2>
-                  {layerAssets.length === 0 ? (
-                    <p className="text-sm text-slate-400 italic">No assets defined for this layer.</p>
-                  ) : (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                      {layerAssets.map(asset => {
-                        const status = asset.dtsAdoptionStatus;
-                        const assetInits = initiatives.filter(
-                          i => i.assetId === asset.id && i.status !== 'cancelled'
-                        );
-                        const totalBudget = assetInits.reduce((s, i) => s + (i.capex ?? 0) + (i.opex ?? 0), 0);
-                        return (
-                          <button
-                            key={asset.id}
-                            data-testid={`dts-alignment-tile-${asset.id}`}
-                            data-status={status ?? ''}
-                            onClick={() => onNavigateToAsset?.(asset.id, asset.name)}
-                            className={cn(
-                              'text-left p-3 rounded-lg border transition-all hover:shadow-md group',
-                              status ? DTS_STATUS_BG[status] : 'bg-white border-slate-200'
-                            )}
-                          >
-                            <div className="text-[10px] font-mono text-slate-400 mb-1">{asset.alias}</div>
-                            <div className="text-xs font-semibold text-slate-800 leading-snug mb-2 group-hover:text-blue-700">
-                              {asset.name}
-                            </div>
-                            <div className="flex items-center justify-between text-[10px] text-slate-500">
-                              <span data-testid="tile-initiative-count">
-                                {assetInits.length} {assetInits.length === 1 ? 'initiative' : 'initiatives'}
-                              </span>
-                              <span data-testid="tile-budget">{fmt(totalBudget)}</span>
-                            </div>
-                            {status && (
-                              <div className={cn(
-                                'mt-2 text-[9px] font-semibold px-1.5 py-0.5 rounded-full inline-block',
-                                DTS_STATUS_BADGE[status]
-                              )}>
-                                {DTS_STATUS_LABEL[status]}
-                              </div>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
       </div>
     );
   }

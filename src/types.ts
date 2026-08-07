@@ -74,7 +74,6 @@ export interface Initiative {
   owner?: string;    // Legacy free-text owner (used as fallback when ownerId is absent)
   ownerId?: string;  // ID of a Resource record
   resourceIds?: string[]; // IDs of additionally assigned resources
-  dtsPhase?: DtsPhase;   // Only relevant for DTS workspaces
 }
 
 /**
@@ -99,26 +98,6 @@ export interface Milestone {
   date: string; // ISO format: YYYY-MM-DD
   name: string;
   type: 'info' | 'warning' | 'critical';
-}
-
-export type DtsAdoptionStatus =
-  | 'not-started'
-  | 'scoping'
-  | 'in-delivery'
-  | 'adopted'
-  | 'decommissioning'
-  | 'not-applicable';
-
-/** Loose string type — phase IDs are now user-defined records stored in IndexedDB. */
-export type DtsPhase = string;
-
-/**
- * A user-configurable DTS Phase record stored in the dtsPhases IndexedDB store.
- */
-export interface DtsPhaseRecord {
-  id: string;
-  name: string;
-  color: string;
 }
 
 export type DecisionStatus = 'proposed' | 'accepted' | 'deprecated' | 'superseded';
@@ -152,7 +131,6 @@ export interface Asset {
   maturity?: number; // 1–5: Emergent → Optimised. Omitted means unrated.
   alias?: string;      // GEANZ alias code, e.g. "TAP.16.01" — present only on GEANZ-sourced assets
   externalId?: string; // GEANZ GUID — used for idempotent re-import
-  dtsAdoptionStatus?: DtsAdoptionStatus; // Only relevant for DTS assets (alias starts with "DTS.")
 }
 
 export type ApplicationType = 'application' | 'infrastructure' | 'document' | 'procedure' | 'other';
@@ -249,16 +227,15 @@ export interface TimelineSettings {
   hasSeenTutorial?: boolean;
   columnZoom?: number; // Multiplier for minimum column width (0.5–3.0, default 1.0)
   sidebarWidth?: number; // Width of the sticky asset/programme sidebar in pixels
-  mobileBucketMode?: 'timeline' | 'quarter' | 'year' | 'programme' | 'strategy' | 'dts-phase';
+  mobileBucketMode?: 'timeline' | 'quarter' | 'year' | 'programme' | 'strategy';
   criticalPath?: 'on' | 'off';
-  groupBy?: 'asset' | 'programme' | 'strategy' | 'dts-phase';
-  colorBy?: 'programme' | 'strategy' | 'status' | 'rag' | 'dts-phase';
+  groupBy?: 'asset' | 'programme' | 'strategy';
+  colorBy?: 'programme' | 'strategy' | 'status' | 'rag';
   showResources?: 'on' | 'off';
   display?: 'both' | 'initiatives' | 'applications';
   templateId?: string;           // Which workspace template was selected on first load
   showGeanzCatalogue?: boolean;  // When false, the GEANZ catalogue section is hidden (default: true)
-  showDtsAdoptionStatus?: 'on' | 'off'; // Show coloured adoption status badges on DTS asset rows
-  clusterName?: string;                 // Agency cluster name — shown in header and DTS Summary export
+  clusterName?: string;          // Agency cluster name — shown in the timeline header
 }
 
 /**
@@ -282,7 +259,6 @@ export interface Version {
     timelineSettings: TimelineSettings;
     resources: Resource[];
     applicationStatuses?: ApplicationStatus[];
-    dtsPhases?: DtsPhaseRecord[];
     decisions?: Decision[];
     rptiDetails?: RptiDetail[];
   };

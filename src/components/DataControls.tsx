@@ -4,7 +4,7 @@ import { exportToExcel, importFromExcel } from '../lib/excel';
 import { SchemaIssue, validateImportSchema } from '../lib/importValidation';
 import { exportToPDF, exportToPNG } from '../lib/pdf';
 import { shareWorkspace } from '../lib/share';
-import { Asset, Application, ApplicationSegment, ApplicationStatus, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource, Version, DtsPhaseRecord, Decision, RptiDetail } from '../types';
+import { Asset, Application, ApplicationSegment, ApplicationStatus, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource, Version, Decision, RptiDetail } from '../types';
 
 interface DataControlsProps {
   data: {
@@ -21,7 +21,6 @@ interface DataControlsProps {
     timelineSettings: TimelineSettings;
     resources: Resource[];
     versions?: Version[];
-    dtsPhases?: DtsPhaseRecord[];
     decisions?: Decision[];
     rptiDetails?: RptiDetail[];
   };
@@ -39,7 +38,6 @@ interface DataControlsProps {
     timelineSettings: TimelineSettings;
     resources: Resource[];
     versions?: Version[];
-    dtsPhases?: DtsPhaseRecord[];
     decisions?: Decision[];
     rptiDetails?: RptiDetail[];
   }) => void;
@@ -169,7 +167,6 @@ export function DataControls({ data, onImport, onError, timelineId }: DataContro
       timelineSettings: importPreviewData.timelineSettings || data.timelineSettings,
       resources: importPreviewData.resources || [],
       versions: importPreviewData.versions || [],
-      dtsPhases: importPreviewData.dtsPhases || [],
     });
     setShowImportModal(false);
     setImportPreviewData(null);
@@ -208,7 +205,6 @@ export function DataControls({ data, onImport, onError, timelineId }: DataContro
       timelineSettings: importPreviewData.timelineSettings || data.timelineSettings,
       resources: mergeArrays(data.resources, importPreviewData.resources),
       versions: mergeArrays(data.versions || [], importPreviewData.versions || []),
-      dtsPhases: mergeArrays(data.dtsPhases || [], importPreviewData.dtsPhases || []),
     });
     setShowImportModal(false);
     setImportPreviewData(null);

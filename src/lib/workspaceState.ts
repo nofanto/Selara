@@ -10,7 +10,6 @@ type WorkspaceContent = {
   assetCategories: unknown[];
   resources?: unknown[];
   applicationStatuses?: unknown[];
-  dtsPhases?: unknown[];
 };
 
 const EMPTY_ARRAY: readonly unknown[] = [];
@@ -34,7 +33,6 @@ export function isWorkspaceEmpty(data: WorkspaceContent): boolean {
     data.assetCategories,
     data.resources ?? EMPTY_ARRAY,
     data.applicationStatuses ?? EMPTY_ARRAY,
-    data.dtsPhases ?? EMPTY_ARRAY,
   ];
 
   return buckets.every(bucket => bucket.length === 0);

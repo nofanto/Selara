@@ -117,22 +117,6 @@
 
 ---
 
-## US-IM-09: Tag an Initiative with a DTS Adoption Phase
-
-**As an** IT portfolio manager working within a DTS or Mixed workspace,
-**I want** to tag each initiative with its DTS adoption phase,
-**so that** I can group and colour the timeline by phase and report spend per phase.
-
-**Acceptance Criteria:**
-- A **DTS Phase** field (Phase 1 – Register & Expose / Phase 2 – Integrate DPI / Phase 3 – AI & Legacy Exit / Back-Office Consolidation / Not DTS) is available in the InitiativePanel when the workspace is DTS or Mixed
-- The same field is available in the Data Manager initiatives table for DTS and Mixed workspaces
-- The DTS Phase value persists to IndexedDB across reloads
-- The timeline can be grouped by DTS Phase (see US-DS-02)
-- The timeline can be coloured by DTS Phase (see US-DS-08)
-- The Budget Summary report breaks spend down by DTS Phase in DTS and Mixed workspaces
-
----
-
 ## US-IM-10: Initiative Bar Interaction and Content Layout
 
 **As an** IT portfolio manager,
@@ -146,4 +130,4 @@
 - The bar displays: initiative name, optional description text, optional budget pill, optional owner initials badge
 - A progress fill overlay covers the left portion of the bar proportional to the initiative's % complete
 - Resize handles appear on hover at the left and right edges of the bar; grabbing either edge resizes the initiative without opening the panel
-- All bar content and interactions behave identically across all grouping modes (by asset, programme, strategy, DTS phase)
+- All bar content and interactions behave identically across all grouping modes (by asset, programme, strategy)

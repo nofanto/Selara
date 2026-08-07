@@ -36,7 +36,6 @@ erDiagram
         string maturity
         string alias
         string externalId
-        string dtsAdoptionStatus
     }
 
     APPLICATION {
@@ -61,12 +60,6 @@ erDiagram
         string color
     }
 
-    DTS_PHASE {
-        string id PK
-        string name
-        string color
-    }
-
     RESOURCE {
         string id PK
         string name
@@ -82,7 +75,6 @@ erDiagram
         string applicationId FK
         string ownerId FK
         string_array resourceIds FK
-        string dtsPhase FK
         date startDate
         date endDate
         number capex
@@ -157,7 +149,6 @@ erDiagram
     APPLICATION |o--o{ INITIATIVE : "targets (optional)"
     RESOURCE |o--o{ INITIATIVE : "owns (optional)"
     RESOURCE }o--o{ INITIATIVE : "assigned to (many-to-many)"
-    DTS_PHASE |o--o{ INITIATIVE : "phases (optional)"
 
     INITIATIVE }o--o{ DEPENDENCY : "polymorphic source/target"
     MILESTONE }o--o{ DEPENDENCY : "polymorphic source/target"
@@ -191,7 +182,7 @@ erDiagram
 | `applications` | `id` | `Application` | v8 |
 | `applicationSegments` | `id` | `ApplicationSegment` | v9 |
 | `applicationStatuses` | `id` | `ApplicationStatus` | v10 |
-| `dtsPhases` | `id` | `DtsPhaseRecord` | v13 |
+| `dtsPhases` | `id` | `DtsPhaseRecord` | v13 — orphaned; see Migration Notes |
 | `decisions` | `id` | `Decision` | v14 |
 
 ## Relationships
@@ -208,12 +199,11 @@ Since IndexedDB has no native foreign-key enforcement, all relationships below a
 - `Initiative.applicationId` (optional) → `Application.id`
 - `Initiative.ownerId` (optional) → `Resource.id`
 - `Initiative.resourceIds` (optional array) → `Resource.id[]` (many-to-many)
-- `Initiative.dtsPhase` (optional) → `DtsPhaseRecord.id`
 - `Milestone.assetId` → `Asset.id`
 - `Dependency.sourceId` / `Dependency.targetId` → polymorphic; resolved via `sourceType`/`targetType` (`'initiative' | 'milestone' | 'segment'`) to `Initiative.id`, `Milestone.id`, or `ApplicationSegment.id`
 - `Decision.linkedEntityId` (optional) → polymorphic; resolved via `linkedEntityType` (`'initiative' | 'programme' | 'asset'`) to `Initiative.id`, `Programme.id`, or `Asset.id`. Unlike `Dependency`, a decision links to at most one item.
 - `Decision.supersededBy` (optional) → `Decision.id` — set when a later decision replaces this one.
-- `Version.data` embeds a denormalized, point-in-time snapshot of every other store (assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, dtsPhases, decisions) — this is how backup/restore and version history are implemented. The `versions` store itself is not part of the regular `getAppData`/`saveAppData` load-save cycle; it's managed separately via `saveVersion`/`getAllVersions`/`deleteVersion`.
+- `Version.data` embeds a denormalized, point-in-time snapshot of every other store (assets, applications, applicationSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, applicationStatuses, decisions) — this is how backup/restore and version history are implemented. `dtsPhases` is not included — it was dropped from `Version.data` when DTS was removed (see Migration Notes). The `versions` store itself is not part of the regular `getAppData`/`saveAppData` load-save cycle; it's managed separately via `saveVersion`/`getAllVersions`/`deleteVersion`.
 
 ## Migration Notes
 
@@ -221,7 +211,7 @@ Schema evolution is handled in the `upgrade()` callback of `openDB<ITMapDB>()` i
 
 - **v11:** Legacy `ApplicationSegment` records that carried `assetId` + `label` fields were rewritten into proper `Application` records with `applicationId`, and the old fields were dropped.
 - **v12:** `Initiative.budget` (single field) was split into separate `capex` and `opex` fields, defaulting `opex` to `0`.
-- **v13:** Added the `dtsPhases` store and seeded 5 default `DtsPhaseRecord`s (`phase-1`, `phase-2`, `phase-3`, `back-office`, `not-dts`) for workspaces that already contained assets whose `alias` starts with `"DTS."`.
+- **v13:** Added the `dtsPhases` store and seeded 5 default `DtsPhaseRecord`s (`phase-1`, `phase-2`, `phase-3`, `back-office`, `not-dts`) for workspaces that already contained assets whose `alias` starts with `"DTS."`. **This store is now orphaned:** the DTS workspace feature was removed (see [ADR-0004](adr/0004-remove-dts.md)), and all application code that read or wrote `dtsPhases` was deleted along with it. Per this app's additive-only migration history, the store's creation logic was simply not carried forward for new databases — no `deleteObjectStore` was called, so any database that already reached v13+ keeps its (now-inert) `dtsPhases` store forever. `DB_VERSION` was not bumped for this removal.
 - **v14:** Added the `decisions` store (no seeding — always empty on creation) to support the in-app portfolio decision log. See [ADR-0002](adr/0002-in-app-decision-log.md).
 
 ## Source of Truth
@@ -234,81 +224,17 @@ All database access is centralized in [`src/lib/db.ts`](../src/lib/db.ts); entit
 
 On first load (or when re-opened from Data Manager's "change template" action), an empty workspace is offered a choice of **starter templates** via `TemplatePickerModal` (`src/components/TemplatePickerModal.tsx`). The selection is handled by `getTemplateData(templateId, withDemoData)` in [`src/lib/workspaceTemplates.ts`](../src/lib/workspaceTemplates.ts), which assembles a full `TemplateAppData` payload that is written into every IndexedDB store via `saveAppData`. `TimelineSettings.templateId` records which template was chosen (informational only).
 
-There are four templates:
+There are three templates:
 
 | id | Name | Demo-data toggle? | Source data |
 |---|---|---|---|
-| `dts` | NZ Digital Target State | Yes | [`src/lib/dtsCatalogue.ts`](../src/lib/dtsCatalogue.ts) (categories/assets) + [`src/lib/dtsDemoData.ts`](../src/lib/dtsDemoData.ts) (demo records) |
 | `geanz` | GEANZ Technology Catalogue | Yes | [`src/demoData.ts`](../src/demoData.ts) |
 | `viewer` | Viewer (upload & view a file) | No | none — empty shell, populated later from an imported Excel file |
 | `blank` | Blank | No | none — empty shell |
 
 Each template exercises a different *subset* of the schema described above. The diagrams below show, per template, exactly which stores get populated and which relationships are actually exercised — as opposed to the full schema diagram, which shows everything the app is *capable* of storing.
 
-No template pre-seeds `decisions` — every template (`dts`, `geanz`, `viewer`, `blank`, with or without demo data) sets `decisions: []`. Decisions are a user-authored log added after the workspace is set up, so they're omitted from the per-template diagrams below.
-
-### `dts` — NZ Digital Target State (with demo data)
-
-```mermaid
-erDiagram
-    ASSET_CATEGORY {
-        int count "6"
-    }
-    ASSET {
-        int count "23"
-        string dtsAdoptionStatus "set on ~20 of 23"
-    }
-    PROGRAMME {
-        int count "4"
-    }
-    STRATEGY {
-        int count "5"
-    }
-    RESOURCE {
-        int count "6"
-    }
-    APPLICATION_STATUS {
-        int count "6"
-    }
-    DTS_PHASE {
-        int count "5"
-    }
-    APPLICATION {
-        int count "10"
-    }
-    APPLICATION_SEGMENT {
-        int count "15"
-    }
-    INITIATIVE {
-        int count "14"
-        string dtsPhase "set on all 14"
-        string ownerId "set"
-        string_array resourceIds "set"
-    }
-    MILESTONE {
-        int count "5"
-    }
-    DEPENDENCY {
-        int count "9"
-        string breakdown "6 initiative-to-initiative, 3 milestone-to-initiative"
-    }
-
-    ASSET_CATEGORY ||--o{ ASSET : categorizes
-    ASSET ||--o{ APPLICATION : hosts
-    APPLICATION ||--o{ APPLICATION_SEGMENT : "has segments"
-    APPLICATION_STATUS ||--o{ APPLICATION_SEGMENT : "status of"
-    ASSET ||--o{ MILESTONE : has
-    PROGRAMME ||--o{ INITIATIVE : groups
-    STRATEGY |o--o{ INITIATIVE : aligns
-    ASSET ||--o{ INITIATIVE : targets
-    RESOURCE |o--o{ INITIATIVE : owns
-    RESOURCE }o--o{ INITIATIVE : "assigned to"
-    DTS_PHASE |o--o{ INITIATIVE : phases
-    INITIATIVE }o--o{ DEPENDENCY : "source/target"
-    MILESTONE }o--o{ DEPENDENCY : "source (3 records)"
-```
-
-This is the only template that populates `dtsPhases` and sets `Asset.dtsAdoptionStatus` / `Initiative.dtsPhase`, and the only one whose demo data includes **milestone-sourced dependencies** (`Dependency.sourceType === 'milestone'`). `timelineSettings.showGeanzCatalogue` is `false`.
+No template pre-seeds `decisions` — every template (`geanz`, `viewer`, `blank`, with or without demo data) sets `decisions: []`. Decisions are a user-authored log added after the workspace is set up, so they're omitted from the per-template diagrams below.
 
 ### `geanz` — GEANZ Technology Catalogue (with demo data)
 
@@ -368,26 +294,25 @@ erDiagram
     INITIATIVE }o--o{ DEPENDENCY : "source/target"
 ```
 
-`dtsPhases` stays empty and `Initiative.dtsPhase` / `Asset.dtsAdoptionStatus` are never set in this template. Instead, `timelineSettings.showGeanzCatalogue` is `true`, which lets the user browse and add from the live 17-area / 300+ asset-type GEANZ taxonomy in [`src/lib/geanzCatalogue.ts`](../src/lib/geanzCatalogue.ts) — that catalogue is rendered directly by the Timeline UI and is **not** seeded into IndexedDB.
+`timelineSettings.showGeanzCatalogue` is `true` in this template, which lets the user browse and add from the live 17-area / 300+ asset-type GEANZ taxonomy in [`src/lib/geanzCatalogue.ts`](../src/lib/geanzCatalogue.ts) — that catalogue is rendered directly by the Timeline UI and is **not** seeded into IndexedDB.
 
-### `dts` / `geanz` — without demo data
+### `geanz` — without demo data
 
-Selecting a template with the demo-data toggle off still seeds the lookup/config stores (categories, assets, programmes, strategies, statuses, DTS phases) but leaves all relationship-bearing record stores empty for the user to fill in:
+Selecting `geanz` with the demo-data toggle off still seeds the lookup/config stores (categories, assets, programmes, strategies, statuses) but leaves all relationship-bearing record stores empty for the user to fill in:
 
-| Store | `dts` (no demo data) | `geanz` (no demo data) |
-|---|---|---|
-| `assetCategories` | 6 | 6 |
-| `assets` | 23 (no `dtsAdoptionStatus`) | 41 |
-| `programmes` | 4 | 6 |
-| `strategies` | 5 | 6 |
-| `applicationStatuses` | 6 | 6 |
-| `dtsPhases` | 5 | 0 |
-| `initiatives` | 0 | 0 |
-| `milestones` | 0 | 0 |
-| `applications` | 0 | 0 |
-| `applicationSegments` | 0 | 0 |
-| `dependencies` | 0 | 0 |
-| `resources` | 0 | 0 |
+| Store | Count |
+|---|---|
+| `assetCategories` | 6 |
+| `assets` | 41 |
+| `programmes` | 6 |
+| `strategies` | 6 |
+| `applicationStatuses` | 6 |
+| `initiatives` | 0 |
+| `milestones` | 0 |
+| `applications` | 0 |
+| `applicationSegments` | 0 |
+| `dependencies` | 0 |
+| `resources` | 0 |
 
 ### `viewer` and `blank` — empty shells
 
@@ -399,7 +324,7 @@ erDiagram
     }
 ```
 
-Both templates produce an identical, fully-empty `TemplateAppData` payload — no categories, assets, programmes, strategies, statuses, or DTS phases are pre-seeded. They differ only in what happens next:
+Both templates produce an identical, fully-empty `TemplateAppData` payload — no categories, assets, programmes, strategies, or statuses are pre-seeded. They differ only in what happens next:
 
 - **`blank`** stays empty; the user builds the workspace manually from the UI.
 - **`viewer`** is immediately followed by an Excel-file import (`handleViewerImport` in `src/App.tsx`), which parses the uploaded file into the same entity shape and populates the stores from that external source rather than from `getTemplateData`.

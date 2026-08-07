@@ -6,16 +6,15 @@ When you open Scenia for the first time, a **template picker** appears. Choose t
 
 | Template | Best for |
 |----------|----------|
-| **NZ Digital Target State** | Agencies modelling their portfolio against the GCDO target architecture. Loads 6 DTS layers and 20 pre-built assets (DPI components, Channels, Common Consolidated Platforms). |
 | **GEANZ Technology Catalogue** | Agencies building an application portfolio using the NZ government GEANZ taxonomy. Loads a representative GEANZ demo portfolio across 13 of 17 TAP areas, with the full catalogue browsable in the GEANZ section. |
-| **Mixed** | Agencies who want the DTS architecture structure with the GEANZ catalogue available for detailed asset types. |
+| **Viewer** | Uploading an Excel file shared by a colleague to view their portfolio. |
 | **Blank** | Agencies with their own internal taxonomy. Starts completely empty. |
 
 ![Template picker modal](../../public/features/template-picker-modal.png)
 
 ## With or without demo data
 
-For each template (except Blank) you can choose how to start:
+For the GEANZ template you can choose how to start:
 
 - **With demo data** — loads the template's asset categories and assets, plus a set of example initiatives, milestones, and application lifecycle segments. Use this to explore how Scenia works before adding your own data.
 - **Without demo data** — loads only the template's structural elements (asset categories and assets) with no initiatives, milestones, or segments. Use this when you are ready to start building your real portfolio from day one.
@@ -27,8 +26,6 @@ A tutorial modal appears automatically. It walks through the key features in fiv
 ## The demo data
 
 The GEANZ template loads a representative NZ government portfolio across 13 of 17 TAP areas, with initiatives, applications, lifecycle segments, resources, and budget figures.
-
-The DTS template loads 20 pre-built assets across the six DTS layers (Customer, Channels, Digital Public Infrastructure, Integration, Agency/Platform, Common Consolidated Platforms), with a set of example NZ government initiatives — Identity Platform Uplift, AI Platform Pilot, Payments Consolidation, API Gateway Implementation, and more — so you can see how a real portfolio maps to the GCDO architecture.
 
 The demo data is safe to experiment with. You can:
 

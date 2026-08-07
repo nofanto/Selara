@@ -30,7 +30,6 @@ The exported workbook contains one sheet per data type:
 | **Resources** | All people and roles in the resources roster |
 | **Versions** | Metadata for all saved history snapshots |
 | **TimelineSettings** | Configuration settings (zoom, start date, toggles) for the current state and snapshots |
-| **DTS Summary** | One row per DTS asset showing adoption status, active initiative count, and total CapEx/OpEx. Only included when exporting from a DTS or Mixed workspace. |
 
 ### Version History Preservation
 

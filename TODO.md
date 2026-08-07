@@ -57,7 +57,7 @@
 
 ### Timeline.tsx — Unified Grouping and Colouring
 
-The `groupBy` feature is currently implemented as four separate rendering branches in `Timeline.tsx`. Each branch independently filters initiatives, calls `layoutAsset()`, and renders initiative bars — meaning a fix or improvement made in one branch (e.g. `asset`) does not automatically apply to the others (`programme`, `strategy`, `dts-phase`, GEANZ). There are also four copies of the colour-selection logic.
+The `groupBy` feature is currently implemented as separate rendering branches in `Timeline.tsx`. Each branch independently filters initiatives, calls `layoutAsset()`, and renders initiative bars — meaning a fix or improvement made in one branch (e.g. `asset`) does not automatically apply to the others (`programme`, `strategy`, GEANZ). There are also multiple copies of the colour-selection logic.
 
 The refactor below consolidates all groupBy modes into a single rendering path.
 
@@ -92,7 +92,7 @@ The refactor below consolidates all groupBy modes into a single rendering path.
     categoryId?: string;
   }
   ```
-- For `programme` / `strategy` / `dts-phase`: each group maps directly to one `GroupRow`.
+- For `programme` / `strategy`: each group maps directly to one `GroupRow`.
 - For `asset`: each asset under each category becomes a `GroupRow` (preserving the existing category-header structure as a separate pass).
 - The GEANZ catalogue rows become `GroupRow` entries with `isGeanz: true`.
 
@@ -104,7 +104,7 @@ The refactor below consolidates all groupBy modes into a single rendering path.
   - `showConflicts?: boolean` (asset mode only)
   - `showApplications?: boolean` (asset mode only)
   - `showGroupBoxes?: boolean` (asset mode only)
-  - `sidebarContent?: ReactNode` (asset mode has drag handles, DTS badges; swimlane modes show "N initiatives")
+  - `sidebarContent?: ReactNode` (asset mode has drag handles; swimlane modes show "N initiatives")
 - The component calls `layoutAsset()` (or `getAssetLayout()` for drag stability) internally.
 - The main JSX becomes a single `{groups.map(group => <InitiativeSwimLane ... />)}`.
 

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Asset, Application, ApplicationSegment, ApplicationStatus, ApplicationType, DtsPhaseRecord, Decision, RptiDetail, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource } from '../types';
+import { Asset, Application, ApplicationSegment, ApplicationStatus, ApplicationType, Decision, RptiDetail, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource } from '../types';
 import { EditableTable, Column } from './EditableTable';
 import { cn } from '../lib/utils';
 import { Database, Layers, Calendar, Flag, Target, Link2, FolderTree, LayoutTemplate, Users, Box } from 'lucide-react';
@@ -21,7 +21,6 @@ interface DataManagerProps {
     timelineSettings: TimelineSettings;
     resources: Resource[];
     applicationStatuses: ApplicationStatus[];
-    dtsPhases: DtsPhaseRecord[];
     decisions: Decision[];
     rptiDetails: RptiDetail[];
   };
@@ -38,7 +37,6 @@ interface DataManagerProps {
     timelineSettings: TimelineSettings;
     resources: Resource[];
     applicationStatuses: ApplicationStatus[];
-    dtsPhases: DtsPhaseRecord[];
     decisions: Decision[];
     rptiDetails: RptiDetail[];
   }) => void;
@@ -46,7 +44,7 @@ interface DataManagerProps {
   searchQuery?: string;
 }
 
-type Tab = 'initiatives' | 'dependencies' | 'assets' | 'assetCategories' | 'programmes' | 'strategies' | 'milestones' | 'resources' | 'applications' | 'appStatuses' | 'dtsPhases';
+type Tab = 'initiatives' | 'dependencies' | 'assets' | 'assetCategories' | 'programmes' | 'strategies' | 'milestones' | 'resources' | 'applications' | 'appStatuses';
 
 export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery }: DataManagerProps) {
   const [activeTab, setActiveTab] = useState<Tab>('initiatives');
@@ -169,18 +167,6 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery 
   const initiativeOptions = data.initiatives.map(i => ({ value: i.id, label: i.name }));
   const categoryOptions = data.assetCategories.map(c => ({ value: c.id, label: c.name }));
 
-  const hasDtsAssets = data.assets.some(a => typeof a.alias === 'string' && a.alias.startsWith('DTS.'));
-
-  const DTS_PHASE_OPTIONS = [
-    { value: '', label: '— Not Set —' },
-    ...(data.dtsPhases || []).map(p => ({ value: p.id, label: p.name })),
-  ];
-
-  const dtsPhaseColumns: Column<DtsPhaseRecord>[] = [
-    { key: 'name', label: 'Phase Name', type: 'text', width: '70%' },
-    { key: 'color', label: 'Color', type: 'color', width: '30%' },
-  ];
-
   const initiativeColumns: Column<Initiative>[] = [
     { key: 'name', label: 'Initiative Name', type: 'text', width: '180px' },
     { key: 'assetId', label: 'Asset', type: 'select', options: assetOptions, width: '120px' },
@@ -206,19 +192,11 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery 
     { key: 'owner', label: 'Owner', type: 'text', width: '110px' },
     { key: 'isPlaceholder', label: 'Placeholder?', type: 'boolean', width: '80px' },
     { key: 'description', label: 'Description', type: 'textarea', width: '220px', placeholder: 'Add a description...' },
-    ...(hasDtsAssets ? [{
-      key: 'dtsPhase' as keyof Initiative,
-      label: 'DTS Phase',
-      type: 'select' as const,
-      cellTestId: 'dts-phase-cell',
-      options: DTS_PHASE_OPTIONS,
-      width: '140px',
-    }] : []),
   ];
 
   const assetColumns: Column<Asset>[] = [
-    { key: 'name', label: 'Asset Name', type: 'text', width: hasDtsAssets ? '30%' : '40%' },
-    { key: 'categoryId', label: 'Category', type: 'select', options: categoryOptions, width: hasDtsAssets ? '30%' : '40%' },
+    { key: 'name', label: 'Asset Name', type: 'text', width: '40%' },
+    { key: 'categoryId', label: 'Category', type: 'select', options: categoryOptions, width: '40%' },
     { key: 'maturity', label: 'Maturity', type: 'select', options: [
       { value: '', label: '— Unrated —' },
       { value: '1', label: '1 – Emergent' },
@@ -227,22 +205,6 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery 
       { value: '4', label: '4 – Managed' },
       { value: '5', label: '5 – Optimised' },
     ], width: '20%' },
-    ...(hasDtsAssets ? [{
-      key: 'dtsAdoptionStatus' as keyof Asset,
-      label: 'DTS Adoption Status',
-      type: 'select' as const,
-      cellTestId: 'dts-adoption-status-cell',
-      options: [
-        { value: '', label: '— Not Set —' },
-        { value: 'not-started', label: 'Not Started' },
-        { value: 'scoping', label: 'Scoping' },
-        { value: 'in-delivery', label: 'In Delivery' },
-        { value: 'adopted', label: 'Adopted' },
-        { value: 'decommissioning', label: 'Decommissioning Incumbent' },
-        { value: 'not-applicable', label: 'Not Applicable' },
-      ],
-      width: '20%',
-    }] : []),
   ];
 
   const categoryColumns: Column<AssetCategory>[] = [
@@ -378,7 +340,6 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery 
     { id: 'milestones', label: 'Milestones', icon: Flag, count: data.milestones.length },
     { id: 'resources', label: 'Resources', icon: Users, count: (data.resources || []).length },
     { id: 'appStatuses', label: 'App Statuses', icon: Layers, count: (data.applicationStatuses || []).length },
-    ...(hasDtsAssets ? [{ id: 'dtsPhases', label: 'DTS Phases', icon: Layers, count: (data.dtsPhases || []).length }] : []),
   ];
 
   return (
@@ -522,17 +483,6 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery 
             idField="id"
             tableId="appStatuses"
             onColumnResize={(col, w) => handleColumnResize('appStatuses', col, w)}
-          />
-        )}
-        {activeTab === 'dtsPhases' && (
-          <EditableTable
-            data={data.dtsPhases || []}
-            columns={getColumnsWithWidths('dtsPhases', dtsPhaseColumns)}
-            onUpdate={(newData) => updateData('dtsPhases', newData)}
-            onDelete={(phase) => { updateData('dtsPhases', (data.dtsPhases || []).filter(p => p.id !== phase.id)); return true; }}
-            idField="id"
-            tableId="dtsPhases"
-            onColumnResize={(col, w) => handleColumnResize('dtsPhases', col, w)}
           />
         )}
       </div>

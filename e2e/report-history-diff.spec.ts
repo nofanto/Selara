@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-async function loadDtsTemplate(page: import('@playwright/test').Page) {
+async function loadGeanzTemplate(page: import('@playwright/test').Page) {
   await page.goto('/');
   await page.evaluate(async () => {
     await new Promise<void>((resolve) => {
@@ -14,7 +14,7 @@ async function loadDtsTemplate(page: import('@playwright/test').Page) {
   });
   await page.reload();
   await page.waitForSelector('[data-testid="template-picker-modal"]', { timeout: 20000 });
-  await page.getByTestId('template-select-with-demo-btn-dts').click();
+  await page.getByTestId('template-select-with-demo-btn-geanz').click();
   await page.waitForSelector('[data-testid="asset-row-content"]', { timeout: 20000 });
   const tutorialModal = page.getByTestId('tutorial-modal');
   if (await tutorialModal.isVisible()) {
@@ -28,7 +28,7 @@ async function loadDtsTemplate(page: import('@playwright/test').Page) {
  */
 test.describe('History Differences report', () => {
   test.beforeEach(async ({ page }) => {
-    await loadDtsTemplate(page);
+    await loadGeanzTemplate(page);
   });
 
   test('Reports view shows History Differences section', async ({ page }) => {

@@ -140,22 +140,8 @@
 - The template picker offers two buttons per template: "With demo data" and "Without demo data" (or equivalent labelling)
 - Selecting "With demo data" loads the template structure plus pre-built initiatives, segments, milestones, and dependencies representative of that template
 - Selecting "Without demo data" loads only the taxonomy (assets and categories) with no initiatives, segments, milestones, or dependencies
-- Both options are available for the DTS and GEANZ templates
+- Both options are available for the GEANZ template
 - The blank template always loads without demo data
-
----
-
-## US-DA-11: Include a DTS Summary Tab in Excel Exports
-
-**As an** IT portfolio manager in a DTS or Mixed workspace,
-**I want** the Excel export to include a dedicated DTS Summary sheet,
-**so that** I can share adoption status and investment data per DTS asset without manual compilation.
-
-**Acceptance Criteria:**
-- Exporting to Excel from a DTS or Mixed workspace produces a workbook with a "DTS Summary" sheet
-- The DTS Summary sheet contains one row per DTS asset with: asset name, adoption status, initiative count, total budget (CapEx + OpEx), lead owner, and target adoption date
-- If a Cluster name is set in workspace settings, it appears in the DTS Summary sheet
-- Exporting from a non-DTS workspace does not include the DTS Summary sheet
 
 ---
 
@@ -171,21 +157,3 @@
 - The export reflects the active zoom level, grouping, display settings, and scroll position at the time of export
 - The export completes without a browser `alert()` dialog or page reload
 
----
-
-## US-DA-13: Configure DTS Phases via Data Manager
-
-**As an** IT portfolio manager using a DTS workspace,
-**I want** to define and manage DTS Phases in the Data Manager,
-**so that** I can customise the phases to match my agency's DTS roadmap rather than using hard-coded defaults.
-
-**Acceptance Criteria:**
-- AC1: A "DTS Phases" tab appears in the Data Manager only when the workspace contains DTS assets
-- AC2: The tab shows a table with Name and Color columns; each row represents one phase
-- AC3: Phases can be added, inline-edited, and deleted via the standard Data Manager controls
-- AC4: The DTS Phase dropdown in the Initiative edit panel is populated from the configurable phase list
-- AC5: The "Group by DTS Phase" view on the timeline uses the configurable phase list as row labels
-- AC6: The Budget by DTS Phase section in Reports uses the configurable phase list
-- AC7: The DTS Phase grouping in Mobile Card View uses the configurable phase list
-- AC8: Default phases (Phase 1–3, Back-Office Consolidation, Not DTS) are pre-loaded in the DTS template
-- AC9: Phase definitions persist across page reloads via IndexedDB

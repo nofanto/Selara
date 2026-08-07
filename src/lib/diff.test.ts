@@ -32,7 +32,6 @@ function makeVersion(overrides: Partial<Version['data']> = {}): Version {
       },
       resources: [],
       applicationStatuses: [],
-      dtsPhases: [],
       ...overrides,
     },
   };

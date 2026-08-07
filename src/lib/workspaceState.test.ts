@@ -16,7 +16,6 @@ describe('isWorkspaceEmpty', () => {
         assetCategories: [],
         resources: [],
         applicationStatuses: [],
-        dtsPhases: [],
       }),
     ).toBe(true);
   });
@@ -35,7 +34,6 @@ describe('isWorkspaceEmpty', () => {
         assetCategories: [],
         resources: [],
         applicationStatuses: [],
-        dtsPhases: [],
       }),
     ).toBe(false);
   });
@@ -54,7 +52,6 @@ describe('isWorkspaceEmpty', () => {
         assetCategories: [],
         resources: [],
         applicationStatuses: [],
-        dtsPhases: [],
       }),
     ).toBe(false);
   });

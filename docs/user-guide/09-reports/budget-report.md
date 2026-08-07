@@ -18,12 +18,11 @@ Each group row shows three columns to the right of the bar:
 | **OpEx** (amber) | Sum of all initiative OpEx in this group |
 | **Total** | CapEx + OpEx combined |
 
-The report includes four groupings:
+The report includes three groupings:
 
 - **By programme** — total budget across all initiatives belonging to each programme
 - **By strategy** — total budget grouped by the strategic theme each initiative is tagged to
 - **By asset category** — total budget grouped by the category of the asset each initiative belongs to
-- **By DTS Phase** — total budget grouped by DTS adoption phase. This breakdown is only shown in DTS and Mixed workspaces.
 
 ## Verifying Totals
 
