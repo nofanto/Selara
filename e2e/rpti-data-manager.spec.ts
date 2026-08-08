@@ -209,4 +209,63 @@ test.describe('RPTI Data Manager tab', () => {
     await page.getByTestId('data-manager-tab-rpti').click();
     await expect(page.locator('[data-testid="data-manager"] tbody tr[data-real="true"]')).toHaveCount(rptiCountAfterRetarget);
   });
+
+  test('Generate button builds a row from a current-year in-production segment linked to an initiative', async ({ page }) => {
+    const currentYear = new Date().getFullYear();
+
+    // Seed a Deliverable + a current-year in-production DeliverableSegment linked to an
+    // existing demo initiative, directly via IndexedDB — demo data never links segments
+    // to initiatives, so nothing would qualify for generation without this.
+    const deliverableId = await page.evaluate(({ year }) => {
+      return new Promise<string>((resolve, reject) => {
+        const req = indexedDB.open('it-initiative-visualiser');
+        req.onsuccess = () => {
+          const db = req.result;
+          const readTx = db.transaction(['assets', 'initiatives'], 'readonly');
+          const assetCursor = readTx.objectStore('assets').openCursor();
+          assetCursor.onsuccess = () => {
+            const assetId = assetCursor.result?.value.id;
+            if (!assetId) { reject(new Error('No assets found')); return; }
+            const initCursor = readTx.objectStore('initiatives').openCursor();
+            initCursor.onsuccess = () => {
+              const initiativeId = initCursor.result?.value.id;
+              if (!initiativeId) { reject(new Error('No initiatives found')); return; }
+
+              const deliverableId = `deliv-gen-test-${Date.now()}`;
+              const writeTx = db.transaction(['deliverables', 'deliverableSegments'], 'readwrite');
+              writeTx.objectStore('deliverables').put({ id: deliverableId, assetId, name: 'Generate Test Deliverable' });
+              writeTx.objectStore('deliverableSegments').put({
+                id: `seg-gen-test-${Date.now()}`,
+                deliverableId,
+                initiativeId,
+                status: 'appstatus-in-production',
+                startDate: `${year}-08-01`,
+                endDate: `${year}-12-31`,
+              });
+              writeTx.oncomplete = () => { db.close(); resolve(deliverableId); };
+              writeTx.onerror = () => reject(writeTx.error);
+            };
+            initCursor.onerror = () => reject(initCursor.error);
+          };
+          assetCursor.onerror = () => reject(assetCursor.error);
+        };
+        req.onerror = () => reject(req.error);
+      });
+    }, { year: currentYear });
+
+    await page.reload();
+    await page.getByTestId('nav-data-manager').click();
+    await page.getByTestId('data-manager-tab-rpti').click();
+
+    await page.getByTestId('rpti-generate-btn').click();
+    await page.getByTestId('confirm-modal-confirm').click();
+    await page.waitForTimeout(300);
+
+    const rows = page.locator('[data-testid="data-manager"] tbody tr[data-real="true"]');
+    await expect(rows).toHaveCount(1);
+    const row = rows.first();
+    await expect(row.locator('td[data-key="targetId"] select')).toHaveValue(deliverableId);
+    await expect(row.locator('td[data-key="developmentType"] select')).toHaveValue('upgrade');
+    await expect(row.locator('td[data-key="plannedImplementationQuarter"] select')).toHaveValue('Q3');
+  });
 });

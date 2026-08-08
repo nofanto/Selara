@@ -40,6 +40,81 @@ function isLiveStatusId(statusId: string, deliverableStatuses: DeliverableStatus
   return statusId === LIVE_STATUS_FALLBACK_ID;
 }
 
+const EXCLUDED_STATUS_FALLBACK_IDS = new Set(['appstatus-sunset', 'appstatus-out-of-support', 'appstatus-retired']);
+const EXCLUDED_STATUS_PATTERN = /sunset|out.of.support|retired|decommission/i;
+
+type SegmentKind = 'new' | 'live' | 'excluded';
+
+// Classifies a segment's status for RPTI generation. Live status wins first (it's the
+// only classification with a real data signal, DeliverableStatus.isLiveStatus); anything
+// matching a known decommission-ish id/name is excluded; everything else is treated as a
+// pre-launch ("new") phase — see requirement-specs/rpti-auto-generation.md.
+function classifySegmentKind(statusId: string, deliverableStatuses: DeliverableStatus[]): SegmentKind {
+  if (isLiveStatusId(statusId, deliverableStatuses)) return 'live';
+  const status = deliverableStatuses.find(s => s.id === statusId);
+  const name = status?.name ?? '';
+  if (EXCLUDED_STATUS_FALLBACK_IDS.has(statusId) || EXCLUDED_STATUS_PATTERN.test(name)) return 'excluded';
+  return 'new';
+}
+
+/**
+ * Generates RptiDetail rows for a single report year from DeliverableSegment data —
+ * see requirement-specs/rpti-auto-generation.md for the full rule. Wipe-and-rebuild:
+ * callers replace the existing rptiDetails for the year with this function's output,
+ * there's no reconciliation with prior manual edits (v1).
+ */
+export function generateRptiDetails(
+  deliverableSegments: DeliverableSegment[],
+  deliverableStatuses: DeliverableStatus[],
+  initiatives: Initiative[],
+  reportYear: number,
+): RptiDetail[] {
+  const inReportYear = (iso: string) => Number(iso.slice(0, 4)) === reportYear;
+  // Deleting an Initiative doesn't clean up DeliverableSegment.initiativeId, so a segment
+  // can carry a dangling reference to an initiative that no longer exists — skip those.
+  const initiativeIds = new Set(initiatives.map(i => i.id));
+
+  const qualifying = deliverableSegments
+    .filter(seg => !!seg.initiativeId && initiativeIds.has(seg.initiativeId) && inReportYear(seg.startDate))
+    .map(seg => ({ segment: seg, kind: classifySegmentKind(seg.status, deliverableStatuses) }))
+    .filter((s): s is { segment: DeliverableSegment; kind: 'new' | 'live' } => s.kind !== 'excluded');
+
+  const groups = new Map<string, { segment: DeliverableSegment; kind: 'new' | 'live' }[]>();
+  for (const item of qualifying) {
+    const key = `${item.segment.initiativeId}::${item.segment.deliverableId}`;
+    const group = groups.get(key);
+    if (group) group.push(item);
+    else groups.set(key, [item]);
+  }
+
+  const byStartDateAsc = (a: { segment: DeliverableSegment }, b: { segment: DeliverableSegment }) =>
+    a.segment.startDate.localeCompare(b.segment.startDate);
+
+  const results: RptiDetail[] = [];
+  for (const [key, items] of groups) {
+    const [initiativeId, deliverableId] = key.split('::');
+    const newItems = items.filter(i => i.kind === 'new').sort(byStartDateAsc);
+    const liveItems = items.filter(i => i.kind === 'live').sort(byStartDateAsc);
+
+    const developmentType: RptiDetail['developmentType'] = newItems.length > 0 ? 'new' : 'upgrade';
+    const anchor = newItems.length > 0
+      ? (liveItems.length > 0 ? liveItems[liveItems.length - 1] : newItems[newItems.length - 1])
+      : liveItems[liveItems.length - 1];
+
+    results.push({
+      id: `rpti-gen-${initiativeId}-${deliverableId}-${reportYear}`,
+      initiativeId,
+      targetType: 'deliverable',
+      targetId: deliverableId,
+      developmentType,
+      plannedImplementationQuarter: deriveQuarterFromDate(anchor.segment.startDate),
+      deliverableSegmentId: anchor.segment.id,
+    });
+  }
+
+  return results;
+}
+
 /**
  * For a deliverable-target RptiDetail, find the initiative's lifecycle segment
  * on that deliverable whose status is "live" and suggest that segment's
@@ -130,10 +205,10 @@ export function exportRptiReportToExcel(
       index + 1,
       targetName,
       initiative?.description ?? '',
-      RPTI_CATEGORY_LABELS[detail.categoryCode],
+      detail.categoryCode ? RPTI_CATEGORY_LABELS[detail.categoryCode] : '',
       detail.developmentType,
-      detail.developer,
-      detail.ppjtiRelatedParty,
+      detail.developer ?? '',
+      detail.ppjtiRelatedParty ?? '',
       formatPlace(detail.dcCity, detail.dcCountry),
       formatPlace(detail.drCity, detail.drCountry),
       suggestion,

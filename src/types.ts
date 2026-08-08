@@ -181,10 +181,10 @@ export interface RptiDetail {
   initiativeId: string;
   targetType: RptiTargetType;
   targetId: string; // Deliverable.id or Asset.id, per targetType
-  categoryCode: RptiCategoryCode;
+  categoryCode?: RptiCategoryCode; // Regulatory classification — no auto-fill source, always set manually
   developmentType: RptiDevelopmentType;
-  developer: RptiDeveloper;
-  ppjtiRelatedParty: RptiRelatedParty;
+  developer?: RptiDeveloper; // No auto-fill source, always set manually
+  ppjtiRelatedParty?: RptiRelatedParty; // No auto-fill source, always set manually
   dcCity?: string;
   dcCountry?: string;
   drCity?: string;

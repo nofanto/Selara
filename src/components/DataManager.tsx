@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import { Asset, Deliverable, DeliverableSegment, DeliverableStatus, DeliverableType, Decision, RptiDetail, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource } from '../types';
 import { EditableTable, Column } from './EditableTable';
 import { cn } from '../lib/utils';
-import { Database, Layers, Calendar, Flag, Target, Link2, FolderTree, LayoutTemplate, Users, Box, ClipboardList } from 'lucide-react';
+import { Database, Layers, Calendar, Flag, Target, Link2, FolderTree, LayoutTemplate, Users, Box, ClipboardList, RefreshCw } from 'lucide-react';
 import { ConfirmModal } from './ConfirmModal';
 import { clearDeliverablesAndSegments, removeDeliverableAndSegments } from '../lib/deliverableCascade';
-import { rptiCascadeOnInitiativeDelete, rptiCascadeOnDeliverableDelete, rptiCascadeOnAssetDelete, RPTI_CATEGORY_LABELS } from '../lib/rpti';
+import { rptiCascadeOnInitiativeDelete, rptiCascadeOnDeliverableDelete, rptiCascadeOnAssetDelete, RPTI_CATEGORY_LABELS, generateRptiDetails } from '../lib/rpti';
 
 interface DataManagerProps {
   data: {
@@ -183,6 +183,19 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery 
     });
   };
 
+  // Wipes and rebuilds all RPTI rows from the current year's DeliverableSegment data —
+  // see requirement-specs/rpti-auto-generation.md. v1: full replace, no reconciliation
+  // with prior manual edits.
+  const handleGenerateRpti = () => {
+    const reportYear = new Date().getFullYear();
+    const generated = generateRptiDetails(data.deliverableSegments || [], data.deliverableStatuses || [], data.initiatives, reportYear);
+    const existingCount = (data.rptiDetails || []).length;
+    const message = existingCount
+      ? `This replaces all ${existingCount} existing RPTI row(s) with ${generated.length} row(s) generated from ${reportYear} deliverable segment data. Any manual edits will be lost. Continue?`
+      : `Generate ${generated.length} RPTI row(s) from ${reportYear} deliverable segment data?`;
+    confirm('Generate RPTI Rows', message, () => updateData('rptiDetails', generated));
+  };
+
   const initiativeColumns: Column<Initiative>[] = [
     { key: 'name', label: 'Initiative Name', type: 'text', width: '180px' },
     { key: 'assetId', label: 'Asset', type: 'select', options: assetOptions, width: '120px' },
@@ -350,8 +363,11 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery 
     { key: 'targetId', label: 'Target', type: 'select', options: rptiTargetOptions, width: '160px' },
     {
       key: 'categoryCode', label: 'Category', type: 'select', width: '220px',
-      options: (Object.keys(RPTI_CATEGORY_LABELS) as (keyof typeof RPTI_CATEGORY_LABELS)[])
-        .map(code => ({ value: code, label: `${code} — ${RPTI_CATEGORY_LABELS[code]}` })),
+      options: [
+        { value: '', label: '— Not set —' },
+        ...(Object.keys(RPTI_CATEGORY_LABELS) as (keyof typeof RPTI_CATEGORY_LABELS)[])
+          .map(code => ({ value: code, label: `${code} — ${RPTI_CATEGORY_LABELS[code]}` })),
+      ],
     },
     {
       key: 'developmentType', label: 'Dev Type', type: 'select', width: '110px',
@@ -359,11 +375,17 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery 
     },
     {
       key: 'developer', label: 'Developer', type: 'select', width: '110px',
-      options: [{ value: 'inhouse', label: 'In-house' }, { value: 'PPJTI', label: 'PPJTI' }],
+      options: [
+        { value: '', label: '— Not set —' },
+        { value: 'inhouse', label: 'In-house' }, { value: 'PPJTI', label: 'PPJTI' },
+      ],
     },
     {
       key: 'ppjtiRelatedParty', label: 'PPJTI Related Party', type: 'select', width: '150px',
-      options: [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }, { value: 'n/a', label: 'N/A' }],
+      options: [
+        { value: '', label: '— Not set —' },
+        { value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }, { value: 'n/a', label: 'N/A' },
+      ],
     },
     {
       key: 'plannedImplementationQuarter', label: 'Quarter', type: 'select', width: '100px',
@@ -543,15 +565,30 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery 
           />
         )}
         {activeTab === 'rpti' && (
-          <EditableTable
-            data={data.rptiDetails || []}
-            columns={getColumnsWithWidths('rpti', rptiColumns)}
-            onUpdate={(newData) => updateData('rptiDetails', deriveRptiTargetTypes(newData))}
-            onDelete={(row) => { updateData('rptiDetails', (data.rptiDetails || []).filter(r => r.id !== row.id)); return true; }}
-            idField="id"
-            tableId="rpti"
-            onColumnResize={(col, w) => handleColumnResize('rpti', col, w)}
-          />
+          <div className="flex flex-col h-full">
+            <div className="flex items-center gap-2 mb-3">
+              <button
+                onClick={handleGenerateRpti}
+                data-testid="rpti-generate-btn"
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-sm font-medium text-sm"
+              >
+                <RefreshCw size={16} />
+                Generate {new Date().getFullYear()} RPTI Rows
+              </button>
+              <p className="text-xs text-slate-500">
+                Rebuilds rows from this year's deliverable segments — replaces all rows below.
+              </p>
+            </div>
+            <EditableTable
+              data={data.rptiDetails || []}
+              columns={getColumnsWithWidths('rpti', rptiColumns)}
+              onUpdate={(newData) => updateData('rptiDetails', deriveRptiTargetTypes(newData))}
+              onDelete={(row) => { updateData('rptiDetails', (data.rptiDetails || []).filter(r => r.id !== row.id)); return true; }}
+              idField="id"
+              tableId="rpti"
+              onColumnResize={(col, w) => handleColumnResize('rpti', col, w)}
+            />
+          </div>
         )}
       </div>
 

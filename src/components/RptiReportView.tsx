@@ -68,9 +68,9 @@ export function RptiReportView({ rptiDetails, initiatives, deliverables, assets,
                   <tr key={detail.id} className="border-t border-slate-100">
                     <td className="px-3 py-2">{index + 1}</td>
                     <td className="px-3 py-2 font-medium text-slate-800">{targetName(detail)}</td>
-                    <td className="px-3 py-2">{RPTI_CATEGORY_LABELS[detail.categoryCode] ? `${detail.categoryCode} — ${RPTI_CATEGORY_LABELS[detail.categoryCode]}` : detail.categoryCode}</td>
+                    <td className="px-3 py-2">{detail.categoryCode ? `${detail.categoryCode} — ${RPTI_CATEGORY_LABELS[detail.categoryCode]}` : '—'}</td>
                     <td className="px-3 py-2 capitalize">{detail.developmentType}</td>
-                    <td className="px-3 py-2">{detail.developer}</td>
+                    <td className="px-3 py-2">{detail.developer ?? '—'}</td>
                     <td className="px-3 py-2">{quarter}</td>
                     <td className="px-3 py-2">${capexAmount.toLocaleString()}</td>
                     <td className="px-3 py-2">${opexAmount.toLocaleString()}</td>
