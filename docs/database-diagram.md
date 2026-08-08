@@ -33,7 +33,7 @@ erDiagram
         string id PK
         string categoryId FK
         string name
-        string maturity
+        int maturity
         string alias
         string externalId
     }
@@ -42,6 +42,7 @@ erDiagram
         string id PK
         string assetId FK
         string name
+        string type "deliverable kind: application/infrastructure/document/procedure/other; undefined treated as 'application'"
     }
 
     APPLICATION_SEGMENT {
@@ -50,6 +51,7 @@ erDiagram
         date startDate
         date endDate
         string status
+        string initiativeId FK "optional; attributes this lifecycle phase to the driving Initiative"
         int row
         int rowSpan
     }
@@ -58,6 +60,7 @@ erDiagram
         string id PK
         string name
         string color
+        boolean isLiveStatus "marks this status as live/in-production"
     }
 
     RESOURCE {
@@ -119,6 +122,30 @@ erDiagram
         string linkedEntityId FK
     }
 
+    RPTI_DETAIL {
+        string id PK
+        string initiativeId FK
+        string targetType "'application' or 'asset'"
+        string targetId FK "polymorphic; Application.id or Asset.id per targetType"
+        string categoryCode
+        string developmentType "'new' or 'upgrade'"
+        string developer "'inhouse' or 'PPJTI'"
+        string ppjtiRelatedParty "'yes'/'no'/'n/a'"
+        string dcCity
+        string dcCountry
+        string drCity
+        string drCountry
+        number capexAmount
+        string capexCurrency
+        number capexIdrEquivalent
+        number opexAmount
+        string opexCurrency
+        number opexIdrEquivalent
+        string plannedImplementationQuarter
+        string applicationSegmentId FK "optional; set when quarter is auto-derived"
+        string remarks
+    }
+
     VERSION {
         string id PK
         string name
@@ -132,15 +159,32 @@ erDiagram
         date startDate
         int monthsToShow
         string budgetVisualisation
-        string groupBy
-        string colorBy
-        string templateId
+        string descriptionDisplay
+        string emptyRowDisplay
+        string snapToPeriod
+        string conflictDetection
+        string showRelationships
+        object columnWidths "optional; per-table column widths"
+        string_array collapsedGroups "optional"
+        boolean hasSeenTutorial "optional"
+        number columnZoom "optional; 0.5-3.0 multiplier"
+        int sidebarWidth "optional; pixels"
+        string mobileBucketMode "optional"
+        string criticalPath "optional"
+        string groupBy "optional"
+        string colorBy "optional"
+        string showResources "optional"
+        string display "optional; 'both'/'initiatives'/'applications'"
+        string templateId "optional; which workspace template was chosen"
+        boolean showGeanzCatalogue "optional, default true"
+        string clusterName "optional"
     }
 
     ASSET_CATEGORY ||--o{ ASSET : "categorizes"
     ASSET ||--o{ APPLICATION : "hosts"
     APPLICATION ||--o{ APPLICATION_SEGMENT : "has timeline segments"
-    APPLICATION_STATUS ||--o{ APPLICATION_SEGMENT : "status of (by name, unenforced)"
+    APPLICATION_STATUS ||--o{ APPLICATION_SEGMENT : "status of (by id, unenforced)"
+    INITIATIVE |o--o{ APPLICATION_SEGMENT : "drives lifecycle phase (optional)"
     ASSET ||--o{ MILESTONE : "has"
 
     PROGRAMME ||--o{ INITIATIVE : "groups"
@@ -159,10 +203,16 @@ erDiagram
     ASSET |o..o{ DECISION : "polymorphic link (optional)"
     DECISION |o--o| DECISION : "superseded by (optional)"
 
+    INITIATIVE ||--o{ RPTI_DETAIL : "backs (one initiative, many report rows)"
+    APPLICATION }o--o| RPTI_DETAIL : "polymorphic target"
+    ASSET }o--o| RPTI_DETAIL : "polymorphic target"
+    APPLICATION_SEGMENT |o..o{ RPTI_DETAIL : "auto-derives planned quarter (optional)"
+
     VERSION }o..o{ ASSET : "snapshot copy"
     VERSION }o..o{ INITIATIVE : "snapshot copy"
     VERSION }o..o{ APPLICATION : "snapshot copy"
     VERSION }o..o{ DECISION : "snapshot copy"
+    VERSION }o..o{ RPTI_DETAIL : "snapshot copy"
 ```
 
 ## Object Stores
@@ -240,7 +290,7 @@ There are three templates:
 
 Each template exercises a different *subset* of the schema described above. The diagrams below show, per template, exactly which stores get populated and which relationships are actually exercised — as opposed to the full schema diagram, which shows everything the app is *capable* of storing.
 
-No template pre-seeds `decisions` — every template (`geanz`, `viewer`, `blank`, with or without demo data) sets `decisions: []`. Decisions are a user-authored log added after the workspace is set up, so they're omitted from the per-template diagrams below.
+No template pre-seeds `decisions` or `rptiDetails` — every template (`geanz`, `viewer`, `blank`, with or without demo data) sets both to `[]`. Decisions and RPTI report rows are user-authored records added after the workspace is set up, so they're omitted from the per-template diagrams below.
 
 ### `geanz` — GEANZ Technology Catalogue (with demo data)
 
@@ -250,8 +300,8 @@ erDiagram
         int count "6"
     }
     ASSET {
-        int count "41"
-        string breakdown "16 banking + 25 GEANZ/TAP-catalogue"
+        int count "42"
+        string breakdown "16 banking + 26 GEANZ/TAP-catalogue"
     }
     PROGRAMME {
         int count "6"
@@ -266,17 +316,17 @@ erDiagram
         int count "6"
     }
     APPLICATION {
-        int count "19"
+        int count "17"
         string breakdown "8 banking + 9 GEANZ"
     }
     APPLICATION_SEGMENT {
-        int count "30"
+        int count "35"
     }
     INITIATIVE {
-        int count "39"
+        int count "48"
         string breakdown "incl. 1 isPlaceholder record"
-        string ownerId "set"
-        string_array resourceIds "set"
+        string ownerId "set on 47 of 48"
+        string_array resourceIds "set on 27 of 48"
     }
     MILESTONE {
         int count "14"
@@ -300,7 +350,7 @@ erDiagram
     INITIATIVE }o--o{ DEPENDENCY : "source/target"
 ```
 
-`timelineSettings.showGeanzCatalogue` is `true` in this template, which lets the user browse and add from the live 17-area / 300+ asset-type GEANZ taxonomy in [`src/lib/geanzCatalogue.ts`](../src/lib/geanzCatalogue.ts) — that catalogue is rendered directly by the Timeline UI and is **not** seeded into IndexedDB.
+`timelineSettings.showGeanzCatalogue` is `true` in this template, which lets the user browse and add from the live 17-area / 140-asset-type GEANZ taxonomy in [`src/lib/geanzCatalogue.ts`](../src/lib/geanzCatalogue.ts) — that catalogue is rendered directly by the Timeline UI and is **not** seeded into IndexedDB.
 
 ### `geanz` — without demo data
 
@@ -309,7 +359,7 @@ Selecting `geanz` with the demo-data toggle off still seeds the lookup/config st
 | Store | Count |
 |---|---|
 | `assetCategories` | 6 |
-| `assets` | 41 |
+| `assets` | 42 |
 | `programmes` | 6 |
 | `strategies` | 6 |
 | `applicationStatuses` | 6 |
