@@ -133,7 +133,7 @@ export interface Asset {
   externalId?: string; // GEANZ GUID — used for idempotent re-import
 }
 
-export type ApplicationType = 'application' | 'infrastructure' | 'document' | 'procedure' | 'other';
+export type DeliverableType = 'application' | 'infrastructure' | 'document' | 'procedure' | 'other';
 
 /**
  * An application, infrastructure item, document, or other deliverable that makes up an IT asset.
@@ -142,7 +142,7 @@ export interface Application {
   id: string;
   assetId: string;
   name: string;
-  type?: ApplicationType; // Undefined is treated as 'application' (legacy records predate this field)
+  type?: DeliverableType; // Undefined is treated as 'application' (legacy records predate this field)
 }
 
 /**

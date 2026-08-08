@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Asset, Application, ApplicationSegment, ApplicationStatus, ApplicationType, Decision, RptiDetail, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource } from '../types';
+import { Asset, Application, ApplicationSegment, ApplicationStatus, DeliverableType, Decision, RptiDetail, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource } from '../types';
 import { EditableTable, Column } from './EditableTable';
 import { cn } from '../lib/utils';
 import { Database, Layers, Calendar, Flag, Target, Link2, FolderTree, LayoutTemplate, Users, Box, ClipboardList } from 'lucide-react';
@@ -298,7 +298,7 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery 
     { key: 'name', label: 'Name', type: 'text', width: '40%' },
     {
       key: 'type', label: 'Type', type: 'select', width: '25%',
-      options: (['application', 'infrastructure', 'document', 'procedure', 'other'] as ApplicationType[])
+      options: (['application', 'infrastructure', 'document', 'procedure', 'other'] as DeliverableType[])
         .map(t => ({ value: t, label: t.charAt(0).toUpperCase() + t.slice(1) })),
     },
     {
