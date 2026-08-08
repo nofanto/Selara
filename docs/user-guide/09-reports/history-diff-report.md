@@ -16,7 +16,7 @@ Once at least one version exists, a version selector appears at the top of the r
 
 Changes are displayed inline. Added content is highlighted to indicate it did not exist in the baseline version. Removed content is marked to show it was present in the baseline but absent in the comparison. Unchanged content appears without highlighting.
 
-Work through the diff section by section — initiatives, dependencies, budgets, and resource assignments — to build a complete picture of what changed between the two snapshots.
+Work through the diff section by section to build a complete picture of what changed between the two snapshots: assets, programmes, strategies, initiatives (including budgets and asset moves), dependencies, milestones, deliverables and their lifecycle segments, deliverable statuses, resources, asset categories, decisions, and RPTI report rows.
 
 ## Error States
 

@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Version, Asset, Application, ApplicationSegment, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource, ApplicationStatus, Decision, RptiDetail } from '../types';
-import { X, Save, History, Trash2, ArrowRight, FileText, AlertCircle, LayoutGrid, Check, Users, GitBranch } from 'lucide-react';
+import { X, Save, History, Trash2, ArrowRight, FileText, AlertCircle, LayoutGrid, Check, Users, GitBranch, Box, Layers, Tags, FolderTree, Scale, ClipboardList } from 'lucide-react';
 import { saveVersion, deleteVersion } from '../lib/db';
 import { ConfirmModal } from './ConfirmModal';
 import { computeDiff } from '../lib/diff';
@@ -471,6 +471,48 @@ function VersionComparisonReport({ baseVersion, comparisonData, onClose }: {
                 data={diff.milestones}
                 icon={FileText}
                 colorClass="rose"
+              />
+              <DiffSection
+                title="Deliverables"
+                data={diff.applications}
+                icon={Box}
+                colorClass="cyan"
+              />
+              <DiffSection
+                title="Deliverable Segments"
+                data={diff.applicationSegments}
+                icon={Layers}
+                colorClass="teal"
+              />
+              <DiffSection
+                title="App Statuses"
+                data={diff.applicationStatuses}
+                icon={Tags}
+                colorClass="orange"
+              />
+              <DiffSection
+                title="Resources"
+                data={diff.resources}
+                icon={Users}
+                colorClass="sky"
+              />
+              <DiffSection
+                title="Categories"
+                data={diff.assetCategories}
+                icon={FolderTree}
+                colorClass="stone"
+              />
+              <DiffSection
+                title="Decisions"
+                data={diff.decisions}
+                icon={Scale}
+                colorClass="fuchsia"
+              />
+              <DiffSection
+                title="RPTI"
+                data={diff.rptiDetails}
+                icon={ClipboardList}
+                colorClass="lime"
               />
             </>
           )}

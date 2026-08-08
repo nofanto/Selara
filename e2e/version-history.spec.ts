@@ -160,6 +160,31 @@ test.describe('Version History & Snapshotting', () => {
     await expect(page.getByText('Renamed from "Passkey Rollout" to "Passkey Rollout MUTATED"')).toBeVisible({ timeout: 5000 });
   });
 
+  test('difference report includes resource and deliverable changes, not just initiatives', async ({ page }) => {
+    await page.getByTestId('nav-history').click();
+    await page.getByRole('button', { name: 'Save Current State' }).click();
+    await page.fill('input[placeholder="e.g., March 2026 Snapshot"]', 'Pre-Resource Baseline');
+    await page.getByRole('button', { name: 'Save Version' }).click();
+    await page.getByTestId('close-version-manager').click();
+
+    await page.getByTestId('nav-data-manager').click();
+    await page.getByTestId('data-manager-tab-resources').click();
+    await page.getByTestId('add-row-btn-resources').click();
+    const newResourceName = `Diff Test Resource ${Date.now()}`;
+    const nameInput = page.locator('table tbody tr[data-real="true"]').last().locator('[data-testid="real-input-name"]');
+    await nameInput.fill(newResourceName);
+    await nameInput.press('Tab');
+    await expect(page.locator('table tbody tr[data-real="true"]').last().locator('[data-testid="real-input-name"]')).toHaveValue(newResourceName);
+
+    await page.getByTestId('nav-history').click();
+    await page.getByText('Pre-Resource Baseline').click();
+    await page.getByRole('button', { name: 'Run Difference Report' }).click();
+
+    await expect(page.getByRole('heading', { name: 'Difference Report' })).toBeVisible();
+    await expect(page.getByText('Resources', { exact: true })).toBeVisible();
+    await expect(page.getByText(newResourceName)).toBeVisible();
+  });
+
   test('snapshot stored in IndexedDB contains all initiative data', async ({ page }) => {
     await page.waitForSelector('[data-testid="asset-row-content"]', { timeout: 10000 });
     await page.getByTestId('nav-history').click();
