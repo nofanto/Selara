@@ -4,14 +4,14 @@ import { exportToExcel, importFromExcel } from '../lib/excel';
 import { SchemaIssue, validateImportSchema } from '../lib/importValidation';
 import { exportToPDF, exportToPNG } from '../lib/pdf';
 import { shareWorkspace } from '../lib/share';
-import { Asset, Application, ApplicationSegment, ApplicationStatus, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource, Version, Decision, RptiDetail } from '../types';
+import { Asset, Deliverable, DeliverableSegment, DeliverableStatus, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource, Version, Decision, RptiDetail } from '../types';
 
 interface DataControlsProps {
   data: {
     assets: Asset[];
-    applications?: Application[];
-    applicationSegments?: ApplicationSegment[];
-    applicationStatuses?: ApplicationStatus[];
+    deliverables?: Deliverable[];
+    deliverableSegments?: DeliverableSegment[];
+    deliverableStatuses?: DeliverableStatus[];
     initiatives: Initiative[];
     milestones: Milestone[];
     programmes: Programme[];
@@ -26,9 +26,9 @@ interface DataControlsProps {
   };
   onImport: (data: {
     assets: Asset[];
-    applications: Application[];
-    applicationSegments: ApplicationSegment[];
-    applicationStatuses: ApplicationStatus[];
+    deliverables: Deliverable[];
+    deliverableSegments: DeliverableSegment[];
+    deliverableStatuses: DeliverableStatus[];
     initiatives: Initiative[];
     milestones: Milestone[];
     programmes: Programme[];
@@ -155,9 +155,9 @@ export function DataControls({ data, onImport, onError, timelineId }: DataContro
     if (!importPreviewData) return;
     onImport({
       assets: importPreviewData.assets || [],
-      applications: importPreviewData.applications || [],
-      applicationSegments: importPreviewData.applicationSegments || [],
-      applicationStatuses: importPreviewData.applicationStatuses || [],
+      deliverables: importPreviewData.deliverables || [],
+      deliverableSegments: importPreviewData.deliverableSegments || [],
+      deliverableStatuses: importPreviewData.deliverableStatuses || [],
       initiatives: importPreviewData.initiatives || [],
       milestones: importPreviewData.milestones || [],
       programmes: importPreviewData.programmes || [],
@@ -193,9 +193,9 @@ export function DataControls({ data, onImport, onError, timelineId }: DataContro
 
     onImport({
       assets: mergeArrays(data.assets, importPreviewData.assets),
-      applications: mergeArrays(data.applications || [], importPreviewData.applications),
-      applicationSegments: mergeArrays(data.applicationSegments || [], importPreviewData.applicationSegments),
-      applicationStatuses: mergeArrays(data.applicationStatuses || [], importPreviewData.applicationStatuses),
+      deliverables: mergeArrays(data.deliverables || [], importPreviewData.deliverables),
+      deliverableSegments: mergeArrays(data.deliverableSegments || [], importPreviewData.deliverableSegments),
+      deliverableStatuses: mergeArrays(data.deliverableStatuses || [], importPreviewData.deliverableStatuses),
       initiatives: mergeArrays(data.initiatives, importPreviewData.initiatives),
       milestones: mergeArrays(data.milestones, importPreviewData.milestones),
       programmes: mergeArrays(data.programmes, importPreviewData.programmes),
@@ -378,9 +378,9 @@ export function DataControls({ data, onImport, onError, timelineId }: DataContro
             <ul className="space-y-2 mb-4 text-sm text-slate-700 bg-slate-50 p-4 rounded-lg border border-slate-200">
               {importPreviewData.initiatives && <li><span className="font-semibold">{importPreviewData.initiatives.length}</span> Initiatives</li>}
               {importPreviewData.assets && <li><span className="font-semibold">{importPreviewData.assets.length}</span> Assets</li>}
-              {importPreviewData.applications && importPreviewData.applications.length > 0 && <li><span className="font-semibold">{importPreviewData.applications.length}</span> Applications</li>}
-              {importPreviewData.applicationSegments && importPreviewData.applicationSegments.length > 0 && <li><span className="font-semibold">{importPreviewData.applicationSegments.length}</span> Application Segments</li>}
-              {importPreviewData.applicationStatuses && importPreviewData.applicationStatuses.length > 0 && <li><span className="font-semibold">{importPreviewData.applicationStatuses.length}</span> Application Statuses</li>}
+              {importPreviewData.deliverables && importPreviewData.deliverables.length > 0 && <li><span className="font-semibold">{importPreviewData.deliverables.length}</span> Deliverables</li>}
+              {importPreviewData.deliverableSegments && importPreviewData.deliverableSegments.length > 0 && <li><span className="font-semibold">{importPreviewData.deliverableSegments.length}</span> Deliverable Segments</li>}
+              {importPreviewData.deliverableStatuses && importPreviewData.deliverableStatuses.length > 0 && <li><span className="font-semibold">{importPreviewData.deliverableStatuses.length}</span> Deliverable Statuses</li>}
               {importPreviewData.resources && importPreviewData.resources.length > 0 && <li><span className="font-semibold">{importPreviewData.resources.length}</span> Resources</li>}
               {importPreviewData.programmes && <li><span className="font-semibold">{importPreviewData.programmes.length}</span> Programmes</li>}
               {importPreviewData.strategies && <li><span className="font-semibold">{importPreviewData.strategies.length}</span> Strategies</li>}

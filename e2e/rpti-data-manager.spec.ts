@@ -148,7 +148,7 @@ test.describe('RPTI Data Manager tab', () => {
     expect(rptiCountAfter).toBe(rptiCountBefore - 1);
   });
 
-  test('Changing a row\'s target from an Asset to an Application re-derives targetType, verified via cascade-delete', async ({ page }) => {
+  test('Changing a row\'s target from an Asset to a Deliverable re-derives targetType, verified via cascade-delete', async ({ page }) => {
     // Create a brand-new Asset with no initiatives/milestones pointing to it, so
     // deleting it later can only affect an RPTI row through targetType/targetId —
     // never through the separate "initiative belongs to this asset" cascade path.
@@ -171,7 +171,7 @@ test.describe('RPTI Data Manager tab', () => {
     for (const opt of options) {
       const label = await opt.textContent();
       if (label === 'Asset: RPTI Retarget Test Asset') assetOptionValue = await opt.getAttribute('value');
-      if (!appOptionValue && label?.startsWith('App:')) appOptionValue = await opt.getAttribute('value');
+      if (!appOptionValue && label?.startsWith('Deliverable:')) appOptionValue = await opt.getAttribute('value');
     }
     expect(assetOptionValue).not.toBeNull();
     expect(appOptionValue).not.toBeNull();
@@ -185,7 +185,7 @@ test.describe('RPTI Data Manager tab', () => {
     await row.locator('td[data-key="ppjtiRelatedParty"] select').press('Tab');
     await page.waitForTimeout(300);
 
-    // Switch the target to the Application option — targetType should re-derive to 'application'.
+    // Switch the target to the Deliverable option — targetType should re-derive to 'deliverable'.
     await targetSelect.selectOption(appOptionValue!);
     await targetSelect.press('Tab');
     await page.waitForTimeout(300);

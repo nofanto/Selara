@@ -1,47 +1,47 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * Application Segment Creation — Application Selector
+ * Deliverable Segment Creation — Deliverable Selector
  *
  * User Story:
- *   As a user creating a new application lifecycle segment, I want to select
- *   which application within the asset the segment belongs to, so the segment
- *   is associated with the correct application.
+ *   As a user creating a new deliverable lifecycle segment, I want to select
+ *   which deliverable within the asset the segment belongs to, so the segment
+ *   is associated with the correct deliverable.
  *
  * Acceptance Criteria:
- *   AC1: The "Add Lifecycle Segment" panel shows an Application dropdown when
- *        the asset has applications defined.
- *   AC2: The dropdown lists all applications belonging to that asset.
- *   AC3: Saving with a selected application sets applicationId on the new segment
+ *   AC1: The "Add Lifecycle Segment" panel shows a Deliverable dropdown when
+ *        the asset has deliverables defined.
+ *   AC2: The dropdown lists all deliverables belonging to that asset.
+ *   AC3: Saving with a selected deliverable sets deliverableId on the new segment
  *        (verified by re-opening the segment and checking the panel subtitle).
  */
-test.describe('Segment creation — application selector', () => {
+test.describe('Segment creation — deliverable selector', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
     await page.waitForSelector('[data-testid="asset-row-content"]', { timeout: 20000 });
-    // Navigate to a year where the CIAM application swimlane has space for a new segment
+    // Navigate to a year where the CIAM deliverable swimlane has space for a new segment
     const startInput = page.getByTestId('timeline-start-input');
     await startInput.fill('2030-01-01');
     await startInput.press('Enter');
     await page.waitForTimeout(300);
   });
 
-  test('AC1: Add Lifecycle Segment panel shows an Application dropdown', async ({ page }) => {
-    // Double-click the CIAM application swimlane to open creation panel
-    const rowContent = page.locator('[data-testid="application-row-content"]').first();
+  test('AC1: Add Lifecycle Segment panel shows a Deliverable dropdown', async ({ page }) => {
+    // Double-click the CIAM deliverable swimlane to open creation panel
+    const rowContent = page.locator('[data-testid="deliverable-row-content"]').first();
     await rowContent.dblclick({ position: { x: 200, y: 20 } });
 
     await expect(page.getByTestId('segment-panel')).toBeVisible();
-    await expect(page.locator('[data-testid="segment-application"]')).toBeVisible();
+    await expect(page.locator('[data-testid="segment-deliverable"]')).toBeVisible();
   });
 
-  test('AC2: Application dropdown lists all applications for the asset', async ({ page }) => {
-    const rowContent = page.locator('[data-testid="application-row-content"]').first();
+  test('AC2: Deliverable dropdown lists all deliverables for the asset', async ({ page }) => {
+    const rowContent = page.locator('[data-testid="deliverable-row-content"]').first();
     await rowContent.dblclick({ position: { x: 200, y: 20 } });
 
     await expect(page.getByTestId('segment-panel')).toBeVisible();
 
-    const select = page.locator('[data-testid="segment-application"]');
+    const select = page.locator('[data-testid="segment-deliverable"]');
     await expect(select).toBeVisible();
 
     // CIAM asset (first in demo data) has: Okta, Azure AD B2C, Keycloak
@@ -55,15 +55,15 @@ test.describe('Segment creation — application selector', () => {
     expect(texts.some(t => t.includes('Keycloak'))).toBe(true);
   });
 
-  test('AC3: Saving with a selected application associates the segment with that application', async ({ page }) => {
-    const rowContent = page.locator('[data-testid="application-row-content"]').first();
+  test('AC3: Saving with a selected deliverable associates the segment with that deliverable', async ({ page }) => {
+    const rowContent = page.locator('[data-testid="deliverable-row-content"]').first();
     await rowContent.dblclick({ position: { x: 200, y: 20 } });
 
     const panel = page.getByTestId('segment-panel');
     await expect(panel).toBeVisible();
 
-    // Select "Keycloak" as the application
-    const select = page.locator('[data-testid="segment-application"]');
+    // Select "Keycloak" as the deliverable
+    const select = page.locator('[data-testid="segment-deliverable"]');
     await select.selectOption({ label: 'Keycloak' });
 
     // Save the segment

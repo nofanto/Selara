@@ -5,8 +5,8 @@ import * as XLSX from 'xlsx';
 /**
  * US-04: Fix export to include all entity types
  *
- * AC1: Excel export includes Applications, ApplicationSegments,
- *      ApplicationStatuses, and Resources sheets.
+ * AC1: Excel export includes Deliverables, DeliverableSegments,
+ *      DeliverableStatuses, and Resources sheets.
  * AC2: Each sheet contains at least one row of data (from demo data).
  * AC3: After exporting and re-importing via Merge, the Resources count
  *      in the import preview modal reflects the imported sheet.
@@ -30,19 +30,19 @@ test.describe('US-04: Export includes all entity types', () => {
   });
 
   // ── AC1 ──────────────────────────────────────────────────────────────────
-  test('AC1: export workbook contains Applications, ApplicationSegments, ApplicationStatuses, Resources sheets', async ({ page }) => {
+  test('AC1: export workbook contains Deliverables, DeliverableSegments, DeliverableStatuses, Resources sheets', async ({ page }) => {
     const wb = await downloadExcel(page);
-    expect(wb.SheetNames).toContain('Applications');
-    expect(wb.SheetNames).toContain('ApplicationSegments');
-    expect(wb.SheetNames).toContain('ApplicationStatuses');
+    expect(wb.SheetNames).toContain('Deliverables');
+    expect(wb.SheetNames).toContain('DeliverableSegments');
+    expect(wb.SheetNames).toContain('DeliverableStatuses');
     expect(wb.SheetNames).toContain('Resources');
   });
 
   // ── AC2 ──────────────────────────────────────────────────────────────────
-  test('AC2: Applications and Resources sheets have data rows', async ({ page }) => {
+  test('AC2: Deliverables and Resources sheets have data rows', async ({ page }) => {
     const wb = await downloadExcel(page);
 
-    const appRows = XLSX.utils.sheet_to_json(wb.Sheets['Applications']);
+    const appRows = XLSX.utils.sheet_to_json(wb.Sheets['Deliverables']);
     expect(appRows.length).toBeGreaterThan(0);
 
     const resourceRows = XLSX.utils.sheet_to_json(wb.Sheets['Resources']);

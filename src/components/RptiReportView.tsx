@@ -1,20 +1,20 @@
 import React from 'react';
-import { RptiDetail, Initiative, Application, Asset, ApplicationSegment, ApplicationStatus } from '../types';
+import { RptiDetail, Initiative, Deliverable, Asset, DeliverableSegment, DeliverableStatus } from '../types';
 import { Download } from 'lucide-react';
-import { RPTI_CATEGORY_LABELS, suggestApplicationQuarter, resolveCost, exportRptiReportToExcel } from '../lib/rpti';
+import { RPTI_CATEGORY_LABELS, suggestDeliverableQuarter, resolveCost, exportRptiReportToExcel } from '../lib/rpti';
 
 interface RptiReportViewProps {
   rptiDetails: RptiDetail[];
   initiatives: Initiative[];
-  applications: Application[];
+  deliverables: Deliverable[];
   assets: Asset[];
-  applicationSegments: ApplicationSegment[];
-  applicationStatuses: ApplicationStatus[];
+  deliverableSegments: DeliverableSegment[];
+  deliverableStatuses: DeliverableStatus[];
 }
 
-export function RptiReportView({ rptiDetails, initiatives, applications, assets, applicationSegments, applicationStatuses }: RptiReportViewProps) {
+export function RptiReportView({ rptiDetails, initiatives, deliverables, assets, deliverableSegments, deliverableStatuses }: RptiReportViewProps) {
   const targetName = (detail: RptiDetail): string => {
-    if (detail.targetType === 'application') return applications.find(a => a.id === detail.targetId)?.name ?? '—';
+    if (detail.targetType === 'deliverable') return deliverables.find(a => a.id === detail.targetId)?.name ?? '—';
     return assets.find(a => a.id === detail.targetId)?.name ?? '—';
   };
 
@@ -27,7 +27,7 @@ export function RptiReportView({ rptiDetails, initiatives, applications, assets,
         <div className="flex-1" />
         {rptiDetails.length > 0 && (
           <button
-            onClick={() => exportRptiReportToExcel(rptiDetails, initiatives, applications, assets, applicationSegments, applicationStatuses)}
+            onClick={() => exportRptiReportToExcel(rptiDetails, initiatives, deliverables, assets, deliverableSegments, deliverableStatuses)}
             data-testid="rpti-report-export-btn"
             className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors text-sm font-medium"
           >
@@ -62,7 +62,7 @@ export function RptiReportView({ rptiDetails, initiatives, applications, assets,
                 const initiative = initiatives.find(i => i.id === detail.initiativeId);
                 const { capexAmount, opexAmount } = resolveCost(detail, initiative);
                 const quarter = detail.plannedImplementationQuarter
-                  ?? suggestApplicationQuarter(detail, applicationSegments, applicationStatuses).quarter
+                  ?? suggestDeliverableQuarter(detail, deliverableSegments, deliverableStatuses).quarter
                   ?? '—';
                 return (
                   <tr key={detail.id} className="border-t border-slate-100">

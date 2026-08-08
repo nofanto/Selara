@@ -1,15 +1,15 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * Application Segment — Double-click to Edit
+ * Deliverable Segment — Double-click to Edit
  *
  * User Story:
- *   As a user viewing application lifecycle segments on the timeline, I want to
+ *   As a user viewing deliverable lifecycle segments on the timeline, I want to
  *   double-click an existing segment to open the Edit Lifecycle Segment panel,
  *   so I can quickly update its details without first single-clicking to select.
  *
  * Acceptance Criteria:
- *   AC1: Double-clicking an existing application segment opens the Edit panel
+ *   AC1: Double-clicking an existing deliverable segment opens the Edit panel
  *        (title reads "Edit Lifecycle Segment", not "Add Lifecycle Segment").
  *   AC2: Double-clicking blank space in the swimlane still opens the Add panel
  *        (title reads "Add Lifecycle Segment").
@@ -39,7 +39,7 @@ test.describe('Segment double-click to edit', () => {
     await startInput.press('Enter');
     await page.waitForTimeout(300);
 
-    const rowContent = page.locator('[data-testid="application-row-content"]').first();
+    const rowContent = page.locator('[data-testid="deliverable-row-content"]').first();
     await rowContent.dblclick({ position: { x: 200, y: 20 } });
 
     const panel = page.getByTestId('segment-panel');

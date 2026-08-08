@@ -1,10 +1,10 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * Application Segment — Delete Confirmation Flow
+ * Deliverable Segment — Delete Confirmation Flow
  *
  * User Story:
- *   As a user editing an application lifecycle segment, I want pressing the
+ *   As a user editing a deliverable lifecycle segment, I want pressing the
  *   delete button to immediately show a confirmation modal (without closing
  *   the edit panel first), so that I can confirm or cancel the deletion in
  *   a single, uninterrupted flow.

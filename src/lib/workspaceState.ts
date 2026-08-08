@@ -1,7 +1,7 @@
 type WorkspaceContent = {
   assets: unknown[];
-  applications?: unknown[];
-  applicationSegments?: unknown[];
+  deliverables?: unknown[];
+  deliverableSegments?: unknown[];
   initiatives: unknown[];
   milestones: unknown[];
   programmes: unknown[];
@@ -9,7 +9,7 @@ type WorkspaceContent = {
   dependencies: unknown[];
   assetCategories: unknown[];
   resources?: unknown[];
-  applicationStatuses?: unknown[];
+  deliverableStatuses?: unknown[];
 };
 
 const EMPTY_ARRAY: readonly unknown[] = [];
@@ -23,8 +23,8 @@ const EMPTY_ARRAY: readonly unknown[] = [];
 export function isWorkspaceEmpty(data: WorkspaceContent): boolean {
   const buckets = [
     data.assets,
-    data.applications ?? EMPTY_ARRAY,
-    data.applicationSegments ?? EMPTY_ARRAY,
+    data.deliverables ?? EMPTY_ARRAY,
+    data.deliverableSegments ?? EMPTY_ARRAY,
     data.initiatives,
     data.milestones,
     data.programmes,
@@ -32,7 +32,7 @@ export function isWorkspaceEmpty(data: WorkspaceContent): boolean {
     data.dependencies,
     data.assetCategories,
     data.resources ?? EMPTY_ARRAY,
-    data.applicationStatuses ?? EMPTY_ARRAY,
+    data.deliverableStatuses ?? EMPTY_ARRAY,
   ];
 
   return buckets.every(bucket => bucket.length === 0);

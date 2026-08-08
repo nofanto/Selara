@@ -1,10 +1,10 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * Application Segment Drag Improvements
+ * Deliverable Segment Drag Improvements
  *
  * User Story:
- *   As a user working with application segments, I want to drag segments
+ *   As a user working with deliverable segments, I want to drag segments
  *   vertically to change their row, have the row-control buttons positioned
  *   so they don't block the right-edge resize handle, and see visible
  *   indicators on the left/right edges to know those edges are resizable.
@@ -15,7 +15,7 @@ import { test, expect } from '@playwright/test';
  *   AC3: The row-control buttons do not overlap the right-edge resize zone
  *   AC4: Left and right resize edge indicators are present in the DOM
  */
-test.describe('Application Segment Drag Improvements', () => {
+test.describe('Deliverable Segment Drag Improvements', () => {
 
   /** Navigate to a year with no demo segments so we control the layout. */
   async function goToEmptyYear(page: import('@playwright/test').Page) {
@@ -27,9 +27,9 @@ test.describe('Application Segment Drag Improvements', () => {
     await page.waitForTimeout(300);
   }
 
-  /** Create one segment in the first application swimlane via double-click. */
+  /** Create one segment in the first deliverable swimlane via double-click. */
   async function createSegment(page: import('@playwright/test').Page) {
-    const rowContent = page.locator('[data-testid="application-row-content"]').first();
+    const rowContent = page.locator('[data-testid="deliverable-row-content"]').first();
     await rowContent.dblclick({ position: { x: 200, y: 20 } });
     const panel = page.getByTestId('segment-panel');
     await panel.getByRole('button', { name: 'Add Segment' }).click();

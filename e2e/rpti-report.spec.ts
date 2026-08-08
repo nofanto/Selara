@@ -52,9 +52,9 @@ test.describe('RPTI Report (IT Development Plan Report)', () => {
     expect(download.suggestedFilename()).toMatch(/rpti/i);
   });
 
-  test('Applications tab shows a Type column that persists across reloads', async ({ page }) => {
+  test('Deliverables tab shows a Type column that persists across reloads', async ({ page }) => {
     await page.getByTestId('nav-data-manager').click();
-    await page.getByTestId('data-manager-tab-applications').click();
+    await page.getByTestId('data-manager-tab-deliverables').click();
     const firstRow = page.locator('[data-testid="data-manager"] tbody tr[data-real="true"]').first();
     const appName = await firstRow.locator('td[data-key="name"] input').inputValue();
     const typeSelect = firstRow.locator('td[data-key="type"] select');
@@ -64,7 +64,7 @@ test.describe('RPTI Report (IT Development Plan Report)', () => {
 
     await page.reload();
     await page.getByTestId('nav-data-manager').click();
-    await page.getByTestId('data-manager-tab-applications').click();
+    await page.getByTestId('data-manager-tab-deliverables').click();
     const nameInputs = page.locator('[data-testid="data-manager"] tbody tr[data-real="true"] td[data-key="name"] input');
     const count = await nameInputs.count();
     let matchIndex = -1;

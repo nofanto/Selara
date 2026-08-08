@@ -54,9 +54,9 @@ const SECTIONS: GuideSection[] = [
     ],
   },
   {
-    title: 'Applications',
+    title: 'Deliverables',
     pages: [
-      { title: 'Adding Applications',  path: '05-applications/adding-applications' },
+      { title: 'Adding Deliverables',  path: '05-applications/adding-applications' },
       { title: 'Lifecycle Segments',   path: '05-applications/lifecycle-segments' },
       { title: 'Managing Segments',    path: '05-applications/managing-segments' },
       { title: 'Display Mode',         path: '05-applications/display-mode' },

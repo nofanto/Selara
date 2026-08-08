@@ -1,19 +1,19 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * User Story: Vertical Resize of Application Segments (rowSpan)
+ * User Story: Vertical Resize of Deliverable Segments (rowSpan)
  *
- * As a Scenia user I want to drag the bottom edge of an application segment
+ * As a Scenia user I want to drag the bottom edge of a deliverable segment
  * to make it span multiple row heights, so I can visually represent one
- * application replacing two (or more) applications that ran in parallel.
+ * deliverable replacing two (or more) deliverables that ran in parallel.
  *
  * Acceptance Criteria:
- *  AC1  Every application segment bar has a bottom drag handle.
+ *  AC1  Every deliverable segment bar has a bottom drag handle.
  *  AC2  Dragging the bottom handle down snaps the segment to 2× row height.
  *  AC3  A segment that spans 2 rows is visually taller than a 1-row segment.
  *  AC5  Overlapping segments are placed in different rows with different top positions.
  */
-test.describe('Application Segment Vertical Resize', () => {
+test.describe('Deliverable Segment Vertical Resize', () => {
   test('AC1 – every segment bar has a bottom drag handle', async ({ page }) => {
     await page.goto('/');
     await page.waitForSelector('[data-testid="asset-row-content"]', { timeout: 20000 });
@@ -29,7 +29,7 @@ test.describe('Application Segment Vertical Resize', () => {
     await page.goto('/');
     await page.waitForSelector('[data-testid="asset-row-content"]', { timeout: 20000 });
 
-    // Navigate to 2030 so the application swimlane is empty and we control exactly
+    // Navigate to 2030 so the deliverable swimlane is empty and we control exactly
     // which segments exist.
     const startInput = page.getByTestId('timeline-start-input');
     await startInput.fill('2030-01-01');
@@ -37,7 +37,7 @@ test.describe('Application Segment Vertical Resize', () => {
     await page.waitForTimeout(300);
 
     // Create one segment in the first ciam swimlane
-    const rowContent = page.locator('[data-testid="application-row-content"]').first();
+    const rowContent = page.locator('[data-testid="deliverable-row-content"]').first();
     await rowContent.dblclick({ position: { x: 200, y: 20 } });
     const panel = page.getByTestId('segment-panel');
     await expect(panel.getByRole('button', { name: 'Add Segment' })).toBeVisible();
@@ -76,7 +76,7 @@ test.describe('Application Segment Vertical Resize', () => {
     await page.goto('/');
     await page.waitForSelector('[data-testid="asset-row-content"]', { timeout: 20000 });
 
-    const ciamSwimlane = page.locator('[data-testid="application-swimlane-a-ciam"]');
+    const ciamSwimlane = page.locator('[data-testid="deliverable-swimlane-a-ciam"]');
     await expect(ciamSwimlane).toBeVisible();
 
     // a-ciam has 6 overlapping segments in demo data — they must be in different rows

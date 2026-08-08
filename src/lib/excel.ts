@@ -1,11 +1,11 @@
 import * as XLSX from 'xlsx';
-import { Asset, Application, ApplicationSegment, ApplicationStatus, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource, Version, RptiDetail } from '../types';
+import { Asset, Deliverable, DeliverableSegment, DeliverableStatus, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource, Version, RptiDetail } from '../types';
 
 interface AppData {
   assets: Asset[];
-  applications?: Application[];
-  applicationSegments?: ApplicationSegment[];
-  applicationStatuses?: ApplicationStatus[];
+  deliverables?: Deliverable[];
+  deliverableSegments?: DeliverableSegment[];
+  deliverableStatuses?: DeliverableStatus[];
   initiatives: Initiative[];
   milestones: Milestone[];
   programmes: Programme[];
@@ -124,14 +124,14 @@ export const exportToExcel = (data: AppData) => {
   // 7. Dependencies
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(flatten(data.dependencies, 'dependencies')), 'Dependencies');
 
-  // 8. Applications
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(flatten(data.applications, 'applications')), 'Applications');
+  // 8. Deliverables
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(flatten(data.deliverables, 'deliverables')), 'Deliverables');
 
-  // 9. Application Segments
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(flatten(data.applicationSegments, 'applicationSegments')), 'ApplicationSegments');
+  // 9. Deliverable Segments
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(flatten(data.deliverableSegments, 'deliverableSegments')), 'DeliverableSegments');
 
-  // 10. Application Statuses
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(flatten(data.applicationStatuses, 'applicationStatuses')), 'ApplicationStatuses');
+  // 10. Deliverable Statuses
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(flatten(data.deliverableStatuses, 'deliverableStatuses')), 'DeliverableStatuses');
 
   // 11. Resources
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(flatten(data.resources, 'resources')), 'Resources');
@@ -189,9 +189,9 @@ export const importFromExcel = async (file: File): Promise<Partial<AppData>> => 
           strategies: getSheetData<any>('Strategies'),
           milestones: getSheetData<any>('Milestones'),
           dependencies: getSheetData<any>('Dependencies'),
-          applications: getSheetData<any>('Applications'),
-          applicationSegments: getSheetData<any>('ApplicationSegments'),
-          applicationStatuses: getSheetData<any>('ApplicationStatuses'),
+          deliverables: getSheetData<any>('Deliverables'),
+          deliverableSegments: getSheetData<any>('DeliverableSegments'),
+          deliverableStatuses: getSheetData<any>('DeliverableStatuses'),
           resources: getSheetData<any>('Resources'),
           rptiDetails: getSheetData<any>('RptiDetails'),
           timelineSettings: getSheetData<any>('TimelineSettings'),
@@ -235,14 +235,14 @@ export const importFromExcel = async (file: File): Promise<Partial<AppData>> => 
         const depSplit = split<Dependency>(raw.dependencies);
         result.dependencies = depSplit.current;
 
-        const appSplit = split<Application>(raw.applications);
-        result.applications = appSplit.current;
+        const appSplit = split<Deliverable>(raw.deliverables);
+        result.deliverables = appSplit.current;
 
-        const segSplit = split<ApplicationSegment>(raw.applicationSegments);
-        result.applicationSegments = segSplit.current;
+        const segSplit = split<DeliverableSegment>(raw.deliverableSegments);
+        result.deliverableSegments = segSplit.current;
 
-        const statSplit = split<ApplicationStatus>(raw.applicationStatuses);
-        result.applicationStatuses = statSplit.current;
+        const statSplit = split<DeliverableStatus>(raw.deliverableStatuses);
+        result.deliverableStatuses = statSplit.current;
 
         const resSplit = split<Resource>(raw.resources);
         result.resources = resSplit.current;
@@ -270,9 +270,9 @@ export const importFromExcel = async (file: File): Promise<Partial<AppData>> => 
                 strategies: stratSplit.byVersion[vid] || [],
                 milestones: mileSplit.byVersion[vid] || [],
                 dependencies: depSplit.byVersion[vid] || [],
-                applications: appSplit.byVersion[vid] || [],
-                applicationSegments: segSplit.byVersion[vid] || [],
-                applicationStatuses: statSplit.byVersion[vid] || [],
+                deliverables: appSplit.byVersion[vid] || [],
+                deliverableSegments: segSplit.byVersion[vid] || [],
+                deliverableStatuses: statSplit.byVersion[vid] || [],
                 resources: resSplit.byVersion[vid] || [],
                 rptiDetails: rptiDetailSplit.byVersion[vid] || [],
                 timelineSettings: sanitizeTimelineSettings(settingsSplit.byVersion[vid]?.[0]) || {},

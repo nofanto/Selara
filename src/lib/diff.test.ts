@@ -9,8 +9,8 @@ function makeVersion(overrides: Partial<Version['data']> = {}): Version {
     timestamp: '2026-05-22T00:00:00.000Z',
     data: {
       assets: [],
-      applications: [],
-      applicationSegments: [],
+      deliverables: [],
+      deliverableSegments: [],
       initiatives: [],
       milestones: [],
       programmes: [],
@@ -31,7 +31,7 @@ function makeVersion(overrides: Partial<Version['data']> = {}): Version {
         display: 'both',
       },
       resources: [],
-      applicationStatuses: [],
+      deliverableStatuses: [],
       ...overrides,
     },
   };
@@ -100,23 +100,23 @@ describe('computeDiff', () => {
     ]);
   });
 
-  it('reports deliverable (application) changes, including type and asset moves', () => {
+  it('reports deliverable changes, including type and asset moves', () => {
     const base = makeVersion({
       assets: [
         { id: 'asset-1', name: 'Core Platform', categoryId: 'cat-1' },
         { id: 'asset-2', name: 'Edge Gateway', categoryId: 'cat-1' },
       ],
-      applications: [{ id: 'app-1', assetId: 'asset-1', name: 'Ledger Service', type: 'application' }],
+      deliverables: [{ id: 'app-1', assetId: 'asset-1', name: 'Ledger Service', type: 'application' }],
     });
-    const current = {
+    const current: Version['data'] = {
       ...base.data,
-      applications: [{ id: 'app-1', assetId: 'asset-2', name: 'Ledger Service', type: 'infrastructure' }],
+      deliverables: [{ id: 'app-1', assetId: 'asset-2', name: 'Ledger Service', type: 'infrastructure' }],
     };
 
     const diff = computeDiff(base, current);
 
     expect(diff.hasChanges).toBe(true);
-    expect(diff.applications.modified).toEqual([
+    expect(diff.deliverables.modified).toEqual([
       {
         name: 'Ledger Service',
         changes: [
@@ -129,26 +129,26 @@ describe('computeDiff', () => {
 
   it('reports deliverable segment status and date changes by resolved status name', () => {
     const base = makeVersion({
-      applications: [{ id: 'app-1', assetId: 'asset-1', name: 'Ledger Service', type: 'application' }],
-      applicationStatuses: [
+      deliverables: [{ id: 'app-1', assetId: 'asset-1', name: 'Ledger Service', type: 'application' }],
+      deliverableStatuses: [
         { id: 'status-planned', name: 'Planned', color: 'slate' },
         { id: 'status-live', name: 'Live', color: 'green', isLiveStatus: true },
       ],
-      applicationSegments: [
-        { id: 'seg-1', applicationId: 'app-1', startDate: '2026-01-01', endDate: '2026-03-01', status: 'status-planned' },
+      deliverableSegments: [
+        { id: 'seg-1', deliverableId: 'app-1', startDate: '2026-01-01', endDate: '2026-03-01', status: 'status-planned' },
       ],
     });
     const current = {
       ...base.data,
-      applicationSegments: [
-        { id: 'seg-1', applicationId: 'app-1', startDate: '2026-01-01', endDate: '2026-04-01', status: 'status-live' },
+      deliverableSegments: [
+        { id: 'seg-1', deliverableId: 'app-1', startDate: '2026-01-01', endDate: '2026-04-01', status: 'status-live' },
       ],
     };
 
     const diff = computeDiff(base, current);
 
     expect(diff.hasChanges).toBe(true);
-    expect(diff.applicationSegments.modified).toEqual([
+    expect(diff.deliverableSegments.modified).toEqual([
       {
         name: 'Ledger Service (2026-01-01 → 2026-04-01)',
         changes: [
@@ -206,7 +206,7 @@ describe('computeDiff', () => {
     const base = makeVersion({
       decisions: [{ id: 'dec-1', title: 'Adopt microservices', status: 'proposed', createdAt: '2026-01-01T00:00:00.000Z' }],
     });
-    const current = {
+    const current: Version['data'] = {
       ...base.data,
       decisions: [{ id: 'dec-1', title: 'Adopt microservices', status: 'accepted', createdAt: '2026-01-01T00:00:00.000Z', decisionOutcome: 'Proceed with phased rollout' }],
     };
@@ -225,16 +225,16 @@ describe('computeDiff', () => {
   it('reports RPTI detail changes, naming the row by initiative and target', () => {
     const base = makeVersion({
       initiatives: [{ id: 'init-1', name: 'Core Banking Upgrade', programmeId: 'prog-1', assetId: 'asset-1', startDate: '2026-01-01', endDate: '2026-06-01', capex: 0, opex: 0 }],
-      applications: [{ id: 'app-1', assetId: 'asset-1', name: 'Ledger Service' }],
+      deliverables: [{ id: 'app-1', assetId: 'asset-1', name: 'Ledger Service' }],
       rptiDetails: [{
-        id: 'rpti-1', initiativeId: 'init-1', targetType: 'application', targetId: 'app-1',
+        id: 'rpti-1', initiativeId: 'init-1', targetType: 'deliverable', targetId: 'app-1',
         categoryCode: '01', developmentType: 'new', developer: 'inhouse', ppjtiRelatedParty: 'no',
       }],
     });
-    const current = {
+    const current: Version['data'] = {
       ...base.data,
       rptiDetails: [{
-        id: 'rpti-1', initiativeId: 'init-1', targetType: 'application', targetId: 'app-1',
+        id: 'rpti-1', initiativeId: 'init-1', targetType: 'deliverable', targetId: 'app-1',
         categoryCode: '01', developmentType: 'upgrade', developer: 'PPJTI', ppjtiRelatedParty: 'yes',
       }],
     };

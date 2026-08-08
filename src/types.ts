@@ -25,7 +25,7 @@ export interface Programme {
 }
 
 /**
- * High-level grouping for IT Assets (e.g., "Infrastructure", "Applications").
+ * High-level grouping for IT Assets (e.g., "Infrastructure", "Deliverables").
  */
 export interface AssetCategory {
   id: string;
@@ -43,9 +43,9 @@ export interface Resource {
 }
 
 /**
- * A named, coloured status that can be applied to an ApplicationSegment.
+ * A named, coloured status that can be applied to an DeliverableSegment.
  */
-export interface ApplicationStatus {
+export interface DeliverableStatus {
   id: string;
   name: string;
   color: string;
@@ -61,7 +61,7 @@ export interface Initiative {
   programmeId: string;
   strategyId?: string;
   assetId: string;
-  applicationId?: string; // Optional: links the initiative to a specific application within the asset
+  deliverableId?: string; // Optional: links the initiative to a specific deliverable within the asset
   startDate: string; // ISO format: YYYY-MM-DD
   endDate: string;   // ISO format: YYYY-MM-DD
   capex: number;     // Capital expenditure
@@ -81,8 +81,8 @@ export interface Initiative {
  */
 export interface Dependency {
   id: string;
-  sourceId: string; // The ID of the initiative, milestone, or application segment that has the dependency
-  targetId: string; // The ID of the initiative or application segment being depended upon
+  sourceId: string; // The ID of the initiative, milestone, or deliverable segment that has the dependency
+  targetId: string; // The ID of the initiative or deliverable segment being depended upon
   type: 'blocks' | 'requires' | 'related';
   midXOffset?: number; // Manual horizontal offset for the vertical segment of the arrow
   sourceType?: 'initiative' | 'milestone' | 'segment'; // Defaults to 'initiative' when absent
@@ -138,7 +138,7 @@ export type DeliverableType = 'application' | 'infrastructure' | 'document' | 'p
 /**
  * An application, infrastructure item, document, or other deliverable that makes up an IT asset.
  */
-export interface Application {
+export interface Deliverable {
   id: string;
   assetId: string;
   name: string;
@@ -146,13 +146,13 @@ export interface Application {
 }
 
 /**
- * A time-bounded lifecycle phase for an Application.
- * An application may have many segments representing its progression
+ * A time-bounded lifecycle phase for a Deliverable.
+ * A deliverable may have many segments representing its progression
  * through planned → in-production → sunset → retired etc.
  */
-export interface ApplicationSegment {
+export interface DeliverableSegment {
   id: string;
-  applicationId: string; // Links segment to an Application record within the asset
+  deliverableId: string; // Links segment to a Deliverable record within the asset
   startDate: string; // ISO format: YYYY-MM-DD
   endDate: string;   // ISO format: YYYY-MM-DD
   status: string;
@@ -161,7 +161,7 @@ export interface ApplicationSegment {
   rowSpan?: number;  // How many rows tall this segment is (default 1). Controlled by bottom-edge drag.
 }
 
-export type RptiTargetType = 'application' | 'asset';
+export type RptiTargetType = 'deliverable' | 'asset';
 export type RptiDevelopmentType = 'new' | 'upgrade';
 export type RptiDeveloper = 'inhouse' | 'PPJTI';
 export type RptiRelatedParty = 'yes' | 'no' | 'n/a';
@@ -172,7 +172,7 @@ export type RptiCategoryCode =
 
 /**
  * One row of the RPTI (IT Development Plan Report) regulatory report — an
- * Initiative's planned development activity on a specific Application or
+ * Initiative's planned development activity on a specific Deliverable or
  * Asset. One Initiative may back multiple RptiDetail rows, one per affected
  * target, without changing Initiative's own single-asset targeting.
  */
@@ -180,7 +180,7 @@ export interface RptiDetail {
   id: string;
   initiativeId: string;
   targetType: RptiTargetType;
-  targetId: string; // Application.id or Asset.id, per targetType
+  targetId: string; // Deliverable.id or Asset.id, per targetType
   categoryCode: RptiCategoryCode;
   developmentType: RptiDevelopmentType;
   developer: RptiDeveloper;
@@ -196,7 +196,7 @@ export interface RptiDetail {
   opexCurrency?: string;
   opexIdrEquivalent?: number;
   plannedImplementationQuarter?: RptiQuarter;
-  applicationSegmentId?: string; // Set when the quarter is auto-derived (targetType 'application' only)
+  deliverableSegmentId?: string; // Set when the quarter is auto-derived (targetType 'deliverable' only)
   remarks?: string;
 }
 
@@ -232,7 +232,7 @@ export interface TimelineSettings {
   groupBy?: 'asset' | 'programme' | 'strategy';
   colorBy?: 'programme' | 'strategy' | 'status' | 'rag';
   showResources?: 'on' | 'off';
-  display?: 'both' | 'initiatives' | 'applications';
+  display?: 'both' | 'initiatives' | 'deliverables';
   templateId?: string;           // Which workspace template was selected on first load
   showGeanzCatalogue?: boolean;  // When false, the GEANZ catalogue section is hidden (default: true)
   clusterName?: string;          // Agency cluster name — shown in the timeline header
@@ -248,8 +248,8 @@ export interface Version {
   description?: string;
   data: {
     assets: Asset[];
-    applications: Application[];
-    applicationSegments: ApplicationSegment[];
+    deliverables: Deliverable[];
+    deliverableSegments: DeliverableSegment[];
     initiatives: Initiative[];
     milestones: Milestone[];
     programmes: Programme[];
@@ -258,7 +258,7 @@ export interface Version {
     assetCategories: AssetCategory[];
     timelineSettings: TimelineSettings;
     resources: Resource[];
-    applicationStatuses?: ApplicationStatus[];
+    deliverableStatuses?: DeliverableStatus[];
     decisions?: Decision[];
     rptiDetails?: RptiDetail[];
   };

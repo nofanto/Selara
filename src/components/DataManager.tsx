@@ -1,17 +1,17 @@
 import React, { useState } from 'react';
-import { Asset, Application, ApplicationSegment, ApplicationStatus, DeliverableType, Decision, RptiDetail, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource } from '../types';
+import { Asset, Deliverable, DeliverableSegment, DeliverableStatus, DeliverableType, Decision, RptiDetail, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource } from '../types';
 import { EditableTable, Column } from './EditableTable';
 import { cn } from '../lib/utils';
 import { Database, Layers, Calendar, Flag, Target, Link2, FolderTree, LayoutTemplate, Users, Box, ClipboardList } from 'lucide-react';
 import { ConfirmModal } from './ConfirmModal';
-import { clearApplicationsAndSegments, removeApplicationAndSegments } from '../lib/applicationCascade';
-import { rptiCascadeOnInitiativeDelete, rptiCascadeOnApplicationDelete, rptiCascadeOnAssetDelete, RPTI_CATEGORY_LABELS } from '../lib/rpti';
+import { clearDeliverablesAndSegments, removeDeliverableAndSegments } from '../lib/deliverableCascade';
+import { rptiCascadeOnInitiativeDelete, rptiCascadeOnDeliverableDelete, rptiCascadeOnAssetDelete, RPTI_CATEGORY_LABELS } from '../lib/rpti';
 
 interface DataManagerProps {
   data: {
     assets: Asset[];
-    applications: Application[];
-    applicationSegments: ApplicationSegment[];
+    deliverables: Deliverable[];
+    deliverableSegments: DeliverableSegment[];
     initiatives: Initiative[];
     milestones: Milestone[];
     programmes: Programme[];
@@ -20,14 +20,14 @@ interface DataManagerProps {
     assetCategories: AssetCategory[];
     timelineSettings: TimelineSettings;
     resources: Resource[];
-    applicationStatuses: ApplicationStatus[];
+    deliverableStatuses: DeliverableStatus[];
     decisions: Decision[];
     rptiDetails: RptiDetail[];
   };
   onUpdate: (data: {
     assets: Asset[];
-    applications: Application[];
-    applicationSegments: ApplicationSegment[];
+    deliverables: Deliverable[];
+    deliverableSegments: DeliverableSegment[];
     initiatives: Initiative[];
     milestones: Milestone[];
     programmes: Programme[];
@@ -36,7 +36,7 @@ interface DataManagerProps {
     assetCategories: AssetCategory[];
     timelineSettings: TimelineSettings;
     resources: Resource[];
-    applicationStatuses: ApplicationStatus[];
+    deliverableStatuses: DeliverableStatus[];
     decisions: Decision[];
     rptiDetails: RptiDetail[];
   }) => void;
@@ -44,7 +44,7 @@ interface DataManagerProps {
   searchQuery?: string;
 }
 
-type Tab = 'initiatives' | 'dependencies' | 'assets' | 'assetCategories' | 'programmes' | 'strategies' | 'milestones' | 'resources' | 'applications' | 'appStatuses' | 'rpti';
+type Tab = 'initiatives' | 'dependencies' | 'assets' | 'assetCategories' | 'programmes' | 'strategies' | 'milestones' | 'resources' | 'deliverables' | 'deliverableStatuses' | 'rpti';
 
 export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery }: DataManagerProps) {
   const [activeTab, setActiveTab] = useState<Tab>('initiatives');
@@ -166,18 +166,18 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery 
   const strategyOptions = data.strategies.map(s => ({ value: s.id, label: s.name }));
   const initiativeOptions = data.initiatives.map(i => ({ value: i.id, label: i.name }));
   const categoryOptions = data.assetCategories.map(c => ({ value: c.id, label: c.name }));
-  const applicationOptions = (data.applications || []).map(a => ({ value: a.id, label: a.name }));
+  const deliverableOptions = (data.deliverables || []).map(a => ({ value: a.id, label: a.name }));
   const rptiTargetOptions = [
-    ...applicationOptions.map(o => ({ value: o.value, label: `App: ${o.label}` })),
+    ...deliverableOptions.map(o => ({ value: o.value, label: `Deliverable: ${o.label}` })),
     ...assetOptions.map(o => ({ value: o.value, label: `Asset: ${o.label}` })),
   ];
 
-  // Recomputes each row's targetType from whichever list (applications vs assets)
+  // Recomputes each row's targetType from whichever list (deliverables vs assets)
   // its current targetId is actually found in, so targetId is the single source
   // of truth and the two fields can never fall out of sync via inline editing.
   const deriveRptiTargetTypes = (rows: RptiDetail[]): RptiDetail[] => {
     return rows.map(row => {
-      if ((data.applications || []).some(a => a.id === row.targetId)) return { ...row, targetType: 'application' as const };
+      if ((data.deliverables || []).some(a => a.id === row.targetId)) return { ...row, targetType: 'deliverable' as const };
       if (data.assets.some(a => a.id === row.targetId)) return { ...row, targetType: 'asset' as const };
       return row;
     });
@@ -294,7 +294,7 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery 
     { key: 'role', label: 'Role', type: 'text', width: '50%' },
   ];
 
-  const applicationColumns: Column<Application>[] = [
+  const deliverableColumns: Column<Deliverable>[] = [
     { key: 'name', label: 'Name', type: 'text', width: '40%' },
     {
       key: 'type', label: 'Type', type: 'select', width: '25%',
@@ -307,40 +307,40 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery 
     },
   ];
 
-  const handleDeleteApplication = (application: Application): boolean => {
-    const affectedSegments = data.applicationSegments.filter(segment => segment.applicationId === application.id);
-    const affectedRpti = data.rptiDetails.filter(r => r.targetType === 'application' && r.targetId === application.id).length;
+  const handleDeleteDeliverable = (deliverable: Deliverable): boolean => {
+    const affectedSegments = data.deliverableSegments.filter(segment => segment.deliverableId === deliverable.id);
+    const affectedRpti = data.rptiDetails.filter(r => r.targetType === 'deliverable' && r.targetId === deliverable.id).length;
     const parts = [];
     if (affectedSegments.length) parts.push(`${affectedSegments.length} segment(s)`);
     if (affectedRpti) parts.push(`${affectedRpti} RPTI report row(s)`);
     const msg = parts.length
-      ? `Deleting "${application.name}" will also remove ${parts.join(', ')}. Continue?`
+      ? `Deleting "${deliverable.name}" will also remove ${parts.join(', ')}. Continue?`
       : undefined;
-    return cascadeDelete('Delete Deliverable', application.name, parts, {
-      ...removeApplicationAndSegments(
-        { applications: data.applications || [], applicationSegments: data.applicationSegments || [] },
-        application.id,
+    return cascadeDelete('Delete Deliverable', deliverable.name, parts, {
+      ...removeDeliverableAndSegments(
+        { deliverables: data.deliverables || [], deliverableSegments: data.deliverableSegments || [] },
+        deliverable.id,
       ),
-      rptiDetails: rptiCascadeOnApplicationDelete(data.rptiDetails, application.id),
+      rptiDetails: rptiCascadeOnDeliverableDelete(data.rptiDetails, deliverable.id),
     }, msg);
   };
 
-  const handleClearApplications = (): boolean => {
-    const segmentCount = data.applicationSegments.length;
-    const affectedRpti = data.rptiDetails.filter(r => r.targetType === 'application').length;
+  const handleClearDeliverables = (): boolean => {
+    const segmentCount = data.deliverableSegments.length;
+    const affectedRpti = data.rptiDetails.filter(r => r.targetType === 'deliverable').length;
     const parts = [];
-    if ((data.applications || []).length) parts.push(`${(data.applications || []).length} deliverable(s)`);
+    if ((data.deliverables || []).length) parts.push(`${(data.deliverables || []).length} deliverable(s)`);
     if (segmentCount) parts.push(`${segmentCount} segment(s)`);
     if (affectedRpti) parts.push(`${affectedRpti} RPTI report row(s)`);
     return cascadeDelete('Delete All Deliverables', 'all deliverables', parts, {
-      ...clearApplicationsAndSegments(),
-      rptiDetails: data.rptiDetails.filter(r => r.targetType !== 'application'),
+      ...clearDeliverablesAndSegments(),
+      rptiDetails: data.rptiDetails.filter(r => r.targetType !== 'deliverable'),
     }, parts.length
-      ? `Deleting all applications will also remove ${parts.join(', ')}. Continue?`
-      : 'Delete all applications?');
+      ? `Deleting all deliverables will also remove ${parts.join(', ')}. Continue?`
+      : 'Delete all deliverables?');
   };
 
-  const appStatusColumns: Column<ApplicationStatus>[] = [
+  const deliverableStatusColumns: Column<DeliverableStatus>[] = [
     { key: 'name', label: 'Status Name', type: 'text', width: '60%' },
     { key: 'color', label: 'Color', type: 'color', width: '40%' },
   ];
@@ -389,13 +389,13 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery 
     { id: 'initiatives', label: 'Initiatives', icon: Layers, count: data.initiatives.length },
     { id: 'dependencies', label: 'Dependencies', icon: Link2, count: data.dependencies.length },
     { id: 'assets', label: 'Assets', icon: Database, count: data.assets.length },
-    { id: 'applications', label: 'Deliverables', icon: Box, count: (data.applications || []).length },
+    { id: 'deliverables', label: 'Deliverables', icon: Box, count: (data.deliverables || []).length },
     { id: 'assetCategories', label: 'Categories', icon: FolderTree, count: data.assetCategories.length },
     { id: 'programmes', label: 'Programmes', icon: Calendar, count: data.programmes.length },
     { id: 'strategies', label: 'Strategies', icon: Target, count: data.strategies.length },
     { id: 'milestones', label: 'Milestones', icon: Flag, count: data.milestones.length },
     { id: 'resources', label: 'Resources', icon: Users, count: (data.resources || []).length },
-    { id: 'appStatuses', label: 'App Statuses', icon: Layers, count: (data.applicationStatuses || []).length },
+    { id: 'deliverableStatuses', label: 'Deliverable Statuses', icon: Layers, count: (data.deliverableStatuses || []).length },
     { id: 'rpti', label: 'RPTI', icon: ClipboardList, count: (data.rptiDetails || []).length },
   ];
 
@@ -518,28 +518,28 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery 
             onColumnResize={(key, width) => handleColumnResize('resources', key, width)}
           />
         )}
-        {activeTab === 'applications' && (
+        {activeTab === 'deliverables' && (
           <EditableTable
-            data={data.applications || []}
-            columns={getColumnsWithWidths('applications', applicationColumns)}
-            onUpdate={(newData) => updateData('applications', newData)}
-            onDelete={handleDeleteApplication}
-            onClearAll={handleClearApplications}
+            data={data.deliverables || []}
+            columns={getColumnsWithWidths('deliverables', deliverableColumns)}
+            onUpdate={(newData) => updateData('deliverables', newData)}
+            onDelete={handleDeleteDeliverable}
+            onClearAll={handleClearDeliverables}
             idField="id"
             searchQuery={searchQuery}
-            tableId="applications"
-            onColumnResize={(key, width) => handleColumnResize('applications', key, width)}
+            tableId="deliverables"
+            onColumnResize={(key, width) => handleColumnResize('deliverables', key, width)}
           />
         )}
-        {activeTab === 'appStatuses' && (
+        {activeTab === 'deliverableStatuses' && (
           <EditableTable
-            data={data.applicationStatuses || []}
-            columns={getColumnsWithWidths('appStatuses', appStatusColumns)}
-            onUpdate={(newData) => updateData('applicationStatuses', newData)}
-            onDelete={(status) => { updateData('applicationStatuses', (data.applicationStatuses || []).filter(s => s.id !== status.id)); return true; }}
+            data={data.deliverableStatuses || []}
+            columns={getColumnsWithWidths('deliverableStatuses', deliverableStatusColumns)}
+            onUpdate={(newData) => updateData('deliverableStatuses', newData)}
+            onDelete={(status) => { updateData('deliverableStatuses', (data.deliverableStatuses || []).filter(s => s.id !== status.id)); return true; }}
             idField="id"
-            tableId="appStatuses"
-            onColumnResize={(col, w) => handleColumnResize('appStatuses', col, w)}
+            tableId="deliverableStatuses"
+            onColumnResize={(col, w) => handleColumnResize('deliverableStatuses', col, w)}
           />
         )}
         {activeTab === 'rpti' && (

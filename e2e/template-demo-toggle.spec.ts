@@ -7,7 +7,7 @@ import { test, expect } from '@playwright/test';
  * AC2: Clicking "Clear data and start again" opens the template picker with a data-loss warning
  * AC3: Each non-blank template card shows two buttons: "With demo data" and "Without demo data"
  * AC4: The Blank template card shows only a "Start blank" button
- * AC5: "With demo data" loads asset categories, assets, initiatives, milestones, and application segments
+ * AC5: "With demo data" loads asset categories, assets, initiatives, milestones, and deliverable segments
  * AC6: "Without demo data" loads only asset categories and assets — no initiatives, milestones, or segments
  * AC7: First-time onboarding flow shows the updated template picker (with/without demo data buttons)
  * AC8: After selecting a template during first run, the tutorial modal is shown
@@ -94,7 +94,7 @@ test.describe('US-18: Template Demo Data Toggle', () => {
     const initiativeBars = page.locator('[data-testid^="initiative-bar"]');
     await expect(initiativeBars.first()).toBeVisible({ timeout: 10000 });
 
-    // At least one application segment rendered
+    // At least one deliverable segment rendered
     const segments = page.locator('[data-testid^="segment-"]');
     await expect(segments.first()).toBeVisible({ timeout: 10000 });
   });
@@ -113,7 +113,7 @@ test.describe('US-18: Template Demo Data Toggle', () => {
     // No initiative bars
     await expect(page.locator('[data-testid^="initiative-bar"]')).toHaveCount(0);
 
-    // No application segments
+    // No deliverable segments
     await expect(page.locator('[data-testid^="segment-"]')).toHaveCount(0);
   });
 

@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx';
-import { RptiDetail, RptiCategoryCode, RptiQuarter, Initiative, Application, Asset, ApplicationSegment, ApplicationStatus } from '../types';
+import { RptiDetail, RptiCategoryCode, RptiQuarter, Initiative, Deliverable, Asset, DeliverableSegment, DeliverableStatus } from '../types';
 
 export const RPTI_CATEGORY_LABELS: Record<RptiCategoryCode, string> = {
   '01': 'Customer management',
@@ -14,7 +14,7 @@ export const RPTI_CATEGORY_LABELS: Record<RptiCategoryCode, string> = {
   '10': 'Management information/reporting systems',
   '11': 'Risk management',
   '12': 'Internal management',
-  '49': 'Other applications',
+  '49': 'Other deliverables',
   '51': 'Data Center / Disaster Recovery Center',
   '52': 'Servers and/or platforms',
   '53': 'Data communication network',
@@ -33,28 +33,28 @@ export function deriveQuarterFromDate(iso: string): RptiQuarter {
   return 'Q4';
 }
 
-function isLiveStatusId(statusId: string, applicationStatuses: ApplicationStatus[]): boolean {
-  const status = applicationStatuses.find(s => s.id === statusId);
-  if (status) return !!status.isLiveStatus || (!applicationStatuses.some(s => s.isLiveStatus) && (statusId === LIVE_STATUS_FALLBACK_ID || LIVE_STATUS_FALLBACK_PATTERN.test(status.name)));
-  // No matching ApplicationStatus record (e.g. legacy default id with no record) — fall back to id/name pattern.
+function isLiveStatusId(statusId: string, deliverableStatuses: DeliverableStatus[]): boolean {
+  const status = deliverableStatuses.find(s => s.id === statusId);
+  if (status) return !!status.isLiveStatus || (!deliverableStatuses.some(s => s.isLiveStatus) && (statusId === LIVE_STATUS_FALLBACK_ID || LIVE_STATUS_FALLBACK_PATTERN.test(status.name)));
+  // No matching DeliverableStatus record (e.g. legacy default id with no record) — fall back to id/name pattern.
   return statusId === LIVE_STATUS_FALLBACK_ID;
 }
 
 /**
- * For an application-target RptiDetail, find the initiative's lifecycle segment
- * on that application whose status is "live" and suggest that segment's
+ * For a deliverable-target RptiDetail, find the initiative's lifecycle segment
+ * on that deliverable whose status is "live" and suggest that segment's
  * planned implementation quarter. Returns {} when nothing matches, so the
  * caller falls back to manual entry.
  */
-export function suggestApplicationQuarter(
+export function suggestDeliverableQuarter(
   detail: Pick<RptiDetail, 'initiativeId' | 'targetType' | 'targetId'>,
-  segments: ApplicationSegment[],
-  applicationStatuses: ApplicationStatus[],
+  segments: DeliverableSegment[],
+  deliverableStatuses: DeliverableStatus[],
 ): { quarter?: RptiQuarter; segmentId?: string } {
-  if (detail.targetType !== 'application') return {};
+  if (detail.targetType !== 'deliverable') return {};
   const candidates = segments
-    .filter(s => s.applicationId === detail.targetId && s.initiativeId === detail.initiativeId)
-    .filter(s => isLiveStatusId(s.status, applicationStatuses))
+    .filter(s => s.deliverableId === detail.targetId && s.initiativeId === detail.initiativeId)
+    .filter(s => isLiveStatusId(s.status, deliverableStatuses))
     .sort((a, b) => a.startDate.localeCompare(b.startDate));
   const match = candidates[0];
   if (!match) return {};
@@ -72,8 +72,8 @@ export function rptiCascadeOnInitiativeDelete(rptiDetails: RptiDetail[], initiat
   return rptiDetails.filter(r => r.initiativeId !== initiativeId);
 }
 
-export function rptiCascadeOnApplicationDelete(rptiDetails: RptiDetail[], applicationId: string): RptiDetail[] {
-  return rptiDetails.filter(r => !(r.targetType === 'application' && r.targetId === applicationId));
+export function rptiCascadeOnDeliverableDelete(rptiDetails: RptiDetail[], deliverableId: string): RptiDetail[] {
+  return rptiDetails.filter(r => !(r.targetType === 'deliverable' && r.targetId === deliverableId));
 }
 
 export function rptiCascadeOnAssetDelete(rptiDetails: RptiDetail[], assetId: string): RptiDetail[] {
@@ -81,7 +81,7 @@ export function rptiCascadeOnAssetDelete(rptiDetails: RptiDetail[], assetId: str
 }
 
 export function rptiCascadeOnSegmentDelete(rptiDetails: RptiDetail[], segmentId: string): RptiDetail[] {
-  return rptiDetails.map(r => r.applicationSegmentId === segmentId ? { ...r, applicationSegmentId: undefined } : r);
+  return rptiDetails.map(r => r.deliverableSegmentId === segmentId ? { ...r, deliverableSegmentId: undefined } : r);
 }
 
 function formatPlace(city?: string, country?: string): string {
@@ -96,10 +96,10 @@ function formatPlace(city?: string, country?: string): string {
 export function exportRptiReportToExcel(
   rptiDetails: RptiDetail[],
   initiatives: Initiative[],
-  applications: Application[],
+  deliverables: Deliverable[],
   assets: Asset[],
-  applicationSegments: ApplicationSegment[] = [],
-  applicationStatuses: ApplicationStatus[] = [],
+  deliverableSegments: DeliverableSegment[] = [],
+  deliverableStatuses: DeliverableStatus[] = [],
 ) {
   const headers = [
     'No.',
@@ -119,11 +119,11 @@ export function exportRptiReportToExcel(
 
   const rows = rptiDetails.map((detail, index) => {
     const initiative = initiatives.find(i => i.id === detail.initiativeId);
-    const targetName = detail.targetType === 'application'
-      ? applications.find(a => a.id === detail.targetId)?.name ?? ''
+    const targetName = detail.targetType === 'deliverable'
+      ? deliverables.find(a => a.id === detail.targetId)?.name ?? ''
       : assets.find(a => a.id === detail.targetId)?.name ?? '';
     const suggestion = detail.plannedImplementationQuarter
-      ?? suggestApplicationQuarter(detail, applicationSegments, applicationStatuses).quarter
+      ?? suggestDeliverableQuarter(detail, deliverableSegments, deliverableStatuses).quarter
       ?? '';
     const { capexAmount, opexAmount } = resolveCost(detail, initiative);
     return [

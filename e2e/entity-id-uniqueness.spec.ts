@@ -72,7 +72,7 @@ test('AC2: all loaded entities have unique IDs within each type', async ({ page 
 
   const tabs: string[] = [
     'initiatives', 'assets', 'assetCategories', 'programmes',
-    'strategies', 'milestones', 'resources', 'applications', 'appStatuses',
+    'strategies', 'milestones', 'resources', 'deliverables', 'deliverableStatuses',
   ];
 
   for (const tab of tabs) {

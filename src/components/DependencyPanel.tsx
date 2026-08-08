@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Dependency, Initiative, Milestone, ApplicationSegment, Application } from '../types';
+import { Dependency, Initiative, Milestone, DeliverableSegment, Deliverable } from '../types';
 import { X, Save, Trash2, ArrowLeftRight } from 'lucide-react';
 import { ConfirmModal } from './ConfirmModal';
 import { useFocusTrap } from '../lib/useFocusTrap';
@@ -8,15 +8,15 @@ interface DependencyPanelProps {
     dependency: Dependency | null;
     initiatives: Initiative[];
     milestones?: Milestone[];
-    applicationSegments?: ApplicationSegment[];
-    applications?: Application[];
+    deliverableSegments?: DeliverableSegment[];
+    deliverables?: Deliverable[];
     onClose: () => void;
     onSave: (dependency: Dependency) => void;
     onDelete?: (dependency: Dependency) => void;
     isOpen: boolean;
 }
 
-export function DependencyPanel({ dependency, initiatives, milestones, applicationSegments, applications, onClose, onSave, onDelete, isOpen }: DependencyPanelProps) {
+export function DependencyPanel({ dependency, initiatives, milestones, deliverableSegments, deliverables, onClose, onSave, onDelete, isOpen }: DependencyPanelProps) {
     const [formData, setFormData] = useState<Dependency | null>(null);
     const [confirmDelete, setConfirmDelete] = useState(false);
     const panelRef = useFocusTrap(isOpen, onClose);
@@ -29,21 +29,21 @@ export function DependencyPanel({ dependency, initiatives, milestones, applicati
 
     if (!isOpen || !formData) return null;
 
-    const getSegmentLabel = (seg: ApplicationSegment): string => {
-        const appName = applications?.find(a => a.id === seg.applicationId)?.name;
+    const getSegmentLabel = (seg: DeliverableSegment): string => {
+        const appName = deliverables?.find(a => a.id === seg.deliverableId)?.name;
         return appName ? `${appName} (${seg.status})` : `Segment (${seg.status})`;
     };
 
     const getEntityName = (id: string, type?: 'initiative' | 'milestone' | 'segment'): string => {
         if (type === 'milestone') return milestones?.find(m => m.id === id)?.name ?? 'Milestone';
         if (type === 'segment') {
-            const seg = applicationSegments?.find(s => s.id === id);
+            const seg = deliverableSegments?.find(s => s.id === id);
             return seg ? getSegmentLabel(seg) : 'Segment';
         }
         // Default: check initiatives first, then segments as fallback
         const init = initiatives.find(i => i.id === id);
         if (init) return init.name;
-        const seg = applicationSegments?.find(s => s.id === id);
+        const seg = deliverableSegments?.find(s => s.id === id);
         return seg ? getSegmentLabel(seg) : 'Unknown';
     };
 

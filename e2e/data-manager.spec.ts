@@ -152,7 +152,7 @@ test.describe('Data Manager — reset buttons', () => {
 
     await expect(page.locator('table tbody tr')).toHaveCount(1);
 
-    for (const tab of ['Assets', 'programmes', 'strategies', 'appStatuses']) {
+    for (const tab of ['Assets', 'programmes', 'strategies', 'deliverableStatuses']) {
       const locator = tab === 'Assets'
         ? page.getByRole('button', { name: /Assets/ })
         : page.getByTestId(`data-manager-tab-${tab}`);

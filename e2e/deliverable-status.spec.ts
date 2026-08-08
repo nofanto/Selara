@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * User Story: Application lifecycle segments are visually distinct from initiatives
+ * User Story: Deliverable lifecycle segments are visually distinct from initiatives
  * and their statuses are configurable via the Data Manager.
  *
  * Acceptance Criteria:
@@ -11,7 +11,7 @@ import { test, expect } from '@playwright/test';
  * AC4: App Statuses tab lists all six default statuses, each with a name and colour.
  * AC5: Renaming a status in the Data Manager updates the label shown on segment bars.
  */
-test.describe('Application segment visual distinction & status management', () => {
+test.describe('Deliverable segment visual distinction & status management', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
     await page.waitForSelector('[data-testid="asset-row-content"]', { timeout: 20000 });
@@ -36,13 +36,13 @@ test.describe('Application segment visual distinction & status management', () =
   // AC3: Data Manager has App Statuses tab
   test('Data Manager has an App Statuses tab', async ({ page }) => {
     await page.getByTestId('nav-data-manager').click();
-    await expect(page.getByTestId('data-manager-tab-appStatuses')).toBeVisible();
+    await expect(page.getByTestId('data-manager-tab-deliverableStatuses')).toBeVisible();
   });
 
   // AC4: App Statuses tab lists all six default statuses with name and colour
   test('App Statuses tab shows all default statuses', async ({ page }) => {
     await page.getByTestId('nav-data-manager').click();
-    await page.getByTestId('data-manager-tab-appStatuses').click();
+    await page.getByTestId('data-manager-tab-deliverableStatuses').click();
 
     // EditableTable renders cells as inputs — check input values
     const nameInputs = page.locator('tbody tr td input[type="text"]');
@@ -58,7 +58,7 @@ test.describe('Application segment visual distinction & status management', () =
   // AC5: Renaming a status updates the label on segment bars
   test('renaming a status in Data Manager updates segment bar labels', async ({ page }) => {
     await page.getByTestId('nav-data-manager').click();
-    await page.getByTestId('data-manager-tab-appStatuses').click();
+    await page.getByTestId('data-manager-tab-deliverableStatuses').click();
 
     // Find the "In Production" name input and change it — cells are always inputs in EditableTable
     const nameInputs = page.locator('tbody tr td input[type="text"]');

@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * Application Segment — Label Visible When Segment Starts Before Timeline
+ * Deliverable Segment — Label Visible When Segment Starts Before Timeline
  *
  * User Story:
  *   As an IT portfolio manager viewing the timeline, I want lifecycle segment
@@ -36,7 +36,7 @@ test.describe('Segment label clamps to visible edge', () => {
     await expect(segBar).toBeVisible({ timeout: 5000 });
 
     // Get the timeline content area left edge (after the sidebar)
-    const contentArea = page.locator('[data-testid="application-row-content"]').first();
+    const contentArea = page.locator('[data-testid="deliverable-row-content"]').first();
     const contentBox = await contentArea.boundingBox();
     expect(contentBox).not.toBeNull();
 

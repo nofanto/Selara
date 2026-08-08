@@ -7,9 +7,9 @@ export type DiffResult = {
   initiatives: EntityDiff;
   dependencies: EntityDiff;
   milestones: EntityDiff;
-  applications: EntityDiff;
-  applicationSegments: EntityDiff;
-  applicationStatuses: EntityDiff;
+  deliverables: EntityDiff;
+  deliverableSegments: EntityDiff;
+  deliverableStatuses: EntityDiff;
   resources: EntityDiff;
   assetCategories: EntityDiff;
   decisions: EntityDiff;
@@ -144,9 +144,9 @@ export function computeDiff(baseVersion: Version, currentData: Version['data']):
     }
   );
 
-  const applications = compareEntities(
-    baseVersion.data.applications,
-    currentData.applications,
+  const deliverables = compareEntities(
+    baseVersion.data.deliverables,
+    currentData.deliverables,
     (a) => a.name,
     (b, c) => {
       const changes: string[] = [];
@@ -163,33 +163,33 @@ export function computeDiff(baseVersion: Version, currentData: Version['data']):
     }
   );
 
-  const getSegmentApplicationName = (applicationId: string) =>
-    currentData.applications.find(a => a.id === applicationId)?.name
-    || baseVersion.data.applications.find(a => a.id === applicationId)?.name
+  const getSegmentDeliverableName = (deliverableId: string) =>
+    currentData.deliverables.find(a => a.id === deliverableId)?.name
+    || baseVersion.data.deliverables.find(a => a.id === deliverableId)?.name
     || 'Unknown deliverable';
 
   const getSegmentStatusName = (statusId: string) =>
-    (currentData.applicationStatuses ?? []).find(s => s.id === statusId)?.name
-    || (baseVersion.data.applicationStatuses ?? []).find(s => s.id === statusId)?.name
+    (currentData.deliverableStatuses ?? []).find(s => s.id === statusId)?.name
+    || (baseVersion.data.deliverableStatuses ?? []).find(s => s.id === statusId)?.name
     || statusId;
 
-  const applicationSegments = compareEntities(
-    baseVersion.data.applicationSegments,
-    currentData.applicationSegments,
-    (s) => `${getSegmentApplicationName(s.applicationId)} (${s.startDate} → ${s.endDate})`,
+  const deliverableSegments = compareEntities(
+    baseVersion.data.deliverableSegments,
+    currentData.deliverableSegments,
+    (s) => `${getSegmentDeliverableName(s.deliverableId)} (${s.startDate} → ${s.endDate})`,
     (b, c) => {
       const changes: string[] = [];
       if (b.startDate !== c.startDate) changes.push(`Start date: ${b.startDate} → ${c.startDate}`);
       if (b.endDate !== c.endDate) changes.push(`End date: ${b.endDate} → ${c.endDate}`);
       if (b.status !== c.status) changes.push(`Status: ${getSegmentStatusName(b.status)} → ${getSegmentStatusName(c.status)}`);
-      if (b.applicationId !== c.applicationId) changes.push(`Moved to deliverable "${getSegmentApplicationName(c.applicationId)}"`);
+      if (b.deliverableId !== c.deliverableId) changes.push(`Moved to deliverable "${getSegmentDeliverableName(c.deliverableId)}"`);
       return changes;
     }
   );
 
-  const applicationStatuses = compareEntities(
-    baseVersion.data.applicationStatuses ?? [],
-    currentData.applicationStatuses ?? [],
+  const deliverableStatuses = compareEntities(
+    baseVersion.data.deliverableStatuses ?? [],
+    currentData.deliverableStatuses ?? [],
     (s) => s.name,
     (b, c) => {
       const changes: string[] = [];
@@ -251,8 +251,8 @@ export function computeDiff(baseVersion: Version, currentData: Version['data']):
         || baseVersion.data.assets.find(a => a.id === targetId)?.name
         || 'Unknown asset';
     }
-    return currentData.applications.find(a => a.id === targetId)?.name
-      || baseVersion.data.applications.find(a => a.id === targetId)?.name
+    return currentData.deliverables.find(a => a.id === targetId)?.name
+      || baseVersion.data.deliverables.find(a => a.id === targetId)?.name
       || 'Unknown deliverable';
   };
 
@@ -283,9 +283,9 @@ export function computeDiff(baseVersion: Version, currentData: Version['data']):
     initiatives.added.length > 0 || initiatives.removed.length > 0 || initiatives.modified.length > 0 ||
     dependencies.added.length > 0 || dependencies.removed.length > 0 || dependencies.modified.length > 0 ||
     milestones.added.length > 0 || milestones.removed.length > 0 || milestones.modified.length > 0 ||
-    applications.added.length > 0 || applications.removed.length > 0 || applications.modified.length > 0 ||
-    applicationSegments.added.length > 0 || applicationSegments.removed.length > 0 || applicationSegments.modified.length > 0 ||
-    applicationStatuses.added.length > 0 || applicationStatuses.removed.length > 0 || applicationStatuses.modified.length > 0 ||
+    deliverables.added.length > 0 || deliverables.removed.length > 0 || deliverables.modified.length > 0 ||
+    deliverableSegments.added.length > 0 || deliverableSegments.removed.length > 0 || deliverableSegments.modified.length > 0 ||
+    deliverableStatuses.added.length > 0 || deliverableStatuses.removed.length > 0 || deliverableStatuses.modified.length > 0 ||
     resources.added.length > 0 || resources.removed.length > 0 || resources.modified.length > 0 ||
     assetCategories.added.length > 0 || assetCategories.removed.length > 0 || assetCategories.modified.length > 0 ||
     decisions.added.length > 0 || decisions.removed.length > 0 || decisions.modified.length > 0 ||
@@ -293,7 +293,7 @@ export function computeDiff(baseVersion: Version, currentData: Version['data']):
 
   return {
     assets, programmes, strategies, initiatives, dependencies, milestones,
-    applications, applicationSegments, applicationStatuses, resources, assetCategories, decisions, rptiDetails,
+    deliverables, deliverableSegments, deliverableStatuses, resources, assetCategories, decisions, rptiDetails,
     hasChanges,
   };
 }

@@ -6,7 +6,7 @@
  */
 
 import { differenceInDays, parseISO, isValid } from 'date-fns';
-import { ApplicationSegment, Initiative, Dependency } from '../types';
+import { DeliverableSegment, Initiative, Dependency } from '../types';
 
 // ---------------------------------------------------------------------------
 // Layout constants — exported so Timeline.tsx can import them
@@ -59,8 +59,8 @@ export function getWidth(startStr: string, endStr: string, totalDays: number): n
  */
 export function resolveSegmentConflicts(
   movedId: string,
-  segments: ApplicationSegment[],
-): ApplicationSegment[] {
+  segments: DeliverableSegment[],
+): DeliverableSegment[] {
   const result = segments.map(s => ({ ...s }));
 
   const ordered = result
@@ -76,7 +76,7 @@ export function resolveSegmentConflicts(
     })
     .map(({ seg }) => seg);
 
-  const placed: ApplicationSegment[] = [];
+  const placed: DeliverableSegment[] = [];
 
   for (const current of ordered) {
     const currentRowSpan = current.rowSpan ?? 1;
@@ -152,7 +152,7 @@ export function getGroupsForAsset(
 // ---------------------------------------------------------------------------
 
 export interface LayoutSegmentItem {
-  seg: ApplicationSegment;
+  seg: DeliverableSegment;
   row: number;
   rowSpan: number;
   top: number;
@@ -166,12 +166,12 @@ export interface LayoutSegmentItem {
  * first-fit for segments without one) and returns pixel geometry for rendering.
  */
 export function layoutSegments(
-  segments: ApplicationSegment[],
+  segments: DeliverableSegment[],
   startDate: Date,
   totalDays: number,
 ): { items: LayoutSegmentItem[]; height: number } {
   type PlacedItem = {
-    seg: ApplicationSegment;
+    seg: DeliverableSegment;
     row: number;
     rowSpan: number;
     left: number;
@@ -180,7 +180,7 @@ export function layoutSegments(
 
   const allItems: PlacedItem[] = [];
 
-  const placeSegment = (seg: ApplicationSegment, preferredRow: number) => {
+  const placeSegment = (seg: DeliverableSegment, preferredRow: number) => {
     const left = getPosition(seg.startDate, startDate, totalDays);
     const right = left + getWidth(seg.startDate, seg.endDate, totalDays);
     const span = seg.rowSpan ?? 1;
@@ -242,7 +242,7 @@ export function layoutSegments(
 export function computeAutoRow(
   newStart: string,
   newEnd: string,
-  existingSegments: ApplicationSegment[],
+  existingSegments: DeliverableSegment[],
   startDate: Date,
   totalDays: number,
 ): number {

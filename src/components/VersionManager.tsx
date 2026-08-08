@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Version, Asset, Application, ApplicationSegment, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource, ApplicationStatus, Decision, RptiDetail } from '../types';
+import { Version, Asset, Deliverable, DeliverableSegment, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource, DeliverableStatus, Decision, RptiDetail } from '../types';
 import { X, Save, History, Trash2, ArrowRight, FileText, AlertCircle, LayoutGrid, Check, Users, GitBranch, Box, Layers, Tags, FolderTree, Scale, ClipboardList } from 'lucide-react';
 import { saveVersion, deleteVersion } from '../lib/db';
 import { ConfirmModal } from './ConfirmModal';
@@ -15,8 +15,8 @@ interface VersionManagerProps {
   onUpdateVersions: (versions: Version[]) => void;
   currentData: {
     assets: Asset[];
-    applications: Application[];
-    applicationSegments: ApplicationSegment[];
+    deliverables: Deliverable[];
+    deliverableSegments: DeliverableSegment[];
     initiatives: Initiative[];
     milestones: Milestone[];
     programmes: Programme[];
@@ -25,7 +25,7 @@ interface VersionManagerProps {
     assetCategories: AssetCategory[];
     timelineSettings: TimelineSettings;
     resources: Resource[];
-    applicationStatuses?: ApplicationStatus[];
+    deliverableStatuses?: DeliverableStatus[];
     decisions?: Decision[];
     rptiDetails?: RptiDetail[];
   };
@@ -55,7 +55,7 @@ export function VersionManager({ isOpen, onClose, onRestore, versions, onUpdateV
       description: newDescription,
       data: structuredClone({
         ...currentData,
-        applicationStatuses: currentData.applicationStatuses || [],
+        deliverableStatuses: currentData.deliverableStatuses || [],
         decisions: currentData.decisions || [],
         rptiDetails: currentData.rptiDetails || [],
       }),
@@ -474,19 +474,19 @@ function VersionComparisonReport({ baseVersion, comparisonData, onClose }: {
               />
               <DiffSection
                 title="Deliverables"
-                data={diff.applications}
+                data={diff.deliverables}
                 icon={Box}
                 colorClass="cyan"
               />
               <DiffSection
                 title="Deliverable Segments"
-                data={diff.applicationSegments}
+                data={diff.deliverableSegments}
                 icon={Layers}
                 colorClass="teal"
               />
               <DiffSection
                 title="App Statuses"
-                data={diff.applicationStatuses}
+                data={diff.deliverableStatuses}
                 icon={Tags}
                 colorClass="orange"
               />

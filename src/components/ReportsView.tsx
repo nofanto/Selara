@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Asset, Initiative, Dependency, Milestone, Version, Programme, Strategy, AssetCategory, Resource, Application, ApplicationSegment, ApplicationStatus, RptiDetail } from '../types';
+import { Asset, Initiative, Dependency, Milestone, Version, Programme, Strategy, AssetCategory, Resource, Deliverable, DeliverableSegment, DeliverableStatus, RptiDetail } from '../types';
 import { getAllVersions } from '../lib/db';
 import { computeDiff, DiffResult } from '../lib/diff';
 import { History, DollarSign, GitBranch, Users, ChevronLeft, Grid, ClipboardList } from 'lucide-react';
@@ -17,9 +17,9 @@ interface ReportsViewProps {
   strategies: Strategy[];
   assetCategories: AssetCategory[];
   resources?: Resource[];
-  applications?: Application[];
-  applicationSegments?: ApplicationSegment[];
-  applicationStatuses?: ApplicationStatus[];
+  deliverables?: Deliverable[];
+  deliverableSegments?: DeliverableSegment[];
+  deliverableStatuses?: DeliverableStatus[];
   rptiDetails?: RptiDetail[];
   onSaveAsset?: (asset: Asset) => void;
 }
@@ -87,7 +87,7 @@ function depSentence(dep: Dependency, src: Initiative, tgt: Initiative, perspect
   return `${src.name} and ${tgt.name} are related.`;
 }
 
-export function ReportsView({ assets, initiatives, milestones, dependencies, currentData, programmes, strategies, assetCategories, resources = [], applications = [], applicationSegments = [], applicationStatuses = [], rptiDetails = [], onSaveAsset }: ReportsViewProps) {
+export function ReportsView({ assets, initiatives, milestones, dependencies, currentData, programmes, strategies, assetCategories, resources = [], deliverables = [], deliverableSegments = [], deliverableStatuses = [], rptiDetails = [], onSaveAsset }: ReportsViewProps) {
   const [selectedReport, setSelectedReport] = useState<ReportSlug | null>(null);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [assetPanelOpen, setAssetPanelOpen] = useState(false);
@@ -588,10 +588,10 @@ export function ReportsView({ assets, initiatives, milestones, dependencies, cur
           <RptiReportView
             rptiDetails={rptiDetails}
             initiatives={initiatives}
-            applications={applications}
+            deliverables={deliverables}
             assets={assets}
-            applicationSegments={applicationSegments}
-            applicationStatuses={applicationStatuses}
+            deliverableSegments={deliverableSegments}
+            deliverableStatuses={deliverableStatuses}
           />
         </div>
       </div>

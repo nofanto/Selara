@@ -5,19 +5,19 @@
  * Templates correspond to different NZ government IT taxonomy / reference architecture choices.
  */
 
-import { Asset, AssetCategory, Decision, RptiDetail, Initiative, Milestone, ApplicationSegment, Programme, Strategy, Dependency, Resource, ApplicationStatus, TimelineSettings, Application } from '../types';
+import { Asset, AssetCategory, Decision, RptiDetail, Initiative, Milestone, DeliverableSegment, Programme, Strategy, Dependency, Resource, DeliverableStatus, TimelineSettings, Deliverable } from '../types';
 import {
   demoAssets,
   demoInitiatives,
   demoMilestones,
-  demoApplicationSegments,
+  demoDeliverableSegments,
   demoAssetCategories,
   demoProgrammes,
   demoStrategies,
   demoDependencies,
   demoResources,
-  demoApplications,
-  demoApplicationStatuses,
+  demoDeliverables,
+  demoDeliverableStatuses,
   demoTimelineSettings,
 } from '../demoData';
 
@@ -56,13 +56,13 @@ export interface TemplateAppData {
   assets: Asset[];
   initiatives: Initiative[];
   milestones: Milestone[];
-  applicationSegments: ApplicationSegment[];
+  deliverableSegments: DeliverableSegment[];
   programmes: Programme[];
   strategies: Strategy[];
   dependencies: Dependency[];
   resources: Resource[];
-  applications: Application[];
-  applicationStatuses: ApplicationStatus[];
+  deliverables: Deliverable[];
+  deliverableStatuses: DeliverableStatus[];
   decisions: Decision[];
   rptiDetails: RptiDetail[];
   timelineSettings: TimelineSettings;
@@ -83,13 +83,13 @@ export function getTemplateData(templateId: TemplateId | string, withDemoData = 
         assets: [],
         initiatives: [],
         milestones: [],
-        applicationSegments: [],
+        deliverableSegments: [],
         programmes: [],
         strategies: [],
         dependencies: [],
         resources: [],
-        applications: [],
-        applicationStatuses: [],
+        deliverables: [],
+        deliverableStatuses: [],
         decisions: [],
         rptiDetails: [],
         timelineSettings: { ...baseSettings, showGeanzCatalogue: false },
@@ -101,13 +101,13 @@ export function getTemplateData(templateId: TemplateId | string, withDemoData = 
         assets: [],
         initiatives: [],
         milestones: [],
-        applicationSegments: [],
+        deliverableSegments: [],
         programmes: [],
         strategies: [],
         dependencies: [],
         resources: [],
-        applications: [],
-        applicationStatuses: [],
+        deliverables: [],
+        deliverableStatuses: [],
         decisions: [],
         rptiDetails: [],
         timelineSettings: { ...baseSettings, showGeanzCatalogue: false },
@@ -120,13 +120,13 @@ export function getTemplateData(templateId: TemplateId | string, withDemoData = 
         assets: demoAssets,
         initiatives: withDemoData ? demoInitiatives : [],
         milestones: withDemoData ? demoMilestones : [],
-        applicationSegments: withDemoData ? demoApplicationSegments : [],
+        deliverableSegments: withDemoData ? demoDeliverableSegments : [],
         programmes: demoProgrammes,
         strategies: demoStrategies,
         dependencies: withDemoData ? demoDependencies : [],
         resources: withDemoData ? demoResources : [],
-        applications: withDemoData ? demoApplications : [],
-        applicationStatuses: demoApplicationStatuses,
+        deliverables: withDemoData ? demoDeliverables : [],
+        deliverableStatuses: demoDeliverableStatuses,
         decisions: [],
         rptiDetails: [],
         timelineSettings: { ...baseSettings, showGeanzCatalogue: true },

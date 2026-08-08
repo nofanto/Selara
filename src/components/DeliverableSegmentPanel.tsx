@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ApplicationSegment, Application, ApplicationStatus, Initiative } from '../types';
+import { DeliverableSegment, Deliverable, DeliverableStatus, Initiative } from '../types';
 import { X, Trash2 } from 'lucide-react';
 import { ConfirmModal } from './ConfirmModal';
 import { useFocusTrap } from '../lib/useFocusTrap';
@@ -13,37 +13,37 @@ const STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: 'appstatus-retired',        label: 'Retired' },
 ];
 
-interface ApplicationSegmentPanelProps {
-  segment: ApplicationSegment | null;
-  application: Application | null;
-  applications?: Application[];
+interface DeliverableSegmentPanelProps {
+  segment: DeliverableSegment | null;
+  deliverable: Deliverable | null;
+  deliverables?: Deliverable[];
   isOpen: boolean;
   isNew: boolean;
   onClose: () => void;
-  onSave: (segment: ApplicationSegment) => void;
-  onDelete?: (segment: ApplicationSegment) => void;
-  applicationStatuses?: ApplicationStatus[];
+  onSave: (segment: DeliverableSegment) => void;
+  onDelete?: (segment: DeliverableSegment) => void;
+  deliverableStatuses?: DeliverableStatus[];
   initiatives?: Initiative[];
 }
 
-export function ApplicationSegmentPanel({
+export function DeliverableSegmentPanel({
   segment,
-  application,
-  applications = [],
+  deliverable,
+  deliverables = [],
   isOpen,
   isNew,
   onClose,
   onSave,
   onDelete,
-  applicationStatuses,
+  deliverableStatuses,
   initiatives = [],
-}: ApplicationSegmentPanelProps) {
-  const [formData, setFormData] = useState<ApplicationSegment | null>(null);
+}: DeliverableSegmentPanelProps) {
+  const [formData, setFormData] = useState<DeliverableSegment | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const panelRef = useFocusTrap(isOpen, onClose);
 
-  const statusOptions = applicationStatuses && applicationStatuses.length > 0
-    ? applicationStatuses.map(s => ({ value: s.id, label: s.name }))
+  const statusOptions = deliverableStatuses && deliverableStatuses.length > 0
+    ? deliverableStatuses.map(s => ({ value: s.id, label: s.name }))
     : STATUS_OPTIONS;
 
   /* eslint-disable react-hooks/set-state-in-effect */
@@ -87,7 +87,7 @@ export function ApplicationSegmentPanel({
                 {isNew ? 'Add Lifecycle Segment' : 'Edit Lifecycle Segment'}
               </h2>
               {(() => {
-                const displayApp = application ?? applications.find(a => a.id === formData?.applicationId);
+                const displayApp = deliverable ?? deliverables.find(a => a.id === formData?.deliverableId);
                 return displayApp ? <p className="text-xs text-slate-500 mt-0.5">{displayApp.name}</p> : null;
               })()}
             </div>
@@ -102,15 +102,15 @@ export function ApplicationSegmentPanel({
 
           <div className="flex-1 overflow-y-auto p-6">
             <form id="segment-form" onSubmit={handleSubmit} className="space-y-5">
-              {applications.length > 0 && field('Application',
+              {deliverables.length > 0 && field('Deliverable',
                 <select
-                  data-testid="segment-application"
-                  value={formData.applicationId ?? ''}
-                  onChange={e => setFormData({ ...formData, applicationId: e.target.value || undefined })}
+                  data-testid="segment-deliverable"
+                  value={formData.deliverableId ?? ''}
+                  onChange={e => setFormData({ ...formData, deliverableId: e.target.value || undefined })}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">— None —</option>
-                  {applications.map(a => (
+                  {deliverables.map(a => (
                     <option key={a.id} value={a.id}>{a.name}</option>
                   ))}
                 </select>
@@ -205,7 +205,7 @@ export function ApplicationSegmentPanel({
         <ConfirmModal
           isOpen={confirmDelete}
           title="Delete Segment"
-          message={`Remove the "${(application ?? applications.find(a => a.id === formData.applicationId))?.name ?? statusOptions.find(o => o.value === formData.status)?.label}" segment? This cannot be undone.`}
+          message={`Remove the "${(deliverable ?? deliverables.find(a => a.id === formData.deliverableId))?.name ?? statusOptions.find(o => o.value === formData.status)?.label}" segment? This cannot be undone.`}
           confirmLabel="Delete"
           onConfirm={() => { onDelete(formData); setConfirmDelete(false); }}
           onCancel={() => setConfirmDelete(false)}

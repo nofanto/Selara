@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { computeAutoRow, layoutSegments, resolveSegmentConflicts } from './timelineLayout';
-import type { ApplicationSegment } from '../types';
+import type { DeliverableSegment } from '../types';
 
 describe('layoutSegments', () => {
   it('keeps explicit rows from colliding when two segments overlap in time', () => {
     const startDate = new Date('2024-01-01T00:00:00.000Z');
 
-    const segments: ApplicationSegment[] = [
+    const segments: DeliverableSegment[] = [
       {
         id: 'seg-a',
-        applicationId: 'app-a',
+        deliverableId: 'app-a',
         startDate: '2024-01-10',
         endDate: '2024-02-10',
         status: 'planned',
@@ -17,7 +17,7 @@ describe('layoutSegments', () => {
       },
       {
         id: 'seg-b',
-        applicationId: 'app-b',
+        deliverableId: 'app-b',
         startDate: '2024-01-20',
         endDate: '2024-02-20',
         status: 'planned',
@@ -38,10 +38,10 @@ describe('layoutSegments', () => {
   it('rechecks moved conflicts so tall explicit rows do not end up overlapping', () => {
     const startDate = new Date('2024-01-01T00:00:00.000Z');
 
-    const segments: ApplicationSegment[] = [
+    const segments: DeliverableSegment[] = [
       {
         id: 'seg-0',
-        applicationId: 'app-0',
+        deliverableId: 'app-0',
         startDate: '2024-01-11',
         endDate: '2024-01-17',
         status: 'planned',
@@ -50,7 +50,7 @@ describe('layoutSegments', () => {
       },
       {
         id: 'seg-1',
-        applicationId: 'app-1',
+        deliverableId: 'app-1',
         startDate: '2024-01-14',
         endDate: '2024-01-22',
         status: 'planned',
@@ -58,7 +58,7 @@ describe('layoutSegments', () => {
       },
       {
         id: 'seg-2',
-        applicationId: 'app-2',
+        deliverableId: 'app-2',
         startDate: '2024-01-12',
         endDate: '2024-01-14',
         status: 'planned',
@@ -66,7 +66,7 @@ describe('layoutSegments', () => {
       },
       {
         id: 'seg-3',
-        applicationId: 'app-3',
+        deliverableId: 'app-3',
         startDate: '2024-01-06',
         endDate: '2024-01-13',
         status: 'planned',
@@ -75,7 +75,7 @@ describe('layoutSegments', () => {
       },
       {
         id: 'seg-4',
-        applicationId: 'app-4',
+        deliverableId: 'app-4',
         startDate: '2024-01-06',
         endDate: '2024-01-07',
         status: 'planned',
@@ -84,7 +84,7 @@ describe('layoutSegments', () => {
       },
       {
         id: 'seg-5',
-        applicationId: 'app-5',
+        deliverableId: 'app-5',
         startDate: '2024-01-05',
         endDate: '2024-01-07',
         status: 'planned',
@@ -92,7 +92,7 @@ describe('layoutSegments', () => {
       },
       {
         id: 'seg-6',
-        applicationId: 'app-6',
+        deliverableId: 'app-6',
         startDate: '2024-01-04',
         endDate: '2024-01-12',
         status: 'planned',
@@ -100,7 +100,7 @@ describe('layoutSegments', () => {
       },
       {
         id: 'seg-7',
-        applicationId: 'app-7',
+        deliverableId: 'app-7',
         startDate: '2024-01-05',
         endDate: '2024-01-12',
         status: 'planned',
@@ -108,7 +108,7 @@ describe('layoutSegments', () => {
       },
       {
         id: 'seg-8',
-        applicationId: 'app-8',
+        deliverableId: 'app-8',
         startDate: '2024-01-08',
         endDate: '2024-01-13',
         status: 'planned',
@@ -132,9 +132,9 @@ describe('layoutSegments', () => {
   it('keeps searching past row 20 when auto-placing a new segment', () => {
     const startDate = new Date('2024-01-01T00:00:00.000Z');
 
-    const existingSegments: ApplicationSegment[] = Array.from({ length: 21 }, (_, row) => ({
+    const existingSegments: DeliverableSegment[] = Array.from({ length: 21 }, (_, row) => ({
       id: `seg-${row}`,
-      applicationId: `app-${row}`,
+      deliverableId: `app-${row}`,
       startDate: '2024-01-10',
       endDate: '2024-02-10',
       status: 'planned',
