@@ -1,7 +1,7 @@
 # RPTI Row Auto-Generation (Design Notes)
 
-> **Status:** Draft — design discussion, not yet implemented.
-> **Context:** Today, `RptiDetail` rows in Data Manager → RPTI are created entirely by hand, with no link to a reporting year and no derivation from `Initiative`/`DeliverableSegment` data (see `docs/adr/0003-rpti-report-and-application-type.md`). This doc captures the agreed direction for making rows generated and auto-filled instead of manually authored, plus what's still open.
+> **Status:** Implemented — see `generateRptiDetails` in `src/lib/rpti.ts`, wired to the **Generate `<year>` RPTI Rows** button in Data Manager → RPTI (`src/components/DataManager.tsx`). Rows remain user-editable after generation; nothing here is enforced beyond generation time.
+> **Context:** `RptiDetail` rows in Data Manager → RPTI are generated from `Initiative`/`DeliverableSegment` data one report-year at a time (see `docs/adr/0003-rpti-report-and-application-type.md` for the underlying data model). This doc captures the agreed generation rule, plus what's still open.
 
 ## Column summary & auto-fill source
 
@@ -27,7 +27,7 @@
 
 1. **Rows are never manually added or removed.** Existence is entirely derived from `DeliverableSegment` data — auto-generated and auto-filled, with fields remaining user-editable afterward.
 
-2. **RPTI is generated one report-year at a time, with no cross-year lookback.** Generating the report for year Y only ever looks at `DeliverableSegment`s whose `startDate` falls within Y. A segment from an earlier or later year is invisible to that run — there is no "does this deliverable have prior history" check across year boundaries. This is a deliberate simplification, not a gap: it means the exact same underlying event (a deliverable's first-ever go-live) can legitimately be classified differently depending on whether its planning happened in the same calendar year as its go-live or not (see step 4).
+2. **RPTI is generated one report-year at a time, with no cross-year lookback.** Generating the report for year Y looks at every `DeliverableSegment` whose `[startDate, endDate]` range **overlaps** Y — i.e. `startDate <= Y-12-31 AND endDate >= Y-01-01` — regardless of which year it started or ends in. A segment with no overlap into Y at all is invisible to that run — there is no separate "does this deliverable have prior history" check across year boundaries beyond what the segment's own date range already covers. This is a deliberate simplification, not a gap: it means the exact same underlying event (a deliverable's first-ever go-live) can legitimately be classified differently depending on whether its planning segment's range overlaps the same calendar year as its go-live or not (see step 4).
 
 3. **Within a report-year's window, a segment "qualifies" only if:**
    - its `status` is `planned`, `funded`, or `in-production`, **and**

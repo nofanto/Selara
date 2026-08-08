@@ -69,13 +69,18 @@ export function generateRptiDetails(
   initiatives: Initiative[],
   reportYear: number,
 ): RptiDetail[] {
-  const inReportYear = (iso: string) => Number(iso.slice(0, 4)) === reportYear;
+  // Overlap, not "starts in": a segment qualifies if any part of its
+  // [startDate, endDate] range falls within the report year, even if it
+  // started in an earlier year or continues into the next one.
+  const yearStart = `${reportYear}-01-01`;
+  const yearEnd = `${reportYear}-12-31`;
+  const overlapsReportYear = (seg: DeliverableSegment) => seg.startDate <= yearEnd && seg.endDate >= yearStart;
   // Deleting an Initiative doesn't clean up DeliverableSegment.initiativeId, so a segment
   // can carry a dangling reference to an initiative that no longer exists — skip those.
   const initiativeIds = new Set(initiatives.map(i => i.id));
 
   const qualifying = deliverableSegments
-    .filter(seg => !!seg.initiativeId && initiativeIds.has(seg.initiativeId) && inReportYear(seg.startDate))
+    .filter(seg => !!seg.initiativeId && initiativeIds.has(seg.initiativeId) && overlapsReportYear(seg))
     .map(seg => ({ segment: seg, kind: classifySegmentKind(seg.status, deliverableStatuses) }))
     .filter((s): s is { segment: DeliverableSegment; kind: 'new' | 'live' } => s.kind !== 'excluded');
 

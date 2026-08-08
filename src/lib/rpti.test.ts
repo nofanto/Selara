@@ -87,7 +87,7 @@ describe('generateRptiDetails', () => {
 
   it('does not look back across years — in-production alone this year is "upgrade" even if planning was last year', () => {
     const segments = [
-      makeSegment({ id: 'seg-planned', status: 'appstatus-planned', startDate: '2025-01-15' }),
+      makeSegment({ id: 'seg-planned', status: 'appstatus-planned', startDate: '2025-01-15', endDate: '2025-02-15' }),
       makeSegment({ id: 'seg-prod', status: 'appstatus-in-production', startDate: '2026-09-01' }),
     ];
     const rows = generateRptiDetails(segments, statuses, [makeInitiative()], 2026);
@@ -114,11 +114,27 @@ describe('generateRptiDetails', () => {
     expect(rows).toHaveLength(0);
   });
 
-  it('excludes segments outside the report year', () => {
+  it('excludes segments entirely outside the report year (no overlap)', () => {
     const segments = [makeSegment({ id: 'seg-2025', startDate: '2025-06-01', endDate: '2025-07-01' })];
     const rows = generateRptiDetails(segments, statuses, [makeInitiative()], 2026);
 
     expect(rows).toHaveLength(0);
+  });
+
+  it('includes a segment that started before the report year but overlaps into it', () => {
+    const segments = [makeSegment({ id: 'seg-straddle', startDate: '2025-11-01', endDate: '2026-02-01' })];
+    const rows = generateRptiDetails(segments, statuses, [makeInitiative()], 2026);
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ deliverableSegmentId: 'seg-straddle' });
+  });
+
+  it('includes a segment that starts in the report year and ends after it', () => {
+    const segments = [makeSegment({ id: 'seg-tail', startDate: '2026-11-01', endDate: '2027-02-01' })];
+    const rows = generateRptiDetails(segments, statuses, [makeInitiative()], 2026);
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ deliverableSegmentId: 'seg-tail' });
   });
 
   it('keeps distinct (initiative, deliverable) pairs as separate rows', () => {
