@@ -316,7 +316,7 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery 
     const msg = parts.length
       ? `Deleting "${application.name}" will also remove ${parts.join(', ')}. Continue?`
       : undefined;
-    return cascadeDelete('Delete Application', application.name, parts, {
+    return cascadeDelete('Delete Deliverable', application.name, parts, {
       ...removeApplicationAndSegments(
         { applications: data.applications || [], applicationSegments: data.applicationSegments || [] },
         application.id,
@@ -329,10 +329,10 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery 
     const segmentCount = data.applicationSegments.length;
     const affectedRpti = data.rptiDetails.filter(r => r.targetType === 'application').length;
     const parts = [];
-    if ((data.applications || []).length) parts.push(`${(data.applications || []).length} application(s)`);
+    if ((data.applications || []).length) parts.push(`${(data.applications || []).length} deliverable(s)`);
     if (segmentCount) parts.push(`${segmentCount} segment(s)`);
     if (affectedRpti) parts.push(`${affectedRpti} RPTI report row(s)`);
-    return cascadeDelete('Delete All Applications', 'all applications', parts, {
+    return cascadeDelete('Delete All Deliverables', 'all deliverables', parts, {
       ...clearApplicationsAndSegments(),
       rptiDetails: data.rptiDetails.filter(r => r.targetType !== 'application'),
     }, parts.length
@@ -389,7 +389,7 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery 
     { id: 'initiatives', label: 'Initiatives', icon: Layers, count: data.initiatives.length },
     { id: 'dependencies', label: 'Dependencies', icon: Link2, count: data.dependencies.length },
     { id: 'assets', label: 'Assets', icon: Database, count: data.assets.length },
-    { id: 'applications', label: 'Applications', icon: Box, count: (data.applications || []).length },
+    { id: 'applications', label: 'Deliverables', icon: Box, count: (data.applications || []).length },
     { id: 'assetCategories', label: 'Categories', icon: FolderTree, count: data.assetCategories.length },
     { id: 'programmes', label: 'Programmes', icon: Calendar, count: data.programmes.length },
     { id: 'strategies', label: 'Strategies', icon: Target, count: data.strategies.length },

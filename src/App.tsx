@@ -1043,7 +1043,7 @@ export default function App() {
           const display = timelineSettings.display || 'both';
           const colorLabel = colorBy === 'programme' ? 'Programme' : colorBy === 'strategy' ? 'Strategy' : colorBy === 'rag' ? 'Status' : 'Progress';
           const groupLabel = groupBy === 'asset' ? 'Asset' : groupBy === 'programme' ? 'Programme' : 'Strategy';
-          const displayLabel = display === 'initiatives' ? 'Initiatives' : display === 'applications' ? 'Applications' : 'Both';
+          const displayLabel = display === 'initiatives' ? 'Initiatives' : display === 'applications' ? 'Deliverables' : 'Both';
           return (
             <div className="relative shrink-0" ref={viewOptionsPanelRef}>
               <button
@@ -1174,7 +1174,7 @@ export default function App() {
                       className={cn("flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all", display === 'applications' ? "bg-slate-100 text-slate-800" : "text-slate-600 hover:bg-slate-50")}
                     >
                       <AppWindow size={13} />
-                      Applications
+                      Deliverables
                     </button>
                   </div>
                 </div>

@@ -122,7 +122,7 @@ export function InitiativePanel({ initiative, assets, applications = [], program
                             return (
                                 <div>
                                     <label htmlFor="applicationId" className="block text-sm font-medium text-slate-700 mb-1">
-                                        Application <span className="text-slate-400 font-normal">(optional)</span>
+                                        Deliverable <span className="text-slate-400 font-normal">(optional)</span>
                                     </label>
                                     <select
                                         id="applicationId"
