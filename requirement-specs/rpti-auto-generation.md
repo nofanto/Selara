@@ -42,6 +42,17 @@
 
 5. **`targetType` is always `'deliverable'` — bare Asset targets are out of scope for generation, by decision.** `Asset` has no lifecycle/segment concept to anchor a rule to, and infrastructure work already has a first-class home: a `Deliverable` with `type: 'infrastructure'` (added in ADR-0003 for exactly this), complete with its own segments. Reportable infrastructure changes — data center relocation, network capacity additions, etc. — should be modeled as an infrastructure-type `Deliverable` going forward, not as a direct `targetType: 'asset'` row, so they generate under the same rule as everything else with no special-casing. Existing manually-created asset-target rows remain readable/editable, but this generation path does not create or extend them.
 
+## Open questions
+
+### Strategy/Programme generation filter — what should step 3 actually check?
+
+Original framing: initiatives should be "triggered by an Initiative that belongs to a Strategy or Programme." But `Initiative.programmeId` is already **mandatory** on every real Initiative — you can't create one without a Programme. So this is trivially already true except for `isPlaceholder` initiatives (empty markers, not real work), which step 3 doesn't currently exclude. Two different things this could mean:
+
+- **(a) Exclude `isPlaceholder` initiatives from generation** — a straightforward correctness fix; every other initiative already has a Programme by construction.
+- **(b) Additionally require `strategyId` to be set** (optional today) — a stricter filter: only initiatives explicitly aligned to a Strategy, not just any Programme-bucketed work, generate rows. Would exclude real initiatives that never got a Strategy tag.
+
+To be addressed later, alongside the auto-fill work in `requirement-specs/rpti-auto-fill-improvements.md`.
+
 ## Shared domain assumptions
 
 - Every deliverable is expected to pass through at least a `planned` segment and an `in-production` segment at some point in its life (not enforced in code today, just a shared mental model).
