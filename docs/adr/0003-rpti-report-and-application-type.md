@@ -6,7 +6,7 @@ Accepted
 
 ## Context and Problem Statement
 
-`requirement-specs/rpti-schema.md` defines RPTI — Indonesia's OJK-regulated IT Development Plan Report (Format 3.1): an 11-column table (row #, application/infrastructure name, description, banking category code, dev type new/upgrade, developer inhouse/PPJTI, PPJTI related-party status, DC/DR location, planned implementation quarter, capex/opex with currency + IDR-equivalent, remarks). Building this as a Scenia feature surfaced two schema gaps:
+`requirement-specs/rpti-schema.md` defines RPTI — Indonesia's OJK-regulated IT Development Plan Report (Format 3.1): an 11-column table (row #, application/infrastructure name, description, banking category code, dev type new/upgrade, developer inhouse/PPJTI, PPJTI related-party status, DC/DR location, planned implementation quarter, capex/opex with currency + IDR-equivalent, remarks). Building this as a Selara feature surfaced two schema gaps:
 
 1. `Application` is implicitly software-only (`{ id, assetId, name }`), but RPTI needs infrastructure items (data centers, networks, security systems) as first-class rows too. `demoData.ts` already had a concrete example of this strain: `app-gz-iaas` ("Infrastructure as a Service") was an infrastructure concept shoehorned into the software-only `Application` shape.
 2. An IT initiative often produces or affects more than one asset/application, but `Initiative.assetId` is a single required field. Timeline row-placement, per-asset conflict detection, and dependency-line position tracking are all structurally keyed to exactly one asset per initiative — confirmed by reading `Timeline.tsx` in detail before deciding.
@@ -38,7 +38,7 @@ Chosen option: "Generalize `Application` with a `type` field, and use a new join
 
 #### Merge Asset/Application, multi-target Initiative
 
-- Good, because it's the most "natural" long-term data model if Scenia later wants infrastructure items to be first-class timeline rows.
+- Good, because it's the most "natural" long-term data model if Selara later wants infrastructure items to be first-class timeline rows.
 - Bad, because it's a rewrite of one of the app's two foundational entities and Timeline's core rendering assumptions — far beyond what RPTI itself requires, and high-risk.
 
 #### `additionalAssetIds?: string[]` on Initiative

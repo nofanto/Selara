@@ -1,6 +1,6 @@
 # Database Diagram
 
-Scenia persists all application data client-side in **IndexedDB**, accessed via the `idb` library. The database is defined in a single location: [`src/lib/db.ts`](../src/lib/db.ts).
+Selara persists all application data client-side in **IndexedDB**, accessed via the `idb` library. The database is defined in a single location: [`src/lib/db.ts`](../src/lib/db.ts).
 
 - **Database name:** `it-initiative-visualiser`
 - **Current schema version:** `17`

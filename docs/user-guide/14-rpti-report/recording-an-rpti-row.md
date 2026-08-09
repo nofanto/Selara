@@ -2,7 +2,7 @@
 
 RPTI (Laporan Rencana Pengembangan Teknologi Informasi) is Indonesia's OJK-regulated IT Development Plan Report — Format 3.1. Each row records a planned development activity on one application or infrastructure item, backed by one of your initiatives.
 
-RPTI rows are managed in **Data Manager → RPTI**, the same spreadsheet-style editor used for every other entity in Scenia (Initiatives, Assets, Applications, and so on). The **RPTI Report** screen under Reports is a read-only summary of the same data, plus the Excel export — see [Exporting the RPTI Report](exporting-the-rpti-report.md).
+RPTI rows are managed in **Data Manager → RPTI**, the same spreadsheet-style editor used for every other entity in Selara (Initiatives, Assets, Applications, and so on). The **RPTI Report** screen under Reports is a read-only summary of the same data, plus the Excel export — see [Exporting the RPTI Report](exporting-the-rpti-report.md).
 
 ## Opening the RPTI tab
 

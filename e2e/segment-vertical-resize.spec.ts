@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 /**
  * User Story: Vertical Resize of Deliverable Segments (rowSpan)
  *
- * As a Scenia user I want to drag the bottom edge of a deliverable segment
+ * As a Selara user I want to drag the bottom edge of a deliverable segment
  * to make it span multiple row heights, so I can visually represent one
  * deliverable replacing two (or more) deliverables that ran in parallel.
  *

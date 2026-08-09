@@ -2,7 +2,7 @@
 
 ## Story
 
-As a new user loading Scenia for the first time,
+As a new user loading Selara for the first time,
 I want to see a realistic NZ government portfolio pre-populated with GEANZ assets, initiatives, and lifecycle segments,
 So that I can immediately understand the value of the GEANZ catalogue feature and the visualiser without having to configure anything.
 

@@ -10,7 +10,7 @@ Areas remain collapsed until you choose to populate them — your timeline stays
 
 ## Demo data
 
-When you first load Scenia, a representative selection of GEANZ assets from 13 of the 17 TAP areas is already pre-populated with example initiatives, lifecycle segments, and milestones. This gives you a working NZ government portfolio out of the box so you can explore the visualiser straight away.
+When you first load Selara, a representative selection of GEANZ assets from 13 of the 17 TAP areas is already pre-populated with example initiatives, lifecycle segments, and milestones. This gives you a working NZ government portfolio out of the box so you can explore the visualiser straight away.
 
 Areas not included in the demo (TAP.05 End User, TAP.10 Data Sharing, TAP.11 ICT Development, and TAP.17 Emerging Technologies) still appear as collapsed area rows ready to be populated.
 

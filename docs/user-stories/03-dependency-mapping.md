@@ -112,7 +112,7 @@
 
 ## US-DM-09: Dependency Constraint Validation (Safety)
 
-**As a** Scenia application,
+**As a** Selara application,
 **I want** to handle invalid dependency data gracefully,
 **so that** the app never crashes due to self-referencing or orphaned dependency records.
 

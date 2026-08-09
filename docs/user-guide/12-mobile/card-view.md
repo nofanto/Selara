@@ -36,7 +36,7 @@ If an asset has scheduling conflicts, a conflict badge appears in the card heade
 
 ## Switching to timeline view
 
-Card View is only active when the viewport is at mobile width. Rotating to landscape or opening Scenia on a wider screen automatically restores the standard timeline.
+Card View is only active when the viewport is at mobile width. Rotating to landscape or opening Selara on a wider screen automatically restores the standard timeline.
 
 ---
 

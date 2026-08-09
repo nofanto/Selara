@@ -6,7 +6,7 @@ Accepted
 
 ## Context and Problem Statement
 
-Scenia's `CLAUDE.md` mandates a strict SDLC (User Story → TDD → Implementation → Verification → Documentation → Commit/Push), but nothing in that lifecycle captures **why** a non-trivial technical or architectural choice was made — only what was built and how to use it. `docs/user-guide/` is purely end-user facing. One-off reports like `docs/sync-audit.md` and `docs/security-review-indexeddb.md` contain decisions (e.g. "add HTTP security headers") but were never captured as discrete, indexed records, so that rationale is easy to lose track of as the codebase evolves. There's no existing ADR/RFC convention anywhere in the repo or its history.
+Selara's `CLAUDE.md` mandates a strict SDLC (User Story → TDD → Implementation → Verification → Documentation → Commit/Push), but nothing in that lifecycle captures **why** a non-trivial technical or architectural choice was made — only what was built and how to use it. `docs/user-guide/` is purely end-user facing. One-off reports like `docs/sync-audit.md` and `docs/security-review-indexeddb.md` contain decisions (e.g. "add HTTP security headers") but were never captured as discrete, indexed records, so that rationale is easy to lose track of as the codebase evolves. There's no existing ADR/RFC convention anywhere in the repo or its history.
 
 ## Decision Drivers
 
@@ -35,7 +35,7 @@ ADR creation is **conditional**, not mandatory for every change: `CLAUDE.md` Ste
 
 #### Lightweight Nygard-style ADRs
 
-- Good, because minimal friction, matches the terse style of existing Scenia docs.
+- Good, because minimal friction, matches the terse style of existing Selara docs.
 - Bad, because it doesn't force enumeration of alternatives considered, which is often the most valuable part of a decision record for future readers.
 
 #### Structured MADR-style ADRs

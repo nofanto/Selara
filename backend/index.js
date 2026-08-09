@@ -5,7 +5,11 @@ const firestore = new Firestore();
 const COLLECTION = 'shared_workspaces';
 
 /**
- * Cloud Function to handle Zero-Knowledge storage for Scenia.
+ * Cloud Function to handle Zero-Knowledge storage, inherited from Scenia.
+ * This is Scenia's original author's deployed infrastructure (see
+ * SHARING_ENABLED in src/components/DataControls.tsx) — the Share feature
+ * is disabled in Selara until this fork stands up its own backend. Update
+ * allowedOrigin once this function is redeployed under Selara's own project.
  */
 exports.handleShare = async (req, res) => {
   // Set CORS headers

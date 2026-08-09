@@ -10,13 +10,13 @@
 
 **Risk: None.**
 
-IndexedDB is governed by the browser's same-origin policy. A page served from `evil.com` cannot read, write, or enumerate data stored under `scenia.website`. This is a hard browser-enforced guarantee that applies regardless of how the app is built. No action required.
+IndexedDB is governed by the browser's same-origin policy. A page served from `evil.com` cannot read, write, or enumerate data stored under this app's own production origin. This is a hard browser-enforced guarantee that applies regardless of how the app is built. No action required.
 
 ---
 
 ## Threat 2 — Cross-Site Scripting (XSS)
 
-XSS is the relevant threat: if an attacker can inject a malicious script into the Scenia page, that script runs in the same origin and has full read/write access to IndexedDB.
+XSS is the relevant threat: if an attacker can inject a malicious script into the Selara page, that script runs in the same origin and has full read/write access to IndexedDB.
 
 ### Code audit result — Clean
 
@@ -61,7 +61,7 @@ The missing headers and their purpose:
 
 Add the headers to the Nginx config block inside `Dockerfile`.
 
-A Content Security Policy appropriate for Scenia (a React SPA with no inline scripts, no external CDN resources, no iframes):
+A Content Security Policy appropriate for Selara (a React SPA with no inline scripts, no external CDN resources, no iframes):
 
 ```
 Content-Security-Policy:

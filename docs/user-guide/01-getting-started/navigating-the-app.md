@@ -4,7 +4,7 @@
 
 ## The four main views
 
-Scenia is organised into four views. On desktop, you switch between them using tabs in the header. On mobile, the tabs appear as a bar at the bottom of the screen.
+Selara is organised into four views. On desktop, you switch between them using tabs in the header. On mobile, the tabs appear as a bar at the bottom of the screen.
 
 - **Visualiser** — the interactive timeline canvas. This is the default view and where you spend most of your time. Initiatives, applications, and dependencies are all displayed here.
 - **Data Manager** — a spreadsheet-style interface with nine tabs covering every data type in your portfolio: initiatives, applications, dependencies, milestones, resources, and more. Use this view to bulk-edit data, paste in CSV, or reset your portfolio.

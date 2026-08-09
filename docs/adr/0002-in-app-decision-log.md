@@ -6,7 +6,7 @@ Accepted
 
 ## Context and Problem Statement
 
-Scenia has no way for its end users (portfolio managers) to record *why* a decision was made about an initiative, programme, or asset — only Version History (a full-state snapshot mechanism) and free-text `description` fields on individual entities. This is a different, new product feature: an in-app, IndexedDB-backed decision log, distinct from the git-tracked `docs/adr/` engineering log this directory holds (see [ADR-0001](0001-record-architecture-decisions.md)) — that log is for developers reasoning about Scenia's own codebase, not for end users reasoning about their portfolio.
+Selara has no way for its end users (portfolio managers) to record *why* a decision was made about an initiative, programme, or asset — only Version History (a full-state snapshot mechanism) and free-text `description` fields on individual entities. This is a different, new product feature: an in-app, IndexedDB-backed decision log, distinct from the git-tracked `docs/adr/` engineering log this directory holds (see [ADR-0001](0001-record-architecture-decisions.md)) — that log is for developers reasoning about Selara's own codebase, not for end users reasoning about their portfolio.
 
 Adding this requires a new IndexedDB object store (`decisions`), which is the kind of data-model change `docs/adr/README.md` calls out as worth recording — so this decision is captured here before implementation.
 

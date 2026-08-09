@@ -2,7 +2,7 @@
 
 ## Story
 
-As a new user opening Scenia for the first time,
+As a new user opening Selara for the first time,
 I want to choose which taxonomy or reference framework best matches my agency's needs,
 So that I start with a relevant portfolio structure without having to configure everything from scratch.
 

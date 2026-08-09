@@ -138,7 +138,7 @@
 
 ## US-30: Unify Application Segment Model (Remove assetId Shortcut)
 
-**As a** developer maintaining the Scenia data model,
+**As a** developer maintaining the Selara data model,
 **I want** all application lifecycle segments to link via an `Application` record rather than directly to an asset,
 **so that** the data model has a single, consistent path and all segments are visible and editable in the Data Manager.
 

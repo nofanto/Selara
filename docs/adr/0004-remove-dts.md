@@ -6,15 +6,15 @@ Accepted
 
 ## Context and Problem Statement
 
-DTS was one of Scenia's workspace templates, modelled on New Zealand government's GCDO (Government Chief Digital Officer) target reference architecture: a fixed set of 6 layers and 20 pre-built assets, plus DTS-specific fields threaded through most of the app (`Initiative.dtsPhase`, `Asset.dtsAdoptionStatus`, a dedicated `dtsPhases` IndexedDB store, DTS-only colour/group-by modes, a DTS Alignment report, a DTS Summary Excel sheet, and DTS-specific Mobile Card View options).
+DTS was one of Selara's workspace templates, modelled on New Zealand government's GCDO (Government Chief Digital Officer) target reference architecture: a fixed set of 6 layers and 20 pre-built assets, plus DTS-specific fields threaded through most of the app (`Initiative.dtsPhase`, `Asset.dtsAdoptionStatus`, a dedicated `dtsPhases` IndexedDB store, DTS-only colour/group-by modes, a DTS Alignment report, a DTS Summary Excel sheet, and DTS-specific Mobile Card View options).
 
-Unlike GEANZ (a general-purpose NZ government application taxonomy usable by any agency) or Viewer/Blank (fully generic), DTS is specific to one government's target architecture and doesn't generalize to Scenia's broader user base. It also touched a disproportionate amount of code relative to its usage — DTS-specific branches existed in `App.tsx`, `Timeline.tsx`, `InitiativePanel.tsx`, `ReportsView.tsx`, `DataManager.tsx`, `MobileCardView.tsx`, `excel.ts`, and `workspaceTemplates.ts` — for a template narrower in applicability than any other.
+Unlike GEANZ (a general-purpose NZ government application taxonomy usable by any agency) or Viewer/Blank (fully generic), DTS is specific to one government's target architecture and doesn't generalize to Selara's broader user base. It also touched a disproportionate amount of code relative to its usage — DTS-specific branches existed in `App.tsx`, `Timeline.tsx`, `InitiativePanel.tsx`, `ReportsView.tsx`, `DataManager.tsx`, `MobileCardView.tsx`, `excel.ts`, and `workspaceTemplates.ts` — for a template narrower in applicability than any other.
 
 Docs also referenced a "Mixed" template (DTS layers + GEANZ catalogue) as if it existed. It was never built — a pre-existing E2E test explicitly asserted its picker card was absent — so it was a documentation error, not a feature to preserve.
 
 ## Decision Drivers
 
-- Remove a workspace-specific feature that doesn't serve Scenia's general user base, without destabilizing the app for existing users who may already have DTS-tagged data.
+- Remove a workspace-specific feature that doesn't serve Selara's general user base, without destabilizing the app for existing users who may already have DTS-tagged data.
 - This app's IndexedDB migrations (`src/lib/db.ts`) have never called `deleteObjectStore` in their history — every migration from v1 to v15 is additive. Introducing a first-ever store deletion for this removal would be a new category of risk for no functional benefit.
 - `Timeline.tsx`'s swimlane body is rendered by mutually exclusive `groupBy` branches with no catch-all `else` (confirmed by reading the render logic directly). Deleting the `'dts-phase'` branch without a corresponding safeguard would silently blank the timeline for any user or saved `Version` snapshot with `groupBy: 'dts-phase'` still persisted from before this removal.
 

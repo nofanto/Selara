@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 /**
  * User Story: Conflict Resolution on Horizontal Segment Drag
  *
- * As a Scenia user, when I drag a deliverable segment left or right so that
+ * As a Selara user, when I drag a deliverable segment left or right so that
  * it overlaps another segment in the same row, the overlapped segment should
  * automatically shift down to the next available row rather than rendering
  * on top of the moved segment.

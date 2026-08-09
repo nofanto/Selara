@@ -1,8 +1,7 @@
 /**
- * Workspace templates for Scenia.
+ * Workspace templates for Selara.
  *
  * Each template defines the initial data loaded into IndexedDB on first run.
- * Templates correspond to different NZ government IT taxonomy / reference architecture choices.
  */
 
 import { Asset, AssetCategory, Decision, RptiDetail, Initiative, Milestone, DeliverableSegment, Programme, Strategy, Dependency, Resource, DeliverableStatus, TimelineSettings, Deliverable } from '../types';

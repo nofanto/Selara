@@ -6,7 +6,7 @@ Accepted
 
 ## Context and Problem Statement
 
-RPTI (`RptiDetail`) rows were introduced in [ADR-0003](0003-rpti-report-and-application-type.md) as a report-scoped feature: the only way to create, edit, or delete a row was a dedicated form panel inside **Reports → RPTI Report** (`RptiReportView.tsx`). Every other entity in Scenia (Initiatives, Assets, Applications, Dependencies, etc.) is instead edited inline as a spreadsheet-style table in **Data Manager**, via the shared `EditableTable` component. This made RPTI rows a second-class citizen: not discoverable alongside the rest of the portfolio data, and requiring a bespoke form UI to maintain.
+RPTI (`RptiDetail`) rows were introduced in [ADR-0003](0003-rpti-report-and-application-type.md) as a report-scoped feature: the only way to create, edit, or delete a row was a dedicated form panel inside **Reports → RPTI Report** (`RptiReportView.tsx`). Every other entity in Selara (Initiatives, Assets, Applications, Dependencies, etc.) is instead edited inline as a spreadsheet-style table in **Data Manager**, via the shared `EditableTable` component. This made RPTI rows a second-class citizen: not discoverable alongside the rest of the portfolio data, and requiring a bespoke form UI to maintain.
 
 Promoting RPTI to a Data Manager tab surfaced two problems the original form's UI had absorbed for free:
 

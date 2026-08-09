@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * User Story: As a Scenia user, I want to access an in-app User Guide
+ * User Story: As a Selara user, I want to access an in-app User Guide
  * so I can learn how to use the app without leaving it.
  *
  * AC:
@@ -33,7 +33,7 @@ test.describe('In-app User Guide', () => {
   test('first page loads markdown content on open', async ({ page }) => {
     await page.getByTestId('nav-guide').click();
 
-    // Default page "What is Scenia?" should render an h1 inside the guide content area
+    // Default page "What is Selara?" should render an h1 inside the guide content area
     const guideContent = page.locator('[data-testid="guide-content"]');
     await expect(guideContent).toBeVisible({ timeout: 5000 });
     const heading = guideContent.locator('h1').first();

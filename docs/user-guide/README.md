@@ -1,6 +1,6 @@
-# Scenia User Guide
+# Selara User Guide
 
-This guide covers every feature of Scenia, written for IT portfolio managers. If you're new, follow the Quick Start path. If you know what you're looking for, jump to the Feature Reference.
+This guide covers every feature of Selara, written for IT portfolio managers. If you're new, follow the Quick Start path. If you know what you're looking for, jump to the Feature Reference.
 
 ---
 
@@ -8,7 +8,7 @@ This guide covers every feature of Scenia, written for IT portfolio managers. If
 
 Follow these three pages to get up and running quickly:
 
-1. [Getting Started](01-getting-started/what-is-scenia.md) — What Scenia is and how your data stays private
+1. [Getting Started](01-getting-started/what-is-selara.md) — What Selara is and how your data stays private
 2. [The Timeline](02-timeline/reading-the-timeline.md) — How the timeline canvas is organised
 3. [Managing Initiatives](03-initiatives/editing-an-initiative.md) — Opening the slide-in panel to update initiative details
 
@@ -20,7 +20,7 @@ Follow these three pages to get up and running quickly:
 
 | Page | Description |
 |------|-------------|
-| [What is Scenia?](01-getting-started/what-is-scenia.md) | What Scenia is and how your data stays private |
+| [What is Selara?](01-getting-started/what-is-selara.md) | What Selara is and how your data stays private |
 | [First Launch](01-getting-started/first-launch.md) | What happens when you open the app for the first time |
 | [Navigating the App](01-getting-started/navigating-the-app.md) | The four main views, global search, and keyboard shortcuts |
 

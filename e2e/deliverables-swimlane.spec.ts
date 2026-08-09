@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 /**
  * User Story: Single Deliverables Swimlane Per Asset
  *
- * As a Scenia user I want one consolidated Deliverables swimlane per IT Asset
+ * As a Selara user I want one consolidated Deliverables swimlane per IT Asset
  * (rather than one row per deliverable) so that I can add lifecycle segments
  * for any technology on a single row, and the IT Asset label spans both
  * the Initiatives and Deliverables swimlanes.

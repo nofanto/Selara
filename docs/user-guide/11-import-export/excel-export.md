@@ -2,7 +2,7 @@
 
 ![Excel export button in Data Manager](../../public/features/excel-export-data-manager.png)
 
-Exporting to Excel produces a structured `.xlsx` file containing your full portfolio data. Use this to share data with stakeholders who work outside Scenia, feed downstream reporting tools, or create an offline backup of the current state.
+Exporting to Excel produces a structured `.xlsx` file containing your full portfolio data. Use this to share data with stakeholders who work outside Selara, feed downstream reporting tools, or create an offline backup of the current state.
 
 ## How to export
 
@@ -33,7 +33,7 @@ The exported workbook contains one sheet per data type:
 
 ### Version History Preservation
 
-Unlike simple backups, Scenia's Excel export preserves your entire **Version History**. When you export:
+Unlike simple backups, Selara's Excel export preserves your entire **Version History**. When you export:
 - The **Versions** sheet captures the name, timestamp, and description of every snapshot you've saved.
 - All other data sheets include a **`versionId`** column. Rows where this is blank represent your current "live" data; rows with an ID correspond to data from a specific historical snapshot.
 

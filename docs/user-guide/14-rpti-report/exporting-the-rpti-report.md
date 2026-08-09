@@ -1,6 +1,6 @@
 # Exporting the RPTI Report
 
-The **Planned Implementation Time** column in RPTI reports which quarter a development is expected to go live. If you leave the **Quarter** column blank for an application-target row in Data Manager, Scenia fills it in automatically at export time, based on the application's lifecycle segments.
+The **Planned Implementation Time** column in RPTI reports which quarter a development is expected to go live. If you leave the **Quarter** column blank for an application-target row in Data Manager, Selara fills it in automatically at export time, based on the application's lifecycle segments.
 
 ## How the export-time quarter fallback works
 

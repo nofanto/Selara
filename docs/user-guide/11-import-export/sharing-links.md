@@ -1,6 +1,8 @@
 # Sharing Links
 
-Scenia allows you to share your current IT portfolio plan with colleagues using a secure, temporary link. This is the fastest way to collaborate without needing to export files or manage user accounts.
+> **Currently disabled.** The Share button is hidden pending Selara's own backend — inherited from Scenia, it pointed at the original author's infrastructure, which this fork doesn't control. See `SHARING_ENABLED` in `src/components/DataControls.tsx`. The rest of this page describes how the feature works once re-enabled.
+
+Selara allows you to share your current IT portfolio plan with colleagues using a secure, temporary link. This is the fastest way to collaborate without needing to export files or manage user accounts.
 
 ## How to Share
 
@@ -11,7 +13,7 @@ Scenia allows you to share your current IT portfolio plan with colleagues using 
 
 ## How to Import a Shared Link
 
-When a colleague clicks your shared link, Scenia will:
+When a colleague clicks your shared link, Selara will:
 1.  Open automatically in their browser.
 2.  Detect the share ID and encryption key in the URL.
 3.  Securely fetch and decrypt the plan.
@@ -19,10 +21,10 @@ When a colleague clicks your shared link, Scenia will:
 
 ## Zero-Knowledge Security
 
-We take your data privacy seriously. Scenia uses a **Zero-Knowledge Architecture** for sharing:
+We take your data privacy seriously. Selara uses a **Zero-Knowledge Architecture** for sharing:
 
 *   **Client-Side Encryption:** Your plan is encrypted in your browser using the **Web Crypto API (AES-GCM)** before it is ever sent to our servers.
 *   **Private Keys:** The encryption key is stored in the URL hash fragment (`#key=...`). Browsers **never** send this hash fragment to any server. 
 *   **Temporary Storage:** Shared plans are stored on our servers in an encrypted format and are automatically deleted after **1 week**.
 
-Only people with the full link (including the part after the `#`) can ever view your data. Even Scenia's administrators cannot decrypt or read your shared plans.
+Only people with the full link (including the part after the `#`) can ever view your data. Even Selara's administrators cannot decrypt or read your shared plans.

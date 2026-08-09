@@ -1,6 +1,6 @@
-# Scenia — Architecture Decision Records
+# Selara — Architecture Decision Records
 
-This directory contains Architecture Decision Records (ADRs) for the Scenia IT Portfolio Planning tool — a log of significant technical and architectural decisions, the alternatives that were considered, and why the chosen option won.
+This directory contains Architecture Decision Records (ADRs) for the Selara IT Portfolio Planning tool — a log of significant technical and architectural decisions, the alternatives that were considered, and why the chosen option won.
 
 ## When to write one
 

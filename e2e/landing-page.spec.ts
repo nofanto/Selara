@@ -20,7 +20,7 @@ test.describe('Landing Page', () => {
 
     // Verify app elements are fundamentally hiding beneath / not focusable while landing page is up
     // Actually the landing page is over them within the DOM, but let's just make sure
-    // Scenia header is in the landing page too so we look for 'Visualiser' nav
+    // Selara header is in the landing page too so we look for 'Visualiser' nav
     const visualiserButton = page.getByTestId('nav-visualiser');
 
     // Click Get Started
@@ -46,7 +46,7 @@ test.describe('Landing Page', () => {
     // GitHub link in nav header
     const navGitHubLink = page.getByRole('link', { name: 'GitHub' }).first();
     await expect(navGitHubLink).toBeVisible();
-    await expect(navGitHubLink).toHaveAttribute('href', 'https://github.com/waylonkenning/scenia');
+    await expect(navGitHubLink).toHaveAttribute('href', 'https://github.com/nofanto/Selara');
 
     // "No signup" tagline under CTA
     await expect(page.getByText('No signup. No servers. Instantly ready.').first()).toBeVisible();
@@ -76,11 +76,12 @@ test.describe('Landing Page', () => {
     await expect(exportCard).toContainText(/capacity/i);
   });
 
-  test('should display Kenning Corporation link in landing page footer', async ({ page }) => {
-    // The landing page is rendered after the app in the DOM, so its Kenning link is last
-    const kenningLink = page.getByRole('link', { name: 'Kenning Corporation Limited' }).last();
-    await expect(kenningLink).toBeVisible();
-    await expect(kenningLink).toHaveAttribute('href', 'https://kenning.co.nz');
+  test('should display fork attribution link in landing page footer', async ({ page }) => {
+    // The landing page is rendered after the app in the DOM, so its Scenia link is last
+    await expect(page.getByText('Forked from').last()).toBeVisible();
+    const sceniaLink = page.getByRole('link', { name: 'Scenia' }).last();
+    await expect(sceniaLink).toBeVisible();
+    await expect(sceniaLink).toHaveAttribute('href', 'https://github.com/waylonkenning/scenia');
   });
 });
 
@@ -98,17 +99,18 @@ test.describe('App Footer', () => {
     const footer = page.locator('footer').last();
 
     // Static text
-    await expect(footer).toContainText('Scenia IT Initiative Planner');
-    await expect(footer).toContainText('an open source tool from');
+    await expect(footer).toContainText('Selara IT Portfolio Planner');
+    await expect(footer).toContainText('an open source tool, forked from');
+    await expect(footer).toContainText('by Waylon Kenning');
 
-    // "open source" links to GitHub
+    // "open source" links to this fork's GitHub repo
     const openSourceLink = footer.getByRole('link', { name: 'open source' });
     await expect(openSourceLink).toBeVisible();
-    await expect(openSourceLink).toHaveAttribute('href', 'https://github.com/waylonkenning/scenia');
+    await expect(openSourceLink).toHaveAttribute('href', 'https://github.com/nofanto/Selara');
 
-    // "Waylon Kenning" links to kenning.co.nz
-    const kenningLink = footer.getByRole('link', { name: 'Waylon Kenning' });
-    await expect(kenningLink).toBeVisible();
-    await expect(kenningLink).toHaveAttribute('href', 'https://kenning.co.nz');
+    // "Scenia" links to the original upstream repo
+    const sceniaLink = footer.getByRole('link', { name: 'Scenia' });
+    await expect(sceniaLink).toBeVisible();
+    await expect(sceniaLink).toHaveAttribute('href', 'https://github.com/waylonkenning/scenia');
   });
 });

@@ -4,6 +4,11 @@ import { exportToExcel, importFromExcel } from '../lib/excel';
 import { SchemaIssue, validateImportSchema } from '../lib/importValidation';
 import { exportToPDF, exportToPNG } from '../lib/pdf';
 import { shareWorkspace } from '../lib/share';
+
+// The Share feature's backend (src/lib/share.ts) points at Waylon Kenning's
+// own Google Cloud Function and Firestore, inherited from Scenia. Disabled
+// until Selara has its own backend to point at — flip this once one exists.
+const SHARING_ENABLED = false;
 import { Asset, Deliverable, DeliverableSegment, DeliverableStatus, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource, Version, Decision, RptiDetail } from '../types';
 
 interface DataControlsProps {
@@ -214,16 +219,18 @@ export function DataControls({ data, onImport, onError, timelineId }: DataContro
 
   return (
     <div className="flex items-center gap-1.5 relative">
-      <button
-        data-testid="share-button"
-        onClick={handleShare}
-        disabled={isSharing}
-        className="flex items-center gap-1.5 px-2.5 py-1.5 bg-blue-50 border border-blue-200 rounded-lg text-xs font-medium text-blue-700 hover:bg-blue-100 transition-colors disabled:opacity-50"
-        title="Generate a temporary, secure share link"
-      >
-        <Share size={14} className={isSharing ? 'animate-pulse' : ''} />
-        {isSharing ? 'Sharing...' : 'Share'}
-      </button>
+      {SHARING_ENABLED && (
+        <button
+          data-testid="share-button"
+          onClick={handleShare}
+          disabled={isSharing}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 bg-blue-50 border border-blue-200 rounded-lg text-xs font-medium text-blue-700 hover:bg-blue-100 transition-colors disabled:opacity-50"
+          title="Generate a temporary, secure share link"
+        >
+          <Share size={14} className={isSharing ? 'animate-pulse' : ''} />
+          {isSharing ? 'Sharing...' : 'Share'}
+        </button>
+      )}
 
       <button
         onClick={handleExportPDF}

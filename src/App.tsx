@@ -412,7 +412,7 @@ export default function App() {
       setTemplatePickerIsReset(false);
     } catch (error) {
       console.error('Viewer import failed:', error instanceof Error ? `${error.name}: ${error.message}` : error);
-      setDbSaveError('Failed to import the file. Please check it is a valid Scenia Excel export.');
+      setDbSaveError('Failed to import the file. Please check it is a valid Selara Excel export.');
     }
   }, []);
 
@@ -694,7 +694,7 @@ export default function App() {
 
         {/* ── Mobile header ── */}
         <div data-testid="mobile-header" className="flex md:hidden items-center gap-3 px-4 py-2">
-          <h1 className="text-lg font-bold text-slate-900 tracking-tight whitespace-nowrap">Scenia</h1>
+          <h1 className="text-lg font-bold text-slate-900 tracking-tight whitespace-nowrap">Selara</h1>
           <div className="flex-1" />
           <button
             data-testid="mobile-settings-btn"
@@ -709,7 +709,7 @@ export default function App() {
         {/* ── Desktop header ── */}
         <div data-testid="desktop-header-controls" className="hidden md:flex flex-wrap items-center gap-3 px-4 py-2 overflow-x-auto">
         {/* Logo */}
-        <h1 className="text-lg font-bold text-slate-900 tracking-tight whitespace-nowrap">Scenia</h1>
+        <h1 className="text-lg font-bold text-slate-900 tracking-tight whitespace-nowrap">Selara</h1>
 
         <div className="w-px h-6 bg-slate-200 shrink-0" />
 
@@ -1480,24 +1480,25 @@ export default function App() {
       </main>
 
       <footer className="hidden md:flex flex-shrink-0 pt-2 items-center justify-center gap-1 text-xs text-slate-400">
-        Scenia IT Initiative Planner — an{' '}
+        Selara IT Portfolio Planner — an{' '}
         <a
-          href="https://github.com/waylonkenning/scenia"
+          href="https://github.com/nofanto/Selara"
           target="_blank"
           rel="noopener noreferrer"
           className="hover:text-slate-600 transition-colors"
         >
           open source
         </a>
-        {' '}tool from{' '}
+        {' '}tool, forked from{' '}
         <a
-          href="https://kenning.co.nz"
+          href="https://github.com/waylonkenning/scenia"
           target="_blank"
           rel="noopener noreferrer"
           className="hover:text-slate-600 transition-colors"
         >
-          Waylon Kenning
+          Scenia
         </a>
+        {' '}by Waylon Kenning
       </footer>
 
       {showFeatures && (

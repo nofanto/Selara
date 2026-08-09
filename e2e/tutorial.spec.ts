@@ -25,9 +25,9 @@ test.describe('Tutorial Modal', () => {
   });
 
   test('appears on first load and persists dismissed state after reload', async ({ page }) => {
-    const heading = page.getByRole('heading', { name: 'Welcome to Scenia' });
+    const heading = page.getByRole('heading', { name: 'Welcome to Selara' });
     await expect(heading).toBeVisible();
-    await expect(page.getByText('Scenia is a complete initiative planning tool')).toBeVisible();
+    await expect(page.getByText('Selara is a complete initiative planning tool')).toBeVisible();
 
     await page.getByRole('button', { name: 'Skip' }).click();
     await expect(heading).toBeHidden();
@@ -37,21 +37,21 @@ test.describe('Tutorial Modal', () => {
   });
 
   test('can be navigated forward and backward', async ({ page }) => {
-    await expect(page.getByRole('heading', { name: 'Welcome to Scenia' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Welcome to Selara' })).toBeVisible();
 
     await next(page);
     await expect(page.getByRole('heading', { name: 'The Timeline' })).toBeVisible();
 
     await page.locator('button').filter({ has: page.locator('.lucide-chevron-left') }).click();
-    await expect(page.getByRole('heading', { name: 'Welcome to Scenia' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Welcome to Selara' })).toBeVisible();
   });
 
   test('can be reopened via Tutorial button', async ({ page }) => {
     await page.getByRole('button', { name: 'Skip' }).click();
-    await expect(page.getByRole('heading', { name: 'Welcome to Scenia' })).toBeHidden();
+    await expect(page.getByRole('heading', { name: 'Welcome to Selara' })).toBeHidden();
 
     await page.getByRole('button', { name: 'Tutorial' }).click();
-    await expect(page.getByRole('heading', { name: 'Welcome to Scenia' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Welcome to Selara' })).toBeVisible();
   });
 });
 
@@ -65,7 +65,7 @@ test.describe('Tutorial Content', () => {
       localStorage.setItem('scenia_has_seen_landing', 'true');
     });
     await page.reload();
-    await expect(page.getByRole('heading', { name: 'Welcome to Scenia' })).toBeVisible({ timeout: 30000 });
+    await expect(page.getByRole('heading', { name: 'Welcome to Selara' })).toBeVisible({ timeout: 30000 });
   });
 
   test('Timeline slide mentions colour modes and critical path', async ({ page }) => {

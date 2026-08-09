@@ -2,7 +2,7 @@
 
 ![Excel import preview modal](../../public/features/excel-import-preview-modal.png)
 
-Importing an `.xlsx` file lets you load portfolio data prepared outside Scenia — from a spreadsheet maintained by another team, a migration from a legacy tool, or a bulk update prepared offline.
+Importing an `.xlsx` file lets you load portfolio data prepared outside Selara — from a spreadsheet maintained by another team, a migration from a legacy tool, or a bulk update prepared offline.
 
 ## Supported file format
 
@@ -27,7 +27,7 @@ Upload a `.xlsx` file. The importer reads the following sheets by name: **Initia
 ## Reviewing the preview
 The preview shows the parsed data before anything is written to your portfolio. Check the row counts and sample values to confirm the file was read correctly.
 
-If the file was exported from Scenia, the preview will also show the number of **History Snapshots** found. Importing these snapshots allows you to restore the full version history of the portfolio.
+If the file was exported from Selara, the preview will also show the number of **History Snapshots** found. Importing these snapshots allows you to restore the full version history of the portfolio.
 
 If any required fields are missing or unrecognised column names are found, a **Schema Warnings** panel appears above the preview listing each issue by sheet and column. Address the warnings in your spreadsheet and re-upload, or proceed if the warnings are acceptable (for example, optional fields you intentionally omitted).
 

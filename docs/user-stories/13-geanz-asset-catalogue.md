@@ -26,7 +26,7 @@ The GEANZ (Government Enterprise Architecture NZ) Technologies taxonomy defines 
 ### AC2 — Pre-populate button
 
 - [ ] Each area row label contains an "+ Add all assets" button.
-- [ ] Clicking the button adds all child assets for that area as individual Scenia `Asset` records (e.g. clicking TAP.17 adds "Narrow AI", "Machine Learning platform", etc.).
+- [ ] Clicking the button adds all child assets for that area as individual Selara `Asset` records (e.g. clicking TAP.17 adds "Narrow AI", "Machine Learning platform", etc.).
 - [ ] Each created asset has its GEANZ `alias` (e.g. `TAP.17.01`) and `name` stored.
 - [ ] After pre-populating, the area row collapses/disappears and the newly created asset swimlanes appear in its place.
 - [ ] The button displays the count of assets that will be added, e.g. "+ Add all 6 assets".

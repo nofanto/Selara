@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 /**
  * User Story: Tap-to-Select for Segments and Initiatives
  *
- * As a Scenia user on any device (including iPad/touch), I want to tap or
+ * As a Selara user on any device (including iPad/touch), I want to tap or
  * click a segment or initiative to select it, so that I can see visible
  * affordance handles that show me what interactions are available — resize
  * left/right, resize taller/shorter, move up/down a row — without needing

@@ -2,7 +2,7 @@
 
 ![Mobile settings bottom sheet open on a phone screen](../../public/features/mobile-settings-sheet.png)
 
-The mobile settings sheet provides quick access to display and filtering options when using Scenia on a phone. It replaces the desktop toolbar controls, which are hidden on mobile viewports.
+The mobile settings sheet provides quick access to display and filtering options when using Selara on a phone. It replaces the desktop toolbar controls, which are hidden on mobile viewports.
 
 ## Opening and closing the sheet
 

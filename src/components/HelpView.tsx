@@ -19,7 +19,7 @@ const SECTIONS: GuideSection[] = [
   {
     title: 'Getting Started',
     pages: [
-      { title: 'What is Scenia?',    path: '01-getting-started/what-is-scenia' },
+      { title: 'What is Selara?',    path: '01-getting-started/what-is-selara' },
       { title: 'First Launch',       path: '01-getting-started/first-launch' },
       { title: 'Navigating the App', path: '01-getting-started/navigating-the-app' },
     ],

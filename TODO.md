@@ -123,19 +123,19 @@ The refactor below consolidates all groupBy modes into a single rendering path.
 ### Completed
 - [x] Fix newly-created initiative showing "Create Initiative" title and no Delete button when re-opened (US-BUG-01)
 - [x] Fix Data Manager initiatives table not scrollable with many rows (missing min-h-0)
-- [x] Scenia review bug: mobile card view hides overlapping initiatives (PR #61)
-- [x] Scenia review bug: viewer file input is not reset after selection (PR #62)
-- [x] Scenia review bug: dependency rendering silently deduplicates/truncates records (PR #51)
-- [x] Scenia review bug: arrow corridor click reliability / brittle selection test (PR #63)
-- [x] Scenia review bug: shared link decryption message clarity (PR #64)
-- [x] Scenia review bug: Playwright tests using hard-coded localhost URLs (PR #65)
-- [x] Scenia review bug: timeline sidebar resize + persistence (PR #66)
-- [x] Scenia review bug: DataManager deletes cascade application records and applicationSegments
-- [x] Scenia review bug: save race in App.tsx no longer allows stale IndexedDB writes to win during rapid edits
-- [x] Scenia review bug: empty-workspace detection is too narrow and can show the first-run picker incorrectly
-- [x] Scenia review bug: import validation accepts structurally broken initiatives as warnings instead of errors
+- [x] Selara review bug: mobile card view hides overlapping initiatives (PR #61)
+- [x] Selara review bug: viewer file input is not reset after selection (PR #62)
+- [x] Selara review bug: dependency rendering silently deduplicates/truncates records (PR #51)
+- [x] Selara review bug: arrow corridor click reliability / brittle selection test (PR #63)
+- [x] Selara review bug: shared link decryption message clarity (PR #64)
+- [x] Selara review bug: Playwright tests using hard-coded localhost URLs (PR #65)
+- [x] Selara review bug: timeline sidebar resize + persistence (PR #66)
+- [x] Selara review bug: DataManager deletes cascade application records and applicationSegments
+- [x] Selara review bug: save race in App.tsx no longer allows stale IndexedDB writes to win during rapid edits
+- [x] Selara review bug: empty-workspace detection is too narrow and can show the first-run picker incorrectly
+- [x] Selara review bug: import validation accepts structurally broken initiatives as warnings instead of errors
 
-### Remaining Scenia review bugs
+### Remaining Selara review bugs
 - [x] Empty-workspace detection is too narrow and can show the first-run picker incorrectly
 - [x] Import validation accepts structurally broken initiatives as warnings instead of errors
 - [x] Version diffing misses major categories of workspace changes

@@ -1,5 +1,5 @@
 /**
- * Zero-knowledge encryption module for Scenia.
+ * Zero-knowledge encryption module for Selara.
  * Uses the native Web Crypto API (AES-GCM) to encrypt data client-side.
  * The encryption key is never sent to the server.
  */

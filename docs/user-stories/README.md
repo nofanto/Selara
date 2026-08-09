@@ -1,6 +1,6 @@
-# Scenia — User Stories
+# Selara — User Stories
 
-This directory contains all user stories for the Scenia IT Portfolio Planning tool.
+This directory contains all user stories for the Selara IT Portfolio Planning tool.
 Stories are grouped by feature domain. Acceptance criteria are derived from
 the Playwright E2E test suite (`e2e/`) and `PLAYWRIGHT_TODO.md`.
 
