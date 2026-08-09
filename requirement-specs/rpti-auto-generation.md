@@ -44,12 +44,19 @@
 
 ## Open questions
 
-### Strategy/Programme generation filter — what should step 3 actually check?
+### 1. Strategy/Programme generation filter — what should step 3 actually check?
 
 Original framing: initiatives should be "triggered by an Initiative that belongs to a Strategy or Programme." But `Initiative.programmeId` is already **mandatory** on every real Initiative — you can't create one without a Programme. So this is trivially already true except for `isPlaceholder` initiatives (empty markers, not real work), which step 3 doesn't currently exclude. Two different things this could mean:
 
 - **(a) Exclude `isPlaceholder` initiatives from generation** — a straightforward correctness fix; every other initiative already has a Programme by construction.
 - **(b) Additionally require `strategyId` to be set** (optional today) — a stricter filter: only initiatives explicitly aligned to a Strategy, not just any Programme-bucketed work, generate rows. Would exclude real initiatives that never got a Strategy tag.
+
+### 2. Dev Type accuracy — fix the single-year-only "new vs. upgrade" check?
+
+Today's classification (rule 2/4 above) only looks *within the single report year* — a documented "deliberate simplification." Practically: if a deliverable went live in 2023, and this year it gets a `planned` segment for an enhancement with no `in-production` segment in the *same* report year, generation currently marks it `'new'` — wrong, it's an upgrade to something already live.
+
+- **Fix now:** add a lightweight "has this deliverable ever had a live segment, in any year" lookup, used only for the new/upgrade signal — doesn't pull extra rows across years, just corrects the classification.
+- **Defer:** keep today's documented simplification for now; revisit once the auto-fill changes in `requirement-specs/rpti-auto-fill-improvements.md` are in and tested on their own.
 
 To be addressed later, alongside the auto-fill work in `requirement-specs/rpti-auto-fill-improvements.md`.
 
