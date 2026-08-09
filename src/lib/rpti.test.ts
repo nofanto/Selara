@@ -96,6 +96,29 @@ describe('generateRptiDetails', () => {
     expect(rows[0]).toMatchObject({ developmentType: 'upgrade', deliverableSegmentId: 'seg-prod' });
   });
 
+  it('classifies as "upgrade" when the deliverable already went live in a prior year, even with only a planned segment this year', () => {
+    const segments = [
+      makeSegment({ id: 'seg-went-live-2025', status: 'appstatus-in-production', startDate: '2025-01-01', endDate: '2025-06-01' }),
+      makeSegment({ id: 'seg-planned-2026', status: 'appstatus-planned', startDate: '2026-02-01', endDate: '2026-03-01' }),
+    ];
+    const rows = generateRptiDetails(segments, statuses, [makeInitiative()], 2026);
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ developmentType: 'upgrade', deliverableSegmentId: 'seg-planned-2026' });
+  });
+
+  it('checks prior-live history deliverable-wide, regardless of which initiative drove the earlier go-live', () => {
+    const segments = [
+      makeSegment({ id: 'seg-went-live-2025', initiativeId: 'init-2', status: 'appstatus-in-production', startDate: '2025-01-01', endDate: '2025-06-01' }),
+      makeSegment({ id: 'seg-planned-2026', initiativeId: 'init-1', status: 'appstatus-planned', startDate: '2026-02-01', endDate: '2026-03-01' }),
+    ];
+    const initiatives = [makeInitiative({ id: 'init-1' }), makeInitiative({ id: 'init-2' })];
+    const rows = generateRptiDetails(segments, statuses, initiatives, 2026);
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ initiativeId: 'init-1', developmentType: 'upgrade' });
+  });
+
   it('excludes sunset, out-of-support, and retired segments entirely', () => {
     const segments = [
       makeSegment({ id: 'seg-sunset', status: 'appstatus-sunset', startDate: '2026-02-01' }),

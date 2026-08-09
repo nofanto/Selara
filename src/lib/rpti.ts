@@ -79,6 +79,18 @@ export function generateRptiDetails(
   // can carry a dangling reference to an initiative that no longer exists — skip those.
   const initiativeIds = new Set(initiatives.map(i => i.id));
 
+  // A deliverable that already went live in a prior, non-overlapping year already
+  // exists — a planned/funded segment this year is an upgrade to it, not a
+  // first-ever "new" build, regardless of which initiative is now touching it.
+  // Deliberately deliverable-wide (not filtered by initiativeId): "has this ever
+  // gone live" is a fact about the deliverable, not about who's working on it now.
+  const hasPriorLiveSegment = (deliverableId: string): boolean =>
+    deliverableSegments.some(seg =>
+      seg.deliverableId === deliverableId &&
+      seg.endDate < yearStart &&
+      classifySegmentKind(seg.status, deliverableStatuses) === 'live'
+    );
+
   const qualifying = deliverableSegments
     .filter(seg => !!seg.initiativeId && initiativeIds.has(seg.initiativeId) && overlapsReportYear(seg))
     .map(seg => ({ segment: seg, kind: classifySegmentKind(seg.status, deliverableStatuses) }))
@@ -101,7 +113,8 @@ export function generateRptiDetails(
     const newItems = items.filter(i => i.kind === 'new').sort(byStartDateAsc);
     const liveItems = items.filter(i => i.kind === 'live').sort(byStartDateAsc);
 
-    const developmentType: RptiDetail['developmentType'] = newItems.length > 0 ? 'new' : 'upgrade';
+    const developmentType: RptiDetail['developmentType'] =
+      newItems.length > 0 && !hasPriorLiveSegment(deliverableId) ? 'new' : 'upgrade';
     const anchor = newItems.length > 0
       ? (liveItems.length > 0 ? liveItems[liveItems.length - 1] : newItems[newItems.length - 1])
       : liveItems[liveItems.length - 1];
