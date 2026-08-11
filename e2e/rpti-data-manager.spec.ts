@@ -265,10 +265,18 @@ test.describe('RPTI Data Manager tab', () => {
     await page.getByTestId('confirm-modal-confirm').click();
     await page.waitForTimeout(300);
 
+    // Demo data itself now has several deliverable segments linked to initiatives (to
+    // exercise RPTI auto-fill), so Generate produces more than just this test's own row —
+    // find it by targetId rather than assuming it's the only one.
     const rows = page.locator('[data-testid="data-manager"] tbody tr[data-real="true"]');
-    await expect(rows).toHaveCount(1);
-    const row = rows.first();
-    await expect(row.locator('td[data-key="targetId"] select')).toHaveValue(deliverableId);
+    const targetSelects = rows.locator('td[data-key="targetId"] select');
+    const count = await targetSelects.count();
+    let matchIndex = -1;
+    for (let i = 0; i < count; i++) {
+      if ((await targetSelects.nth(i).inputValue()) === deliverableId) { matchIndex = i; break; }
+    }
+    expect(matchIndex).toBeGreaterThanOrEqual(0);
+    const row = rows.nth(matchIndex);
     await expect(row.locator('td[data-key="developmentType"] select')).toHaveValue('upgrade');
     await expect(row.locator('td[data-key="plannedImplementationQuarter"] select')).toHaveValue('Q3');
   });
@@ -344,10 +352,18 @@ test.describe('RPTI Data Manager tab', () => {
     await page.getByTestId('confirm-modal-confirm').click();
     await page.waitForTimeout(300);
 
+    // Demo data itself now has several deliverable segments linked to initiatives (to
+    // exercise RPTI auto-fill), so Generate produces more than just this test's own row —
+    // find it by targetId rather than assuming it's the only one.
     const rows = page.locator('[data-testid="data-manager"] tbody tr[data-real="true"]');
-    await expect(rows).toHaveCount(1);
-    const row = rows.first();
-    await expect(row.locator('td[data-key="targetId"] select')).toHaveValue(deliverableId);
+    const targetSelects = rows.locator('td[data-key="targetId"] select');
+    const count = await targetSelects.count();
+    let matchIndex = -1;
+    for (let i = 0; i < count; i++) {
+      if ((await targetSelects.nth(i).inputValue()) === deliverableId) { matchIndex = i; break; }
+    }
+    expect(matchIndex).toBeGreaterThanOrEqual(0);
+    const row = rows.nth(matchIndex);
     // Category has no per-Deliverable override in this test, so it comes from AssetCategory.
     await expect(row.locator('td[data-key="categoryCode"] select')).toHaveValue('06');
     // Developer is Deliverable-only; ppjtiRelatedParty auto-fills to n/a since it isn't PPJTI.

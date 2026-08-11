@@ -21,12 +21,16 @@ export const demoTimelineSettings: TimelineSettings = {
     showRelationships: 'on',
     collapsedGroups: [],
     sidebarWidth: 256,
+    defaultCurrency: 'IDR',
 };
 
 export const demoAssetCategories: AssetCategory[] = [
-    { id: 'cat-iam', name: 'Identity & Access Management', order: 1 },
+    // categoryCode/DC-DR fields are RPTI defaults: a Deliverable's own values (set below)
+    // override these per field. Not every category needs one — cat-data/cat-core/cat-cloud/
+    // cat-int are left without RPTI defaults, same as a category legitimately can be.
+    { id: 'cat-iam', name: 'Identity & Access Management', order: 1, categoryCode: '12', dcCity: 'Jakarta', dcCountry: 'Indonesia', drCity: 'Bandung', drCountry: 'Indonesia' },
     { id: 'cat-data', name: 'Data Platform', order: 2 },
-    { id: 'cat-channel', name: 'Customer Channels', order: 3 },
+    { id: 'cat-channel', name: 'Customer Channels', order: 3, categoryCode: '06', dcCity: 'Jakarta', dcCountry: 'Indonesia', drCity: 'Surabaya', drCountry: 'Indonesia' },
     { id: 'cat-core', name: 'Core Banking', order: 4 },
     { id: 'cat-cloud', name: 'Cloud Infrastructure', order: 5 },
     { id: 'cat-int', name: 'Integration & APIs', order: 6 },
@@ -117,39 +121,50 @@ export const demoAssets: Asset[] = [
 ];
 
 export const demoDeliverables: Deliverable[] = [
-    // Customer IAM (CIAM) — a-ciam
-    { id: 'app-okta', assetId: 'a-ciam', name: 'Okta' },
+    // Customer IAM (CIAM) — a-ciam / cat-iam (RPTI default categoryCode '12', DC Jakarta/DR Bandung)
+    // Both Okta and Keycloak override categoryCode to '01' (customer-facing, not the category's
+    // internal-management default) — demonstrating why a category default alone isn't always enough.
+    { id: 'app-okta', assetId: 'a-ciam', name: 'Okta', categoryCode: '01', developer: 'inhouse' },
     { id: 'app-azuread', assetId: 'a-ciam', name: 'Azure AD B2C' },
-    { id: 'app-keycloak', assetId: 'a-ciam', name: 'Keycloak' },
+    // Keycloak overrides categoryCode + dcCity/dcCountry, but leaves drCity/drCountry
+    // unset — those two fall back to cat-iam's Bandung/Indonesia default.
+    { id: 'app-keycloak', assetId: 'a-ciam', name: 'Keycloak', categoryCode: '01', developer: 'PPJTI', dcCity: 'Singapore', dcCountry: 'Singapore' },
     // Internet Banking — a-web
     { id: 'app-angular', assetId: 'a-web', name: 'Angular Frontend' },
     { id: 'app-bff', assetId: 'a-web', name: 'BFF Service' },
-    // Mobile Banking App — a-mobile
+    // Mobile Banking App — a-mobile / cat-channel (RPTI default categoryCode '06', DC Jakarta/DR Surabaya)
     { id: 'app-ios', assetId: 'a-mobile', name: 'iOS App' },
     { id: 'app-android', assetId: 'a-mobile', name: 'Android App' },
-    { id: 'app-rn', assetId: 'a-mobile', name: 'React Native Shell' },
+    // React Native Shell sets only developer — categoryCode and all four location fields are
+    // left unset, so every one of them falls back to cat-channel's category-level default.
+    { id: 'app-rn', assetId: 'a-mobile', name: 'React Native Shell', developer: 'inhouse' },
     // ── GEANZ asset deliverables ──────────────────────────────────────────────
+    // The shared GEANZ asset category has no AssetCategory record backing it (see
+    // GEANZ_CATEGORY_ID), so these set categoryCode/developer/location directly —
+    // a deliverable-only default, the same way Developer always works everywhere.
     { id: 'app-gz-fmis',    assetId: 'gz-fmis',    name: 'Financial Management Information System' },
-    { id: 'app-gz-authn',   assetId: 'gz-authn',   name: 'Authentication' },
-    { id: 'app-gz-email',   assetId: 'gz-email',   name: 'Email applications' },
-    { id: 'app-gz-iaas',    assetId: 'gz-iaas',    name: 'Infrastructure as a Service (IaaS)', type: 'infrastructure' },
+    { id: 'app-gz-authn',   assetId: 'gz-authn',   name: 'Authentication', categoryCode: '54', developer: 'inhouse', dcCity: 'Jakarta', dcCountry: 'Indonesia', drCity: 'Surabaya', drCountry: 'Indonesia' },
+    { id: 'app-gz-email',   assetId: 'gz-email',   name: 'Email applications', categoryCode: '12', developer: 'PPJTI', dcCity: 'Jakarta', dcCountry: 'Indonesia', drCity: 'Surabaya', drCountry: 'Indonesia' },
+    { id: 'app-gz-iaas',    assetId: 'gz-iaas',    name: 'Infrastructure as a Service (IaaS)', type: 'infrastructure', categoryCode: '52', developer: 'PPJTI', dcCity: 'Singapore', dcCountry: 'Singapore', drCity: 'Jakarta', drCountry: 'Indonesia' },
     { id: 'app-gz-gesb',    assetId: 'gz-gesb',    name: 'Enterprise Service Bus (ESB)', type: 'infrastructure' },
-    { id: 'app-gz-siem',    assetId: 'gz-siem',    name: 'Security Incident and Event Management' },
+    { id: 'app-gz-siem',    assetId: 'gz-siem',    name: 'Security Incident and Event Management', categoryCode: '54', developer: 'inhouse', dcCity: 'Jakarta', dcCountry: 'Indonesia', drCity: 'Surabaya', drCountry: 'Indonesia' },
     { id: 'app-gz-portal',  assetId: 'gz-portal',  name: 'Customer Portal Application Service' },
     { id: 'app-gz-itsm',    assetId: 'gz-itsm',    name: 'ICT Service Management (ITSM)' },
     { id: 'app-gz-apimgmt', assetId: 'gz-apimgmt', name: 'API Management' },
 ];
 
 export const demoDeliverableSegments: DeliverableSegment[] = [
-    // Okta — in production across the full visible range
-    { id: 'seg-okta-prod', deliverableId: 'app-okta', status: 'appstatus-in-production', startDate: relDate(-1, 1, 1), endDate: relDate(2, 12, 31) },
+    // Okta — in production across the full visible range; linked to the Passkey Rollout
+    // initiative (RPTI generation treats this as an 'upgrade' — Okta's already live).
+    { id: 'seg-okta-prod', deliverableId: 'app-okta', status: 'appstatus-in-production', startDate: relDate(-1, 1, 1), endDate: relDate(2, 12, 31), initiativeId: 'i-ciam-passkey' },
     // Azure AD B2C — in production, then sunset as CIAM migrates to Okta
     { id: 'seg-azuread-prod', deliverableId: 'app-azuread', status: 'appstatus-in-production', startDate: relDate(-1, 1, 1), endDate: relDate(0, 6, 30) },
     { id: 'seg-azuread-sunset', deliverableId: 'app-azuread', status: 'appstatus-sunset', startDate: relDate(0, 7, 1), endDate: relDate(1, 6, 30) },
     { id: 'seg-azuread-oos', deliverableId: 'app-azuread', status: 'appstatus-out-of-support', startDate: relDate(1, 7, 1), endDate: relDate(2, 6, 30) },
-    // Keycloak — planned then funded as a potential alternative
-    { id: 'seg-keycloak-planned', deliverableId: 'app-keycloak', status: 'appstatus-planned', startDate: relDate(0, 1, 1), endDate: relDate(0, 9, 30) },
-    { id: 'seg-keycloak-funded', deliverableId: 'app-keycloak', status: 'appstatus-funded', startDate: relDate(0, 10, 1), endDate: relDate(1, 12, 31) },
+    // Keycloak — planned then funded as a potential alternative; linked to SSO Consolidation
+    // (RPTI generation treats this as 'new' — Keycloak has never gone live).
+    { id: 'seg-keycloak-planned', deliverableId: 'app-keycloak', status: 'appstatus-planned', startDate: relDate(0, 1, 1), endDate: relDate(0, 9, 30), initiativeId: 'i-ciam-sso' },
+    { id: 'seg-keycloak-funded', deliverableId: 'app-keycloak', status: 'appstatus-funded', startDate: relDate(0, 10, 1), endDate: relDate(1, 12, 31), initiativeId: 'i-ciam-sso' },
     // Angular Frontend — long-running in production
     { id: 'seg-angular-prod', deliverableId: 'app-angular', status: 'appstatus-in-production', startDate: relDate(-1, 1, 1), endDate: relDate(2, 12, 31) },
     // BFF Service — in production, moving to sunset as architecture evolves
@@ -160,10 +175,11 @@ export const demoDeliverableSegments: DeliverableSegment[] = [
     { id: 'seg-ios-sunset', deliverableId: 'app-ios', status: 'appstatus-sunset', startDate: relDate(1, 7, 1), endDate: relDate(2, 6, 30) },
     // Android App — in production throughout
     { id: 'seg-android-prod', deliverableId: 'app-android', status: 'appstatus-in-production', startDate: relDate(-1, 1, 1), endDate: relDate(2, 12, 31) },
-    // React Native Shell — planned, funded, then in production as consolidation succeeds
-    { id: 'seg-rn-planned', deliverableId: 'app-rn', status: 'appstatus-planned', startDate: relDate(0, 1, 1), endDate: relDate(0, 6, 30) },
-    { id: 'seg-rn-funded', deliverableId: 'app-rn', status: 'appstatus-funded', startDate: relDate(0, 7, 1), endDate: relDate(1, 3, 31) },
-    { id: 'seg-rn-prod', deliverableId: 'app-rn', status: 'appstatus-in-production', startDate: relDate(1, 4, 1), endDate: relDate(2, 12, 31) },
+    // React Native Shell — planned, funded, then in production as consolidation succeeds;
+    // all three linked to the React Native Rewrite initiative that drives the whole lifecycle.
+    { id: 'seg-rn-planned', deliverableId: 'app-rn', status: 'appstatus-planned', startDate: relDate(0, 1, 1), endDate: relDate(0, 6, 30), initiativeId: 'i-mobile-rn' },
+    { id: 'seg-rn-funded', deliverableId: 'app-rn', status: 'appstatus-funded', startDate: relDate(0, 7, 1), endDate: relDate(1, 3, 31), initiativeId: 'i-mobile-rn' },
+    { id: 'seg-rn-prod', deliverableId: 'app-rn', status: 'appstatus-in-production', startDate: relDate(1, 4, 1), endDate: relDate(2, 12, 31), initiativeId: 'i-mobile-rn' },
 
     // ── GEANZ asset lifecycle segments ────────────────────────────────────────
     // FMIS — in production, migrating to cloud
@@ -171,15 +187,15 @@ export const demoDeliverableSegments: DeliverableSegment[] = [
     { id: 'seg-gz-fmis-sunset',    deliverableId: 'app-gz-fmis',    status: 'appstatus-sunset',        startDate: relDate(1, 4, 1),  endDate: relDate(2, 6, 30), row: 1 },
     // Authentication — current platform phasing out, replacement being funded
     { id: 'seg-gz-authn-prod',     deliverableId: 'app-gz-authn',   status: 'appstatus-in-production', startDate: relDate(-1, 1, 1), endDate: relDate(0, 6, 30) },
-    { id: 'seg-gz-authn-funded',   deliverableId: 'app-gz-authn',   status: 'appstatus-funded',        startDate: relDate(0, 1, 1),  endDate: relDate(0, 6, 30), row: 1 },
+    { id: 'seg-gz-authn-funded',   deliverableId: 'app-gz-authn',   status: 'appstatus-funded',        startDate: relDate(0, 1, 1),  endDate: relDate(0, 6, 30), row: 1, initiativeId: 'i-gz-authn-mfa' },
     { id: 'seg-gz-authn-new-prod', deliverableId: 'app-gz-authn',   status: 'appstatus-in-production', startDate: relDate(0, 7, 1),  endDate: relDate(2, 12, 31), row: 1 },
     // Email — legacy mail in production, M365 funded and going live
     { id: 'seg-gz-email-legacy',   deliverableId: 'app-gz-email',   status: 'appstatus-in-production', startDate: relDate(-1, 1, 1), endDate: relDate(0, 6, 30) },
-    { id: 'seg-gz-email-m365-fd',  deliverableId: 'app-gz-email',   status: 'appstatus-funded',        startDate: relDate(0, 1, 1),  endDate: relDate(0, 5, 31), row: 1 },
+    { id: 'seg-gz-email-m365-fd',  deliverableId: 'app-gz-email',   status: 'appstatus-funded',        startDate: relDate(0, 1, 1),  endDate: relDate(0, 5, 31), row: 1, initiativeId: 'i-gz-email-m365' },
     { id: 'seg-gz-email-m365',     deliverableId: 'app-gz-email',   status: 'appstatus-in-production', startDate: relDate(0, 7, 1),  endDate: relDate(2, 12, 31), row: 1 },
     // IaaS — on-prem datacentre running down as cloud ramps up
     { id: 'seg-gz-iaas-onprem',    deliverableId: 'app-gz-iaas',    status: 'appstatus-in-production', startDate: relDate(-1, 1, 1), endDate: relDate(1, 6, 30) },
-    { id: 'seg-gz-iaas-cloud-fd',  deliverableId: 'app-gz-iaas',    status: 'appstatus-funded',        startDate: relDate(0, 1, 1),  endDate: relDate(1, 6, 30), row: 1 },
+    { id: 'seg-gz-iaas-cloud-fd',  deliverableId: 'app-gz-iaas',    status: 'appstatus-funded',        startDate: relDate(0, 1, 1),  endDate: relDate(1, 6, 30), row: 1, initiativeId: 'i-gz-iaas-migration' },
     { id: 'seg-gz-iaas-sunset',    deliverableId: 'app-gz-iaas',    status: 'appstatus-sunset',        startDate: relDate(1, 7, 1),  endDate: relDate(2, 6, 30) },
     { id: 'seg-gz-iaas-cloud',     deliverableId: 'app-gz-iaas',    status: 'appstatus-in-production', startDate: relDate(1, 7, 1),  endDate: relDate(2, 12, 31), row: 1 },
     // Enterprise Service Bus — production until retirement
@@ -187,7 +203,7 @@ export const demoDeliverableSegments: DeliverableSegment[] = [
     { id: 'seg-gz-gesb-sunset',    deliverableId: 'app-gz-gesb',    status: 'appstatus-sunset',        startDate: relDate(1, 1, 1),  endDate: relDate(2, 12, 31), row: 1 },
     // SIEM — platform upgrade in progress
     { id: 'seg-gz-siem-prod',      deliverableId: 'app-gz-siem',    status: 'appstatus-in-production', startDate: relDate(-1, 1, 1), endDate: relDate(0, 12, 31) },
-    { id: 'seg-gz-siem-funded',    deliverableId: 'app-gz-siem',    status: 'appstatus-funded',        startDate: relDate(0, 7, 1),  endDate: relDate(1, 3, 31), row: 1 },
+    { id: 'seg-gz-siem-funded',    deliverableId: 'app-gz-siem',    status: 'appstatus-funded',        startDate: relDate(0, 7, 1),  endDate: relDate(1, 3, 31), row: 1, initiativeId: 'i-gz-siem-upgrade' },
     { id: 'seg-gz-siem-new',       deliverableId: 'app-gz-siem',    status: 'appstatus-in-production', startDate: relDate(1, 4, 1),  endDate: relDate(2, 12, 31), row: 1 },
     // Customer Portal — long-running production service
     { id: 'seg-gz-portal-prod',    deliverableId: 'app-gz-portal',  status: 'appstatus-in-production', startDate: relDate(-1, 1, 1), endDate: relDate(2, 12, 31) },
