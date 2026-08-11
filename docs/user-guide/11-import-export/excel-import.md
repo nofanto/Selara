@@ -6,7 +6,7 @@ Importing an `.xlsx` file lets you load portfolio data prepared outside Selara �
 
 ## Supported file format
 
-Upload a `.xlsx` file. The importer reads the following sheets by name: **Initiatives**, **Assets**, **Programmes**, **Strategies**, **Milestones**. Sheets with unrecognised names are ignored. Column headers must match the expected field names; the schema warnings panel reports any mismatches (see below).
+Upload a `.xlsx` file. The importer reads the following sheets by name: **Initiatives**, **Assets**, **AssetCategories**, **Programmes**, **Strategies**, **Milestones**, **Dependencies**, **Deliverables**, **DeliverableSegments**, **DeliverableStatuses**, **Resources**, **RptiDetails**, **TimelineSettings**, **Versions**. Sheets with unrecognised names are ignored. Column headers must match the expected field names; the schema warnings panel reports any mismatches (see below).
 
 ## Uploading a file
 
@@ -21,11 +21,9 @@ Upload a `.xlsx` file. The importer reads the following sheets by name: **Initia
 1. Open the **Data Manager** panel.
 2. Click **Import Excel**.
 3. Select your `.xlsx` file. The **Import Preview** modal opens.
-| **Dependencies** | All initiative dependency relationships |
-| **Versions** | Historical snapshots |
 
 ## Reviewing the preview
-The preview shows the parsed data before anything is written to your portfolio. Check the row counts and sample values to confirm the file was read correctly.
+The preview shows the parsed data before anything is written to your portfolio, with a row count per sheet found — Initiatives, Assets, Deliverables, Deliverable Segments, Deliverable Statuses, Resources, Categories, RPTI Details, and more. Check the row counts and sample values to confirm the file was read correctly.
 
 If the file was exported from Selara, the preview will also show the number of **History Snapshots** found. Importing these snapshots allows you to restore the full version history of the portfolio.
 
@@ -64,13 +62,13 @@ The modal offers two modes:
 
 - Initiatives and other records with an `id` matching an existing record are updated in place.
 - Records with new `id` values are added.
-- Existing records whose `id` does not appear in the file are left untouched.
+- Existing records whose `id` does not appear in the file are left untouched — this includes RPTI Detail rows: merging a file with no **RptiDetails** sheet leaves your existing RPTI report data exactly as it was.
 
 Use **Merge Data** when your file contains a partial update or additions to an existing portfolio.
 
 ### Overwrite All Data
 
-- All current portfolio data is replaced with the contents of the file.
+- All current portfolio data is replaced with the contents of the file, including RPTI Detail rows.
 - Records not present in the file are deleted.
 
 Use **Overwrite All Data** when the file represents the complete intended state of the portfolio.

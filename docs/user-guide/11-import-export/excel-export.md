@@ -18,18 +18,19 @@ The exported workbook contains one sheet per data type:
 | Sheet | Contents |
 |---|---|
 | **Initiatives** | All initiatives with their fields (including CapEx and OpEx) |
-| **Assets** | All application assets |
-| **AssetCategories** | All asset category groupings |
+| **Assets** | All assets |
+| **AssetCategories** | All asset category groupings, including their default RPTI category code and DC/DR location |
 | **Programmes** | All programmes |
 | **Strategies** | All strategies |
 | **Milestones** | All milestones |
 | **Dependencies** | All initiative dependency relationships |
-| **Applications** | All applications linked to assets |
-| **ApplicationSegments** | All application lifecycle segments |
-| **ApplicationStatuses** | All named status labels for segments |
+| **Deliverables** | All deliverables linked to assets, including their RPTI category/developer/DC-DR overrides |
+| **DeliverableSegments** | All deliverable lifecycle segments |
+| **DeliverableStatuses** | All named status labels for segments |
 | **Resources** | All people and roles in the resources roster |
+| **RptiDetails** | A raw backup copy of every RPTI report row (see [Recording an RPTI Row](../14-rpti-report/recording-an-rpti-row.md)) — separate from the formatted "Format 3.1" report export |
 | **Versions** | Metadata for all saved history snapshots |
-| **TimelineSettings** | Configuration settings (zoom, start date, toggles) for the current state and snapshots |
+| **TimelineSettings** | Configuration settings (zoom, start date, default currency, toggles) for the current state and snapshots |
 
 ### Version History Preservation
 

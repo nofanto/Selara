@@ -172,6 +172,8 @@ export function DataControls({ data, onImport, onError, timelineId }: DataContro
       timelineSettings: importPreviewData.timelineSettings || data.timelineSettings,
       resources: importPreviewData.resources || [],
       versions: importPreviewData.versions || [],
+      decisions: importPreviewData.decisions || [],
+      rptiDetails: importPreviewData.rptiDetails || [],
     });
     setShowImportModal(false);
     setImportPreviewData(null);
@@ -210,6 +212,8 @@ export function DataControls({ data, onImport, onError, timelineId }: DataContro
       timelineSettings: importPreviewData.timelineSettings || data.timelineSettings,
       resources: mergeArrays(data.resources, importPreviewData.resources),
       versions: mergeArrays(data.versions || [], importPreviewData.versions || []),
+      decisions: mergeArrays(data.decisions || [], importPreviewData.decisions),
+      rptiDetails: mergeArrays(data.rptiDetails || [], importPreviewData.rptiDetails),
     });
     setShowImportModal(false);
     setImportPreviewData(null);
@@ -394,6 +398,8 @@ export function DataControls({ data, onImport, onError, timelineId }: DataContro
               {importPreviewData.milestones && <li><span className="font-semibold">{importPreviewData.milestones.length}</span> Milestones</li>}
               {importPreviewData.dependencies && <li><span className="font-semibold">{importPreviewData.dependencies.length}</span> Dependencies</li>}
               {importPreviewData.assetCategories && <li><span className="font-semibold">{importPreviewData.assetCategories.length}</span> Categories</li>}
+              {importPreviewData.rptiDetails && importPreviewData.rptiDetails.length > 0 && <li><span className="font-semibold">{importPreviewData.rptiDetails.length}</span> RPTI Details</li>}
+              {importPreviewData.decisions && importPreviewData.decisions.length > 0 && <li><span className="font-semibold">{importPreviewData.decisions.length}</span> Decisions</li>}
               {importPreviewData.versions && importPreviewData.versions.length > 0 && <li><span className="font-semibold text-indigo-600">{importPreviewData.versions.length}</span> History Snapshots</li>}
             </ul>
 
