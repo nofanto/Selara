@@ -44,6 +44,21 @@ interface EditableTableProps<T> {
   onColumnResize?: (columnKey: string, newWidth: string) => void;
 }
 
+function getCellTitle<T>(row: T & { [key: string]: any }, col: Column<T>): string | undefined {
+  const value = row[col.key as string];
+  if (value === null || value === undefined || value === '') return undefined;
+
+  if (col.type === 'select' && col.options) {
+    return col.options.find(o => String(o.value) === String(value))?.label ?? String(value);
+  }
+  if (col.type === 'color') {
+    return COLORS.find(c => c.value === String(value))?.name;
+  }
+  if (col.type === 'boolean') return undefined;
+
+  return String(value);
+}
+
 function splitCsvLine(line: string): string[] {
   const values: string[] = [];
   let current = '';
@@ -532,13 +547,16 @@ export function EditableTable<T extends { [key: string]: any }>({
             {sortedRows.map(({ row, originalIndex }) => {
               return (
                 <tr key={`${String(row[idField])}-${originalIndex}`} data-real="true" data-id={String(row[idField])} className="hover:bg-slate-50 group">
-                  {columns.map((col) => (
-                    <td key={`${String(row[idField])}-${originalIndex}-${String(col.key)}`} data-key={String(col.key)} data-testid={col.cellTestId} className="border-b border-r border-slate-100 last:border-r-0 p-0 relative">
+                  {columns.map((col) => {
+                    const cellTitle = getCellTitle(row, col);
+                    return (
+                    <td key={`${String(row[idField])}-${originalIndex}-${String(col.key)}`} data-key={String(col.key)} data-testid={col.cellTestId} title={cellTitle} className="border-b border-r border-slate-100 last:border-r-0 p-0 relative">
                       {col.type === 'select' ? (
                         <select
                           value={String(row[col.key] || '')}
                           onChange={(e) => handleChange(originalIndex, col.key, e.target.value, false)}
                           aria-label={col.label}
+                          title={cellTitle}
                           className="w-full h-full px-3 py-2 bg-transparent border-none focus:ring-2 focus:ring-inset focus:ring-blue-500 outline-none appearance-none"
                         >
                           <option value="">Select...</option>
@@ -605,6 +623,7 @@ export function EditableTable<T extends { [key: string]: any }>({
                           onChange={(e) => handleChange(originalIndex, col.key, e.target.value, false)}
                           placeholder={col.placeholder}
                           aria-label={col.label}
+                          title={cellTitle}
                           className="w-full px-3 py-2 bg-transparent border-none focus:ring-2 focus:ring-inset focus:ring-blue-500 outline-none resize-none text-sm"
                           data-testid={`real-textarea-${String(col.key)}`}
                         />
@@ -615,12 +634,13 @@ export function EditableTable<T extends { [key: string]: any }>({
                           onChange={(e) => handleChange(originalIndex, col.key, col.type === 'number' ? Number(e.target.value) : e.target.value, false)}
                           placeholder={col.placeholder}
                           aria-label={col.label}
+                          title={cellTitle}
                           className="w-full h-full px-3 py-2 bg-transparent border-none focus:ring-2 focus:ring-inset focus:ring-blue-500 outline-none"
                           data-testid={`real-input-${String(col.key)}`}
                         />
                       )}
                     </td>
-                  ))}
+                  );})}
                   <td className="border-b border-slate-100 p-1 text-center">
                     <button
                       onClick={() => handleDelete(originalIndex)}
