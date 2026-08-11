@@ -31,6 +31,11 @@ export interface AssetCategory {
   id: string;
   name: string;
   order?: number; // Optional sort order for the categories
+  categoryCode?: RptiCategoryCode; // Default RPTI category for deliverables in this category; a Deliverable's own categoryCode overrides it
+  dcCity?: string;   // Default RPTI data center location; a Deliverable's own dcCity/dcCountry overrides it, per field
+  dcCountry?: string;
+  drCity?: string;   // Default RPTI disaster recovery center location; a Deliverable's own drCity/drCountry overrides it, per field
+  drCountry?: string;
 }
 
 /**
@@ -143,6 +148,12 @@ export interface Deliverable {
   assetId: string;
   name: string;
   type?: DeliverableType; // Undefined is treated as 'application' (legacy records predate this field)
+  categoryCode?: RptiCategoryCode; // Overrides the parent AssetCategory's default RPTI category when set
+  developer?: RptiDeveloper; // No category-level default — varies too much within one architectural category to make one trustworthy
+  dcCity?: string;   // Overrides the parent AssetCategory's default RPTI data center location when set, per field
+  dcCountry?: string;
+  drCity?: string;   // Overrides the parent AssetCategory's default RPTI disaster recovery center location when set, per field
+  drCountry?: string;
 }
 
 /**
@@ -189,12 +200,8 @@ export interface RptiDetail {
   dcCountry?: string;
   drCity?: string;
   drCountry?: string;
-  capexAmount?: number; // Defaults to the linked Initiative's capex when unset
-  capexCurrency?: string;
-  capexIdrEquivalent?: number;
-  opexAmount?: number; // Defaults to the linked Initiative's opex when unset
-  opexCurrency?: string;
-  opexIdrEquivalent?: number;
+  capexAmount?: number; // Defaults to the linked Initiative's capex when unset. Always in TimelineSettings.defaultCurrency — this app reports in a single workspace-wide currency, no per-row conversion.
+  opexAmount?: number; // Defaults to the linked Initiative's opex when unset. Always in TimelineSettings.defaultCurrency, same as capexAmount.
   plannedImplementationQuarter?: RptiQuarter;
   deliverableSegmentId?: string; // Set when the quarter is auto-derived (targetType 'deliverable' only)
   remarks?: string;
@@ -236,6 +243,7 @@ export interface TimelineSettings {
   templateId?: string;           // Which workspace template was selected on first load
   showGeanzCatalogue?: boolean;  // When false, the GEANZ catalogue section is hidden (default: true)
   clusterName?: string;          // Agency cluster name — shown in the timeline header
+  defaultCurrency?: string;      // Single workspace-wide currency for RptiDetail.capexAmount/opexAmount, e.g. 'USD', 'IDR'
 }
 
 /**

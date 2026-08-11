@@ -29,6 +29,14 @@ test.describe('Deliverables — Data Manager tab', () => {
     await expect(table.locator('th').filter({ hasText: 'Asset' })).toBeVisible();
   });
 
+  test('Deliverables tab shows RPTI auto-fill override columns (categoryCode, developer, DC/DR location)', async ({ page }) => {
+    await page.getByTestId('data-manager-tab-deliverables').click();
+    const headerText = (await page.locator('[data-testid="data-manager"] thead').innerText()).toLowerCase();
+    for (const label of ['RPTI Category Override', 'Developer', 'DC City Override', 'DC Country Override', 'DR City Override', 'DR Country Override']) {
+      expect(headerText).toContain(label.toLowerCase());
+    }
+  });
+
   test('Deliverables tab shows demo deliverable rows', async ({ page }) => {
     await page.getByTestId('data-manager-tab-deliverables').click();
     // There should be at least one deliverable in demo data

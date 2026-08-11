@@ -19,6 +19,10 @@ test.describe('RPTI Data Manager tab', () => {
     for (const label of ['Initiative', 'Target', 'Category', 'Dev Type', 'Developer', 'Quarter', 'DC City', 'DR City', 'Remarks']) {
       expect(headerText).toContain(label.toLowerCase());
     }
+    // Per-row currency/IDR-equivalent columns were removed — currency is now a single
+    // workspace-wide setting (Default Currency), not tracked per row. See ADR-0006.
+    expect(headerText).not.toContain('idr equiv');
+    expect(headerText).not.toContain('currency');
   });
 
   test('Adding a row inline persists after reload', async ({ page }) => {
@@ -267,5 +271,105 @@ test.describe('RPTI Data Manager tab', () => {
     await expect(row.locator('td[data-key="targetId"] select')).toHaveValue(deliverableId);
     await expect(row.locator('td[data-key="developmentType"] select')).toHaveValue('upgrade');
     await expect(row.locator('td[data-key="plannedImplementationQuarter"] select')).toHaveValue('Q3');
+  });
+
+  test('Generate button auto-fills categoryCode/developer/ppjtiRelatedParty/location from the Deliverable, falling back to its AssetCategory default per field', async ({ page }) => {
+    const currentYear = new Date().getFullYear();
+
+    // Seed a Deliverable that overrides only dcCity and sets developer directly, plus
+    // its Asset's AssetCategory carrying categoryCode + the rest of the location fields
+    // as defaults — exercises both the override-wins and fallback paths in one row.
+    const deliverableId = await page.evaluate(({ year }) => {
+      return new Promise<string>((resolve, reject) => {
+        const req = indexedDB.open('it-initiative-visualiser');
+        req.onsuccess = () => {
+          const db = req.result;
+          const readTx = db.transaction(['assets', 'initiatives', 'assetCategories'], 'readonly');
+          const assetCursor = readTx.objectStore('assets').openCursor();
+          assetCursor.onsuccess = () => {
+            const asset = assetCursor.result?.value;
+            if (!asset) { reject(new Error('No assets found')); return; }
+            const initCursor = readTx.objectStore('initiatives').openCursor();
+            initCursor.onsuccess = () => {
+              const initiativeId = initCursor.result?.value.id;
+              if (!initiativeId) { reject(new Error('No initiatives found')); return; }
+              const catReq = readTx.objectStore('assetCategories').get(asset.categoryId);
+              catReq.onsuccess = () => {
+                const category = catReq.result;
+                if (!category) { reject(new Error('Asset has no category')); return; }
+
+                const deliverableId = `deliv-autofill-test-${Date.now()}`;
+                const writeTx = db.transaction(['deliverables', 'deliverableSegments', 'assetCategories'], 'readwrite');
+                writeTx.objectStore('deliverables').put({
+                  id: deliverableId,
+                  assetId: asset.id,
+                  name: 'Auto-fill Test Deliverable',
+                  developer: 'inhouse',
+                  dcCity: 'Jakarta', // overrides the category default below
+                });
+                writeTx.objectStore('deliverableSegments').put({
+                  id: `seg-autofill-test-${Date.now()}`,
+                  deliverableId,
+                  initiativeId,
+                  status: 'appstatus-planned',
+                  startDate: `${year}-02-01`,
+                  endDate: `${year}-03-01`,
+                });
+                writeTx.objectStore('assetCategories').put({
+                  ...category,
+                  categoryCode: '06',
+                  dcCity: 'Should Be Overridden By Deliverable',
+                  dcCountry: 'Indonesia',
+                  drCity: 'Surabaya',
+                  drCountry: 'Indonesia',
+                });
+                writeTx.oncomplete = () => { db.close(); resolve(deliverableId); };
+                writeTx.onerror = () => reject(writeTx.error);
+              };
+              catReq.onerror = () => reject(catReq.error);
+            };
+            initCursor.onerror = () => reject(initCursor.error);
+          };
+          assetCursor.onerror = () => reject(assetCursor.error);
+        };
+        req.onerror = () => reject(req.error);
+      });
+    }, { year: currentYear });
+
+    await page.reload();
+    await page.getByTestId('nav-data-manager').click();
+    await page.getByTestId('data-manager-tab-rpti').click();
+
+    await page.getByTestId('rpti-generate-btn').click();
+    await page.getByTestId('confirm-modal-confirm').click();
+    await page.waitForTimeout(300);
+
+    const rows = page.locator('[data-testid="data-manager"] tbody tr[data-real="true"]');
+    await expect(rows).toHaveCount(1);
+    const row = rows.first();
+    await expect(row.locator('td[data-key="targetId"] select')).toHaveValue(deliverableId);
+    // Category has no per-Deliverable override in this test, so it comes from AssetCategory.
+    await expect(row.locator('td[data-key="categoryCode"] select')).toHaveValue('06');
+    // Developer is Deliverable-only; ppjtiRelatedParty auto-fills to n/a since it isn't PPJTI.
+    await expect(row.locator('td[data-key="developer"] select')).toHaveValue('inhouse');
+    await expect(row.locator('td[data-key="ppjtiRelatedParty"] select')).toHaveValue('n/a');
+    // dcCity is overridden on the Deliverable; the other three fall back to the AssetCategory default.
+    await expect(row.locator('td[data-key="dcCity"] input')).toHaveValue('Jakarta');
+    await expect(row.locator('td[data-key="dcCountry"] input')).toHaveValue('Indonesia');
+    await expect(row.locator('td[data-key="drCity"] input')).toHaveValue('Surabaya');
+    await expect(row.locator('td[data-key="drCountry"] input')).toHaveValue('Indonesia');
+  });
+
+  test('Default Currency input persists across reload', async ({ page }) => {
+    const input = page.getByTestId('rpti-default-currency-input');
+    await input.fill('IDR');
+    await input.press('Tab');
+    await page.waitForTimeout(300);
+
+    await page.reload();
+    await page.getByTestId('nav-data-manager').click();
+    await page.getByTestId('data-manager-tab-rpti').click();
+
+    await expect(page.getByTestId('rpti-default-currency-input')).toHaveValue('IDR');
   });
 });

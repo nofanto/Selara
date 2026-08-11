@@ -10,14 +10,13 @@
 | No. | *(display only)* | Sequential index — not stored | — |
 | Target | `targetId` / `targetType` | The qualifying segment's `deliverableId`; `targetType` fixed to `'deliverable'` | Yes |
 | Initiative | `initiativeId` | The qualifying segment's `initiativeId` | Yes* |
-| Category | `categoryCode` | **No source — manual.** Nothing in the data model maps to OJK's category codes (01–12/49 deliverable, 51–54/99 infra) | Yes |
+| Category | `categoryCode` | `Deliverable.categoryCode ?? AssetCategory.categoryCode` (via `Asset.categoryId`) — see `requirement-specs/rpti-auto-fill-improvements.md` / [ADR-0006](../docs/adr/0006-rpti-auto-fill-and-single-currency.md) | Yes |
 | Dev Type | `developmentType` | Derived per the collapsing rule below (not a plain per-segment lookup) | Yes |
-| Developer | `developer` | **No source — manual.** No inhouse/PPJTI field exists anywhere upstream | Yes |
-| PPJTI Related Party | `ppjtiRelatedParty` | **No source — manual** | Yes |
+| Developer | `developer` | `Deliverable.developer` — no category-level default | Yes |
+| PPJTI Related Party | `ppjtiRelatedParty` | `'n/a'` whenever the resolved `developer !== 'PPJTI'` (including unset); left blank for manual entry only when `developer === 'PPJTI'` | Yes |
 | Quarter | `plannedImplementationQuarter` | The anchor segment's `startDate` (see anchoring rule below) — extends the existing `suggestDeliverableQuarter` logic | Yes — manual value wins if set, else the suggestion is used |
-| CapEx / OpEx | `capexAmount` / `opexAmount` | *(pre-existing)* `resolveCost` — defaults to the linked Initiative's `capex`/`opex` | Yes — same override-wins pattern |
-| CapEx/OpEx Currency, IDR Equiv. | `capexCurrency`, `capexIdrEquivalent`, etc. | **No source — manual** | Yes |
-| DC / DR Location | `dcCity`, `dcCountry`, `drCity`, `drCountry` | **No source — manual.** `Asset` has no location fields | Yes |
+| CapEx / OpEx | `capexAmount` / `opexAmount` | *(pre-existing)* `resolveCost` — defaults to the linked Initiative's `capex`/`opex`. Always in `TimelineSettings.defaultCurrency` — a single workspace-wide currency, not tracked per row | Yes — same override-wins pattern |
+| DC / DR Location | `dcCity`, `dcCountry`, `drCity`, `drCountry` | `Deliverable.dcCity ?? AssetCategory.dcCity` etc., resolved independently per field | Yes |
 | Remarks | `remarks` | **No source — always manual, free text** | Yes |
 | *(provenance, not a report column)* | `deliverableSegmentId` | Set to the qualifying segment's `id` — becomes the row's generation anchor, not just quarter-derivation metadata like it is today | — |
 

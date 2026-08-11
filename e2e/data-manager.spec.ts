@@ -25,6 +25,14 @@ test.describe('Data Manager — core operations', () => {
     }
   });
 
+  test('Categories tab shows RPTI default columns (categoryCode, DC/DR location)', async ({ page }) => {
+    await page.getByTestId('data-manager-tab-assetCategories').click();
+    const headerText = (await page.locator('[data-testid="data-manager"] thead').innerText()).toLowerCase();
+    for (const label of ['Default RPTI Category', 'Default DC City', 'Default DC Country', 'Default DR City', 'Default DR Country']) {
+      expect(headerText).toContain(label.toLowerCase());
+    }
+  });
+
   test('add and delete a row', async ({ page }) => {
     const realRows = page.locator('table tbody tr[data-real="true"]');
     const initialCount = await realRows.count();

@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx';
-import { RptiDetail, RptiCategoryCode, RptiQuarter, Initiative, Deliverable, Asset, DeliverableSegment, DeliverableStatus } from '../types';
+import { RptiDetail, RptiCategoryCode, RptiQuarter, Initiative, Deliverable, Asset, AssetCategory, DeliverableSegment, DeliverableStatus } from '../types';
 
 export const RPTI_CATEGORY_LABELS: Record<RptiCategoryCode, string> = {
   '01': 'Customer management',
@@ -57,18 +57,40 @@ function classifySegmentKind(statusId: string, deliverableStatuses: DeliverableS
   return 'new';
 }
 
+export interface GenerateRptiDetailsInput {
+  deliverableSegments: DeliverableSegment[];
+  deliverableStatuses: DeliverableStatus[];
+  initiatives: Initiative[];
+  deliverables: Deliverable[];
+  assets: Asset[];
+  assetCategories: AssetCategory[];
+}
+
+// Resolves the AssetCategory backing a Deliverable's auto-fill defaults, via
+// Deliverable.assetId -> Asset.categoryId. Undefined when any link is missing.
+function resolveAssetCategory(
+  deliverable: Deliverable | undefined,
+  assets: Asset[],
+  assetCategories: AssetCategory[],
+): AssetCategory | undefined {
+  const asset = deliverable && assets.find(a => a.id === deliverable.assetId);
+  return asset ? assetCategories.find(c => c.id === asset.categoryId) : undefined;
+}
+
 /**
  * Generates RptiDetail rows for a single report year from DeliverableSegment data —
- * see requirement-specs/rpti-auto-generation.md for the full rule. Wipe-and-rebuild:
- * callers replace the existing rptiDetails for the year with this function's output,
- * there's no reconciliation with prior manual edits (v1).
+ * see requirement-specs/rpti-auto-generation.md for the row-generation rule and
+ * requirement-specs/rpti-auto-fill-improvements.md for the categoryCode/developer/
+ * location auto-fill rules below. Wipe-and-rebuild: callers replace the existing
+ * rptiDetails for the year with this function's output, there's no reconciliation
+ * with prior manual edits (v1).
  */
 export function generateRptiDetails(
-  deliverableSegments: DeliverableSegment[],
-  deliverableStatuses: DeliverableStatus[],
-  initiatives: Initiative[],
+  input: GenerateRptiDetailsInput,
   reportYear: number,
 ): RptiDetail[] {
+  const { deliverableSegments, deliverableStatuses, initiatives, deliverables, assets, assetCategories } = input;
+
   // Overlap, not "starts in": a segment qualifies if any part of its
   // [startDate, endDate] range falls within the report year, even if it
   // started in an earlier year or continues into the next one.
@@ -119,12 +141,26 @@ export function generateRptiDetails(
       ? (liveItems.length > 0 ? liveItems[liveItems.length - 1] : newItems[newItems.length - 1])
       : liveItems[liveItems.length - 1];
 
+    const deliverable = deliverables.find(d => d.id === deliverableId);
+    const category = resolveAssetCategory(deliverable, assets, assetCategories);
+    const developer = deliverable?.developer;
+
     results.push({
       id: `rpti-gen-${initiativeId}-${deliverableId}-${reportYear}`,
       initiativeId,
       targetType: 'deliverable',
       targetId: deliverableId,
+      categoryCode: deliverable?.categoryCode ?? category?.categoryCode,
       developmentType,
+      developer,
+      // 'n/a' by definition whenever the resolved developer isn't PPJTI — including
+      // when developer itself is unset, since there's no category-level default for
+      // it. Only genuinely ambiguous, so left blank for manual entry, when it's PPJTI.
+      ppjtiRelatedParty: developer !== 'PPJTI' ? 'n/a' : undefined,
+      dcCity: deliverable?.dcCity ?? category?.dcCity,
+      dcCountry: deliverable?.dcCountry ?? category?.dcCountry,
+      drCity: deliverable?.drCity ?? category?.drCity,
+      drCountry: deliverable?.drCountry ?? category?.drCountry,
       plannedImplementationQuarter: deriveQuarterFromDate(anchor.segment.startDate),
       deliverableSegmentId: anchor.segment.id,
     });

@@ -66,7 +66,7 @@ interface ITMapDB extends DBSchema {
 }
 
 const DB_NAME = 'it-initiative-visualiser';
-const DB_VERSION = 17;
+const DB_VERSION = 18;
 
 let dbPromise: Promise<IDBPDatabase<ITMapDB>>;
 
@@ -199,6 +199,19 @@ export const initDB = () => {
           }
           if (!db.objectStoreNames.contains('deliverableStatuses')) {
             db.createObjectStore('deliverableStatuses', { keyPath: 'id' });
+          }
+        }
+        if (oldVersion < 18) {
+          // Currency is now a single workspace-wide fact (TimelineSettings.defaultCurrency),
+          // not tracked per row — drop the now-redundant per-row currency/IDR-equivalent
+          // fields from RptiDetail. See requirement-specs/rpti-auto-fill-improvements.md.
+          const allRptiDetails = await tx.objectStore('rptiDetails').getAll();
+          for (const detail of allRptiDetails) {
+            const d = detail as any;
+            if (d.capexCurrency !== undefined || d.opexCurrency !== undefined || d.capexIdrEquivalent !== undefined || d.opexIdrEquivalent !== undefined) {
+              const { capexCurrency: _cc, opexCurrency: _oc, capexIdrEquivalent: _cie, opexIdrEquivalent: _oie, ...rest } = d;
+              await tx.objectStore('rptiDetails').put(rest);
+            }
           }
         }
       },

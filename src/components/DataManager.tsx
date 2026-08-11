@@ -188,7 +188,14 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery 
   // with prior manual edits.
   const handleGenerateRpti = () => {
     const reportYear = new Date().getFullYear();
-    const generated = generateRptiDetails(data.deliverableSegments || [], data.deliverableStatuses || [], data.initiatives, reportYear);
+    const generated = generateRptiDetails({
+      deliverableSegments: data.deliverableSegments || [],
+      deliverableStatuses: data.deliverableStatuses || [],
+      initiatives: data.initiatives,
+      deliverables: data.deliverables || [],
+      assets: data.assets,
+      assetCategories: data.assetCategories,
+    }, reportYear);
     const existingCount = (data.rptiDetails || []).length;
     const message = existingCount
       ? `This replaces all ${existingCount} existing RPTI row(s) with ${generated.length} row(s) generated from ${reportYear} deliverable segment data. Any manual edits will be lost. Continue?`
@@ -237,8 +244,20 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery 
   ];
 
   const categoryColumns: Column<AssetCategory>[] = [
-    { key: 'name', label: 'Category Name', type: 'text', width: '80%' },
-    { key: 'order', label: 'Sort Order', type: 'number', width: '20%' },
+    { key: 'name', label: 'Category Name', type: 'text', width: '200px' },
+    { key: 'order', label: 'Sort Order', type: 'number', width: '100px' },
+    {
+      key: 'categoryCode', label: 'Default RPTI Category', type: 'select', width: '220px',
+      options: [
+        { value: '', label: '— Not set —' },
+        ...(Object.keys(RPTI_CATEGORY_LABELS) as (keyof typeof RPTI_CATEGORY_LABELS)[])
+          .map(code => ({ value: code, label: `${code} — ${RPTI_CATEGORY_LABELS[code]}` })),
+      ],
+    },
+    { key: 'dcCity', label: 'Default DC City', type: 'text', width: '130px' },
+    { key: 'dcCountry', label: 'Default DC Country', type: 'text', width: '130px' },
+    { key: 'drCity', label: 'Default DR City', type: 'text', width: '130px' },
+    { key: 'drCountry', label: 'Default DR Country', type: 'text', width: '130px' },
   ];
 
   const programmeColumns: Column<Programme>[] = [
@@ -308,16 +327,35 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery 
   ];
 
   const deliverableColumns: Column<Deliverable>[] = [
-    { key: 'name', label: 'Name', type: 'text', width: '40%' },
+    { key: 'name', label: 'Name', type: 'text', width: '180px' },
     {
-      key: 'type', label: 'Type', type: 'select', width: '25%',
+      key: 'type', label: 'Type', type: 'select', width: '130px',
       options: (['application', 'infrastructure', 'document', 'procedure', 'other'] as DeliverableType[])
         .map(t => ({ value: t, label: t.charAt(0).toUpperCase() + t.slice(1) })),
     },
     {
-      key: 'assetId', label: 'Asset', type: 'select', width: '35%',
+      key: 'assetId', label: 'Asset', type: 'select', width: '160px',
       options: data.assets.map(a => ({ value: a.id, label: a.name })),
     },
+    {
+      key: 'categoryCode', label: 'RPTI Category Override', type: 'select', width: '220px',
+      options: [
+        { value: '', label: '— Use category default —' },
+        ...(Object.keys(RPTI_CATEGORY_LABELS) as (keyof typeof RPTI_CATEGORY_LABELS)[])
+          .map(code => ({ value: code, label: `${code} — ${RPTI_CATEGORY_LABELS[code]}` })),
+      ],
+    },
+    {
+      key: 'developer', label: 'Developer', type: 'select', width: '110px',
+      options: [
+        { value: '', label: '— Not set —' },
+        { value: 'inhouse', label: 'In-house' }, { value: 'PPJTI', label: 'PPJTI' },
+      ],
+    },
+    { key: 'dcCity', label: 'DC City Override', type: 'text', width: '130px' },
+    { key: 'dcCountry', label: 'DC Country Override', type: 'text', width: '130px' },
+    { key: 'drCity', label: 'DR City Override', type: 'text', width: '130px' },
+    { key: 'drCountry', label: 'DR Country Override', type: 'text', width: '130px' },
   ];
 
   const handleDeleteDeliverable = (deliverable: Deliverable): boolean => {
@@ -394,12 +432,8 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery 
         { value: 'Q1', label: 'Q1' }, { value: 'Q2', label: 'Q2' }, { value: 'Q3', label: 'Q3' }, { value: 'Q4', label: 'Q4' },
       ],
     },
-    { key: 'capexAmount', label: 'CapEx Override ($)', type: 'number', width: '140px' },
-    { key: 'capexCurrency', label: 'CapEx Currency', type: 'text', width: '110px' },
-    { key: 'capexIdrEquivalent', label: 'CapEx IDR Equiv.', type: 'number', width: '140px' },
-    { key: 'opexAmount', label: 'OpEx Override ($)', type: 'number', width: '140px' },
-    { key: 'opexCurrency', label: 'OpEx Currency', type: 'text', width: '110px' },
-    { key: 'opexIdrEquivalent', label: 'OpEx IDR Equiv.', type: 'number', width: '140px' },
+    { key: 'capexAmount', label: 'CapEx Override', type: 'number', width: '140px' },
+    { key: 'opexAmount', label: 'OpEx Override', type: 'number', width: '140px' },
     { key: 'dcCity', label: 'DC City', type: 'text', width: '110px' },
     { key: 'dcCountry', label: 'DC Country', type: 'text', width: '110px' },
     { key: 'drCity', label: 'DR City', type: 'text', width: '110px' },
@@ -578,7 +612,24 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery 
               <p className="text-xs text-slate-500">
                 Rebuilds rows from this year's deliverable segments — replaces all rows below.
               </p>
+              <div className="flex items-center gap-2 ml-auto">
+                <label htmlFor="rpti-default-currency" className="text-xs text-slate-500 whitespace-nowrap">
+                  Default Currency
+                </label>
+                <input
+                  id="rpti-default-currency"
+                  data-testid="rpti-default-currency-input"
+                  type="text"
+                  value={data.timelineSettings.defaultCurrency ?? ''}
+                  onChange={(e) => updateData('timelineSettings', { ...data.timelineSettings, defaultCurrency: e.target.value })}
+                  placeholder="e.g. IDR"
+                  className="w-20 px-2 py-1 text-sm border border-slate-200 rounded-md"
+                />
+              </div>
             </div>
+            <p className="text-xs text-slate-500 mb-3 -mt-2">
+              All CapEx/OpEx figures below are reported in this currency.
+            </p>
             <EditableTable
               data={data.rptiDetails || []}
               columns={getColumnsWithWidths('rpti', rptiColumns)}

@@ -3,7 +3,7 @@
 Selara persists all application data client-side in **IndexedDB**, accessed via the `idb` library. The database is defined in a single location: [`src/lib/db.ts`](../src/lib/db.ts).
 
 - **Database name:** `it-initiative-visualiser`
-- **Current schema version:** `17`
+- **Current schema version:** `18`
 - **Object stores:** 15 (all key-path stores except `settings`, which uses an explicit out-of-line key)
 - **Indexes:** none — all lookups are done via `getAll()` with in-memory filtering/joining on foreign-key-like fields (there is no `createIndex` usage anywhere in the codebase)
 
@@ -27,6 +27,11 @@ erDiagram
         string id PK
         string name
         int order
+        string categoryCode "optional; default RPTI category for deliverables in this category"
+        string dcCity "optional; default RPTI data center location"
+        string dcCountry "optional"
+        string drCity "optional; default RPTI disaster recovery center location"
+        string drCountry "optional"
     }
 
     ASSET {
@@ -43,6 +48,12 @@ erDiagram
         string assetId FK
         string name
         string type "deliverable kind: application/infrastructure/document/procedure/other; undefined treated as 'application'"
+        string categoryCode "optional; overrides AssetCategory.categoryCode when set"
+        string developer "optional; 'inhouse' or 'PPJTI' — no category-level default"
+        string dcCity "optional; overrides AssetCategory.dcCity when set"
+        string dcCountry "optional"
+        string drCity "optional; overrides AssetCategory.drCity when set"
+        string drCountry "optional"
     }
 
     DELIVERABLE_SEGMENT {
@@ -135,12 +146,8 @@ erDiagram
         string dcCountry
         string drCity
         string drCountry
-        number capexAmount
-        string capexCurrency
-        number capexIdrEquivalent
-        number opexAmount
-        string opexCurrency
-        number opexIdrEquivalent
+        number capexAmount "always in SETTINGS.defaultCurrency"
+        number opexAmount "always in SETTINGS.defaultCurrency"
         string plannedImplementationQuarter
         string deliverableSegmentId FK "optional; set when quarter is auto-derived"
         string remarks
@@ -178,6 +185,7 @@ erDiagram
         string templateId "optional; which workspace template was chosen"
         boolean showGeanzCatalogue "optional, default true"
         string clusterName "optional"
+        string defaultCurrency "optional; single workspace-wide currency for RptiDetail.capexAmount/opexAmount"
     }
 
     ASSET_CATEGORY ||--o{ ASSET : "categorizes"
@@ -270,6 +278,7 @@ Schema evolution is handled in the `upgrade()` callback of `openDB<ITMapDB>()` i
 - **v15:** Added the `rptiDetails` store (no seeding) and a `type` field on `Deliverable`, to support the RPTI regulatory report. See [ADR-0003](adr/0003-rpti-report-and-application-type.md).
 - **v16:** Flattened `RptiDetail.location` (a nested `{ dataCenter: {city, country}, disasterRecoveryCenter: {city, country} }` object) into four top-level fields — `dcCity`, `dcCountry`, `drCity`, `drCountry` — so the field could be edited inline in Data Manager, whose `EditableTable` component only supports flat columns. Existing `rptiDetails` records with a `location` value are rewritten in place: their nested fields are copied to the new top-level fields and `location` is removed. See [ADR-0005](adr/0005-rpti-data-manager-tab.md).
 - **v17:** `Application`/`ApplicationSegment`/`ApplicationStatus` were renamed to `Deliverable`/`DeliverableSegment`/`DeliverableStatus` throughout the codebase (the entity covers more than software applications — infrastructure, documents, procedures, etc. — see [ADR-0003](adr/0003-rpti-report-and-application-type.md)), and their object stores renamed to match (`applications` → `deliverables`, `applicationSegments` → `deliverableSegments`, `applicationStatuses` → `deliverableStatuses`). `RptiTargetType`'s `'application'` value became `'deliverable'`. **No data migration was performed** — new stores are created under the new names (for both fresh databases and existing ones upgrading through v17), and the old `applications`/`applicationSegments`/`applicationStatuses` stores are left in place, orphaned and unmigrated, on any database that already had them — same treatment as `dtsPhases` at v13.
+- **v18:** Currency became a single workspace-wide fact (`SETTINGS.defaultCurrency`) instead of a per-row one — `RptiDetail.capexCurrency`, `opexCurrency`, `capexIdrEquivalent`, and `opexIdrEquivalent` were removed from the type. Existing `rptiDetails` records with any of those four fields set have them stripped in place (read-all/rewrite-all, same pattern as v16). `AssetCategory` and `Deliverable` both gained new optional auto-fill fields (`categoryCode`, `dcCity`/`dcCountry`/`drCity`/`drCountry`; `Deliverable` additionally `developer`) — additive, no migration needed. See [ADR-0006](adr/0006-rpti-auto-fill-and-single-currency.md).
 
 ## Source of Truth
 
