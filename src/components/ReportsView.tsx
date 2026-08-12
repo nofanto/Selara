@@ -40,8 +40,8 @@ function BackButton({ onBack }: { onBack: () => void }) {
   );
 }
 
-const fmt = (n: number) =>
-  n >= 1_000_000 ? `$${(n / 1_000_000).toFixed(1)}m` : n >= 1_000 ? `$${Math.round(n / 1_000)}k` : `$${n.toLocaleString()}`;
+const fmt = (n: number, currency: string) =>
+  n >= 1_000_000 ? `${currency} ${(n / 1_000_000).toFixed(1)}m` : n >= 1_000 ? `${currency} ${Math.round(n / 1_000)}k` : `${currency} ${n.toLocaleString()}`;
 
 function BudgetBar({ total, max, color }: { total: number; max: number; color?: string }) {
   return (
@@ -51,7 +51,7 @@ function BudgetBar({ total, max, color }: { total: number; max: number; color?: 
   );
 }
 
-function BudgetSection({ testId, title, rows, max }: { testId: string; title: string; rows: { id: string; name: string; capex: number; opex: number; total: number; color?: string }[]; max: number }) {
+function BudgetSection({ testId, title, rows, max, currency }: { testId: string; title: string; rows: { id: string; name: string; capex: number; opex: number; total: number; color?: string }[]; max: number; currency: string }) {
   return (
     <div data-testid={testId} className="space-y-2">
       <div className="flex items-center gap-3">
@@ -65,9 +65,9 @@ function BudgetSection({ testId, title, rows, max }: { testId: string; title: st
         <div key={row.id} data-testid={`budget-row-${testId.replace('budget-by-', '')}-${row.id}`} className="flex items-center gap-3">
           <span className="text-sm text-slate-700 w-44 truncate flex-shrink-0">{row.name}</span>
           <BudgetBar total={row.total} max={max} color={row.color} />
-          <span data-testid="row-capex" className="text-xs text-blue-600 w-16 text-right flex-shrink-0">{fmt(row.capex)}</span>
-          <span data-testid="row-opex" className="text-xs text-amber-600 w-16 text-right flex-shrink-0">{fmt(row.opex)}</span>
-          <span data-testid="row-total" className="text-sm font-semibold text-slate-800 w-16 text-right flex-shrink-0">{fmt(row.total)}</span>
+          <span data-testid="row-capex" className="text-xs text-blue-600 w-16 text-right flex-shrink-0">{fmt(row.capex, currency)}</span>
+          <span data-testid="row-opex" className="text-xs text-amber-600 w-16 text-right flex-shrink-0">{fmt(row.opex, currency)}</span>
+          <span data-testid="row-total" className="text-sm font-semibold text-slate-800 w-16 text-right flex-shrink-0">{fmt(row.total, currency)}</span>
         </div>
       ))}
     </div>
@@ -440,6 +440,8 @@ export function ReportsView({ assets, initiatives, milestones, dependencies, cur
       })
       .filter(r => r.total > 0).sort((a, b) => b.total - a.total);
 
+    const currency = currentData.timelineSettings.defaultCurrency || 'USD';
+
     return (
       <div data-testid="report-view-budget" className="h-full overflow-y-auto p-6 bg-slate-50">
         <div className="max-w-3xl mx-auto">
@@ -448,15 +450,15 @@ export function ReportsView({ assets, initiatives, milestones, dependencies, cur
             <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
               <h2 className="text-base font-semibold text-slate-800">Budget Summary</h2>
               <div className="flex items-center gap-3 text-sm">
-                <span data-testid="budget-grand-total-capex" className="text-blue-600"><span className="font-medium">CapEx</span> {fmt(grandCapex)}</span>
-                <span data-testid="budget-grand-total-opex" className="text-amber-600"><span className="font-medium">OpEx</span> {fmt(grandOpex)}</span>
-                <span data-testid="budget-grand-total" className="font-bold text-slate-700">{fmt(grandTotal)} total</span>
+                <span data-testid="budget-grand-total-capex" className="text-blue-600"><span className="font-medium">CapEx</span> {fmt(grandCapex, currency)}</span>
+                <span data-testid="budget-grand-total-opex" className="text-amber-600"><span className="font-medium">OpEx</span> {fmt(grandOpex, currency)}</span>
+                <span data-testid="budget-grand-total" className="font-bold text-slate-700">{fmt(grandTotal, currency)} total</span>
               </div>
             </div>
             <div className="p-4 space-y-6">
-              <BudgetSection testId="budget-by-programme" title="By Programme" rows={byProgramme} max={byProgramme[0]?.total ?? 0} />
-              <BudgetSection testId="budget-by-strategy" title="By Strategy" rows={byStrategy} max={byStrategy[0]?.total ?? 0} />
-              <BudgetSection testId="budget-by-category" title="By Category" rows={byCategory} max={byCategory[0]?.total ?? 0} />
+              <BudgetSection testId="budget-by-programme" title="By Programme" rows={byProgramme} max={byProgramme[0]?.total ?? 0} currency={currency} />
+              <BudgetSection testId="budget-by-strategy" title="By Strategy" rows={byStrategy} max={byStrategy[0]?.total ?? 0} currency={currency} />
+              <BudgetSection testId="budget-by-category" title="By Category" rows={byCategory} max={byCategory[0]?.total ?? 0} currency={currency} />
             </div>
           </div>
         </div>
@@ -592,6 +594,7 @@ export function ReportsView({ assets, initiatives, milestones, dependencies, cur
             assets={assets}
             deliverableSegments={deliverableSegments}
             deliverableStatuses={deliverableStatuses}
+            defaultCurrency={currentData.timelineSettings.defaultCurrency || 'USD'}
           />
         </div>
       </div>

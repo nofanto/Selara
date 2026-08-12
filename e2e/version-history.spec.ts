@@ -80,7 +80,7 @@ test.describe('Version History & Snapshotting', () => {
     await expect(page.getByText(addedInitName, { exact: true })).toBeVisible();
     await expect(page.getByText('Changed').first()).toBeVisible();
     await expect(page.getByText(secondInitName, { exact: true })).toBeVisible();
-    await expect(page.getByText(/CapEx: .*\d+ → \$999,999/)).toBeVisible();
+    await expect(page.getByText(/CapEx: .*\d+ → IDR 999,999/)).toBeVisible();
   });
 
   test('should not crash when selected version is deleted while comparison report is open', async ({ page }) => {

@@ -38,7 +38,7 @@ test.describe('Data Validation', () => {
         await expect(panel).toBeVisible();
 
         // Set a negative budget
-        await panel.getByLabel('CapEx ($)').fill('-5000');
+        await panel.getByLabel('CapEx (IDR)').fill('-5000');
 
         // Try to save
         await panel.getByRole('button', { name: 'Save Changes' }).click();
@@ -80,7 +80,7 @@ test.describe('Data Validation', () => {
         await expect(panel).toBeVisible();
 
         // Set a negative OpEx
-        await panel.getByLabel('OpEx ($)').fill('-1000');
+        await panel.getByLabel('OpEx (IDR)').fill('-1000');
 
         // Try to save
         await panel.getByRole('button', { name: 'Save Changes' }).click();
@@ -103,7 +103,7 @@ test.describe('Data Validation', () => {
         // Set valid dates
         await panel.getByLabel('Start Date').fill('2026-01-01');
         await panel.getByLabel('End Date').fill('2026-12-31');
-        await panel.getByLabel('CapEx ($)').fill('100000');
+        await panel.getByLabel('CapEx (IDR)').fill('100000');
 
         // Save should work
         await panel.getByRole('button', { name: 'Save Changes' }).click();

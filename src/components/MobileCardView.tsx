@@ -256,9 +256,9 @@ const InitiativeRow: React.FC<{
           <div data-testid={`initiative-budget-${initiative.id}`} className="mt-1 flex items-center gap-1">
             <DollarSign size={10} className="text-slate-400 flex-shrink-0" />
             <span className="text-xs text-slate-500">
-              {(initiative.capex || 0) > 0 && `CapEx ${(initiative.capex || 0).toLocaleString('en-NZ', { style: 'currency', currency: 'NZD', maximumFractionDigits: 0 })}`}
+              {(initiative.capex || 0) > 0 && `CapEx ${settings.defaultCurrency || 'USD'} ${(initiative.capex || 0).toLocaleString()}`}
               {(initiative.capex || 0) > 0 && (initiative.opex || 0) > 0 && ' · '}
-              {(initiative.opex || 0) > 0 && `OpEx ${(initiative.opex || 0).toLocaleString('en-NZ', { style: 'currency', currency: 'NZD', maximumFractionDigits: 0 })}`}
+              {(initiative.opex || 0) > 0 && `OpEx ${settings.defaultCurrency || 'USD'} ${(initiative.opex || 0).toLocaleString()}`}
             </span>
           </div>
         )}
@@ -594,6 +594,7 @@ export function MobileCardView({
         onSave={handleSave}
         onDelete={handleDelete}
         isOpen={isPanelOpen}
+        defaultCurrency={settings.defaultCurrency || 'USD'}
       />
     </>
   );

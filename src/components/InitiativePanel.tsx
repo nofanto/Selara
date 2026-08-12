@@ -21,9 +21,10 @@ interface InitiativePanelProps {
     decisions?: Decision[];
     onOpenDecision?: (decisionId: string) => void;
     isNew?: boolean;
+    defaultCurrency?: string;
 }
 
-export function InitiativePanel({ initiative, assets, deliverables = [], programmes, strategies, dependencies = [], initiatives = [], resources = [], onClose, onSave, onDelete, isOpen, decisions = [], onOpenDecision, isNew = false }: InitiativePanelProps) {
+export function InitiativePanel({ initiative, assets, deliverables = [], programmes, strategies, dependencies = [], initiatives = [], resources = [], onClose, onSave, onDelete, isOpen, decisions = [], onOpenDecision, isNew = false, defaultCurrency = 'USD' }: InitiativePanelProps) {
     const [formData, setFormData] = useState<Initiative | null>(null);
     const [errors, setErrors] = useState<ValidationErrors>({});
     const [confirmDelete, setConfirmDelete] = useState(false);
@@ -210,18 +211,18 @@ export function InitiativePanel({ initiative, assets, deliverables = [], program
                         <div className="grid grid-cols-2 gap-3">
                             <div>
                                 <label htmlFor="capex" className="block text-sm font-medium text-slate-700 mb-1">
-                                    CapEx ($)
+                                    CapEx ({defaultCurrency})
                                 </label>
                                 <div className="relative">
                                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                        <span className="text-slate-500 sm:text-sm">$</span>
+                                        <span className="text-slate-500 sm:text-sm">{defaultCurrency}</span>
                                     </div>
                                     <input
                                         id="capex"
                                         type="number"
                                         inputMode="numeric"
                                         step="1000"
-                                        className={`w-full pl-7 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm ${errors.capex ? 'border-red-400' : 'border-slate-300'}`}
+                                        className={`w-full pl-12 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm ${errors.capex ? 'border-red-400' : 'border-slate-300'}`}
                                         value={formData.capex || ''}
                                         onChange={(e) => { const val = e.target.value === '' ? 0 : parseInt(e.target.value, 10) || 0; setFormData({ ...formData, capex: val }); setErrors(prev => { const { capex: _c, ...rest } = prev; return rest; }); }}
                                     />
@@ -230,18 +231,18 @@ export function InitiativePanel({ initiative, assets, deliverables = [], program
                             </div>
                             <div>
                                 <label htmlFor="opex" className="block text-sm font-medium text-slate-700 mb-1">
-                                    OpEx ($)
+                                    OpEx ({defaultCurrency})
                                 </label>
                                 <div className="relative">
                                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                        <span className="text-slate-500 sm:text-sm">$</span>
+                                        <span className="text-slate-500 sm:text-sm">{defaultCurrency}</span>
                                     </div>
                                     <input
                                         id="opex"
                                         type="number"
                                         inputMode="numeric"
                                         step="1000"
-                                        className={`w-full pl-7 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm ${errors.opex ? 'border-red-400' : 'border-slate-300'}`}
+                                        className={`w-full pl-12 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm ${errors.opex ? 'border-red-400' : 'border-slate-300'}`}
                                         value={formData.opex || ''}
                                         onChange={(e) => { const val = e.target.value === '' ? 0 : parseInt(e.target.value, 10) || 0; setFormData({ ...formData, opex: val }); setErrors(prev => { const { opex: _o, ...rest } = prev; return rest; }); }}
                                     />

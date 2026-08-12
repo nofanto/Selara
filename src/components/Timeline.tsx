@@ -2554,6 +2554,7 @@ export function Timeline({ assets, deliverables = [], initiatives, milestones, p
         decisions={decisions}
         onOpenDecision={onOpenDecision}
         isNew={creatingInitiativeParams !== null}
+        defaultCurrency={settings.defaultCurrency || 'USD'}
         onSave={(initiative) => {
           if (initiativePanelId) {
             if (onUpdateInitiative) onUpdateInitiative(initiative);

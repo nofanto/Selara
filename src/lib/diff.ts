@@ -48,6 +48,7 @@ const getAssetCategoryName = (versionData: Version['data'], categoryId: string |
   versionData.assetCategories.find(category => category.id === categoryId)?.name || 'Uncategorised';
 
 export function computeDiff(baseVersion: Version, currentData: Version['data']): DiffResult {
+  const currency = currentData.timelineSettings.defaultCurrency || 'USD';
   const assets = compareEntities(
     baseVersion.data.assets,
     currentData.assets,
@@ -100,8 +101,8 @@ export function computeDiff(baseVersion: Version, currentData: Version['data']):
       if (b.name !== c.name) changes.push(`Renamed from "${b.name}" to "${c.name}"`);
       if (b.startDate !== c.startDate) changes.push(`Start date: ${b.startDate} → ${c.startDate}`);
       if (b.endDate !== c.endDate) changes.push(`End date: ${b.endDate} → ${c.endDate}`);
-      if (b.capex !== c.capex) changes.push(`CapEx: $${(b.capex || 0).toLocaleString()} → $${(c.capex || 0).toLocaleString()}`);
-      if (b.opex !== c.opex) changes.push(`OpEx: $${(b.opex || 0).toLocaleString()} → $${(c.opex || 0).toLocaleString()}`);
+      if (b.capex !== c.capex) changes.push(`CapEx: ${currency} ${(b.capex || 0).toLocaleString()} → ${currency} ${(c.capex || 0).toLocaleString()}`);
+      if (b.opex !== c.opex) changes.push(`OpEx: ${currency} ${(b.opex || 0).toLocaleString()} → ${currency} ${(c.opex || 0).toLocaleString()}`);
       if (b.assetId !== c.assetId) {
         const oldAsset = baseVersion.data.assets.find(a => a.id === b.assetId)?.name || 'Unknown';
         const newAsset = currentData.assets.find(a => a.id === c.assetId)?.name || 'Unknown';

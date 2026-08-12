@@ -5,10 +5,10 @@ import { cn } from '../lib/utils';
 const ICON_BTN = "w-5 h-5 bg-white hover:bg-slate-100 rounded shadow-sm text-slate-700 text-[10px] flex items-center justify-center leading-none";
 const MAX_DESCRIPTION_CHARS = 600;
 
-function formatBudget(amount: number): string {
+function formatBudget(amount: number, currency: string): string {
   return amount >= 1_000_000
-    ? `$${(amount / 1_000_000).toFixed(1)}m`
-    : `$${Math.round(amount / 1000)}k`;
+    ? `${currency} ${(amount / 1_000_000).toFixed(1)}m`
+    : `${currency} ${Math.round(amount / 1000)}k`;
 }
 
 export interface InitiativeBarProps {
@@ -78,9 +78,10 @@ export function InitiativeBar({
     ? init.description.slice(0, MAX_DESCRIPTION_CHARS)
     : '';
 
+  const currency = settings.defaultCurrency || 'USD';
   const hoverTitle = isGroup
     ? `Group: ${init.name}\n${safeDescription}`
-    : `${init.isPlaceholder ? '[Placeholder] ' : ''}${init.name}\nProgramme: ${progName ?? ''}\nStrategy: ${stratName ?? ''}\nCapEx: $${capex.toLocaleString()}\nOpEx: $${opex.toLocaleString()}${safeDescription ? `\n${safeDescription}` : ''}`;
+    : `${init.isPlaceholder ? '[Placeholder] ' : ''}${init.name}\nProgramme: ${progName ?? ''}\nStrategy: ${stratName ?? ''}\nCapEx: ${currency} ${capex.toLocaleString()}\nOpEx: ${currency} ${opex.toLocaleString()}${safeDescription ? `\n${safeDescription}` : ''}`;
 
   return (
     <div
@@ -186,7 +187,7 @@ export function InitiativeBar({
                         : 'bg-white/20 text-white',
                   )}
                 >
-                  CapEx {formatBudget(capex)}
+                  CapEx {formatBudget(capex, currency)}
                 </span>
               )}
               {opex > 0 && (
@@ -201,7 +202,7 @@ export function InitiativeBar({
                         : 'bg-white/20 text-white',
                   )}
                 >
-                  OpEx {formatBudget(opex)}
+                  OpEx {formatBudget(opex, currency)}
                 </span>
               )}
             </div>
