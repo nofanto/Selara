@@ -4,18 +4,18 @@ import { test, expect } from '@playwright/test';
  * Bug fix: segments created via double-click should show delete button after saving.
  *
  * Root cause: new segments were saved with their 'seg-new-*' placeholder ID intact.
- * ApplicationSegmentPanel.isNew checks id.includes('new'), so the delete button was
+ * DeliverableSegmentPanel.isNew checks id.includes('new'), so the delete button was
  * permanently suppressed for any segment created by double-click.
  *
- * Fix: handleSaveApplicationSegment replaces the placeholder ID with a permanent one
+ * Fix: handleSaveDeliverableSegment replaces the placeholder ID with a permanent one
  * on the first save.
  */
 test.describe('Segment delete button after double-click creation', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
-    await page.waitForSelector('[data-testid="application-row-content"]', { timeout: 20000 });
+    await page.waitForSelector('[data-testid="deliverable-row-content"]', { timeout: 20000 });
 
-    // Navigate to 2030 so no demo segments appear in the application rows,
+    // Navigate to 2030 so no demo segments appear in the deliverable rows,
     // giving us clean empty rows to double-click on.
     const startInput = page.getByTestId('timeline-start-input');
     await startInput.fill('2030-01-01');
@@ -30,8 +30,8 @@ test.describe('Segment delete button after double-click creation', () => {
     // Count bars before (should be 0 in 2030)
     const countBefore = await segmentBars.count();
 
-    // Double-click on an application row to open the create panel
-    const rowContent = page.locator('[data-testid="application-row-content"]').first();
+    // Double-click on a deliverable row to open the create panel
+    const rowContent = page.locator('[data-testid="deliverable-row-content"]').first();
     await rowContent.dblclick({ position: { x: 200, y: 20 } });
 
     await expect(panel.getByRole('button', { name: 'Add Segment' })).toBeVisible({ timeout: 5000 });

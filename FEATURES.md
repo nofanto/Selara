@@ -1,6 +1,6 @@
-# Scenia — Product Feature Reference
+# Selara — Product Feature Reference
 
-Internal reference document. Plain-language master list of everything Scenia can do, grouped by product area. Use this to audit tutorial and help content.
+Internal reference document. Plain-language master list of everything Selara can do, grouped by product area. Use this to audit tutorial and help content.
 
 ---
 

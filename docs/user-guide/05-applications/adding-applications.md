@@ -20,6 +20,7 @@ Changes are saved immediately — there is no separate save step.
 - Each application belongs to exactly one asset.
 - Once you have at least one application defined for an asset, an **Applications swimlane** appears beneath that asset's initiative row in the Visualiser.
 - Applications are included in version snapshots, so your historical records capture the full application landscape at the time each snapshot was taken.
+- The **Type** column classifies what kind of item the row represents — Application, Infrastructure, Document, Procedure, or Other. It defaults to Application if left unset. This is used by reports (like the [RPTI Report](../14-rpti-report/recording-an-rpti-row.md)) that need to distinguish software applications from infrastructure and other non-software deliverables.
 
 ---
 

@@ -1,18 +1,18 @@
 {
-  "name": "scenia",
+  "name": "selara",
   "version": "1.0.0",
   "private": false,
-  "description": "Strategic roadmap visualiser for IT planning",
+  "description": "IT portfolio planning and roadmap visualiser, forked from Scenia",
   "license": "Apache-2.0",
-  "author": "Waylon Kenning",
+  "author": "nofanto",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/waylonkenning/scenia.git"
+    "url": "git+https://github.com/nofanto/Selara.git"
   },
   "bugs": {
-    "url": "https://github.com/waylonkenning/scenia/issues"
+    "url": "https://github.com/nofanto/Selara/issues"
   },
-  "homepage": "https://github.com/waylonkenning/scenia#readme",
+  "homepage": "https://github.com/nofanto/Selara#readme",
   "type": "module",
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",

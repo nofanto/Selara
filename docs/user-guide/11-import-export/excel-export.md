@@ -2,7 +2,7 @@
 
 ![Excel export button in Data Manager](../../public/features/excel-export-data-manager.png)
 
-Exporting to Excel produces a structured `.xlsx` file containing your full portfolio data. Use this to share data with stakeholders who work outside Scenia, feed downstream reporting tools, or create an offline backup of the current state.
+Exporting to Excel produces a structured `.xlsx` file containing your full portfolio data. Use this to share data with stakeholders who work outside Selara, feed downstream reporting tools, or create an offline backup of the current state.
 
 ## How to export
 
@@ -18,23 +18,23 @@ The exported workbook contains one sheet per data type:
 | Sheet | Contents |
 |---|---|
 | **Initiatives** | All initiatives with their fields (including CapEx and OpEx) |
-| **Assets** | All application assets |
-| **AssetCategories** | All asset category groupings |
+| **Assets** | All assets |
+| **AssetCategories** | All asset category groupings, including their default RPTI category code and DC/DR location |
 | **Programmes** | All programmes |
 | **Strategies** | All strategies |
 | **Milestones** | All milestones |
 | **Dependencies** | All initiative dependency relationships |
-| **Applications** | All applications linked to assets |
-| **ApplicationSegments** | All application lifecycle segments |
-| **ApplicationStatuses** | All named status labels for segments |
+| **Deliverables** | All deliverables linked to assets, including their RPTI category/developer/DC-DR overrides |
+| **DeliverableSegments** | All deliverable lifecycle segments |
+| **DeliverableStatuses** | All named status labels for segments |
 | **Resources** | All people and roles in the resources roster |
+| **RptiDetails** | A raw backup copy of every RPTI report row (see [Recording an RPTI Row](../14-rpti-report/recording-an-rpti-row.md)) — separate from the formatted "Format 3.1" report export |
 | **Versions** | Metadata for all saved history snapshots |
-| **TimelineSettings** | Configuration settings (zoom, start date, toggles) for the current state and snapshots |
-| **DTS Summary** | One row per DTS asset showing adoption status, active initiative count, and total CapEx/OpEx. Only included when exporting from a DTS or Mixed workspace. |
+| **TimelineSettings** | Configuration settings (zoom, start date, default currency, toggles) for the current state and snapshots |
 
 ### Version History Preservation
 
-Unlike simple backups, Scenia's Excel export preserves your entire **Version History**. When you export:
+Unlike simple backups, Selara's Excel export preserves your entire **Version History**. When you export:
 - The **Versions** sheet captures the name, timestamp, and description of every snapshot you've saved.
 - All other data sheets include a **`versionId`** column. Rows where this is blank represent your current "live" data; rows with an ID correspond to data from a specific historical snapshot.
 

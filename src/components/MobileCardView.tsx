@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Asset, Initiative, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource, DtsAdoptionStatus, DtsPhaseRecord } from '../types';
+import { Asset, Initiative, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource, Decision } from '../types';
 import { ChevronDown, ChevronRight, AlertTriangle, DollarSign, AlignLeft, GitBranch } from 'lucide-react';
 import { InitiativePanel } from './InitiativePanel';
 
@@ -12,13 +12,14 @@ interface MobileCardViewProps {
   assetCategories: AssetCategory[];
   settings: TimelineSettings;
   resources?: Resource[];
-  dtsPhases?: DtsPhaseRecord[];
+  decisions?: Decision[];
+  onOpenDecision?: (decisionId: string) => void;
   onSaveInitiative: (initiative: Initiative) => void;
   onDeleteInitiative?: (initiative: Initiative) => void;
   onOpenSettings: () => void;
 }
 
-type BucketMode = 'timeline' | 'quarter' | 'year' | 'programme' | 'strategy' | 'dts-phase';
+type BucketMode = 'timeline' | 'quarter' | 'year' | 'programme' | 'strategy';
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
 
@@ -65,7 +66,6 @@ function bucketInitiatives(
   mode: BucketMode,
   programmes: Programme[],
   strategies: Strategy[],
-  dtsPhaseLabels: Record<string, string> = {},
 ): Map<string, Initiative[]> {
   const map = new Map<string, Initiative[]>();
 
@@ -85,8 +85,6 @@ function bucketInitiatives(
     } else if (mode === 'programme') {
       const prog = programmes.find(p => p.id === init.programmeId);
       key = prog?.name ?? 'No programme';
-    } else if (mode === 'dts-phase') {
-      key = getSafeRecordValue(dtsPhaseLabels, init.dtsPhase) ?? 'No DTS Phase';
     } else {
       const strat = strategies.find(s => s.id === init.strategyId);
       key = strat?.name ?? 'No strategy';
@@ -134,24 +132,6 @@ function conflictCount(assetInitiatives: Initiative[]): number {
 }
 
 
-const DTS_ADOPTION_STATUS_LABEL: Record<DtsAdoptionStatus, string> = {
-  'not-started':    'Not Started',
-  'scoping':        'Scoping',
-  'in-delivery':    'In Delivery',
-  'adopted':        'Adopted',
-  'decommissioning':'Decommissioning',
-  'not-applicable': 'N/A',
-};
-
-const DTS_ADOPTION_STATUS_STYLE: Record<DtsAdoptionStatus, string> = {
-  'not-started':    'bg-slate-100 text-slate-500',
-  'scoping':        'bg-yellow-50 text-yellow-700',
-  'in-delivery':    'bg-blue-50 text-blue-700',
-  'adopted':        'bg-green-50 text-green-700',
-  'decommissioning':'bg-orange-50 text-orange-700',
-  'not-applicable': 'bg-slate-50 text-slate-400',
-};
-
 // ── Programme colour dot ──────────────────────────────────────────────────────
 
 function ProgrammeDot({ colorClass }: { colorClass: string }) {
@@ -194,7 +174,6 @@ const InitiativeRow: React.FC<{
   settings: TimelineSettings;
   dependencies: Dependency[];
   allInitiatives: Initiative[];
-  dtsPhaseLabels: Record<string, string>;
   onClick: () => void;
 }> = ({
   initiative,
@@ -203,7 +182,6 @@ const InitiativeRow: React.FC<{
   settings,
   dependencies,
   allInitiatives,
-  dtsPhaseLabels,
   onClick,
 }) => {
   const prog = programmes.find(p => p.id === initiative.programmeId);
@@ -266,15 +244,6 @@ const InitiativeRow: React.FC<{
         )}
         {/* Programme name */}
         {prog && <div className="text-xs text-slate-400 mt-0.5">{prog.name}</div>}
-        {/* DTS Phase label */}
-        {initiative.dtsPhase && getSafeRecordValue(dtsPhaseLabels, initiative.dtsPhase) && (
-          <div
-            data-testid={`initiative-phase-label-${initiative.id}`}
-            className="text-[10px] text-indigo-500 font-medium mt-0.5"
-          >
-            {getSafeRecordValue(dtsPhaseLabels, initiative.dtsPhase)}
-          </div>
-        )}
         {/* Description */}
         {showDescription && (
           <div data-testid={`initiative-description-${initiative.id}`} className="mt-1.5 flex items-start gap-1">
@@ -287,9 +256,9 @@ const InitiativeRow: React.FC<{
           <div data-testid={`initiative-budget-${initiative.id}`} className="mt-1 flex items-center gap-1">
             <DollarSign size={10} className="text-slate-400 flex-shrink-0" />
             <span className="text-xs text-slate-500">
-              {(initiative.capex || 0) > 0 && `CapEx ${(initiative.capex || 0).toLocaleString('en-NZ', { style: 'currency', currency: 'NZD', maximumFractionDigits: 0 })}`}
+              {(initiative.capex || 0) > 0 && `CapEx ${settings.defaultCurrency || 'USD'} ${(initiative.capex || 0).toLocaleString()}`}
               {(initiative.capex || 0) > 0 && (initiative.opex || 0) > 0 && ' · '}
-              {(initiative.opex || 0) > 0 && `OpEx ${(initiative.opex || 0).toLocaleString('en-NZ', { style: 'currency', currency: 'NZD', maximumFractionDigits: 0 })}`}
+              {(initiative.opex || 0) > 0 && `OpEx ${settings.defaultCurrency || 'USD'} ${(initiative.opex || 0).toLocaleString()}`}
             </span>
           </div>
         )}
@@ -329,7 +298,6 @@ const BucketSection: React.FC<{
   settings: TimelineSettings;
   dependencies: Dependency[];
   allInitiatives: Initiative[];
-  dtsPhaseLabels: Record<string, string>;
   onSelectInitiative: (i: Initiative) => void;
 }> = ({
   label,
@@ -339,7 +307,6 @@ const BucketSection: React.FC<{
   settings,
   dependencies,
   allInitiatives,
-  dtsPhaseLabels,
   onSelectInitiative,
 }) => {
   const [expanded, setExpanded] = useState(true);
@@ -365,7 +332,6 @@ const BucketSection: React.FC<{
           settings={settings}
           dependencies={dependencies}
           allInitiatives={allInitiatives}
-          dtsPhaseLabels={dtsPhaseLabels}
           onClick={() => onSelectInitiative(init)}
         />
       ))}
@@ -386,7 +352,6 @@ const AssetCard: React.FC<{
   settings: TimelineSettings;
   allInitiatives: Initiative[];
   bucketMode: BucketMode;
-  dtsPhaseLabels: Record<string, string>;
   onSelectInitiative: (i: Initiative) => void;
   onOpenSettings?: () => void;
 }> = ({
@@ -400,7 +365,6 @@ const AssetCard: React.FC<{
   settings,
   allInitiatives,
   bucketMode,
-  dtsPhaseLabels,
   onSelectInitiative,
   onOpenSettings,
 }) => {
@@ -411,7 +375,7 @@ const AssetCard: React.FC<{
     return new Date(i.startDate) <= today && new Date(i.endDate) >= today;
   }).length;
 
-  const buckets = bucketInitiatives(initiatives, bucketMode, programmes, strategies, dtsPhaseLabels);
+  const buckets = bucketInitiatives(initiatives, bucketMode, programmes, strategies);
 
   // Determine a representative colour: first initiative's programme colour
   const firstProg = initiatives.length > 0
@@ -431,14 +395,6 @@ const AssetCard: React.FC<{
         }
         <span className="flex-1 text-sm font-semibold text-slate-800 truncate">{asset.name}</span>
         <div className="flex items-center gap-2 flex-shrink-0">
-        {settings.showDtsAdoptionStatus === 'on' && asset.dtsAdoptionStatus && (
-          <span
-            data-testid={`mobile-adoption-badge-${asset.id}`}
-            className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${getSafeRecordValue(DTS_ADOPTION_STATUS_STYLE as Record<string, string>, asset.dtsAdoptionStatus) ?? ''}`}
-          >
-            {getSafeRecordValue(DTS_ADOPTION_STATUS_LABEL as Record<string, string>, asset.dtsAdoptionStatus) ?? asset.dtsAdoptionStatus}
-          </span>
-        )}
           {conflicts > 0 && (
             <span
               data-testid={`conflict-badge-${asset.id}`}
@@ -489,7 +445,6 @@ const AssetCard: React.FC<{
                 settings={settings}
                 dependencies={dependencies}
                 allInitiatives={allInitiatives}
-                dtsPhaseLabels={dtsPhaseLabels}
                 onSelectInitiative={onSelectInitiative}
               />
             ))}
@@ -511,7 +466,8 @@ export function MobileCardView({
   assetCategories,
   settings,
   resources = [],
-  dtsPhases = [],
+  decisions = [],
+  onOpenDecision,
   onSaveInitiative,
   onDeleteInitiative,
   onOpenSettings,
@@ -520,16 +476,6 @@ export function MobileCardView({
   const [isPanelOpen, setIsPanelOpen] = useState(false);
 
   const bucketMode: BucketMode = settings.mobileBucketMode ?? 'timeline';
-
-  const dtsPhaseLabels: Record<string, string> = Object.fromEntries(
-    (dtsPhases.length > 0 ? dtsPhases : [
-      { id: 'phase-1',     name: 'Phase 1 — Register & Expose' },
-      { id: 'phase-2',     name: 'Phase 2 — Integrate DPI' },
-      { id: 'phase-3',     name: 'Phase 3 — AI & Legacy Exit' },
-      { id: 'back-office', name: 'Back-Office Consolidation' },
-      { id: 'not-dts',     name: 'Not DTS' },
-    ]).map(p => [p.id, p.name])
-  );
 
   // Filter initiatives to the window defined by startDate + monthsToShow
   const windowStart = new Date(settings.startDate);
@@ -603,7 +549,6 @@ export function MobileCardView({
                   settings={settings}
                   allInitiatives={initiatives}
                   bucketMode={bucketMode}
-                  dtsPhaseLabels={dtsPhaseLabels}
                   onSelectInitiative={handleSelectInitiative}
                   onOpenSettings={onOpenSettings}
                 />
@@ -627,7 +572,6 @@ export function MobileCardView({
                 settings={settings}
                 allInitiatives={initiatives}
                 bucketMode={bucketMode}
-                dtsPhaseLabels={dtsPhaseLabels}
                 onSelectInitiative={handleSelectInitiative}
                 onOpenSettings={onOpenSettings}
               />
@@ -644,11 +588,13 @@ export function MobileCardView({
         dependencies={dependencies}
         initiatives={initiatives}
         resources={resources}
-        dtsPhases={dtsPhases}
+        decisions={decisions}
+        onOpenDecision={onOpenDecision}
         onClose={() => setIsPanelOpen(false)}
         onSave={handleSave}
         onDelete={handleDelete}
         isOpen={isPanelOpen}
+        defaultCurrency={settings.defaultCurrency || 'USD'}
       />
     </>
   );

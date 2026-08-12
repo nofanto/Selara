@@ -2,7 +2,7 @@
 
 ![Mobile settings bottom sheet open on a phone screen](../../public/features/mobile-settings-sheet.png)
 
-The mobile settings sheet provides quick access to display and filtering options when using Scenia on a phone. It replaces the desktop toolbar controls, which are hidden on mobile viewports.
+The mobile settings sheet provides quick access to display and filtering options when using Selara on a phone. It replaces the desktop toolbar controls, which are hidden on mobile viewports.
 
 ## Opening and closing the sheet
 
@@ -51,4 +51,4 @@ Turning off Conflicts hides the badge count from card headers. The other three t
 ---
 
 - Previous: [Card View](card-view.md)
-- This is the last page in the guide.
+- Next: [Recording a Decision](../13-decisions/recording-a-decision.md)

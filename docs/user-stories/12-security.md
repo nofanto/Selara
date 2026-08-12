@@ -2,7 +2,7 @@
 
 ## US-SEC-01: HTTP Security Headers
 
-**As an** IT portfolio manager using Scenia,
+**As an** IT portfolio manager using Selara,
 **I want** the application to send HTTP security headers with every response,
 **so that** the browser enforces defence-in-depth protections even if an XSS vector is introduced in the future.
 

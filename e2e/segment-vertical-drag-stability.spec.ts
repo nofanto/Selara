@@ -30,7 +30,7 @@ test.describe('Segment vertical drag — neighbour stability', () => {
     await page.waitForTimeout(300);
   }
 
-  // Helper: create a segment by double-clicking at a position within an application row
+  // Helper: create a segment by double-clicking at a position within a deliverable row
   async function addSegment(page: any, rowContent: any, x: number) {
     const panel = page.getByTestId('segment-panel');
     await rowContent.dblclick({ position: { x, y: 20 } });
@@ -41,7 +41,7 @@ test.describe('Segment vertical drag — neighbour stability', () => {
 
   test('AC-A – neighbour segments stay fixed while dragging a segment vertically', async ({ page }) => {
     await setupCleanSwimlane(page);
-    const rowContent = page.locator('[data-testid="application-row-content"]').first();
+    const rowContent = page.locator('[data-testid="deliverable-row-content"]').first();
 
     // Create two non-overlapping segments — they start in the same row
     await addSegment(page, rowContent, 80);
@@ -77,7 +77,7 @@ test.describe('Segment vertical drag — neighbour stability', () => {
 
   test('AC-B – clicking a segment does not move any other segment', async ({ page }) => {
     await setupCleanSwimlane(page);
-    const rowContent = page.locator('[data-testid="application-row-content"]').first();
+    const rowContent = page.locator('[data-testid="deliverable-row-content"]').first();
 
     await addSegment(page, rowContent, 80);
     await addSegment(page, rowContent, 420);
@@ -103,7 +103,7 @@ test.describe('Segment vertical drag — neighbour stability', () => {
 
   test('AC-C – conflict resolution fires after releasing a vertical drag onto an occupied row', async ({ page }) => {
     await setupCleanSwimlane(page);
-    const rowContent = page.locator('[data-testid="application-row-content"]').first();
+    const rowContent = page.locator('[data-testid="deliverable-row-content"]').first();
 
     // Create two overlapping segments by dragging the left one over the right after creation
     await addSegment(page, rowContent, 80);

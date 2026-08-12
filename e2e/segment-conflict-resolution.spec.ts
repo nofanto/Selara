@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 /**
  * User Story: Conflict Resolution on Horizontal Segment Drag
  *
- * As a Scenia user, when I drag an application segment left or right so that
+ * As a Selara user, when I drag a deliverable segment left or right so that
  * it overlaps another segment in the same row, the overlapped segment should
  * automatically shift down to the next available row rather than rendering
  * on top of the moved segment.
@@ -26,7 +26,7 @@ test.describe('Segment Conflict Resolution on Horizontal Drag', () => {
     await startInput.press('Enter');
     await page.waitForTimeout(300);
 
-    const rowContent = page.locator('[data-testid="application-row-content"]').first();
+    const rowContent = page.locator('[data-testid="deliverable-row-content"]').first();
 
     // Create segment 1 at the left of the timeline
     await rowContent.dblclick({ position: { x: 80, y: 20 } });

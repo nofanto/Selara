@@ -6,8 +6,8 @@ describe('isWorkspaceEmpty', () => {
     expect(
       isWorkspaceEmpty({
         assets: [],
-        applications: [],
-        applicationSegments: [],
+        deliverables: [],
+        deliverableSegments: [],
         initiatives: [],
         milestones: [],
         programmes: [],
@@ -15,8 +15,7 @@ describe('isWorkspaceEmpty', () => {
         dependencies: [],
         assetCategories: [],
         resources: [],
-        applicationStatuses: [],
-        dtsPhases: [],
+        deliverableStatuses: [],
       }),
     ).toBe(true);
   });
@@ -25,8 +24,8 @@ describe('isWorkspaceEmpty', () => {
     expect(
       isWorkspaceEmpty({
         assets: [],
-        applications: [],
-        applicationSegments: [],
+        deliverables: [],
+        deliverableSegments: [],
         initiatives: [],
         milestones: [{ id: 'm1' }],
         programmes: [],
@@ -34,8 +33,7 @@ describe('isWorkspaceEmpty', () => {
         dependencies: [],
         assetCategories: [],
         resources: [],
-        applicationStatuses: [],
-        dtsPhases: [],
+        deliverableStatuses: [],
       }),
     ).toBe(false);
   });
@@ -44,8 +42,8 @@ describe('isWorkspaceEmpty', () => {
     expect(
       isWorkspaceEmpty({
         assets: [],
-        applications: [{ id: 'app-1' }],
-        applicationSegments: [],
+        deliverables: [{ id: 'app-1' }],
+        deliverableSegments: [],
         initiatives: [],
         milestones: [],
         programmes: [],
@@ -53,8 +51,7 @@ describe('isWorkspaceEmpty', () => {
         dependencies: [],
         assetCategories: [],
         resources: [],
-        applicationStatuses: [],
-        dtsPhases: [],
+        deliverableStatuses: [],
       }),
     ).toBe(false);
   });

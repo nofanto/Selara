@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 /**
  * User Story: Tap-to-Select for Segments and Initiatives
  *
- * As a Scenia user on any device (including iPad/touch), I want to tap or
+ * As a Selara user on any device (including iPad/touch), I want to tap or
  * click a segment or initiative to select it, so that I can see visible
  * affordance handles that show me what interactions are available — resize
  * left/right, resize taller/shorter, move up/down a row — without needing
@@ -53,9 +53,9 @@ test.describe('Tap-to-Select for Segments and Initiatives', () => {
     const startInput = page.getByTestId('timeline-start-input');
     await startInput.fill('2030-01-01');
     await startInput.press('Enter');
-    await page.waitForSelector('[data-testid="application-row-content"]');
+    await page.waitForSelector('[data-testid="deliverable-row-content"]');
 
-    const rowContent = page.locator('[data-testid="application-row-content"]').first();
+    const rowContent = page.locator('[data-testid="deliverable-row-content"]').first();
     await rowContent.dblclick({ position: { x: 200, y: 20 } });
     const panel = page.getByTestId('segment-panel');
     await expect(panel.getByRole('button', { name: 'Add Segment' })).toBeVisible();
@@ -74,9 +74,9 @@ test.describe('Tap-to-Select for Segments and Initiatives', () => {
     const startInput = page.getByTestId('timeline-start-input');
     await startInput.fill('2030-01-01');
     await startInput.press('Enter');
-    await page.waitForSelector('[data-testid="application-row-content"]');
+    await page.waitForSelector('[data-testid="deliverable-row-content"]');
 
-    const rowContent = page.locator('[data-testid="application-row-content"]').first();
+    const rowContent = page.locator('[data-testid="deliverable-row-content"]').first();
     await rowContent.dblclick({ position: { x: 200, y: 20 } });
     const panel = page.getByTestId('segment-panel');
     await expect(panel.getByRole('button', { name: 'Add Segment' })).toBeVisible();

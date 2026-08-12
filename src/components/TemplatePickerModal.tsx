@@ -18,7 +18,7 @@ export function TemplatePickerModal({ onSelect, onViewerImport, isReset = false 
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col animate-in zoom-in-95 duration-150">
         <div className="p-6 border-b border-slate-100">
           <h2 className="text-xl font-bold text-slate-900">
-            {isReset ? 'Clear data and start again' : 'Welcome to Scenia'}
+            {isReset ? 'Clear data and start again' : 'Welcome to Selara'}
           </h2>
           <p className="text-sm text-slate-500 mt-1">
             {isReset

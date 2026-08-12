@@ -8,7 +8,7 @@ test.describe('Features Modal', () => {
 
   test('opens, shows expected content, and closes', async ({ page }) => {
     await page.getByTestId('nav-features').click();
-    await expect(page.getByText('Scenia Features & Capabilities')).toBeVisible();
+    await expect(page.getByText('Selara Features & Capabilities')).toBeVisible();
 
     // Core navigation sections
     await expect(page.getByText('Navigation & Setup')).toBeVisible();
@@ -17,7 +17,7 @@ test.describe('Features Modal', () => {
 
     // Close
     await page.locator('button[aria-label="Close Features"]').click();
-    await expect(page.getByText('Scenia Features & Capabilities')).toBeHidden();
+    await expect(page.getByText('Selara Features & Capabilities')).toBeHidden();
   });
 
   test('loads correct v3 animation assets (move-resize and grouped images)', async ({ page }) => {

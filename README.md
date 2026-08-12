@@ -1,10 +1,12 @@
-# Scenia: Strategic Roadmap & Visualiser
+# Selara: IT Portfolio Planning & Roadmap Visualiser
 
-**Scenia is now open source!** We've made the full codebase publicly available under the Apache 2.0 licence. Whether you want to self-host, contribute, or just explore — you're welcome here.
+**Selara is open source**, available under the Apache 2.0 licence. Whether you want to self-host, contribute, or just explore — you're welcome here.
 
-Scenia is a powerful, interactive visualiser designed for IT strategic planning. It allows teams to map out initiatives across different IT assets, track dependencies, and identify scheduling conflicts in a clean, timeline-based interface.
+Selara is a powerful, interactive visualiser designed for IT strategic planning. It allows teams to map out initiatives across different IT assets, track dependencies, and identify scheduling conflicts in a clean, timeline-based interface.
 
-**[🌐 View Live Demo](https://scenia.website)** · **[⭐ Star on GitHub](https://github.com/waylonkenning/scenia)**
+Selara is a fork of [Scenia](https://github.com/waylonkenning/scenia) by Waylon Kenning.
+
+**[⭐ Star on GitHub](https://github.com/nofanto/Selara)**
 
 ## 🚀 Key Features
 
@@ -38,20 +40,14 @@ Manages the connection to IndexedDB, providing a local-first experience that wor
 
 ## 🚢 Deployment
 
-Scenia is containerised using Docker and deployed to **Google Cloud Run** via **Google Cloud Build**.
-
-### Continuous Deployment
-The deployment pipeline is defined in `cloudbuild.yaml`:
-1.  **Build:** A multi-stage Docker build is triggered.
-2.  **Push:** The resulting image is pushed to the Google Container Registry.
-3.  **Deploy:** The image is deployed to Google Cloud Run, automatically serving the application over HTTPS.
+**TBD.** This fork inherited a `Dockerfile` and `cloudbuild.yaml` from Scenia (Docker image served via Nginx on port 8080, built for Google Cloud Build / Cloud Run), but no hosting target has been set up for Selara yet. Don't assume a push to this repo deploys anywhere — that was Scenia's original Cloud Build trigger pointing at `scenia.website`, which is Waylon Kenning's infrastructure, not this fork's. See `CLAUDE.md`'s Deployment Targets section for the current state.
 
 ## 💻 Local Development
 
 1.  **Clone the repository:**
     ```bash
-    git clone https://github.com/waylonkenning/scenia.git
-    cd scenia
+    git clone https://github.com/nofanto/Selara.git
+    cd Selara
     ```
 2.  **Install dependencies:**
     ```bash
@@ -72,4 +68,4 @@ Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for gui
 
 ## 📜 License
 
-Licensed under the **Apache License 2.0**. See [LICENSE](LICENSE) for the full text.
+Licensed under the **Apache License 2.0**. See [LICENSE](LICENSE) for the full text. This project is a derivative work of [Scenia](https://github.com/waylonkenning/scenia), also Apache 2.0 licensed.

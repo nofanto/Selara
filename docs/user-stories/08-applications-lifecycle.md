@@ -138,7 +138,7 @@
 
 ## US-30: Unify Application Segment Model (Remove assetId Shortcut)
 
-**As a** developer maintaining the Scenia data model,
+**As a** developer maintaining the Selara data model,
 **I want** all application lifecycle segments to link via an `Application` record rather than directly to an asset,
 **so that** the data model has a single, consistent path and all segments are visible and editable in the Data Manager.
 
@@ -170,18 +170,3 @@ The shortcut is used in both GEANZ demo data (~20 segments for `gz-*` assets) an
 - `src/components/Timeline.tsx` — remove `assetId` branch in segment rendering
 - `e2e/` — add test confirming applications appear in the Data Manager for both GEANZ and DTS templates
 
----
-
-## US-AL-10: Show DTS Adoption Status on Asset Rows
-
-**As an** IT portfolio manager working within a DTS or Mixed workspace,
-**I want** to see each asset's DTS adoption status displayed directly on the timeline,
-**so that** I can assess overall Digital Target State progress without switching to a report.
-
-**Acceptance Criteria:**
-- An **Adoption Status** field (Not Started / Scoping / In Delivery / Adopted / Decommissioning Incumbent / Not Applicable) is available on each asset in Data Manager → Assets, for DTS and Mixed workspaces only
-- A **DTS Adoption Status** display toggle is available in the timeline header for DTS and Mixed workspaces
-- When the toggle is enabled, a coloured badge showing the adoption status appears on each asset row in the timeline sidebar
-- The badge colour matches the status: distinct colours for each of the six status values
-- Adoption status values persist to IndexedDB across reloads
-- The toggle state persists across page reloads

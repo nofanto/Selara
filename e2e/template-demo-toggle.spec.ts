@@ -7,7 +7,7 @@ import { test, expect } from '@playwright/test';
  * AC2: Clicking "Clear data and start again" opens the template picker with a data-loss warning
  * AC3: Each non-blank template card shows two buttons: "With demo data" and "Without demo data"
  * AC4: The Blank template card shows only a "Start blank" button
- * AC5: "With demo data" loads asset categories, assets, initiatives, milestones, and application segments
+ * AC5: "With demo data" loads asset categories, assets, initiatives, milestones, and deliverable segments
  * AC6: "Without demo data" loads only asset categories and assets — no initiatives, milestones, or segments
  * AC7: First-time onboarding flow shows the updated template picker (with/without demo data buttons)
  * AC8: After selecting a template during first run, the tutorial modal is shown
@@ -64,7 +64,7 @@ test.describe('US-18: Template Demo Data Toggle', () => {
     await simulateFirstRun(page);
     await page.waitForSelector('[data-testid="template-picker-modal"]', { timeout: 20000 });
 
-    for (const templateId of ['dts', 'geanz']) {
+    for (const templateId of ['geanz']) {
       await expect(page.getByTestId(`template-select-with-demo-btn-${templateId}`)).toBeVisible();
       await expect(page.getByTestId(`template-select-no-demo-btn-${templateId}`)).toBeVisible();
     }
@@ -82,43 +82,38 @@ test.describe('US-18: Template Demo Data Toggle', () => {
   });
 
   // ── AC5 ──────────────────────────────────────────────────────────────────
-  test('AC5: DTS "With demo data" loads categories, assets, initiatives, and segments', async ({ page }) => {
+  test('AC5: GEANZ "With demo data" loads categories, assets, initiatives, and segments', async ({ page }) => {
     await page.goto('/');
     await simulateFirstRun(page);
     await page.waitForSelector('[data-testid="template-picker-modal"]', { timeout: 20000 });
-    await page.getByTestId('template-select-with-demo-btn-dts').click();
+    await page.getByTestId('template-select-with-demo-btn-geanz').click();
 
     await page.waitForSelector('[data-testid="asset-row-content"]', { timeout: 20000 });
-
-    // DTS category header visible
-    await expect(page.getByText('Digital Public Infrastructure')).toBeVisible();
 
     // At least one initiative bar rendered
     const initiativeBars = page.locator('[data-testid^="initiative-bar"]');
     await expect(initiativeBars.first()).toBeVisible({ timeout: 10000 });
 
-    // At least one application segment rendered
+    // At least one deliverable segment rendered
     const segments = page.locator('[data-testid^="segment-"]');
     await expect(segments.first()).toBeVisible({ timeout: 10000 });
   });
 
   // ── AC6 ──────────────────────────────────────────────────────────────────
-  test('AC6: DTS "Without demo data" loads only categories and assets — no initiatives or segments', async ({ page }) => {
+  test('AC6: GEANZ "Without demo data" loads only categories and assets — no initiatives or segments', async ({ page }) => {
     await page.goto('/');
     await simulateFirstRun(page);
     await page.waitForSelector('[data-testid="template-picker-modal"]', { timeout: 20000 });
-    await page.getByTestId('template-select-no-demo-btn-dts').click();
+    await page.getByTestId('template-select-no-demo-btn-geanz').click();
 
     await page.waitForSelector('[data-testid="asset-row-content"]', { timeout: 20000 });
 
-    // DTS category header and asset row should be visible
-    await expect(page.getByText('Digital Public Infrastructure')).toBeVisible();
     await expect(page.locator('[data-testid="asset-row-content"]').first()).toBeVisible();
 
     // No initiative bars
     await expect(page.locator('[data-testid^="initiative-bar"]')).toHaveCount(0);
 
-    // No application segments
+    // No deliverable segments
     await expect(page.locator('[data-testid^="segment-"]')).toHaveCount(0);
   });
 
@@ -129,8 +124,8 @@ test.describe('US-18: Template Demo Data Toggle', () => {
     await page.waitForSelector('[data-testid="template-picker-modal"]', { timeout: 20000 });
 
     // The updated dual-button structure must appear in the first-run context too
-    await expect(page.getByTestId('template-select-with-demo-btn-dts')).toBeVisible();
-    await expect(page.getByTestId('template-select-no-demo-btn-dts')).toBeVisible();
+    await expect(page.getByTestId('template-select-with-demo-btn-geanz')).toBeVisible();
+    await expect(page.getByTestId('template-select-no-demo-btn-geanz')).toBeVisible();
     await expect(page.getByTestId('template-start-blank-btn')).toBeVisible();
   });
 
@@ -140,7 +135,7 @@ test.describe('US-18: Template Demo Data Toggle', () => {
     // Fresh DB means hasSeenTutorial = false, so tutorial auto-opens after template selection
     await simulateFirstRun(page);
     await page.waitForSelector('[data-testid="template-picker-modal"]', { timeout: 20000 });
-    await page.getByTestId('template-select-with-demo-btn-dts').click();
+    await page.getByTestId('template-select-with-demo-btn-geanz').click();
 
     // Tutorial modal must appear (identified by its data-testid added in implementation)
     await expect(page.getByTestId('tutorial-modal')).toBeVisible({ timeout: 10000 });

@@ -1,11 +1,11 @@
 import * as XLSX from 'xlsx';
-import { Asset, Application, ApplicationSegment, ApplicationStatus, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, DtsAdoptionStatus, TimelineSettings, Resource, Version, DtsPhaseRecord } from '../types';
+import { Asset, Deliverable, DeliverableSegment, DeliverableStatus, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource, Version, RptiDetail } from '../types';
 
 interface AppData {
   assets: Asset[];
-  applications?: Application[];
-  applicationSegments?: ApplicationSegment[];
-  applicationStatuses?: ApplicationStatus[];
+  deliverables?: Deliverable[];
+  deliverableSegments?: DeliverableSegment[];
+  deliverableStatuses?: DeliverableStatus[];
   initiatives: Initiative[];
   milestones: Milestone[];
   programmes: Programme[];
@@ -15,7 +15,7 @@ interface AppData {
   timelineSettings?: TimelineSettings;
   resources?: Resource[];
   versions?: Version[];
-  dtsPhases?: DtsPhaseRecord[];
+  rptiDetails?: RptiDetail[];
 }
 
 
@@ -40,15 +40,6 @@ const sanitizeTimelineSettings = (raw: unknown): TimelineSettings | undefined =>
     startDate,
     monthsToShow,
   } as TimelineSettings;
-};
-
-const DTS_ADOPTION_STATUS_LABEL: Record<DtsAdoptionStatus, string> = {
-  'not-started':    'Not Started',
-  'scoping':        'Scoping',
-  'in-delivery':    'In Delivery',
-  'adopted':        'Adopted',
-  'decommissioning':'Decommissioning Incumbent',
-  'not-applicable': 'Not Applicable',
 };
 
 const normalizeResourceIds = (value: unknown): string[] | undefined => {
@@ -133,20 +124,20 @@ export const exportToExcel = (data: AppData) => {
   // 7. Dependencies
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(flatten(data.dependencies, 'dependencies')), 'Dependencies');
 
-  // 8. Applications
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(flatten(data.applications, 'applications')), 'Applications');
+  // 8. Deliverables
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(flatten(data.deliverables, 'deliverables')), 'Deliverables');
 
-  // 9. Application Segments
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(flatten(data.applicationSegments, 'applicationSegments')), 'ApplicationSegments');
+  // 9. Deliverable Segments
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(flatten(data.deliverableSegments, 'deliverableSegments')), 'DeliverableSegments');
 
-  // 10. Application Statuses
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(flatten(data.applicationStatuses, 'applicationStatuses')), 'ApplicationStatuses');
+  // 10. Deliverable Statuses
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(flatten(data.deliverableStatuses, 'deliverableStatuses')), 'DeliverableStatuses');
 
   // 11. Resources
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(flatten(data.resources, 'resources')), 'Resources');
 
-  // 12. DTS Phases
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(flatten(data.dtsPhases, 'dtsPhases')), 'DtsPhases');
+  // 12. RPTI Details (raw backup copy — the pretty Format 3.1 export is a separate, report-scoped export)
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(flatten(data.rptiDetails, 'rptiDetails')), 'RptiDetails');
 
   // 13. Timeline Settings (versioned)
   const settingsList = [];
@@ -164,54 +155,6 @@ export const exportToExcel = (data: AppData) => {
     description: v.description || '',
   }));
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(versionsMetadata), 'Versions');
-
-  // 15. DTS Summary — only for workspaces that have DTS assets (alias starts with "DTS.")
-  // Note: DTS Summary is a presentation sheet for CURRENT data only
-  const dtsAssets = data.assets.filter(a => typeof a.alias === 'string' && a.alias.startsWith('DTS.'));
-  if (dtsAssets.length > 0) {
-    const activeInitiatives = data.initiatives.filter(i => !i.isPlaceholder);
-    const dtsSummaryRows = dtsAssets
-      .sort((a, b) => {
-        const catA = data.assetCategories.find(c => c.id === a.categoryId);
-        const catB = data.assetCategories.find(c => c.id === b.categoryId);
-        const orderA = catA?.order ?? 999;
-        const orderB = catB?.order ?? 999;
-        if (orderA !== orderB) return orderA - orderB;
-        return (a.alias ?? '').localeCompare(b.alias ?? '');
-      })
-      .map(asset => {
-        const category = data.assetCategories.find(c => c.id === asset.categoryId);
-        const assetInits = activeInitiatives.filter(i => i.assetId === asset.id);
-        const totalCapex = assetInits.reduce((sum, i) => sum + (i.capex || 0), 0);
-        const totalOpex = assetInits.reduce((sum, i) => sum + (i.opex || 0), 0);
-        return {
-          'Layer': category?.name ?? '',
-          'Asset Name': asset.name,
-          'Alias': asset.alias ?? '',
-          'Adoption Status': asset.dtsAdoptionStatus
-            ? DTS_ADOPTION_STATUS_LABEL[asset.dtsAdoptionStatus] ?? asset.dtsAdoptionStatus
-            : '',
-          'Initiative Count': assetInits.length,
-          'Total CapEx ($)': totalCapex,
-          'Total OpEx ($)': totalOpex,
-        };
-      });
-
-    const clusterName = data.timelineSettings?.clusterName;
-    let dtsSummaryWs: XLSX.WorkSheet;
-    if (clusterName) {
-      // Add cluster name as a metadata header row, then a blank row, then the data
-      dtsSummaryWs = XLSX.utils.aoa_to_sheet([
-        ['Cluster', clusterName],
-        [],
-        ['Layer', 'Asset Name', 'Alias', 'Adoption Status', 'Initiative Count', 'Total CapEx ($)', 'Total OpEx ($)'],
-        ...dtsSummaryRows.map(r => [r['Layer'], r['Asset Name'], r['Alias'], r['Adoption Status'], r['Initiative Count'], r['Total CapEx ($)'], r['Total OpEx ($)']]),
-      ]);
-    } else {
-      dtsSummaryWs = XLSX.utils.json_to_sheet(dtsSummaryRows);
-    }
-    XLSX.utils.book_append_sheet(wb, dtsSummaryWs, 'DTS Summary');
-  }
 
   // Write file
   XLSX.writeFile(wb, `it-roadmap-${new Date().toISOString().split('T')[0]}.xlsx`);
@@ -246,11 +189,11 @@ export const importFromExcel = async (file: File): Promise<Partial<AppData>> => 
           strategies: getSheetData<any>('Strategies'),
           milestones: getSheetData<any>('Milestones'),
           dependencies: getSheetData<any>('Dependencies'),
-          applications: getSheetData<any>('Applications'),
-          applicationSegments: getSheetData<any>('ApplicationSegments'),
-          applicationStatuses: getSheetData<any>('ApplicationStatuses'),
+          deliverables: getSheetData<any>('Deliverables'),
+          deliverableSegments: getSheetData<any>('DeliverableSegments'),
+          deliverableStatuses: getSheetData<any>('DeliverableStatuses'),
           resources: getSheetData<any>('Resources'),
-          dtsPhases: getSheetData<any>('DtsPhases'),
+          rptiDetails: getSheetData<any>('RptiDetails'),
           timelineSettings: getSheetData<any>('TimelineSettings'),
           versions: getSheetData<any>('Versions'),
         };
@@ -292,20 +235,20 @@ export const importFromExcel = async (file: File): Promise<Partial<AppData>> => 
         const depSplit = split<Dependency>(raw.dependencies);
         result.dependencies = depSplit.current;
 
-        const appSplit = split<Application>(raw.applications);
-        result.applications = appSplit.current;
+        const appSplit = split<Deliverable>(raw.deliverables);
+        result.deliverables = appSplit.current;
 
-        const segSplit = split<ApplicationSegment>(raw.applicationSegments);
-        result.applicationSegments = segSplit.current;
+        const segSplit = split<DeliverableSegment>(raw.deliverableSegments);
+        result.deliverableSegments = segSplit.current;
 
-        const statSplit = split<ApplicationStatus>(raw.applicationStatuses);
-        result.applicationStatuses = statSplit.current;
+        const statSplit = split<DeliverableStatus>(raw.deliverableStatuses);
+        result.deliverableStatuses = statSplit.current;
 
         const resSplit = split<Resource>(raw.resources);
         result.resources = resSplit.current;
 
-        const dtsPhaseSplit = split<DtsPhaseRecord>(raw.dtsPhases);
-        result.dtsPhases = dtsPhaseSplit.current;
+        const rptiDetailSplit = split<RptiDetail>(raw.rptiDetails);
+        result.rptiDetails = rptiDetailSplit.current;
 
         const settingsSplit = split<TimelineSettings>(raw.timelineSettings);
         result.timelineSettings = sanitizeTimelineSettings(settingsSplit.current[0]);
@@ -327,11 +270,11 @@ export const importFromExcel = async (file: File): Promise<Partial<AppData>> => 
                 strategies: stratSplit.byVersion[vid] || [],
                 milestones: mileSplit.byVersion[vid] || [],
                 dependencies: depSplit.byVersion[vid] || [],
-                applications: appSplit.byVersion[vid] || [],
-                applicationSegments: segSplit.byVersion[vid] || [],
-                applicationStatuses: statSplit.byVersion[vid] || [],
+                deliverables: appSplit.byVersion[vid] || [],
+                deliverableSegments: segSplit.byVersion[vid] || [],
+                deliverableStatuses: statSplit.byVersion[vid] || [],
                 resources: resSplit.byVersion[vid] || [],
-                dtsPhases: dtsPhaseSplit.byVersion[vid] || [],
+                rptiDetails: rptiDetailSplit.byVersion[vid] || [],
                 timelineSettings: sanitizeTimelineSettings(settingsSplit.byVersion[vid]?.[0]) || {},
               }
             };

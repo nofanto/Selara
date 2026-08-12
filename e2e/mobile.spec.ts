@@ -39,34 +39,6 @@ async function setBudgetMode(page: Page, desired: 'off' | 'label' | 'bar-height'
   }
 }
 
-async function simulateFirstRun(page: Page) {
-  await page.evaluate(async () => {
-    await new Promise<void>((resolve) => {
-      const req = indexedDB.deleteDatabase('it-initiative-visualiser');
-      req.onsuccess = () => resolve();
-      req.onerror = () => resolve();
-      req.onblocked = () => setTimeout(resolve, 200);
-    });
-    localStorage.removeItem('scenia-e2e');
-    localStorage.setItem('scenia_has_seen_landing', 'true');
-  });
-  await page.reload();
-}
-
-async function loadDtsMobile(page: Page) {
-  await page.goto('/');
-  await simulateFirstRun(page);
-  await page.waitForSelector('[data-testid="template-picker-modal"]', { timeout: 10000 });
-  await page.getByTestId('template-select-with-demo-btn-dts').click();
-  await page.waitForSelector('[data-testid="mobile-card-view"]', { timeout: 10000 });
-  const tutorialModal = page.getByTestId('tutorial-modal');
-  await tutorialModal.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
-  if (await tutorialModal.isVisible()) {
-    await page.getByRole('button', { name: 'Close' }).first().click();
-    await tutorialModal.waitFor({ state: 'hidden', timeout: 5000 });
-  }
-}
-
 // ─── Mobile layout foundation ─────────────────────────────────────────────────
 
 test.describe('Mobile layout — foundation', () => {
@@ -445,37 +417,6 @@ test.describe('Mobile card view — display toggles', () => {
     await setToggle(page, 'mobile-toggle-relationships', false);
     await closeSettingsEsc(page);
     await expect(page.locator(`[data-testid="initiative-relationships-${INITIATIVE_ID}"]`)).not.toBeVisible();
-  });
-});
-
-// ─── DTS fields ───────────────────────────────────────────────────────────────
-
-test.describe('Mobile card view — DTS fields', () => {
-  test.use({ viewport: { width: 390, height: 844 } });
-
-  test('DTS Phase bucket mode appears in settings for DTS workspaces', async ({ page }) => {
-    await loadDtsMobile(page);
-    await openSettings(page);
-    await expect(page.getByTestId('bucket-mode-dts-phase')).toBeVisible();
-  });
-
-  test('Adoption Status toggle appears in settings for DTS workspaces', async ({ page }) => {
-    await loadDtsMobile(page);
-    await openSettings(page);
-    await expect(page.getByTestId('mobile-toggle-dts-adoption')).toBeVisible();
-  });
-
-  test('enabling Adoption Status shows badges on asset cards', async ({ page }) => {
-    await loadDtsMobile(page);
-    await openSettings(page);
-    await page.getByTestId('mobile-toggle-dts-adoption').click();
-    await page.getByTestId('mobile-settings-backdrop').click();
-    await expect(page.locator('[data-testid^="mobile-adoption-badge-"]').first()).toBeVisible();
-  });
-
-  test('initiative rows show DTS phase label when phase is set', async ({ page }) => {
-    await loadDtsMobile(page);
-    await expect(page.locator('[data-testid^="initiative-phase-label-"]').first()).toBeVisible();
   });
 });
 

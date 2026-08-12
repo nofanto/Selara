@@ -1,16 +1,17 @@
 import React, { useState } from 'react';
-import { Asset, Application, ApplicationSegment, ApplicationStatus, DtsPhaseRecord, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource } from '../types';
+import { Asset, Deliverable, DeliverableSegment, DeliverableStatus, DeliverableType, Decision, RptiDetail, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource } from '../types';
 import { EditableTable, Column } from './EditableTable';
 import { cn } from '../lib/utils';
-import { Database, Layers, Calendar, Flag, Target, Link2, FolderTree, LayoutTemplate, Users, Box } from 'lucide-react';
+import { Database, Layers, Calendar, Flag, Target, Link2, FolderTree, LayoutTemplate, Users, Box, ClipboardList, RefreshCw } from 'lucide-react';
 import { ConfirmModal } from './ConfirmModal';
-import { clearApplicationsAndSegments, removeApplicationAndSegments } from '../lib/applicationCascade';
+import { clearDeliverablesAndSegments, removeDeliverableAndSegments } from '../lib/deliverableCascade';
+import { rptiCascadeOnInitiativeDelete, rptiCascadeOnDeliverableDelete, rptiCascadeOnAssetDelete, RPTI_CATEGORY_LABELS, generateRptiDetails } from '../lib/rpti';
 
 interface DataManagerProps {
   data: {
     assets: Asset[];
-    applications: Application[];
-    applicationSegments: ApplicationSegment[];
+    deliverables: Deliverable[];
+    deliverableSegments: DeliverableSegment[];
     initiatives: Initiative[];
     milestones: Milestone[];
     programmes: Programme[];
@@ -19,13 +20,14 @@ interface DataManagerProps {
     assetCategories: AssetCategory[];
     timelineSettings: TimelineSettings;
     resources: Resource[];
-    applicationStatuses: ApplicationStatus[];
-    dtsPhases: DtsPhaseRecord[];
+    deliverableStatuses: DeliverableStatus[];
+    decisions: Decision[];
+    rptiDetails: RptiDetail[];
   };
   onUpdate: (data: {
     assets: Asset[];
-    applications: Application[];
-    applicationSegments: ApplicationSegment[];
+    deliverables: Deliverable[];
+    deliverableSegments: DeliverableSegment[];
     initiatives: Initiative[];
     milestones: Milestone[];
     programmes: Programme[];
@@ -34,14 +36,15 @@ interface DataManagerProps {
     assetCategories: AssetCategory[];
     timelineSettings: TimelineSettings;
     resources: Resource[];
-    applicationStatuses: ApplicationStatus[];
-    dtsPhases: DtsPhaseRecord[];
+    deliverableStatuses: DeliverableStatus[];
+    decisions: Decision[];
+    rptiDetails: RptiDetail[];
   }) => void;
   onOpenTemplatePicker: () => void;
   searchQuery?: string;
 }
 
-type Tab = 'initiatives' | 'dependencies' | 'assets' | 'assetCategories' | 'programmes' | 'strategies' | 'milestones' | 'resources' | 'applications' | 'appStatuses' | 'dtsPhases';
+type Tab = 'initiatives' | 'dependencies' | 'assets' | 'assetCategories' | 'programmes' | 'strategies' | 'milestones' | 'resources' | 'deliverables' | 'deliverableStatuses' | 'rpti';
 
 export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery }: DataManagerProps) {
   const [activeTab, setActiveTab] = useState<Tab>('initiatives');
@@ -79,15 +82,23 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery 
     const affectedMiles = data.milestones.filter(m => m.assetId === asset.id);
     const affectedInitIds = new Set(affectedInits.map(i => i.id));
     const affectedDeps = data.dependencies.filter(d => affectedInitIds.has(d.sourceId) || affectedInitIds.has(d.targetId));
+    const affectedRptiFromInits = data.rptiDetails.filter(r => affectedInitIds.has(r.initiativeId)).length;
+    const affectedRptiFromAsset = data.rptiDetails.filter(r => r.targetType === 'asset' && r.targetId === asset.id).length;
+    const affectedRpti = affectedRptiFromInits + affectedRptiFromAsset;
     const parts = [];
     if (affectedInits.length) parts.push(`${affectedInits.length} initiative(s)`);
     if (affectedMiles.length) parts.push(`${affectedMiles.length} milestone(s)`);
     if (affectedDeps.length) parts.push(`${affectedDeps.length} dependency(ies)`);
+    if (affectedRpti) parts.push(`${affectedRpti} RPTI report row(s)`);
     return cascadeDelete('Delete Asset', asset.name, parts, {
       assets: data.assets.filter(a => a.id !== asset.id),
       initiatives: data.initiatives.filter(i => i.assetId !== asset.id),
       milestones: data.milestones.filter(m => m.assetId !== asset.id),
       dependencies: data.dependencies.filter(d => !affectedInitIds.has(d.sourceId) && !affectedInitIds.has(d.targetId)),
+      rptiDetails: rptiCascadeOnAssetDelete(
+        data.rptiDetails.filter(r => !affectedInitIds.has(r.initiativeId)),
+        asset.id
+      ),
     });
   };
 
@@ -118,10 +129,14 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery 
 
   const handleDeleteInitiative = (init: Initiative): boolean => {
     const affectedDeps = data.dependencies.filter(d => d.sourceId === init.id || d.targetId === init.id);
-    const parts = affectedDeps.length ? [`${affectedDeps.length} dependency(ies)`] : [];
+    const affectedRpti = data.rptiDetails.filter(r => r.initiativeId === init.id).length;
+    const parts = [];
+    if (affectedDeps.length) parts.push(`${affectedDeps.length} dependency(ies)`);
+    if (affectedRpti) parts.push(`${affectedRpti} RPTI report row(s)`);
     return cascadeDelete('Delete Initiative', init.name, parts, {
       initiatives: data.initiatives.filter(i => i.id !== init.id),
       dependencies: data.dependencies.filter(d => d.sourceId !== init.id && d.targetId !== init.id),
+      rptiDetails: rptiCascadeOnInitiativeDelete(data.rptiDetails, init.id),
     });
   };
 
@@ -151,18 +166,42 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery 
   const strategyOptions = data.strategies.map(s => ({ value: s.id, label: s.name }));
   const initiativeOptions = data.initiatives.map(i => ({ value: i.id, label: i.name }));
   const categoryOptions = data.assetCategories.map(c => ({ value: c.id, label: c.name }));
-
-  const hasDtsAssets = data.assets.some(a => typeof a.alias === 'string' && a.alias.startsWith('DTS.'));
-
-  const DTS_PHASE_OPTIONS = [
-    { value: '', label: '— Not Set —' },
-    ...(data.dtsPhases || []).map(p => ({ value: p.id, label: p.name })),
+  const deliverableOptions = (data.deliverables || []).map(a => ({ value: a.id, label: a.name }));
+  const rptiTargetOptions = [
+    ...deliverableOptions.map(o => ({ value: o.value, label: `Deliverable: ${o.label}` })),
+    ...assetOptions.map(o => ({ value: o.value, label: `Asset: ${o.label}` })),
   ];
 
-  const dtsPhaseColumns: Column<DtsPhaseRecord>[] = [
-    { key: 'name', label: 'Phase Name', type: 'text', width: '70%' },
-    { key: 'color', label: 'Color', type: 'color', width: '30%' },
-  ];
+  // Recomputes each row's targetType from whichever list (deliverables vs assets)
+  // its current targetId is actually found in, so targetId is the single source
+  // of truth and the two fields can never fall out of sync via inline editing.
+  const deriveRptiTargetTypes = (rows: RptiDetail[]): RptiDetail[] => {
+    return rows.map(row => {
+      if ((data.deliverables || []).some(a => a.id === row.targetId)) return { ...row, targetType: 'deliverable' as const };
+      if (data.assets.some(a => a.id === row.targetId)) return { ...row, targetType: 'asset' as const };
+      return row;
+    });
+  };
+
+  // Wipes and rebuilds all RPTI rows from the current year's DeliverableSegment data —
+  // see requirement-specs/rpti-auto-generation.md. v1: full replace, no reconciliation
+  // with prior manual edits.
+  const handleGenerateRpti = () => {
+    const reportYear = new Date().getFullYear();
+    const generated = generateRptiDetails({
+      deliverableSegments: data.deliverableSegments || [],
+      deliverableStatuses: data.deliverableStatuses || [],
+      initiatives: data.initiatives,
+      deliverables: data.deliverables || [],
+      assets: data.assets,
+      assetCategories: data.assetCategories,
+    }, reportYear);
+    const existingCount = (data.rptiDetails || []).length;
+    const message = existingCount
+      ? `This replaces all ${existingCount} existing RPTI row(s) with ${generated.length} row(s) generated from ${reportYear} deliverable segment data. Any manual edits will be lost. Continue?`
+      : `Generate ${generated.length} RPTI row(s) from ${reportYear} deliverable segment data?`;
+    confirm('Generate RPTI Rows', message, () => updateData('rptiDetails', generated));
+  };
 
   const initiativeColumns: Column<Initiative>[] = [
     { key: 'name', label: 'Initiative Name', type: 'text', width: '180px' },
@@ -171,8 +210,8 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery 
     { key: 'strategyId', label: 'Strategy', type: 'select', options: strategyOptions, width: '110px' },
     { key: 'startDate', label: 'Start Date', type: 'date', width: '120px' },
     { key: 'endDate', label: 'End Date', type: 'date', width: '120px' },
-    { key: 'capex', label: 'CapEx ($)', type: 'number', width: '100px' },
-    { key: 'opex', label: 'OpEx ($)', type: 'number', width: '100px' },
+    { key: 'capex', label: `CapEx (${data.timelineSettings.defaultCurrency || 'USD'})`, type: 'number', width: '100px' },
+    { key: 'opex', label: `OpEx (${data.timelineSettings.defaultCurrency || 'USD'})`, type: 'number', width: '100px' },
     { key: 'status', label: 'Status', type: 'select', options: [
       { value: 'planned', label: 'Planned' },
       { value: 'active', label: 'Active' },
@@ -189,19 +228,11 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery 
     { key: 'owner', label: 'Owner', type: 'text', width: '110px' },
     { key: 'isPlaceholder', label: 'Placeholder?', type: 'boolean', width: '80px' },
     { key: 'description', label: 'Description', type: 'textarea', width: '220px', placeholder: 'Add a description...' },
-    ...(hasDtsAssets ? [{
-      key: 'dtsPhase' as keyof Initiative,
-      label: 'DTS Phase',
-      type: 'select' as const,
-      cellTestId: 'dts-phase-cell',
-      options: DTS_PHASE_OPTIONS,
-      width: '140px',
-    }] : []),
   ];
 
   const assetColumns: Column<Asset>[] = [
-    { key: 'name', label: 'Asset Name', type: 'text', width: hasDtsAssets ? '30%' : '40%' },
-    { key: 'categoryId', label: 'Category', type: 'select', options: categoryOptions, width: hasDtsAssets ? '30%' : '40%' },
+    { key: 'name', label: 'Asset Name', type: 'text', width: '40%' },
+    { key: 'categoryId', label: 'Category', type: 'select', options: categoryOptions, width: '40%' },
     { key: 'maturity', label: 'Maturity', type: 'select', options: [
       { value: '', label: '— Unrated —' },
       { value: '1', label: '1 – Emergent' },
@@ -210,27 +241,23 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery 
       { value: '4', label: '4 – Managed' },
       { value: '5', label: '5 – Optimised' },
     ], width: '20%' },
-    ...(hasDtsAssets ? [{
-      key: 'dtsAdoptionStatus' as keyof Asset,
-      label: 'DTS Adoption Status',
-      type: 'select' as const,
-      cellTestId: 'dts-adoption-status-cell',
-      options: [
-        { value: '', label: '— Not Set —' },
-        { value: 'not-started', label: 'Not Started' },
-        { value: 'scoping', label: 'Scoping' },
-        { value: 'in-delivery', label: 'In Delivery' },
-        { value: 'adopted', label: 'Adopted' },
-        { value: 'decommissioning', label: 'Decommissioning Incumbent' },
-        { value: 'not-applicable', label: 'Not Applicable' },
-      ],
-      width: '20%',
-    }] : []),
   ];
 
   const categoryColumns: Column<AssetCategory>[] = [
-    { key: 'name', label: 'Category Name', type: 'text', width: '80%' },
-    { key: 'order', label: 'Sort Order', type: 'number', width: '20%' },
+    { key: 'name', label: 'Category Name', type: 'text', width: '200px' },
+    { key: 'order', label: 'Sort Order', type: 'number', width: '100px' },
+    {
+      key: 'categoryCode', label: 'Default RPTI Category', type: 'select', width: '220px',
+      options: [
+        { value: '', label: '— Not set —' },
+        ...(Object.keys(RPTI_CATEGORY_LABELS) as (keyof typeof RPTI_CATEGORY_LABELS)[])
+          .map(code => ({ value: code, label: `${code} — ${RPTI_CATEGORY_LABELS[code]}` })),
+      ],
+    },
+    { key: 'dcCity', label: 'Default DC City', type: 'text', width: '130px' },
+    { key: 'dcCountry', label: 'Default DC Country', type: 'text', width: '130px' },
+    { key: 'drCity', label: 'Default DR City', type: 'text', width: '130px' },
+    { key: 'drCountry', label: 'Default DR Country', type: 'text', width: '130px' },
   ];
 
   const programmeColumns: Column<Programme>[] = [
@@ -299,57 +326,133 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery 
     { key: 'role', label: 'Role', type: 'text', width: '50%' },
   ];
 
-  const applicationColumns: Column<Application>[] = [
-    { key: 'name', label: 'Name', type: 'text', width: '60%' },
+  const deliverableColumns: Column<Deliverable>[] = [
+    { key: 'name', label: 'Name', type: 'text', width: '180px' },
     {
-      key: 'assetId', label: 'Asset', type: 'select', width: '40%',
+      key: 'type', label: 'Type', type: 'select', width: '130px',
+      options: (['application', 'infrastructure', 'document', 'procedure', 'other'] as DeliverableType[])
+        .map(t => ({ value: t, label: t.charAt(0).toUpperCase() + t.slice(1) })),
+    },
+    {
+      key: 'assetId', label: 'Asset', type: 'select', width: '160px',
       options: data.assets.map(a => ({ value: a.id, label: a.name })),
     },
+    {
+      key: 'categoryCode', label: 'RPTI Category Override', type: 'select', width: '220px',
+      options: [
+        { value: '', label: '— Use category default —' },
+        ...(Object.keys(RPTI_CATEGORY_LABELS) as (keyof typeof RPTI_CATEGORY_LABELS)[])
+          .map(code => ({ value: code, label: `${code} — ${RPTI_CATEGORY_LABELS[code]}` })),
+      ],
+    },
+    {
+      key: 'developer', label: 'Developer', type: 'select', width: '110px',
+      options: [
+        { value: '', label: '— Not set —' },
+        { value: 'inhouse', label: 'In-house' }, { value: 'PPJTI', label: 'PPJTI' },
+      ],
+    },
+    { key: 'dcCity', label: 'DC City Override', type: 'text', width: '130px' },
+    { key: 'dcCountry', label: 'DC Country Override', type: 'text', width: '130px' },
+    { key: 'drCity', label: 'DR City Override', type: 'text', width: '130px' },
+    { key: 'drCountry', label: 'DR Country Override', type: 'text', width: '130px' },
   ];
 
-  const handleDeleteApplication = (application: Application): boolean => {
-    const affectedSegments = data.applicationSegments.filter(segment => segment.applicationId === application.id);
-    const parts = affectedSegments.length ? [`${affectedSegments.length} segment(s)`] : [];
-    const msg = affectedSegments.length
-      ? `Deleting "${application.name}" will also remove ${affectedSegments.length} segment(s). Continue?`
+  const handleDeleteDeliverable = (deliverable: Deliverable): boolean => {
+    const affectedSegments = data.deliverableSegments.filter(segment => segment.deliverableId === deliverable.id);
+    const affectedRpti = data.rptiDetails.filter(r => r.targetType === 'deliverable' && r.targetId === deliverable.id).length;
+    const parts = [];
+    if (affectedSegments.length) parts.push(`${affectedSegments.length} segment(s)`);
+    if (affectedRpti) parts.push(`${affectedRpti} RPTI report row(s)`);
+    const msg = parts.length
+      ? `Deleting "${deliverable.name}" will also remove ${parts.join(', ')}. Continue?`
       : undefined;
-    return cascadeDelete('Delete Application', application.name, parts, {
-      ...removeApplicationAndSegments(
-        { applications: data.applications || [], applicationSegments: data.applicationSegments || [] },
-        application.id,
+    return cascadeDelete('Delete Deliverable', deliverable.name, parts, {
+      ...removeDeliverableAndSegments(
+        { deliverables: data.deliverables || [], deliverableSegments: data.deliverableSegments || [] },
+        deliverable.id,
       ),
+      rptiDetails: rptiCascadeOnDeliverableDelete(data.rptiDetails, deliverable.id),
     }, msg);
   };
 
-  const handleClearApplications = (): boolean => {
-    const segmentCount = data.applicationSegments.length;
+  const handleClearDeliverables = (): boolean => {
+    const segmentCount = data.deliverableSegments.length;
+    const affectedRpti = data.rptiDetails.filter(r => r.targetType === 'deliverable').length;
     const parts = [];
-    if ((data.applications || []).length) parts.push(`${(data.applications || []).length} application(s)`);
+    if ((data.deliverables || []).length) parts.push(`${(data.deliverables || []).length} deliverable(s)`);
     if (segmentCount) parts.push(`${segmentCount} segment(s)`);
-    return cascadeDelete('Delete All Applications', 'all applications', parts, {
-      ...clearApplicationsAndSegments(),
+    if (affectedRpti) parts.push(`${affectedRpti} RPTI report row(s)`);
+    return cascadeDelete('Delete All Deliverables', 'all deliverables', parts, {
+      ...clearDeliverablesAndSegments(),
+      rptiDetails: data.rptiDetails.filter(r => r.targetType !== 'deliverable'),
     }, parts.length
-      ? `Deleting all applications will also remove ${parts.join(', ')}. Continue?`
-      : 'Delete all applications?');
+      ? `Deleting all deliverables will also remove ${parts.join(', ')}. Continue?`
+      : 'Delete all deliverables?');
   };
 
-  const appStatusColumns: Column<ApplicationStatus>[] = [
+  const deliverableStatusColumns: Column<DeliverableStatus>[] = [
     { key: 'name', label: 'Status Name', type: 'text', width: '60%' },
     { key: 'color', label: 'Color', type: 'color', width: '40%' },
+  ];
+
+  const rptiColumns: Column<RptiDetail>[] = [
+    { key: 'initiativeId', label: 'Initiative', type: 'select', options: initiativeOptions, width: '150px' },
+    { key: 'targetId', label: 'Target', type: 'select', options: rptiTargetOptions, width: '160px' },
+    {
+      key: 'categoryCode', label: 'Category', type: 'select', width: '220px',
+      options: [
+        { value: '', label: '— Not set —' },
+        ...(Object.keys(RPTI_CATEGORY_LABELS) as (keyof typeof RPTI_CATEGORY_LABELS)[])
+          .map(code => ({ value: code, label: `${code} — ${RPTI_CATEGORY_LABELS[code]}` })),
+      ],
+    },
+    {
+      key: 'developmentType', label: 'Dev Type', type: 'select', width: '110px',
+      options: [{ value: 'new', label: 'New' }, { value: 'upgrade', label: 'Upgrade' }],
+    },
+    {
+      key: 'developer', label: 'Developer', type: 'select', width: '110px',
+      options: [
+        { value: '', label: '— Not set —' },
+        { value: 'inhouse', label: 'In-house' }, { value: 'PPJTI', label: 'PPJTI' },
+      ],
+    },
+    {
+      key: 'ppjtiRelatedParty', label: 'PPJTI Related Party', type: 'select', width: '150px',
+      options: [
+        { value: '', label: '— Not set —' },
+        { value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }, { value: 'n/a', label: 'N/A' },
+      ],
+    },
+    {
+      key: 'plannedImplementationQuarter', label: 'Quarter', type: 'select', width: '100px',
+      options: [
+        { value: '', label: '— Not set —' },
+        { value: 'Q1', label: 'Q1' }, { value: 'Q2', label: 'Q2' }, { value: 'Q3', label: 'Q3' }, { value: 'Q4', label: 'Q4' },
+      ],
+    },
+    { key: 'capexAmount', label: 'CapEx Override', type: 'number', width: '140px' },
+    { key: 'opexAmount', label: 'OpEx Override', type: 'number', width: '140px' },
+    { key: 'dcCity', label: 'DC City', type: 'text', width: '110px' },
+    { key: 'dcCountry', label: 'DC Country', type: 'text', width: '110px' },
+    { key: 'drCity', label: 'DR City', type: 'text', width: '110px' },
+    { key: 'drCountry', label: 'DR Country', type: 'text', width: '110px' },
+    { key: 'remarks', label: 'Remarks', type: 'textarea', width: '200px' },
   ];
 
   const tabs = [
     { id: 'initiatives', label: 'Initiatives', icon: Layers, count: data.initiatives.length },
     { id: 'dependencies', label: 'Dependencies', icon: Link2, count: data.dependencies.length },
     { id: 'assets', label: 'Assets', icon: Database, count: data.assets.length },
-    { id: 'applications', label: 'Applications', icon: Box, count: (data.applications || []).length },
+    { id: 'deliverables', label: 'Deliverables', icon: Box, count: (data.deliverables || []).length },
     { id: 'assetCategories', label: 'Categories', icon: FolderTree, count: data.assetCategories.length },
     { id: 'programmes', label: 'Programmes', icon: Calendar, count: data.programmes.length },
     { id: 'strategies', label: 'Strategies', icon: Target, count: data.strategies.length },
     { id: 'milestones', label: 'Milestones', icon: Flag, count: data.milestones.length },
     { id: 'resources', label: 'Resources', icon: Users, count: (data.resources || []).length },
-    { id: 'appStatuses', label: 'App Statuses', icon: Layers, count: (data.applicationStatuses || []).length },
-    ...(hasDtsAssets ? [{ id: 'dtsPhases', label: 'DTS Phases', icon: Layers, count: (data.dtsPhases || []).length }] : []),
+    { id: 'deliverableStatuses', label: 'Deliverable Statuses', icon: Layers, count: (data.deliverableStatuses || []).length },
+    { id: 'rpti', label: 'RPTI', icon: ClipboardList, count: (data.rptiDetails || []).length },
   ];
 
   return (
@@ -471,40 +574,72 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery 
             onColumnResize={(key, width) => handleColumnResize('resources', key, width)}
           />
         )}
-        {activeTab === 'applications' && (
+        {activeTab === 'deliverables' && (
           <EditableTable
-            data={data.applications || []}
-            columns={getColumnsWithWidths('applications', applicationColumns)}
-            onUpdate={(newData) => updateData('applications', newData)}
-            onDelete={handleDeleteApplication}
-            onClearAll={handleClearApplications}
+            data={data.deliverables || []}
+            columns={getColumnsWithWidths('deliverables', deliverableColumns)}
+            onUpdate={(newData) => updateData('deliverables', newData)}
+            onDelete={handleDeleteDeliverable}
+            onClearAll={handleClearDeliverables}
             idField="id"
             searchQuery={searchQuery}
-            tableId="applications"
-            onColumnResize={(key, width) => handleColumnResize('applications', key, width)}
+            tableId="deliverables"
+            onColumnResize={(key, width) => handleColumnResize('deliverables', key, width)}
           />
         )}
-        {activeTab === 'appStatuses' && (
+        {activeTab === 'deliverableStatuses' && (
           <EditableTable
-            data={data.applicationStatuses || []}
-            columns={getColumnsWithWidths('appStatuses', appStatusColumns)}
-            onUpdate={(newData) => updateData('applicationStatuses', newData)}
-            onDelete={(status) => { updateData('applicationStatuses', (data.applicationStatuses || []).filter(s => s.id !== status.id)); return true; }}
+            data={data.deliverableStatuses || []}
+            columns={getColumnsWithWidths('deliverableStatuses', deliverableStatusColumns)}
+            onUpdate={(newData) => updateData('deliverableStatuses', newData)}
+            onDelete={(status) => { updateData('deliverableStatuses', (data.deliverableStatuses || []).filter(s => s.id !== status.id)); return true; }}
             idField="id"
-            tableId="appStatuses"
-            onColumnResize={(col, w) => handleColumnResize('appStatuses', col, w)}
+            tableId="deliverableStatuses"
+            onColumnResize={(col, w) => handleColumnResize('deliverableStatuses', col, w)}
           />
         )}
-        {activeTab === 'dtsPhases' && (
-          <EditableTable
-            data={data.dtsPhases || []}
-            columns={getColumnsWithWidths('dtsPhases', dtsPhaseColumns)}
-            onUpdate={(newData) => updateData('dtsPhases', newData)}
-            onDelete={(phase) => { updateData('dtsPhases', (data.dtsPhases || []).filter(p => p.id !== phase.id)); return true; }}
-            idField="id"
-            tableId="dtsPhases"
-            onColumnResize={(col, w) => handleColumnResize('dtsPhases', col, w)}
-          />
+        {activeTab === 'rpti' && (
+          <div className="flex flex-col h-full">
+            <div className="flex items-center gap-2 mb-3">
+              <button
+                onClick={handleGenerateRpti}
+                data-testid="rpti-generate-btn"
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-sm font-medium text-sm"
+              >
+                <RefreshCw size={16} />
+                Generate {new Date().getFullYear()} RPTI Rows
+              </button>
+              <p className="text-xs text-slate-500">
+                Rebuilds rows from this year's deliverable segments — replaces all rows below.
+              </p>
+              <div className="flex items-center gap-2 ml-auto">
+                <label htmlFor="rpti-default-currency" className="text-xs text-slate-500 whitespace-nowrap">
+                  Default Currency
+                </label>
+                <input
+                  id="rpti-default-currency"
+                  data-testid="rpti-default-currency-input"
+                  type="text"
+                  value={data.timelineSettings.defaultCurrency ?? ''}
+                  onChange={(e) => updateData('timelineSettings', { ...data.timelineSettings, defaultCurrency: e.target.value })}
+                  placeholder="e.g. IDR"
+                  className="w-20 px-2 py-1 text-sm border border-slate-200 rounded-md"
+                />
+              </div>
+            </div>
+            <p className="text-xs text-slate-500 mb-3 -mt-2">
+              All CapEx/OpEx figures below are reported in this currency.
+            </p>
+            <EditableTable
+              data={data.rptiDetails || []}
+              columns={getColumnsWithWidths('rpti', rptiColumns)}
+              onUpdate={(newData) => updateData('rptiDetails', deriveRptiTargetTypes(newData))}
+              onDelete={(row) => { updateData('rptiDetails', (data.rptiDetails || []).filter(r => r.id !== row.id)); return true; }}
+              idField="id"
+              tableId="rpti"
+              onColumnResize={(col, w) => handleColumnResize('rpti', col, w)}
+            />
+          </div>
         )}
       </div>
 

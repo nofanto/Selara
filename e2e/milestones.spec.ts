@@ -99,9 +99,9 @@ test.describe('Milestone Swimlane Span', () => {
     await page.waitForSelector('[data-testid="asset-row-content"]', { timeout: 10000 });
   });
 
-  test('milestone line extends to bottom of applications swimlane when display is Both', async ({ page }) => {
+  test('milestone line extends to bottom of deliverables swimlane when display is Both', async ({ page }) => {
     const milestone = page.locator('[data-milestone-id="ms-4"]');
-    const appSwimlane = page.locator('[data-testid="application-swimlane-a-mobile"]');
+    const appSwimlane = page.locator('[data-testid="deliverable-swimlane-a-mobile"]');
     await expect(milestone).toBeVisible();
     await expect(appSwimlane).toBeVisible();
 
@@ -114,18 +114,18 @@ test.describe('Milestone Swimlane Span', () => {
     await page.getByTestId('view-options-btn').click();
     await page.getByTestId('show-initiatives').click();
     await page.mouse.click(100, 100);
-    await expect(page.locator('[data-testid^="application-swimlane-"]')).toHaveCount(0);
+    await expect(page.locator('[data-testid^="deliverable-swimlane-"]')).toHaveCount(0);
     await expect(page.locator('[data-milestone-id]').first()).toBeVisible();
   });
 
-  test('milestones visible and spanning applications swimlane in Applications-only mode', async ({ page }) => {
+  test('milestones visible and spanning deliverables swimlane in Deliverables-only mode', async ({ page }) => {
     await page.getByTestId('view-options-btn').click();
-    await page.getByTestId('show-applications').click();
+    await page.getByTestId('show-deliverables').click();
     await page.mouse.click(100, 100);
     await expect(page.locator('[data-testid="asset-row-content"]')).toHaveCount(0);
 
     const milestone = page.locator('[data-milestone-id="ms-4"]');
-    const appSwimlane = page.locator('[data-testid="application-swimlane-a-mobile"]');
+    const appSwimlane = page.locator('[data-testid="deliverable-swimlane-a-mobile"]');
     await expect(appSwimlane).toBeVisible();
     await expect(milestone).toBeVisible();
 
@@ -135,9 +135,9 @@ test.describe('Milestone Swimlane Span', () => {
     expect(milestoneBox!.y + milestoneBox!.height).toBeGreaterThanOrEqual(appBox!.y + appBox!.height - 2);
   });
 
-  test('milestone badge is positioned above the applications swimlane top edge', async ({ page }) => {
+  test('milestone badge is positioned above the deliverables swimlane top edge', async ({ page }) => {
     const milestone = page.locator('[data-milestone-id="ms-4"]');
-    const appSwimlane = page.locator('[data-testid="application-swimlane-a-mobile"]');
+    const appSwimlane = page.locator('[data-testid="deliverable-swimlane-a-mobile"]');
     const badge = milestone.locator('[data-testid="milestone-dep-handle"]');
     await expect(badge).toBeVisible();
 

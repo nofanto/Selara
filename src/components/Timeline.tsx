@@ -1,13 +1,13 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { useMediaQuery } from '../lib/useMediaQuery';
-import { Asset, Application, ApplicationSegment, ApplicationStatus, DtsPhaseRecord, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource } from '../types';
+import { Asset, Deliverable, DeliverableSegment, DeliverableStatus, Decision, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource } from '../types';
 import { differenceInDays, format, parseISO, isValid, addQuarters, getYear, getQuarter, addDays, startOfMonth, lastDayOfMonth, addMonths, addWeeks } from 'date-fns';
 import { cn, reorder } from '../lib/utils';
 import { AlertTriangle, Star, Info, ChevronRight, ChevronDown, ChevronUp, Boxes, Trash2 } from 'lucide-react';
-import { geanzAreas, GEANZ_CATEGORY_ID, GEANZ_TO_DTS_MAP, GeanzArea } from '../lib/geanzCatalogue';
+import { geanzAreas, GEANZ_CATEGORY_ID, GeanzArea } from '../lib/geanzCatalogue';
 import { InitiativePanel } from './InitiativePanel';
 import { InitiativeBar } from './InitiativeBar';
-import { ApplicationSegmentPanel } from './ApplicationSegmentPanel';
+import { DeliverableSegmentPanel } from './DeliverableSegmentPanel';
 import { DependencyPanel } from './DependencyPanel';
 import { ArrowDisambiguator } from './ArrowDisambiguator';
 import { computeCriticalPath } from '../lib/criticalPath';
@@ -27,7 +27,7 @@ import {
 
 interface TimelineProps {
   assets: Asset[];
-  applications?: Application[];
+  deliverables?: Deliverable[];
   initiatives: Initiative[];
   milestones: Milestone[];
   programmes: Programme[];
@@ -44,12 +44,13 @@ interface TimelineProps {
   onDeleteInitiative?: (initiative: Initiative) => void;
   onUpdateSettings?: (settings: TimelineSettings) => void;
   searchQuery?: string;
-  applicationSegments?: ApplicationSegment[];
-  onSaveApplicationSegment?: (segment: ApplicationSegment) => void;
-  onDeleteApplicationSegment?: (segment: ApplicationSegment) => void;
-  onUpdateApplicationSegments?: (segments: ApplicationSegment[]) => void;
-  applicationStatuses?: ApplicationStatus[];
-  dtsPhases?: DtsPhaseRecord[];
+  deliverableSegments?: DeliverableSegment[];
+  onSaveDeliverableSegment?: (segment: DeliverableSegment) => void;
+  onDeleteDeliverableSegment?: (segment: DeliverableSegment) => void;
+  onUpdateDeliverableSegments?: (segments: DeliverableSegment[]) => void;
+  deliverableStatuses?: DeliverableStatus[];
+  decisions?: Decision[];
+  onOpenDecision?: (decisionId: string) => void;
   onDeleteAsset?: (assetId: string) => void;
   onBulkDeleteAssets?: (assetIds: string[]) => void;
   onAddAssets?: (assets: Asset[]) => void;
@@ -60,7 +61,7 @@ const SIDEBAR_WIDTH_MOBILE = 120; // 7.5rem
 const MAX_RENDERED_DEPENDENCIES = 2000;
 
 
-export function Timeline({ assets, applications = [], initiatives, milestones, programmes, strategies, dependencies, assetCategories, resources = [], settings, onAddInitiative, onUpdateInitiative, onUpdateAssets, onUpdateDependencies, onUpdateMilestone, onDeleteInitiative, onUpdateSettings, searchQuery, applicationSegments: applicationSegmentsProp = [], onSaveApplicationSegment, onDeleteApplicationSegment, onUpdateApplicationSegments, applicationStatuses = [], dtsPhases = [], onDeleteAsset, onBulkDeleteAssets, onAddAssets }: TimelineProps) {
+export function Timeline({ assets, deliverables = [], initiatives, milestones, programmes, strategies, dependencies, assetCategories, resources = [], settings, onAddInitiative, onUpdateInitiative, onUpdateAssets, onUpdateDependencies, onUpdateMilestone, onDeleteInitiative, onUpdateSettings, searchQuery, deliverableSegments: deliverableSegmentsProp = [], onSaveDeliverableSegment, onDeleteDeliverableSegment, onUpdateDeliverableSegments, deliverableStatuses = [], decisions = [], onOpenDecision, onDeleteAsset, onBulkDeleteAssets, onAddAssets }: TimelineProps) {
   const isMobile = useMediaQuery('(max-width: 767px)');
   const defaultSidebarWidth = isMobile ? SIDEBAR_WIDTH_MOBILE : (settings.sidebarWidth ?? SIDEBAR_WIDTH_DESKTOP);
   const [sidebarWidth, setSidebarWidth] = useState(defaultSidebarWidth);
@@ -79,7 +80,7 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
 
   const SEGMENT_COLORS: Record<string, string> = {};
   const SEGMENT_LABELS: Record<string, string> = {};
-  (applicationStatuses ?? []).forEach(s => {
+  (deliverableStatuses ?? []).forEach(s => {
     SEGMENT_COLORS[s.id] = s.color;
     SEGMENT_LABELS[s.id] = s.name;
   });
@@ -113,12 +114,9 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
   );
 
   // ── Shared colour + subtitle helpers (single source of truth) ────────────
-  const dtsPhaseMap = useMemo(() => new Map(dtsPhases.map(p => [p.id, p])), [dtsPhases]);
-
   function getInitiativeColor(init: Initiative, prog: Programme | undefined, strat: Strategy | undefined): string {
     if (colorBy === 'rag')       return RAG_COLORS[init.ragStatus || 'none'];
     if (colorBy === 'status')    return STATUS_COLORS[normalizeInitiativeStatus(init.status)];
-    if (colorBy === 'dts-phase') return dtsPhaseMap.get(init.dtsPhase as string)?.color || 'bg-slate-400';
     if (colorBy === 'programme') return prog?.color || 'bg-slate-500';
     return strat?.color || 'bg-slate-400';
   }
@@ -133,7 +131,6 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
   ): string | undefined {
     if (colorBy === 'rag')       return init.ragStatus ? RAG_LABELS[init.ragStatus] : undefined;
     if (colorBy === 'status')    return STATUS_LABELS[normalizeInitiativeStatus(init.status)];
-    if (colorBy === 'dts-phase') return dtsPhaseMap.get(init.dtsPhase as string)?.name;
     if (isGroup)                 return colorBy === 'programme' ? groupProgrammeNames : groupStrategyNames;
     return colorBy === 'programme' ? prog?.name : strat?.name;
   }
@@ -190,7 +187,7 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
   const [moving, setMoving] = useState<{ id: string; initialX: number; initialY: number; initialStart: string; initialEnd: string } | null>(null);
   const [movingMilestone, setMovingMilestone] = useState<{ id: string; initialX: number; initialY: number; initialDate: string } | null>(null);
   const [movingDependency, setMovingDependency] = useState<{ id: string; initialX: number; initialOffset: number } | null>(null);
-  const [localSegments, setLocalSegments] = useState<ApplicationSegment[]>(applicationSegmentsProp);
+  const [localSegments, setLocalSegments] = useState<DeliverableSegment[]>(deliverableSegmentsProp);
   const [movingSegment, setMovingSegment] = useState<{ id: string; initialX: number; initialY: number; initialRow: number; initialStart: string; initialEnd: string } | null>(null);
   const [resizingSegment, setResizingSegment] = useState<{ id: string; edge: 'start' | 'end'; initialX: number; initialDate: string } | null>(null);
   const [resizingSegmentVertical, setResizingSegmentVertical] = useState<{ id: string; initialY: number; initialRowSpan: number } | null>(null);
@@ -395,9 +392,9 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
 
   useEffect(() => {
     if (!movingSegment && !resizingSegment && !resizingSegmentVertical) {
-      setLocalSegments(applicationSegmentsProp);
+      setLocalSegments(deliverableSegmentsProp);
     }
-  }, [applicationSegmentsProp, movingSegment, resizingSegment, resizingSegmentVertical]);
+  }, [deliverableSegmentsProp, movingSegment, resizingSegment, resizingSegmentVertical]);
 
   useEffect(() => {
     if (!movingMilestone) {
@@ -889,12 +886,12 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
           onUpdateDependencies([...dependencies, newDependency]);
         }
       }
-      if (resizingSegmentVertical && onSaveApplicationSegment) {
+      if (resizingSegmentVertical && onSaveDeliverableSegment) {
         const updated = localSegments.find(s => s.id === resizingSegmentVertical.id);
-        if (updated) onSaveApplicationSegment(updated);
-      } else if (resizingSegment && onSaveApplicationSegment) {
+        if (updated) onSaveDeliverableSegment(updated);
+      } else if (resizingSegment && onSaveDeliverableSegment) {
         const updated = localSegments.find(s => s.id === resizingSegment.id);
-        if (updated) onSaveApplicationSegment(updated);
+        if (updated) onSaveDeliverableSegment(updated);
       } else if (movingSegment) {
         // Only save/resolve if an actual drag occurred — a bare click must not trigger conflict resolution
         if (isDraggingRef.current) {
@@ -905,11 +902,11 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
             const segmentsWithRow = localSegments.map(s => s.id === movingSegment.id ? movedWithRow : s);
             const resolved = resolveSegmentConflicts(movingSegment.id, segmentsWithRow);
             const changed = resolved.filter((s, i) => s.row !== segmentsWithRow[i]?.row || s.id === movingSegment.id);
-            if (changed.length > 1 && onUpdateApplicationSegments) {
+            if (changed.length > 1 && onUpdateDeliverableSegments) {
               setLocalSegments(resolved);
-              onUpdateApplicationSegments(resolved);
-            } else if (onSaveApplicationSegment) {
-              onSaveApplicationSegment(updated);
+              onUpdateDeliverableSegments(resolved);
+            } else if (onSaveDeliverableSegment) {
+              onSaveDeliverableSegment(updated);
             }
           }
         }
@@ -935,7 +932,7 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [resizingSidebar, resizing, moving, movingMilestone, drawingDependency, movingDependency, resizingSegment, resizingSegmentVertical, movingSegment, localInitiatives, localMilestones, localSegments, totalWidth, totalDays, onUpdateInitiative, onUpdateDependencies, onUpdateMilestone, onSaveApplicationSegment, onUpdateApplicationSegments, dependencies, initiativePositions, milestonePositions, segmentPositions, settings, settings.showRelationships, settings.snapToPeriod]);
+  }, [resizingSidebar, resizing, moving, movingMilestone, drawingDependency, movingDependency, resizingSegment, resizingSegmentVertical, movingSegment, localInitiatives, localMilestones, localSegments, totalWidth, totalDays, onUpdateInitiative, onUpdateDependencies, onUpdateMilestone, onSaveDeliverableSegment, onUpdateDeliverableSegments, dependencies, initiativePositions, milestonePositions, segmentPositions, settings, settings.showRelationships, settings.snapToPeriod]);
 
   const handleCategoryDragStart = (e: React.DragEvent, category: string) => {
     setDraggingCategory(category);
@@ -1116,9 +1113,9 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
   };
 
   // Closures delegating to pure functions in ../lib/timelineLayout
-  const layoutSegments = (segments: ApplicationSegment[]) =>
+  const layoutSegments = (segments: DeliverableSegment[]) =>
     tlLayoutSegments(segments, startDate, totalDays);
-  const computeAutoRow = (newStart: string, newEnd: string, existingSegments: ApplicationSegment[]) =>
+  const computeAutoRow = (newStart: string, newEnd: string, existingSegments: DeliverableSegment[]) =>
     tlComputeAutoRow(newStart, newEnd, existingSegments, startDate, totalDays);
 
   // Move a segment up or down one row, cascading conflicts if needed
@@ -1206,11 +1203,11 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
       const orig = updated.find(u => u.id === s.id);
       return orig && s.row !== orig.row && s.id !== segId;
     });
-    if (hasConflicts && onUpdateApplicationSegments) {
-      onUpdateApplicationSegments(resolved);
-    } else if (onSaveApplicationSegment) {
+    if (hasConflicts && onUpdateDeliverableSegments) {
+      onUpdateDeliverableSegments(resolved);
+    } else if (onSaveDeliverableSegment) {
       const movedSeg = resolved.find(s => s.id === segId);
-      if (movedSeg) onSaveApplicationSegment(movedSeg);
+      if (movedSeg) onSaveDeliverableSegment(movedSeg);
     }
   };
 
@@ -1364,17 +1361,6 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
   const isCurrentTimeVisible = currentPos >= 0 && currentPos <= 100;
   const groupBy = settings.groupBy || 'asset';
   const display = settings.display || 'both';
-  const hasDtsAssets = assets.some(a => typeof a.alias === 'string' && a.alias.startsWith('DTS.'));
-
-  const DTS_PHASE_GROUPS = dtsPhases.length > 0
-    ? dtsPhases.map(p => ({ id: p.id, name: p.name }))
-    : [
-        { id: 'phase-1', name: 'Phase 1 — Register & Expose' },
-        { id: 'phase-2', name: 'Phase 2 — Integrate DPI' },
-        { id: 'phase-3', name: 'Phase 3 — AI & Legacy Exit' },
-        { id: 'back-office', name: 'Back-Office Consolidation' },
-        { id: 'not-dts', name: 'Not DTS' },
-      ];
 
   const groupedReferenceIds = new Set((groupBy === 'programme' ? programmes : strategies).map(group => group.id));
   const orphanedSwimlaneInitiatives = (groupBy === 'programme' || groupBy === 'strategy')
@@ -1402,7 +1388,7 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
         <div className="relative w-max min-w-full">
           <div className="flex sticky top-0 z-40 bg-white shadow-sm border-b border-slate-200">
             <div data-testid="timeline-sidebar-header" className="sticky left-0 flex-shrink-0 p-4 font-bold text-slate-700 border-r border-slate-200 bg-slate-50 z-50 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.1)] relative" style={{ width: SIDEBAR_WIDTH }}>
-              {groupBy === 'programme' ? 'Programme' : groupBy === 'strategy' ? 'Strategy' : groupBy === 'dts-phase' ? 'DTS Phase' : 'Asset'}
+              {groupBy === 'programme' ? 'Programme' : groupBy === 'strategy' ? 'Strategy' : 'Asset'}
               {!isMobile && (
                 <button
                   type="button"
@@ -1853,63 +1839,6 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
               );
             })()}
 
-            {/* Swimlane view: group by DTS Phase */}
-            {groupBy === 'dts-phase' && DTS_PHASE_GROUPS.map(group => {
-              const groupInits = localInitiatives.filter(i => i.dtsPhase === group.id && !i.isPlaceholder);
-              if (groupInits.length === 0) return null;
-              const { items: swimlaneItems, height: swimlaneHeight } = layoutAsset(groupInits);
-              return (
-                <div key={group.id} data-testid={`swimlane-row-dts-phase-${group.id}`}>
-                  <div className="flex z-30 bg-slate-100 border-y border-slate-200 w-max">
-                    <div className="sticky left-0 flex-shrink-0 px-4 py-1.5 text-xs font-bold text-slate-500 uppercase tracking-wider bg-slate-100 z-40 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.1)]" style={{ width: SIDEBAR_WIDTH }}>
-                      {group.name}
-                      <span className="ml-2 text-[10px] font-medium tracking-normal normal-case text-slate-400">({groupInits.length})</span>
-                    </div>
-                    <div className="flex-shrink-0" style={{ width: totalWidth }} />
-                  </div>
-                  <div className="flex border-b border-slate-200 hover:bg-slate-50 transition-colors">
-                    <div className="sticky left-0 flex-shrink-0 bg-white border-r border-slate-200 px-3 flex items-center z-20 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.06)]" style={{ width: SIDEBAR_WIDTH, height: swimlaneHeight }}>
-                      <span className="text-xs text-slate-400 truncate">{groupInits.length} initiative{groupInits.length !== 1 ? 's' : ''}</span>
-                    </div>
-                    <div className="relative bg-white" style={{ width: totalWidth, height: swimlaneHeight }}>
-                      {isCurrentTimeVisible && (
-                        <div className="absolute top-0 bottom-0 w-0.5 bg-emerald-400/80 z-10 pointer-events-none" style={{ left: `${currentPos}%` }} />
-                      )}
-                      {swimlaneItems.map(({ init, top, height: barH, left, width: barW }: any) => {
-                        if (left + barW < 0 || left > 100) return null;
-                        const prog = programmeMap.get(init.programmeId);
-                        const strat = strategyMap.get(init.strategyId);
-                        return (
-                          <InitiativeBar
-                            key={init.id}
-                            init={init}
-                            left={left}
-                            width={barW}
-                            height={barH}
-                            top={top}
-                            colorClass={getInitiativeColor(init, prog, strat)}
-                            isSelected={selectedInitiativeId === init.id}
-                            resources={resources}
-                            settings={settings}
-                            progName={prog?.name}
-                            stratName={strat?.name}
-                            isDraggingRef={isDraggingRef}
-                            onSelect={() => setSelectedInitiativeId(init.id)}
-                            onOpenPanel={() => setInitiativePanelId(init.id)}
-                            onMoveStart={(e) => {
-                              isDraggingRef.current = false;
-                              setMoving({ id: init.id, initialX: e.clientX, initialY: e.clientY, initialStart: init.startDate, initialEnd: init.endDate });
-                            }}
-                            onResizeStart={(e, edge) => handleResizeStart(e, init.id, edge, edge === 'start' ? init.startDate : init.endDate)}
-                          />
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-
             {/* Default view: group by Asset/Category */}
             {/* eslint-disable-next-line react-hooks/refs */}
             {groupBy === 'asset' && sortedCategoryIds.map((catId) => {
@@ -1922,9 +1851,9 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
               if (settings.emptyRowDisplay === 'hide') {
                 categoryAssets = categoryAssets.filter(asset => {
                   const hasInitiatives = localInitiatives.some(i => i.assetId === asset.id);
-                  const hasApplications = applications.some(a => a.assetId === asset.id);
-                  if (display === 'applications') return hasApplications;
-                  if (display === 'both') return hasInitiatives || hasApplications;
+                  const hasDeliverables = deliverables.some(a => a.assetId === asset.id);
+                  if (display === 'deliverables') return hasDeliverables;
+                  if (display === 'both') return hasInitiatives || hasDeliverables;
                   return hasInitiatives;
                 });
               }
@@ -1958,9 +1887,6 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
                         <span className="text-[10px] font-medium text-slate-400 tracking-normal normal-case">
                           ({categoryAssets.length} asset{categoryAssets.length !== 1 ? 's' : ''})
                         </span>
-                        {catId.startsWith('cat-dts-') && (
-                          <span className="text-[9px] font-normal text-slate-300 normal-case tracking-normal">© Crown copyright, CC BY 4.0</span>
-                        )}
                       </button>
                     </div>
                     <div className="flex-shrink-0" style={{ width: totalWidth }} />
@@ -1968,19 +1894,19 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
 
                   {!isCollapsed && categoryAssets.map(asset => {
                     const allAssetInitiatives = localInitiatives.filter(i => i.assetId === asset.id);
-                    const assetApplications = applications.filter(a => a.assetId === asset.id);
-                    // All initiatives render at the asset level; applicationId is metadata only
+                    const assetDeliverables = deliverables.filter(a => a.assetId === asset.id);
+                    // All initiatives render at the asset level; deliverableId is metadata only
                     const assetLevelInitiatives = allAssetInitiatives;
                     const assetMilestones = milestones.filter(m => m.assetId === asset.id);
                     const conflictPoints = getConflictPoints(asset.id);
                     const { items: layoutItems, height: rowHeight } = getAssetLayout(asset, assetLevelInitiatives);
-                    // Collect all segments for this asset's applications swimlane
+                    // Collect all segments for this asset's deliverables swimlane
                     const assetSegments = localSegments.filter(s =>
-                      assetApplications.some(a => a.id === s.applicationId)
+                      assetDeliverables.some(a => a.id === s.deliverableId)
                     );
 
-                    // When in applications-only mode, skip assets with no applications only if empty rows are hidden
-                    if (display === 'applications' && assetApplications.length === 0 && settings.emptyRowDisplay === 'hide') return null;
+                    // When in deliverables-only mode, skip assets with no deliverables only if empty rows are hidden
+                    if (display === 'deliverables' && assetDeliverables.length === 0 && settings.emptyRowDisplay === 'hide') return null;
 
                     return (
                       <React.Fragment key={asset.id}>
@@ -1993,7 +1919,7 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
                         )}
                         onDragOver={(e) => handleAssetDragOver(e, asset)}
                       >
-                        {/* Asset Name Sidebar — spans both Initiatives and Applications swimlanes */}
+                        {/* Asset Name Sidebar — spans both Initiatives and Deliverables swimlanes */}
                         <div
                           data-testid="asset-swimlane-label"
                           data-alias={asset.alias}
@@ -2008,32 +1934,6 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
                               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="5" r="1" /><circle cx="9" cy="12" r="1" /><circle cx="9" cy="19" r="1" /><circle cx="15" cy="5" r="1" /><circle cx="15" cy="12" r="1" /><circle cx="15" cy="19" r="1" /></svg>
                             </div>}
                             <div className="font-semibold text-slate-800 min-w-0 flex-1">{asset.name}</div>
-                            {settings.showDtsAdoptionStatus === 'on' && typeof asset.alias === 'string' && asset.alias.startsWith('DTS.') && asset.dtsAdoptionStatus && (() => {
-                              const statusColors: Record<string, string> = {
-                                'not-started': 'bg-slate-200 text-slate-600',
-                                'scoping': 'bg-yellow-100 text-yellow-700',
-                                'in-delivery': 'bg-blue-100 text-blue-700',
-                                'adopted': 'bg-emerald-100 text-emerald-700',
-                                'decommissioning': 'bg-orange-100 text-orange-700',
-                                'not-applicable': 'bg-slate-100 text-slate-400',
-                              };
-                              const statusLabels: Record<string, string> = {
-                                'not-started': 'Not Started',
-                                'scoping': 'Scoping',
-                                'in-delivery': 'In Delivery',
-                                'adopted': 'Adopted',
-                                'decommissioning': 'Decommissioning',
-                                'not-applicable': 'N/A',
-                              };
-                              return (
-                                <span
-                                  data-testid={`dts-adoption-badge-${asset.id}`}
-                                  className={cn('flex-shrink-0 text-[9px] font-semibold px-1.5 py-0.5 rounded-full', statusColors[asset.dtsAdoptionStatus] || 'bg-slate-100 text-slate-500')}
-                                >
-                                  {statusLabels[asset.dtsAdoptionStatus] || asset.dtsAdoptionStatus}
-                                </span>
-                              );
-                            })()}
                             {onDeleteAsset && (
                               <button
                                 data-testid="asset-swimlane-delete-btn"
@@ -2041,7 +1941,7 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
                                   e.stopPropagation();
                                   const hasLinkedData =
                                     initiatives.some(i => i.assetId === asset.id) ||
-                                    applications.some(a => a.assetId === asset.id);
+                                    deliverables.some(a => a.assetId === asset.id);
                                   if (hasLinkedData) {
                                     setPendingConfirm({ type: 'delete-asset', assetId: asset.id, assetName: asset.name, hasLinkedData: true });
                                   } else {
@@ -2061,8 +1961,8 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
                         {/* Swimlanes stacked vertically */}
                         <div className="flex flex-col relative">
 
-                        {/* Initiatives swimlane — hidden when display is 'applications' */}
-                        {display !== 'applications' && (
+                        {/* Initiatives swimlane — hidden when display is 'deliverables' */}
+                        {display !== 'deliverables' && (
                         <div
                           data-testid="asset-row-content"
                           className="relative flex-shrink-0"
@@ -2192,21 +2092,21 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
                         </div>
                         )} {/* end initiatives swimlane */}
 
-                        {/* Applications swimlane — single merged row per asset, hidden when display is 'initiatives'.
-                            Renders when the asset has Application objects (which may have lifecycle segments). */}
-                        {display !== 'initiatives' && (assetApplications.length > 0 || assetSegments.length > 0) && (() => {
+                        {/* Deliverables swimlane — single merged row per asset, hidden when display is 'initiatives'.
+                            Renders when the asset has Deliverable objects (which may have lifecycle segments). */}
+                        {display !== 'initiatives' && (assetDeliverables.length > 0 || assetSegments.length > 0) && (() => {
                           const { items: segLayoutItems, height: swimlaneHeight } = layoutSegments(assetSegments);
                           return (
                           <div
-                            data-testid={`application-swimlane-${asset.id}`}
+                            data-testid={`deliverable-swimlane-${asset.id}`}
                             className="border-t border-slate-100"
                           >
                             <div
-                              data-testid="application-row-content"
+                              data-testid="deliverable-row-content"
                               className="relative flex-shrink-0 bg-slate-50/30"
                               style={{ width: totalWidth, height: swimlaneHeight }}
                               onDoubleClick={(e) => {
-                                if (!onSaveApplicationSegment) return;
+                                if (!onSaveDeliverableSegment) return;
                                 const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
                                 const offsetX = e.clientX - rect.left;
                                 const pct = offsetX / totalWidth;
@@ -2227,7 +2127,7 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
                               {segLayoutItems.map(({ seg, top, height, left, width, rowSpan, row }) => {
                                 if (left + width < 0 || left > 100) return null;
                                 const colorClass = SEGMENT_COLORS[seg.status] || 'bg-slate-400';
-                                const displayLabel = applications.find(a => a.id === seg.applicationId)?.name
+                                const displayLabel = deliverables.find(a => a.id === seg.deliverableId)?.name
                                   || SEGMENT_LABELS[seg.status];
                                 const isSegSelected = selectedSegmentId === seg.id;
                                 return (
@@ -2332,7 +2232,7 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
                             </div>
                           </div>
                           );
-                        })()} {/* end applications swimlane */}
+                        })()} {/* end deliverables swimlane */}
 
                         {/* Milestone markers — lifted to span both swimlanes */}
                         {assetMilestones.map(mile => {
@@ -2351,7 +2251,7 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
                             >
                               <div className="absolute top-0 bottom-0 w-px border-l border-dashed border-slate-400/50 group-hover/marker:border-slate-600" />
                               {/* Badge pinned to initiatives-row height so it stays within that swimlane */}
-                              <div className="flex flex-col items-center justify-center" style={{ height: display !== 'applications' ? rowHeight : undefined }}>
+                              <div className="flex flex-col items-center justify-center" style={{ height: display !== 'deliverables' ? rowHeight : undefined }}>
                                 <div data-testid="milestone-dep-handle" className={cn(
                                   "relative p-1.5 rounded-full shadow-md border-2 border-white transition-transform group-hover/marker:scale-110",
                                   mile.type === 'critical' ? "bg-red-100 text-red-600" :
@@ -2425,15 +2325,6 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
                           >
                             <div className="flex-1">
                               <div className="text-xs font-semibold text-slate-600">{area.name}</div>
-                              {GEANZ_TO_DTS_MAP[area.alias] && (
-                                <span
-                                  data-testid="geanz-dts-map-badge"
-                                  className="inline-block mt-0.5 text-[9px] font-mono font-semibold text-indigo-600 bg-indigo-50 border border-indigo-200 rounded px-1 py-0.5 leading-none"
-                                  title={`Maps to DTS component ${GEANZ_TO_DTS_MAP[area.alias]}`}
-                                >
-                                  {GEANZ_TO_DTS_MAP[area.alias]}
-                                </span>
-                              )}
                             </div>
                             {area.assets.length > 0 ? (
                               <button
@@ -2512,7 +2403,7 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       const hasLinkedData = allAssetInitiatives.length > 0 ||
-                                        applications.some(a => a.assetId === asset.id);
+                                        deliverables.some(a => a.assetId === asset.id);
                                       if (hasLinkedData) {
                                         setPendingConfirm({ type: 'delete-asset', assetId: asset.id, assetName: asset.name, hasLinkedData: true });
                                       } else {
@@ -2526,7 +2417,7 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
                                   </button>
                                 )}
                               </div>
-                              {display !== 'applications' && (
+                              {display !== 'deliverables' && (
                               <div
                                 data-testid="asset-row-content"
                                 className="relative flex-shrink-0"
@@ -2654,15 +2545,16 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
               : null
         }
         assets={assets}
-        applications={applications}
+        deliverables={deliverables}
         programmes={programmes}
         strategies={strategies}
         dependencies={dependencies}
         initiatives={initiatives}
         resources={resources}
-        hasDtsAssets={hasDtsAssets}
-        dtsPhases={dtsPhases}
+        decisions={decisions}
+        onOpenDecision={onOpenDecision}
         isNew={creatingInitiativeParams !== null}
+        defaultCurrency={settings.defaultCurrency || 'USD'}
         onSave={(initiative) => {
           if (initiativePanelId) {
             if (onUpdateInitiative) onUpdateInitiative(initiative);
@@ -2681,7 +2573,7 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
         }}
       />
 
-      <ApplicationSegmentPanel
+      <DeliverableSegmentPanel
         isOpen={segmentPanelId !== null || creatingSegmentParams !== null}
         isNew={creatingSegmentParams !== null}
         segment={
@@ -2690,39 +2582,40 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
             : creatingSegmentParams
               ? {
                   id: creatingSegmentParams.id,
-                  applicationId: applications.find(a => a.assetId === creatingSegmentParams.assetId)?.id ?? '',
+                  deliverableId: deliverables.find(a => a.assetId === creatingSegmentParams.assetId)?.id ?? '',
                   startDate: creatingSegmentParams.startDate,
                   endDate: creatingSegmentParams.endDate,
-                  status: applicationStatuses[0]?.id ?? 'appstatus-planned',
+                  status: deliverableStatuses[0]?.id ?? 'appstatus-planned',
                   row: creatingSegmentParams.row,
                   rowSpan: 1,
                 }
               : null
         }
-        application={
+        deliverable={
           (segmentPanelId
-            ? applications.find(a => a.id === localSegments.find(s => s.id === segmentPanelId)?.applicationId)
+            ? deliverables.find(a => a.id === localSegments.find(s => s.id === segmentPanelId)?.deliverableId)
             : null) || null
         }
-        applications={(() => {
+        deliverables={(() => {
           const assetId = segmentPanelId
-            ? applications.find(a => a.id === localSegments.find(s => s.id === segmentPanelId)?.applicationId)?.assetId
+            ? deliverables.find(a => a.id === localSegments.find(s => s.id === segmentPanelId)?.deliverableId)?.assetId
             : creatingSegmentParams?.assetId;
-          return assetId ? applications.filter(a => a.assetId === assetId) : [];
+          return assetId ? deliverables.filter(a => a.assetId === assetId) : [];
         })()}
         onClose={() => { setSegmentPanelId(null); setSelectedSegmentId(null); setCreatingSegmentParams(null); }}
         onSave={(seg) => {
-          if (onSaveApplicationSegment) onSaveApplicationSegment(seg);
+          if (onSaveDeliverableSegment) onSaveDeliverableSegment(seg);
           setSegmentPanelId(null);
           setSelectedSegmentId(null);
           setCreatingSegmentParams(null);
         }}
         onDelete={(seg) => {
-          if (onDeleteApplicationSegment) onDeleteApplicationSegment(seg);
+          if (onDeleteDeliverableSegment) onDeleteDeliverableSegment(seg);
           setSegmentPanelId(null);
           setSelectedSegmentId(null);
         }}
-        applicationStatuses={applicationStatuses}
+        deliverableStatuses={deliverableStatuses}
+        initiatives={initiatives}
       />
 
       <DependencyPanel
@@ -2731,8 +2624,8 @@ export function Timeline({ assets, applications = [], initiatives, milestones, p
         dependency={selectedDependencyId ? dependencies.find(d => d.id === selectedDependencyId) || null : null}
         initiatives={initiatives}
         milestones={milestones}
-        applicationSegments={localSegments}
-        applications={applications}
+        deliverableSegments={localSegments}
+        deliverables={deliverables}
         onSave={(updatedDep) => {
           if (onUpdateDependencies) {
             onUpdateDependencies(dependencies.map(d => d.id === updatedDep.id ? updatedDep : d));

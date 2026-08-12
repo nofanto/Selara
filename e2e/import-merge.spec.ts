@@ -94,4 +94,40 @@ test.describe('Import Preview & Merge', () => {
         await searchInput.fill('Passkey Rollout');
         await expect(page.locator('tbody tr[data-real="true"]')).toHaveCount(1);
     });
+
+    test('Merge import preserves existing RPTI Detail rows even when the import file has no RptiDetails sheet', async ({ page }) => {
+        // Seed an RPTI row via the Data Manager UI — mirrors the pattern in
+        // e2e/rpti-data-manager.spec.ts.
+        await page.getByRole('button', { name: 'Data Manager' }).click();
+        await page.getByTestId('data-manager-tab-rpti').click();
+        await page.getByTestId('add-row-btn-rpti').click();
+        const row = page.locator('[data-testid="data-manager"] tbody tr[data-real="true"]').last();
+        await row.locator('td[data-key="initiativeId"] select').selectOption({ index: 1 });
+        await row.locator('td[data-key="targetId"] select').selectOption({ index: 1 });
+        await row.locator('td[data-key="categoryCode"] select').selectOption('06');
+        await row.locator('td[data-key="developmentType"] select').selectOption('new');
+        await row.locator('td[data-key="developer"] select').selectOption('inhouse');
+        await row.locator('td[data-key="ppjtiRelatedParty"] select').selectOption('n/a');
+        await row.locator('td[data-key="remarks"] textarea').fill('Should survive import');
+        await row.locator('td[data-key="remarks"] textarea').press('Tab');
+        await page.waitForTimeout(300);
+
+        const rptiRowsBefore = await page.locator('[data-testid="data-manager"] tbody tr[data-real="true"]').count();
+        expect(rptiRowsBefore).toBeGreaterThan(0);
+
+        // Import a file whose only sheet is Initiatives — it has no RptiDetails
+        // sheet at all, so existing RPTI rows should be untouched by the merge.
+        const fileChooserPromise = page.waitForEvent('filechooser');
+        await page.getByRole('button', { name: 'Import' }).click();
+        const fileChooser = await fileChooserPromise;
+        await fileChooser.setFiles(mockFilePath);
+
+        const modal = page.locator('.import-preview-modal');
+        await expect(modal).toBeVisible();
+        await page.getByRole('button', { name: 'Merge Data' }).click();
+        await expect(modal).toBeHidden();
+
+        await page.getByTestId('data-manager-tab-rpti').click();
+        await expect(page.locator('[data-testid="data-manager"] tbody tr[data-real="true"]')).toHaveCount(rptiRowsBefore);
+    });
 });

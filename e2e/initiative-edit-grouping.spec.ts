@@ -1,9 +1,9 @@
 import { test, expect, Page } from '@playwright/test';
 
 /**
- * US-01: Edit initiative interaction in programme/strategy/DTS phase grouping
+ * US-01: Edit initiative interaction in programme/strategy grouping
  *
- * When grouped by programme, strategy, or DTS phase, single-clicking an
+ * When grouped by programme or strategy, single-clicking an
  * initiative should show the edit icon (top-right) and double-clicking should
  * open the Edit Initiative modal — matching the behaviour in group-by-asset.
  */
@@ -16,7 +16,7 @@ async function openViewOptions(page: Page) {
   }
 }
 
-async function switchGrouping(page: Page, groupBy: 'programme' | 'strategy' | 'dts-phase') {
+async function switchGrouping(page: Page, groupBy: 'programme' | 'strategy') {
   await openViewOptions(page);
   await page.getByTestId(`group-by-${groupBy}`).click();
   // Close popover by clicking the button again (toggle)

@@ -14,33 +14,33 @@ test.describe('Display Mode Picker', () => {
     await page.waitForSelector('[data-testid="asset-row-content"]', { timeout: 10000 });
   });
 
-  test('View Options popover has Show section with Both/Initiatives/Applications', async ({ page }) => {
+  test('View Options popover has Show section with Both/Initiatives/Deliverables', async ({ page }) => {
     await page.getByTestId('view-options-btn').click();
     await expect(page.getByTestId('view-options-popover')).toBeVisible();
     await expect(page.getByTestId('show-both')).toBeVisible();
     await expect(page.getByTestId('show-initiatives')).toBeVisible();
-    await expect(page.getByTestId('show-applications')).toBeVisible();
+    await expect(page.getByTestId('show-deliverables')).toBeVisible();
   });
 
-  test('default mode is Both: initiative bars and application rows visible', async ({ page }) => {
+  test('default mode is Both: initiative bars and deliverable rows visible', async ({ page }) => {
     await expect(page.locator('[data-testid^="initiative-bar"]').first()).toBeVisible();
-    await expect(page.locator('[data-testid^="application-swimlane-"]').first()).toBeVisible();
+    await expect(page.locator('[data-testid^="deliverable-swimlane-"]').first()).toBeVisible();
   });
 
-  test('Initiatives mode hides application rows', async ({ page }) => {
+  test('Initiatives mode hides deliverable rows', async ({ page }) => {
     await page.getByTestId('view-options-btn').click();
     await page.getByTestId('show-initiatives').click();
     await page.mouse.click(100, 100);
     await expect(page.locator('[data-testid^="initiative-bar"]').first()).toBeVisible();
-    await expect(page.locator('[data-testid^="application-swimlane-"]')).toHaveCount(0);
+    await expect(page.locator('[data-testid^="deliverable-swimlane-"]')).toHaveCount(0);
   });
 
-  test('Applications mode hides initiative bars', async ({ page }) => {
+  test('Deliverables mode hides initiative bars', async ({ page }) => {
     await page.getByTestId('view-options-btn').click();
-    await page.getByTestId('show-applications').click();
+    await page.getByTestId('show-deliverables').click();
     await page.mouse.click(100, 100);
     await expect(page.locator('[data-testid^="initiative-bar"]')).toHaveCount(0);
-    await expect(page.locator('[data-testid^="application-swimlane-"]').first()).toBeVisible();
+    await expect(page.locator('[data-testid^="deliverable-swimlane-"]').first()).toBeVisible();
   });
 
   test('switching back to Both restores both layers and button label reflects active mode', async ({ page }) => {
@@ -52,7 +52,7 @@ test.describe('Display Mode Picker', () => {
     await page.getByTestId('show-both').click();
     await page.mouse.click(100, 100);
     await expect(page.locator('[data-testid^="initiative-bar"]').first()).toBeVisible();
-    await expect(page.locator('[data-testid^="application-swimlane-"]').first()).toBeVisible();
+    await expect(page.locator('[data-testid^="deliverable-swimlane-"]').first()).toBeVisible();
     await expect(btn).toContainText('Both');
   });
 });
@@ -63,16 +63,16 @@ test.describe('Display Mode — Empty Rows interaction', () => {
     await page.waitForSelector('[data-testid="asset-row-content"]', { timeout: 10000 });
   });
 
-  test('Applications + Empty Rows Show: assets without applications still visible', async ({ page }) => {
+  test('Deliverables + Empty Rows Show: assets without deliverables still visible', async ({ page }) => {
     await page.getByTestId('view-options-btn').click();
-    await page.getByTestId('show-applications').click();
+    await page.getByTestId('show-deliverables').click();
     await page.mouse.click(100, 100);
     await expect(page.locator('[data-testid="asset-row-a-eiam"]')).toBeVisible();
   });
 
-  test('Applications + Empty Rows Hide: assets without applications are hidden', async ({ page }) => {
+  test('Deliverables + Empty Rows Hide: assets without deliverables are hidden', async ({ page }) => {
     await page.getByTestId('view-options-btn').click();
-    await page.getByTestId('show-applications').click();
+    await page.getByTestId('show-deliverables').click();
     await page.mouse.click(100, 100);
     await page.getByTestId('display-more-btn').click();
     await page.locator('#emptyRowDisplay').selectOption('hide');
@@ -81,7 +81,7 @@ test.describe('Display Mode — Empty Rows interaction', () => {
     await expect(page.locator('[data-testid="asset-row-a-ciam"]')).toBeVisible();
   });
 
-  test('Both + Empty Rows Hide: assets with applications remain visible', async ({ page }) => {
+  test('Both + Empty Rows Hide: assets with deliverables remain visible', async ({ page }) => {
     await page.getByTestId('display-more-btn').click();
     await page.locator('#emptyRowDisplay').selectOption('hide');
     await page.mouse.click(100, 100);

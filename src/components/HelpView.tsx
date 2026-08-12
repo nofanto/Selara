@@ -19,7 +19,7 @@ const SECTIONS: GuideSection[] = [
   {
     title: 'Getting Started',
     pages: [
-      { title: 'What is Scenia?',    path: '01-getting-started/what-is-scenia' },
+      { title: 'What is Selara?',    path: '01-getting-started/what-is-selara' },
       { title: 'First Launch',       path: '01-getting-started/first-launch' },
       { title: 'Navigating the App', path: '01-getting-started/navigating-the-app' },
     ],
@@ -54,9 +54,9 @@ const SECTIONS: GuideSection[] = [
     ],
   },
   {
-    title: 'Applications',
+    title: 'Deliverables',
     pages: [
-      { title: 'Adding Applications',  path: '05-applications/adding-applications' },
+      { title: 'Adding Deliverables',  path: '05-applications/adding-applications' },
       { title: 'Lifecycle Segments',   path: '05-applications/lifecycle-segments' },
       { title: 'Managing Segments',    path: '05-applications/managing-segments' },
       { title: 'Display Mode',         path: '05-applications/display-mode' },

@@ -1,16 +1,16 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * Applications feature:
- * - IT assets are composed of applications
- * - Applications have: name, asset (parent), status
- * - Initiatives can optionally be linked to an application within their asset
- * - Application sub-rows appear in the visualiser beneath their parent asset row
+ * Deliverables feature:
+ * - IT assets are composed of deliverables
+ * - Deliverables have: name, asset (parent), status
+ * - Initiatives can optionally be linked to a deliverable within their asset
+ * - Deliverable sub-rows appear in the visualiser beneath their parent asset row
  * - Milestones remain at the asset level
- * - Assets with no applications render as before (no regressions)
+ * - Assets with no deliverables render as before (no regressions)
  */
 
-test.describe('Applications — Data Manager tab', () => {
+test.describe('Deliverables — Data Manager tab', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
     await page.waitForSelector('[data-testid="asset-row-content"]', { timeout: 20000 });
@@ -18,26 +18,34 @@ test.describe('Applications — Data Manager tab', () => {
     await expect(page.getByTestId('data-manager')).toBeVisible();
   });
 
-  test('Applications tab is present in the Data Manager', async ({ page }) => {
-    await expect(page.getByTestId('data-manager-tab-applications')).toBeVisible();
+  test('Deliverables tab is present in the Data Manager', async ({ page }) => {
+    await expect(page.getByTestId('data-manager-tab-deliverables')).toBeVisible();
   });
 
-  test('Applications tab shows Name and Asset columns', async ({ page }) => {
-    await page.getByTestId('data-manager-tab-applications').click();
+  test('Deliverables tab shows Name and Asset columns', async ({ page }) => {
+    await page.getByTestId('data-manager-tab-deliverables').click();
     const table = page.getByTestId('data-manager');
     await expect(table.locator('th').filter({ hasText: 'Name' })).toBeVisible();
     await expect(table.locator('th').filter({ hasText: 'Asset' })).toBeVisible();
   });
 
-  test('Applications tab shows demo application rows', async ({ page }) => {
-    await page.getByTestId('data-manager-tab-applications').click();
-    // There should be at least one application in demo data
+  test('Deliverables tab shows RPTI auto-fill override columns (categoryCode, developer, DC/DR location)', async ({ page }) => {
+    await page.getByTestId('data-manager-tab-deliverables').click();
+    const headerText = (await page.locator('[data-testid="data-manager"] thead').innerText()).toLowerCase();
+    for (const label of ['RPTI Category Override', 'Developer', 'DC City Override', 'DC Country Override', 'DR City Override', 'DR Country Override']) {
+      expect(headerText).toContain(label.toLowerCase());
+    }
+  });
+
+  test('Deliverables tab shows demo deliverable rows', async ({ page }) => {
+    await page.getByTestId('data-manager-tab-deliverables').click();
+    // There should be at least one deliverable in demo data
     const rows = page.locator('[data-testid="data-manager"] tbody tr:not(.ghost-row)');
     await expect(rows.first()).toBeVisible();
   });
 
-  test('can add a new application row', async ({ page }) => {
-    await page.getByTestId('data-manager-tab-applications').click();
+  test('can add a new deliverable row', async ({ page }) => {
+    await page.getByTestId('data-manager-tab-deliverables').click();
     const initialCount = await page.locator('[data-testid="data-manager"] tbody tr:not(.ghost-row)').count();
 
     await page.getByRole('button', { name: 'Add Row' }).click();
@@ -45,8 +53,8 @@ test.describe('Applications — Data Manager tab', () => {
     expect(newCount).toBe(initialCount + 1);
   });
 
-  test('can open an application name for editing', async ({ page }) => {
-    await page.getByTestId('data-manager-tab-applications').click();
+  test('can open a deliverable name for editing', async ({ page }) => {
+    await page.getByTestId('data-manager-tab-deliverables').click();
     // Double-clicking the name cell should open an inline text input
     const nameCell = page.locator('[data-testid="data-manager"] tbody tr:not(.ghost-row) td[data-key="name"]').first();
     await nameCell.dblclick();
@@ -55,30 +63,30 @@ test.describe('Applications — Data Manager tab', () => {
   });
 });
 
-test.describe('Applications — InitiativePanel dropdown', () => {
+test.describe('Deliverables — InitiativePanel dropdown', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
     await page.waitForSelector('[data-testid="asset-row-content"]', { timeout: 20000 });
   });
 
-  test('Application dropdown appears in the InitiativePanel', async ({ page }) => {
+  test('Deliverable dropdown appears in the InitiativePanel', async ({ page }) => {
     const bar = page.locator('[data-testid^="initiative-bar"]').first();
     await bar.click();
     await page.getByTestId('initiative-action-edit').click();
     const panel = page.getByTestId('initiative-panel');
     await expect(panel).toBeVisible();
-    await expect(panel.locator('[data-testid="initiative-application"]')).toBeVisible();
+    await expect(panel.locator('[data-testid="initiative-deliverable"]')).toBeVisible();
   });
 
-  test('Application dropdown is filtered to the selected asset', async ({ page }) => {
-    // Open an initiative on an asset that has applications (a-ciam in demo data)
+  test('Deliverable dropdown is filtered to the selected asset', async ({ page }) => {
+    // Open an initiative on an asset that has deliverables (a-ciam in demo data)
     const bar = page.locator('[data-initiative-id="i-ciam-passkey"]').first();
     await bar.click();
     await page.getByTestId('initiative-action-edit').click();
     const panel = page.getByTestId('initiative-panel');
     await expect(panel).toBeVisible();
 
-    const appDropdown = panel.locator('[data-testid="initiative-application"]');
+    const appDropdown = panel.locator('[data-testid="initiative-deliverable"]');
     await expect(appDropdown).toBeVisible();
 
     // Should show only apps belonging to a-ciam — count options (minus the blank one)
@@ -87,15 +95,15 @@ test.describe('Applications — InitiativePanel dropdown', () => {
     expect(count).toBeGreaterThan(1); // at least the blank + one app option
   });
 
-  test('Changing asset resets the application selection', async ({ page }) => {
+  test('Changing asset resets the deliverable selection', async ({ page }) => {
     const bar = page.locator('[data-initiative-id="i-ciam-passkey"]').first();
     await bar.click();
     await page.getByTestId('initiative-action-edit').click();
     const panel = page.getByTestId('initiative-panel');
     await expect(panel).toBeVisible();
 
-    const appDropdown = panel.locator('[data-testid="initiative-application"]');
-    // Select an application first
+    const appDropdown = panel.locator('[data-testid="initiative-deliverable"]');
+    // Select a deliverable first
     const options = await appDropdown.locator('option').all();
     if (options.length > 1) {
       const secondOptionValue = await options[1].getAttribute('value');
@@ -105,20 +113,20 @@ test.describe('Applications — InitiativePanel dropdown', () => {
       }
     }
 
-    // Change the asset — application should reset to blank
+    // Change the asset — deliverable should reset to blank
     const assetSelect = panel.locator('#assetId');
     await assetSelect.selectOption('a-web');
     await expect(appDropdown).toHaveValue('');
   });
 
-  test('Application assignment saves and persists after reload', async ({ page }) => {
+  test('Deliverable assignment saves and persists after reload', async ({ page }) => {
     const bar = page.locator('[data-initiative-id="i-ciam-passkey"]').first();
     await bar.click();
     await page.getByTestId('initiative-action-edit').click();
     const panel = page.getByTestId('initiative-panel');
     await expect(panel).toBeVisible();
 
-    const appDropdown = panel.locator('[data-testid="initiative-application"]');
+    const appDropdown = panel.locator('[data-testid="initiative-deliverable"]');
     const options = await appDropdown.locator('option:not([value=""])').all();
     if (options.length > 0) {
       const appValue = await options[0].getAttribute('value');
@@ -134,46 +142,46 @@ test.describe('Applications — InitiativePanel dropdown', () => {
         await page.getByTestId('initiative-action-edit').click();
         const panel2 = page.getByTestId('initiative-panel');
         await expect(panel2).toBeVisible();
-        await expect(panel2.locator('[data-testid="initiative-application"]')).toHaveValue(appValue);
+        await expect(panel2.locator('[data-testid="initiative-deliverable"]')).toHaveValue(appValue);
       }
     }
   });
 });
 
-test.describe('Applications — Visualiser sub-rows', () => {
+test.describe('Deliverables — Visualiser sub-rows', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
     await page.waitForSelector('[data-testid="asset-row-content"]', { timeout: 20000 });
   });
 
-  test('application sub-rows are visible in the timeline for assets with applications', async ({ page }) => {
-    // a-ciam should have application sub-rows based on demo data
-    await expect(page.locator('[data-testid^="application-swimlane-"]').first()).toBeVisible({ timeout: 10000 });
+  test('deliverable sub-rows are visible in the timeline for assets with deliverables', async ({ page }) => {
+    // a-ciam should have deliverable sub-rows based on demo data
+    await expect(page.locator('[data-testid^="deliverable-swimlane-"]').first()).toBeVisible({ timeout: 10000 });
   });
 
-  test('one applications swimlane per asset with applications (3 in demo data)', async ({ page }) => {
-    // Demo data has 3 assets with applications: a-ciam, a-web, a-mobile
-    const appSwimlanes = page.locator('[data-testid^="application-swimlane-"]');
+  test('one deliverables swimlane per asset with deliverables (3 in demo data)', async ({ page }) => {
+    // Demo data has 3 assets with deliverables: a-ciam, a-web, a-mobile
+    const appSwimlanes = page.locator('[data-testid^="deliverable-swimlane-"]');
     await expect(appSwimlanes).toHaveCount(3);
   });
 
-  test('application sub-row shows lifecycle segment bars from demo data', async ({ page }) => {
-    // Demo data includes segments for each application; at least one bar should be visible
-    const appRow = page.locator('[data-testid^="application-swimlane-"]').first();
+  test('deliverable sub-row shows lifecycle segment bars from demo data', async ({ page }) => {
+    // Demo data includes segments for each deliverable; at least one bar should be visible
+    const appRow = page.locator('[data-testid^="deliverable-swimlane-"]').first();
     await expect(appRow).toBeVisible();
     const segmentBar = appRow.locator('[data-testid^="segment-bar-"]').first();
     await expect(segmentBar).toBeVisible();
   });
 
-  test('initiatives linked to an application remain visible at the asset level', async ({ page }) => {
-    // Link i-ciam-passkey to an application and verify it still renders in the asset row
+  test('initiatives linked to a deliverable remain visible at the asset level', async ({ page }) => {
+    // Link i-ciam-passkey to a deliverable and verify it still renders in the asset row
     const bar = page.locator('[data-initiative-id="i-ciam-passkey"]').first();
     await bar.click();
     await page.getByTestId('initiative-action-edit').click();
     const panel = page.getByTestId('initiative-panel');
     await expect(panel).toBeVisible();
 
-    const appDropdown = panel.locator('[data-testid="initiative-application"]');
+    const appDropdown = panel.locator('[data-testid="initiative-deliverable"]');
     const allOptions = await appDropdown.locator('option').all();
     const nonBlankOptions = [];
     for (const opt of allOptions) {
@@ -190,20 +198,20 @@ test.describe('Applications — Visualiser sub-rows', () => {
     }
   });
 
-  test('assets with no applications render without an applications swimlane', async ({ page }) => {
-    // a-k8s (Kubernetes Platform) has no applications in demo data
+  test('assets with no deliverables render without an deliverables swimlane', async ({ page }) => {
+    // a-k8s (Kubernetes Platform) has no deliverables in demo data
     await expect(page.locator('[data-testid="asset-row-a-k8s"]')).toBeVisible();
-    await expect(page.locator('[data-testid="application-swimlane-a-k8s"]')).toHaveCount(0);
+    await expect(page.locator('[data-testid="deliverable-swimlane-a-k8s"]')).toHaveCount(0);
   });
 
-  test('milestones remain visible at the asset level alongside application sub-rows', async ({ page }) => {
+  test('milestones remain visible at the asset level alongside deliverable sub-rows', async ({ page }) => {
     // The CIAM asset has milestones in demo data — they should still render
     await expect(page.locator('[data-testid="milestone-dep-handle"]').first()).toBeVisible();
   });
 });
 
-test.describe('Applications — Version snapshots', () => {
-  test('applications are included in version snapshots', async ({ page }) => {
+test.describe('Deliverables — Version snapshots', () => {
+  test('deliverables are included in version snapshots', async ({ page }) => {
     await page.goto('/');
     await page.waitForSelector('[data-testid="asset-row-content"]', { timeout: 20000 });
 
@@ -217,21 +225,21 @@ test.describe('Applications — Version snapshots', () => {
     await expect(page.getByText('App Test Snapshot')).toBeVisible();
     await page.getByTestId('close-version-manager').click();
 
-    // Add a new application
+    // Add a new deliverable
     await page.getByTestId('nav-data-manager').click();
-    await page.getByTestId('data-manager-tab-applications').click();
+    await page.getByTestId('data-manager-tab-deliverables').click();
     await page.getByRole('button', { name: 'Add Row' }).click();
 
-    // Restore the snapshot — the new application should be gone
+    // Restore the snapshot — the new deliverable should be gone
     await page.getByTestId('nav-history').click();
     await page.getByText('App Test Snapshot').click();
     await page.getByRole('button', { name: 'Restore' }).first().click();
     await page.locator('[data-testid="confirm-modal-confirm"]').click();
     // VersionManager auto-closes after restore (onRestore + onClose both called in confirm handler)
 
-    // Application count should match the snapshot (not include the newly added row)
+    // Deliverable count should match the snapshot (not include the newly added row)
     await page.getByTestId('nav-data-manager').click();
-    await page.getByTestId('data-manager-tab-applications').click();
+    await page.getByTestId('data-manager-tab-deliverables').click();
     // The page renders without error
     await expect(page.getByTestId('data-manager')).toBeVisible();
   });

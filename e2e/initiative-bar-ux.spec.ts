@@ -134,7 +134,7 @@ test.describe('US-IE-03: Relationship drag handle', () => {
   });
 });
 
-// ─── Application Segment UX (mirrors US-IE-01/02/03 for segments) ─────────────
+// ─── Deliverable Segment UX (mirrors US-IE-01/02/03 for segments) ─────────────
 
 async function getFirstSegment(page: Page) {
   return page.locator('[data-testid^="segment-bar-"]').first();

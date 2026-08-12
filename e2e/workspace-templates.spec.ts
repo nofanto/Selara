@@ -4,8 +4,7 @@ import { test, expect } from '@playwright/test';
  * User Story 15: Workspace Templates (Multi-Taxonomy Support)
  *
  * AC1: TemplatePickerModal shown on first load (empty DB, no scenia-e2e flag)
- * AC2: Modal shows 4 template cards: dts, geanz, viewer, blank
- * AC3: DTS template loads 6 DTS layer categories + 20 assets; GEANZ section hidden
+ * AC2: Modal shows 3 template cards: geanz, viewer, blank
  * AC4: GEANZ template loads GEANZ demo portfolio; GEANZ section visible
  * AC5: Viewer card has single "Upload file" button; triggers file chooser; closes picker after import
  * AC6: Blank template loads empty workspace; GEANZ section hidden
@@ -47,33 +46,16 @@ test.describe('Workspace Templates', () => {
     await expect(page.getByTestId('template-picker-modal')).toBeVisible({ timeout: 20000 });
   });
 
-  // AC2: all 4 template cards are present
-  test('AC2: all 4 template cards are visible', async ({ page }) => {
+  // AC2: all 3 template cards are present
+  test('AC2: all 3 template cards are visible', async ({ page }) => {
     await page.goto('/');
     await simulateFirstRun(page);
     await page.waitForSelector('[data-testid="template-picker-modal"]', { timeout: 20000 });
-    await expect(page.getByTestId('template-card-dts')).toBeVisible();
     await expect(page.getByTestId('template-card-geanz')).toBeVisible();
     await expect(page.getByTestId('template-card-viewer')).toBeVisible();
     await expect(page.getByTestId('template-card-blank')).toBeVisible();
     // Mixed card must no longer exist
     await expect(page.getByTestId('template-card-mixed')).not.toBeVisible();
-  });
-
-  // AC3: DTS template
-  test('AC3: DTS template loads DTS categories and assets; GEANZ section hidden', async ({ page }) => {
-    await page.goto('/');
-    await simulateFirstRun(page);
-    await page.waitForSelector('[data-testid="template-picker-modal"]', { timeout: 20000 });
-    await page.getByTestId('template-select-with-demo-btn-dts').click();
-    // DTS assets render as regular swimlanes
-    await page.waitForSelector('[data-testid="asset-row-content"]', { timeout: 20000 });
-    // A DTS category header should be visible
-    await expect(page.getByText('Digital Public Infrastructure')).toBeVisible();
-    // A DTS asset should be visible
-    await expect(page.getByText('Identity & Credential Services').first()).toBeVisible();
-    // GEANZ section should be hidden
-    await expect(page.getByTestId('geanz-section')).not.toBeVisible();
   });
 
   // AC4: GEANZ template

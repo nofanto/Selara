@@ -1,6 +1,6 @@
-# Scenia User Guide
+# Selara User Guide
 
-This guide covers every feature of Scenia, written for IT portfolio managers. If you're new, follow the Quick Start path. If you know what you're looking for, jump to the Feature Reference.
+This guide covers every feature of Selara, written for IT portfolio managers. If you're new, follow the Quick Start path. If you know what you're looking for, jump to the Feature Reference.
 
 ---
 
@@ -8,7 +8,7 @@ This guide covers every feature of Scenia, written for IT portfolio managers. If
 
 Follow these three pages to get up and running quickly:
 
-1. [Getting Started](01-getting-started/what-is-scenia.md) — What Scenia is and how your data stays private
+1. [Getting Started](01-getting-started/what-is-selara.md) — What Selara is and how your data stays private
 2. [The Timeline](02-timeline/reading-the-timeline.md) — How the timeline canvas is organised
 3. [Managing Initiatives](03-initiatives/editing-an-initiative.md) — Opening the slide-in panel to update initiative details
 
@@ -20,7 +20,7 @@ Follow these three pages to get up and running quickly:
 
 | Page | Description |
 |------|-------------|
-| [What is Scenia?](01-getting-started/what-is-scenia.md) | What Scenia is and how your data stays private |
+| [What is Selara?](01-getting-started/what-is-selara.md) | What Selara is and how your data stays private |
 | [First Launch](01-getting-started/first-launch.md) | What happens when you open the app for the first time |
 | [Navigating the App](01-getting-started/navigating-the-app.md) | The four main views, global search, and keyboard shortcuts |
 
@@ -121,6 +121,20 @@ Follow these three pages to get up and running quickly:
 | [Card View](12-mobile/card-view.md) | The asset card layout shown on phones and tablets |
 | [Mobile Settings](12-mobile/mobile-settings.md) | The mobile settings sheet and display toggles |
 
+### 13 Decisions
+
+| Page | Description |
+|------|-------------|
+| [Recording a Decision](13-decisions/recording-a-decision.md) | Creating, editing, and changing the status of a portfolio decision |
+| [Linking Decisions to Portfolio Items](13-decisions/linking-decisions.md) | Attaching a decision to an initiative, programme, or asset |
+
+### 14 RPTI Report
+
+| Page | Description |
+|------|-------------|
+| [Recording an RPTI Row](14-rpti-report/recording-an-rpti-row.md) | Managing RPTI rows in Data Manager to build the Indonesian OJK IT Development Plan Report |
+| [Exporting the RPTI Report](14-rpti-report/exporting-the-rpti-report.md) | How a missing quarter is filled in at export time, and exporting to Excel |
+
 ---
 
 ## Feature Reference
@@ -133,6 +147,7 @@ An alphabetical index of capabilities and where to find them.
 | Conflict Detection | [Conflict Detection](02-timeline/conflict-detection.md) |
 | Critical Path | [Critical Path](04-dependencies/critical-path.md) |
 | CSV Import | [CSV Paste](07-data-manager/csv-paste.md) |
+| Decisions | [Recording a Decision](13-decisions/recording-a-decision.md) |
 | Dependencies | [Drawing Dependencies](04-dependencies/drawing-dependencies.md) |
 | Display Modes | [Display Mode](05-applications/display-mode.md) |
 | Excel Export | [Excel Export](11-import-export/excel-export.md) |
@@ -144,6 +159,7 @@ An alphabetical index of capabilities and where to find them.
 | PDF Export | [PDF & SVG Export](11-import-export/pdf-svg-export.md) |
 | Reports | [Reports Overview](09-reports/overview.md) |
 | Resources | [Resource Roster](08-resources/resource-roster.md) |
+| RPTI Report | [Recording an RPTI Row](14-rpti-report/recording-an-rpti-row.md) |
 | SVG Export | [PDF & SVG Export](11-import-export/pdf-svg-export.md) |
 | Undo/Redo | [Navigating the App](01-getting-started/navigating-the-app.md) |
 | Version History | [Saving a Version](10-version-history/saving-a-version.md) |

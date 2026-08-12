@@ -1,6 +1,10 @@
 import { test, expect } from '@playwright/test';
 
-test.describe('Sharable Links', () => {
+// Skipped: the Share feature is disabled (SHARING_ENABLED = false in
+// DataControls.tsx) pending Selara's own backend — src/lib/share.ts's
+// hardcoded endpoint belongs to Scenia's original author. Re-enable this
+// suite once the feature points at Selara's own backend.
+test.describe.skip('Sharable Links', () => {
   test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
   });

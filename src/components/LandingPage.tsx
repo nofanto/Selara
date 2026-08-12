@@ -21,7 +21,7 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
             <div className="w-8 h-8 rounded bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center font-bold text-white text-lg shadow-lg">
               S
             </div>
-            <span className="text-xl font-bold tracking-tight">Scenia</span>
+            <span className="text-xl font-bold tracking-tight">Selara</span>
           </div>
           <div className="flex items-center gap-4">
             <button
@@ -31,7 +31,7 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
               Launch App
             </button>
             <a
-              href="https://github.com/waylonkenning/scenia"
+              href="https://github.com/nofanto/Selara"
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-300 transition-colors"
@@ -61,7 +61,7 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
           >
             Your IT Portfolio, <br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400">
-              The Complete Scene.
+              Perfectly Aligned.
             </span>
           </motion.h1>
 
@@ -71,7 +71,7 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
             transition={{ duration: 0.5, delay: 0.2 }}
             className="text-lg md:text-xl text-slate-400 max-w-2xl mb-12 leading-relaxed"
           >
-            Scenia gives you the full view — map initiatives across time, sequence dependencies, track costs, and report on progress. Free, private, and running entirely in your browser.
+            Selara gives you the full view — map initiatives across time, sequence dependencies, track costs, and report on progress. Free, private, and running entirely in your browser.
           </motion.p>
 
           <motion.div
@@ -106,7 +106,7 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
               </div>
               <img
                 src="/tutorial/2-visualiser.png"
-                alt="Scenia Visualiser"
+                alt="Selara Visualiser"
                 className="w-full h-auto object-cover"
               />
             </div>
@@ -170,7 +170,7 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
             <div className="mt-16 flex flex-col items-center gap-3">
               <div className="flex items-center gap-4 text-slate-500 text-sm">
                 <a
-                  href="https://github.com/waylonkenning/scenia"
+                  href="https://github.com/nofanto/Selara"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-1.5 hover:text-slate-300 transition-colors"
@@ -181,18 +181,7 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
                 <span>·</span>
                 <span>Apache 2.0</span>
               </div>
-              <p className="text-slate-600 text-sm">
-                Built by{' '}
-                <a
-                  href="https://kenning.co.nz"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-slate-500 hover:text-slate-300 transition-colors"
-                >
-                  Kenning Corporation Limited
-                </a>
-              </p>
-              <p className="text-slate-700 text-sm">&copy; {new Date().getFullYear()} Scenia.</p>
+              <p className="text-slate-700 text-sm">&copy; {new Date().getFullYear()} Selara.</p>
             </div>
           </div>
         </footer>

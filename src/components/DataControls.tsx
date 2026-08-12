@@ -4,14 +4,19 @@ import { exportToExcel, importFromExcel } from '../lib/excel';
 import { SchemaIssue, validateImportSchema } from '../lib/importValidation';
 import { exportToPDF, exportToPNG } from '../lib/pdf';
 import { shareWorkspace } from '../lib/share';
-import { Asset, Application, ApplicationSegment, ApplicationStatus, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource, Version, DtsPhaseRecord } from '../types';
+
+// The Share feature's backend (src/lib/share.ts) points at Waylon Kenning's
+// own Google Cloud Function and Firestore, inherited from Scenia. Disabled
+// until Selara has its own backend to point at — flip this once one exists.
+const SHARING_ENABLED = false;
+import { Asset, Deliverable, DeliverableSegment, DeliverableStatus, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource, Version, Decision, RptiDetail } from '../types';
 
 interface DataControlsProps {
   data: {
     assets: Asset[];
-    applications?: Application[];
-    applicationSegments?: ApplicationSegment[];
-    applicationStatuses?: ApplicationStatus[];
+    deliverables?: Deliverable[];
+    deliverableSegments?: DeliverableSegment[];
+    deliverableStatuses?: DeliverableStatus[];
     initiatives: Initiative[];
     milestones: Milestone[];
     programmes: Programme[];
@@ -21,13 +26,14 @@ interface DataControlsProps {
     timelineSettings: TimelineSettings;
     resources: Resource[];
     versions?: Version[];
-    dtsPhases?: DtsPhaseRecord[];
+    decisions?: Decision[];
+    rptiDetails?: RptiDetail[];
   };
   onImport: (data: {
     assets: Asset[];
-    applications: Application[];
-    applicationSegments: ApplicationSegment[];
-    applicationStatuses: ApplicationStatus[];
+    deliverables: Deliverable[];
+    deliverableSegments: DeliverableSegment[];
+    deliverableStatuses: DeliverableStatus[];
     initiatives: Initiative[];
     milestones: Milestone[];
     programmes: Programme[];
@@ -37,7 +43,8 @@ interface DataControlsProps {
     timelineSettings: TimelineSettings;
     resources: Resource[];
     versions?: Version[];
-    dtsPhases?: DtsPhaseRecord[];
+    decisions?: Decision[];
+    rptiDetails?: RptiDetail[];
   }) => void;
   onError?: (message: string | null) => void;
   timelineId?: string; // ID of the element to capture for PDF
@@ -153,9 +160,9 @@ export function DataControls({ data, onImport, onError, timelineId }: DataContro
     if (!importPreviewData) return;
     onImport({
       assets: importPreviewData.assets || [],
-      applications: importPreviewData.applications || [],
-      applicationSegments: importPreviewData.applicationSegments || [],
-      applicationStatuses: importPreviewData.applicationStatuses || [],
+      deliverables: importPreviewData.deliverables || [],
+      deliverableSegments: importPreviewData.deliverableSegments || [],
+      deliverableStatuses: importPreviewData.deliverableStatuses || [],
       initiatives: importPreviewData.initiatives || [],
       milestones: importPreviewData.milestones || [],
       programmes: importPreviewData.programmes || [],
@@ -165,7 +172,8 @@ export function DataControls({ data, onImport, onError, timelineId }: DataContro
       timelineSettings: importPreviewData.timelineSettings || data.timelineSettings,
       resources: importPreviewData.resources || [],
       versions: importPreviewData.versions || [],
-      dtsPhases: importPreviewData.dtsPhases || [],
+      decisions: importPreviewData.decisions || [],
+      rptiDetails: importPreviewData.rptiDetails || [],
     });
     setShowImportModal(false);
     setImportPreviewData(null);
@@ -192,9 +200,9 @@ export function DataControls({ data, onImport, onError, timelineId }: DataContro
 
     onImport({
       assets: mergeArrays(data.assets, importPreviewData.assets),
-      applications: mergeArrays(data.applications || [], importPreviewData.applications),
-      applicationSegments: mergeArrays(data.applicationSegments || [], importPreviewData.applicationSegments),
-      applicationStatuses: mergeArrays(data.applicationStatuses || [], importPreviewData.applicationStatuses),
+      deliverables: mergeArrays(data.deliverables || [], importPreviewData.deliverables),
+      deliverableSegments: mergeArrays(data.deliverableSegments || [], importPreviewData.deliverableSegments),
+      deliverableStatuses: mergeArrays(data.deliverableStatuses || [], importPreviewData.deliverableStatuses),
       initiatives: mergeArrays(data.initiatives, importPreviewData.initiatives),
       milestones: mergeArrays(data.milestones, importPreviewData.milestones),
       programmes: mergeArrays(data.programmes, importPreviewData.programmes),
@@ -204,7 +212,8 @@ export function DataControls({ data, onImport, onError, timelineId }: DataContro
       timelineSettings: importPreviewData.timelineSettings || data.timelineSettings,
       resources: mergeArrays(data.resources, importPreviewData.resources),
       versions: mergeArrays(data.versions || [], importPreviewData.versions || []),
-      dtsPhases: mergeArrays(data.dtsPhases || [], importPreviewData.dtsPhases || []),
+      decisions: mergeArrays(data.decisions || [], importPreviewData.decisions),
+      rptiDetails: mergeArrays(data.rptiDetails || [], importPreviewData.rptiDetails),
     });
     setShowImportModal(false);
     setImportPreviewData(null);
@@ -214,16 +223,18 @@ export function DataControls({ data, onImport, onError, timelineId }: DataContro
 
   return (
     <div className="flex items-center gap-1.5 relative">
-      <button
-        data-testid="share-button"
-        onClick={handleShare}
-        disabled={isSharing}
-        className="flex items-center gap-1.5 px-2.5 py-1.5 bg-blue-50 border border-blue-200 rounded-lg text-xs font-medium text-blue-700 hover:bg-blue-100 transition-colors disabled:opacity-50"
-        title="Generate a temporary, secure share link"
-      >
-        <Share size={14} className={isSharing ? 'animate-pulse' : ''} />
-        {isSharing ? 'Sharing...' : 'Share'}
-      </button>
+      {SHARING_ENABLED && (
+        <button
+          data-testid="share-button"
+          onClick={handleShare}
+          disabled={isSharing}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 bg-blue-50 border border-blue-200 rounded-lg text-xs font-medium text-blue-700 hover:bg-blue-100 transition-colors disabled:opacity-50"
+          title="Generate a temporary, secure share link"
+        >
+          <Share size={14} className={isSharing ? 'animate-pulse' : ''} />
+          {isSharing ? 'Sharing...' : 'Share'}
+        </button>
+      )}
 
       <button
         onClick={handleExportPDF}
@@ -378,15 +389,17 @@ export function DataControls({ data, onImport, onError, timelineId }: DataContro
             <ul className="space-y-2 mb-4 text-sm text-slate-700 bg-slate-50 p-4 rounded-lg border border-slate-200">
               {importPreviewData.initiatives && <li><span className="font-semibold">{importPreviewData.initiatives.length}</span> Initiatives</li>}
               {importPreviewData.assets && <li><span className="font-semibold">{importPreviewData.assets.length}</span> Assets</li>}
-              {importPreviewData.applications && importPreviewData.applications.length > 0 && <li><span className="font-semibold">{importPreviewData.applications.length}</span> Applications</li>}
-              {importPreviewData.applicationSegments && importPreviewData.applicationSegments.length > 0 && <li><span className="font-semibold">{importPreviewData.applicationSegments.length}</span> Application Segments</li>}
-              {importPreviewData.applicationStatuses && importPreviewData.applicationStatuses.length > 0 && <li><span className="font-semibold">{importPreviewData.applicationStatuses.length}</span> Application Statuses</li>}
+              {importPreviewData.deliverables && importPreviewData.deliverables.length > 0 && <li><span className="font-semibold">{importPreviewData.deliverables.length}</span> Deliverables</li>}
+              {importPreviewData.deliverableSegments && importPreviewData.deliverableSegments.length > 0 && <li><span className="font-semibold">{importPreviewData.deliverableSegments.length}</span> Deliverable Segments</li>}
+              {importPreviewData.deliverableStatuses && importPreviewData.deliverableStatuses.length > 0 && <li><span className="font-semibold">{importPreviewData.deliverableStatuses.length}</span> Deliverable Statuses</li>}
               {importPreviewData.resources && importPreviewData.resources.length > 0 && <li><span className="font-semibold">{importPreviewData.resources.length}</span> Resources</li>}
               {importPreviewData.programmes && <li><span className="font-semibold">{importPreviewData.programmes.length}</span> Programmes</li>}
               {importPreviewData.strategies && <li><span className="font-semibold">{importPreviewData.strategies.length}</span> Strategies</li>}
               {importPreviewData.milestones && <li><span className="font-semibold">{importPreviewData.milestones.length}</span> Milestones</li>}
               {importPreviewData.dependencies && <li><span className="font-semibold">{importPreviewData.dependencies.length}</span> Dependencies</li>}
               {importPreviewData.assetCategories && <li><span className="font-semibold">{importPreviewData.assetCategories.length}</span> Categories</li>}
+              {importPreviewData.rptiDetails && importPreviewData.rptiDetails.length > 0 && <li><span className="font-semibold">{importPreviewData.rptiDetails.length}</span> RPTI Details</li>}
+              {importPreviewData.decisions && importPreviewData.decisions.length > 0 && <li><span className="font-semibold">{importPreviewData.decisions.length}</span> Decisions</li>}
               {importPreviewData.versions && importPreviewData.versions.length > 0 && <li><span className="font-semibold text-indigo-600">{importPreviewData.versions.length}</span> History Snapshots</li>}
             </ul>
 

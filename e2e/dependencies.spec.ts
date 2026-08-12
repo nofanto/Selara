@@ -102,37 +102,6 @@ async function dragMilestoneToBelowInitiative(page: Page) {
   await page.mouse.up();
 }
 
-async function simulateFirstRun(page: Page) {
-  await page.evaluate(async () => {
-    await new Promise<void>((resolve) => {
-      const req = indexedDB.deleteDatabase('it-initiative-visualiser');
-      req.onsuccess = () => resolve();
-      req.onerror = () => resolve();
-      req.onblocked = () => setTimeout(resolve, 200);
-    });
-    localStorage.removeItem('scenia-e2e');
-    localStorage.setItem('scenia_has_seen_landing', 'true');
-  });
-  await page.reload();
-}
-
-async function loadDtsTemplate(page: Page, withDemoData = true) {
-  await page.goto('/');
-  await simulateFirstRun(page);
-  await page.waitForSelector('[data-testid="template-picker-modal"]', { timeout: 10000 });
-  if (withDemoData) {
-    await page.getByTestId('template-select-with-demo-btn-dts').click();
-  } else {
-    await page.getByTestId('template-select-no-demo-btn-dts').click();
-  }
-  await page.waitForSelector('[data-testid="asset-row-content"]', { timeout: 10000 });
-  const tutorialModal = page.getByTestId('tutorial-modal');
-  if (await tutorialModal.isVisible()) {
-    await page.getByRole('button', { name: 'Close' }).first().click();
-    await tutorialModal.waitFor({ state: 'hidden', timeout: 5000 });
-  }
-}
-
 async function openReportsDependencies(page: Page) {
   await page.goto('/');
   await page.waitForSelector('[data-testid="asset-row-content"]', { timeout: 10000 });
@@ -499,54 +468,6 @@ test.describe('Segment Dependencies', () => {
 
     await page.locator('[data-dep-id]').last().locator('path').first().click({ force: true });
     await expect(page.locator('[data-testid="dep-source-name"]')).toBeVisible();
-  });
-});
-
-// ─── DTS Template Dependencies ───────────────────────────────────────────────
-
-test.describe('DTS Template Dependencies', () => {
-  test('DTS demo data includes at least 6 initiative-to-initiative dependencies', async ({ page }) => {
-    await loadDtsTemplate(page);
-    await page.getByTestId('nav-data-manager').click();
-    await page.waitForSelector('[data-testid="data-manager"]');
-    await page.getByRole('button', { name: /Dependencies/ }).click();
-
-    const badge = page.locator('[data-testid="data-manager-tab-dependencies"] span').last();
-    const count = parseInt(await badge.textContent() || '0', 10);
-    expect(count).toBeGreaterThanOrEqual(6);
-  });
-
-  test('DTS demo data includes at least 2 milestone-to-initiative dependencies', async ({ page }) => {
-    await loadDtsTemplate(page);
-    await page.getByTestId('nav-reports').click();
-    await page.getByTestId('report-card-initiatives-dependencies').click();
-    await expect(page.getByTestId('report-milestone-dependencies')).toBeVisible({ timeout: 10000 });
-    expect(await page.locator('[data-testid="report-milestone-dependencies"] li').count()).toBeGreaterThanOrEqual(2);
-  });
-
-  test('Portal Decommission initiative shows at least 2 upstream blockers', async ({ page }) => {
-    test.setTimeout(60000);
-    await loadDtsTemplate(page);
-
-    const portalBar = page.locator('[data-testid^="initiative-bar-dts-i-portal"]');
-    await expect(portalBar).toBeVisible({ timeout: 15000 });
-    await portalBar.click();
-    await page.getByTestId('initiative-action-edit').click();
-    await expect(page.getByTestId('related-initiatives-section')).toBeVisible({ timeout: 10000 });
-    expect(await page.locator('[data-testid="related-initiatives-section"] li').count()).toBeGreaterThanOrEqual(2);
-  });
-
-  test('loading DTS template WITHOUT demo data results in zero dependencies', async ({ page }) => {
-    await loadDtsTemplate(page, false);
-    await page.getByTestId('nav-data-manager').click();
-    await page.waitForSelector('[data-testid="data-manager"]');
-    await page.getByRole('button', { name: /Dependencies/ }).click();
-
-    const count = parseInt(
-      await page.locator('[data-testid="data-manager-tab-dependencies"] span').last().textContent() || '0',
-      10
-    );
-    expect(count).toBe(0);
   });
 });
 

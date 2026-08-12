@@ -7,8 +7,7 @@
 **so that** I can navigate directly to the analysis I need without seeing all reports at once.
 
 **Acceptance Criteria:**
-- The Reports view shows a home screen with six selectable report cards: History, Budget, Initiatives & Dependencies, Capacity, Maturity Heatmap, DTS Alignment
-- The DTS Alignment card is only visible in DTS and Mixed workspaces
+- The Reports view shows a home screen with six selectable report cards: History, Budget, Initiatives & Dependencies, Capacity, Maturity Heatmap, RPTI Report
 - Clicking a card navigates into that full-width report
 - A back button returns to the report selection home screen
 - The "Reports" nav tab shows the correct active state
@@ -70,21 +69,6 @@
 - A version selector appears after at least one version has been saved
 - Running the diff shows inline results
 - An error message is displayed if versions fail to load
-
----
-
-## US-RP-06: View a DTS Alignment Coverage Report
-
-**As an** IT portfolio manager working within a DTS or Mixed workspace,
-**I want** to see a coverage grid of all 20 DTS assets coloured by adoption status,
-**so that** I can report Digital Target State progress to GCDO or cluster leads in a single view.
-
-**Acceptance Criteria:**
-- A "DTS Alignment" report card is available on the Reports home screen in DTS and Mixed workspaces only
-- The report renders a grid of all 20 DTS assets arranged in their six DTS layers
-- Each asset tile is coloured by its adoption status (Not Started / Scoping / In Delivery / Adopted / Decommissioning Incumbent / Not Applicable)
-- Each tile shows the initiative count and total budget for initiatives linked to that asset
-- Assets with no initiatives linked show a zero count
 
 ---
 

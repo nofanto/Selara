@@ -1,29 +1,26 @@
 /**
- * Workspace templates for Scenia.
+ * Workspace templates for Selara.
  *
  * Each template defines the initial data loaded into IndexedDB on first run.
- * Templates correspond to different NZ government IT taxonomy / reference architecture choices.
  */
 
-import { Asset, AssetCategory, DtsPhaseRecord, Initiative, Milestone, ApplicationSegment, Programme, Strategy, Dependency, Resource, ApplicationStatus, TimelineSettings, Application } from '../types';
-import { DTS_CATEGORIES, DTS_ASSETS } from './dtsCatalogue';
-import { defaultDtsPhases, dtsDemoInitiatives, dtsDemoMilestones, dtsDemoApplicationSegments, dtsDemoApplications, dtsDemoProgrammes, dtsDemoStrategies, dtsDemoAdoptionStatuses, dtsDemoInitiativePhases, dtsDemoDependencies } from './dtsDemoData';
+import { Asset, AssetCategory, Decision, RptiDetail, Initiative, Milestone, DeliverableSegment, Programme, Strategy, Dependency, Resource, DeliverableStatus, TimelineSettings, Deliverable } from '../types';
 import {
   demoAssets,
   demoInitiatives,
   demoMilestones,
-  demoApplicationSegments,
+  demoDeliverableSegments,
   demoAssetCategories,
   demoProgrammes,
   demoStrategies,
   demoDependencies,
   demoResources,
-  demoApplications,
-  demoApplicationStatuses,
+  demoDeliverables,
+  demoDeliverableStatuses,
   demoTimelineSettings,
 } from '../demoData';
 
-export type TemplateId = 'dts' | 'geanz' | 'viewer' | 'blank';
+export type TemplateId = 'geanz' | 'viewer' | 'blank';
 
 export interface WorkspaceTemplate {
   id: TemplateId;
@@ -33,12 +30,6 @@ export interface WorkspaceTemplate {
 }
 
 export const WORKSPACE_TEMPLATES: WorkspaceTemplate[] = [
-  {
-    id: 'dts',
-    name: 'NZ Digital Target State',
-    description: 'Model your portfolio against the GCDO target architecture.',
-    tagline: '6 layers · 20 pre-built assets',
-  },
   {
     id: 'geanz',
     name: 'GEANZ Technology Catalogue',
@@ -64,14 +55,15 @@ export interface TemplateAppData {
   assets: Asset[];
   initiatives: Initiative[];
   milestones: Milestone[];
-  applicationSegments: ApplicationSegment[];
+  deliverableSegments: DeliverableSegment[];
   programmes: Programme[];
   strategies: Strategy[];
   dependencies: Dependency[];
   resources: Resource[];
-  applications: Application[];
-  applicationStatuses: ApplicationStatus[];
-  dtsPhases: DtsPhaseRecord[];
+  deliverables: Deliverable[];
+  deliverableStatuses: DeliverableStatus[];
+  decisions: Decision[];
+  rptiDetails: RptiDetail[];
   timelineSettings: TimelineSettings;
 }
 
@@ -82,25 +74,6 @@ export function getTemplateData(templateId: TemplateId | string, withDemoData = 
   };
 
   switch (templateId) {
-    case 'dts':
-      return {
-        assetCategories: DTS_CATEGORIES,
-        assets: withDemoData
-          ? DTS_ASSETS.map(a => ({ ...a, dtsAdoptionStatus: dtsDemoAdoptionStatuses[a.id] }))
-          : DTS_ASSETS,
-        initiatives: withDemoData ? dtsDemoInitiatives.map(i => ({ ...i, dtsPhase: dtsDemoInitiativePhases[i.id] })) : [],
-        milestones: withDemoData ? dtsDemoMilestones : [],
-        applicationSegments: withDemoData ? dtsDemoApplicationSegments : [],
-        programmes: dtsDemoProgrammes,
-        strategies: dtsDemoStrategies,
-        dependencies: withDemoData ? dtsDemoDependencies : [],
-        resources: withDemoData ? demoResources : [],
-        applications: withDemoData ? dtsDemoApplications : [],
-        applicationStatuses: demoApplicationStatuses,
-        dtsPhases: defaultDtsPhases,
-        timelineSettings: { ...baseSettings, showGeanzCatalogue: false },
-      };
-
     case 'viewer':
       // Viewer mode loads data from an uploaded Excel file — no preset data needed.
       // Return a blank workspace as the fallback.
@@ -109,14 +82,15 @@ export function getTemplateData(templateId: TemplateId | string, withDemoData = 
         assets: [],
         initiatives: [],
         milestones: [],
-        applicationSegments: [],
+        deliverableSegments: [],
         programmes: [],
         strategies: [],
         dependencies: [],
         resources: [],
-        applications: [],
-        applicationStatuses: [],
-        dtsPhases: [],
+        deliverables: [],
+        deliverableStatuses: [],
+        decisions: [],
+        rptiDetails: [],
         timelineSettings: { ...baseSettings, showGeanzCatalogue: false },
       };
 
@@ -126,14 +100,15 @@ export function getTemplateData(templateId: TemplateId | string, withDemoData = 
         assets: [],
         initiatives: [],
         milestones: [],
-        applicationSegments: [],
+        deliverableSegments: [],
         programmes: [],
         strategies: [],
         dependencies: [],
         resources: [],
-        applications: [],
-        applicationStatuses: [],
-        dtsPhases: [],
+        deliverables: [],
+        deliverableStatuses: [],
+        decisions: [],
+        rptiDetails: [],
         timelineSettings: { ...baseSettings, showGeanzCatalogue: false },
       };
 
@@ -144,14 +119,15 @@ export function getTemplateData(templateId: TemplateId | string, withDemoData = 
         assets: demoAssets,
         initiatives: withDemoData ? demoInitiatives : [],
         milestones: withDemoData ? demoMilestones : [],
-        applicationSegments: withDemoData ? demoApplicationSegments : [],
+        deliverableSegments: withDemoData ? demoDeliverableSegments : [],
         programmes: demoProgrammes,
         strategies: demoStrategies,
         dependencies: withDemoData ? demoDependencies : [],
         resources: withDemoData ? demoResources : [],
-        applications: withDemoData ? demoApplications : [],
-        applicationStatuses: demoApplicationStatuses,
-        dtsPhases: [],
+        deliverables: withDemoData ? demoDeliverables : [],
+        deliverableStatuses: demoDeliverableStatuses,
+        decisions: [],
+        rptiDetails: [],
         timelineSettings: { ...baseSettings, showGeanzCatalogue: true },
       };
   }

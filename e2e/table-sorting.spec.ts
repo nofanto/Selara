@@ -29,7 +29,7 @@ test.describe('Table Column Sorting', () => {
   });
 
   test('Should sort Initiatives by CapEx', async ({ page }) => {
-    const capexHeader = page.getByRole('columnheader', { name: 'CapEx ($)' });
+    const capexHeader = page.getByRole('columnheader', { name: 'CapEx (IDR)' });
 
     // Sort Ascending
     await capexHeader.click();

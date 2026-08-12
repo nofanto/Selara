@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { Version, Asset, Application, ApplicationSegment, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource, ApplicationStatus, DtsPhaseRecord } from '../types';
-import { X, Save, History, Trash2, ArrowRight, FileText, AlertCircle, LayoutGrid, Check, Users, GitBranch } from 'lucide-react';
+import { Version, Asset, Deliverable, DeliverableSegment, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource, DeliverableStatus, Decision, RptiDetail } from '../types';
+import { X, Save, History, Trash2, ArrowRight, FileText, AlertCircle, LayoutGrid, Check, Users, GitBranch, Box, Layers, Tags, FolderTree, Scale, ClipboardList } from 'lucide-react';
 import { saveVersion, deleteVersion } from '../lib/db';
 import { ConfirmModal } from './ConfirmModal';
 import { computeDiff } from '../lib/diff';
@@ -15,8 +15,8 @@ interface VersionManagerProps {
   onUpdateVersions: (versions: Version[]) => void;
   currentData: {
     assets: Asset[];
-    applications: Application[];
-    applicationSegments: ApplicationSegment[];
+    deliverables: Deliverable[];
+    deliverableSegments: DeliverableSegment[];
     initiatives: Initiative[];
     milestones: Milestone[];
     programmes: Programme[];
@@ -25,8 +25,9 @@ interface VersionManagerProps {
     assetCategories: AssetCategory[];
     timelineSettings: TimelineSettings;
     resources: Resource[];
-    applicationStatuses?: ApplicationStatus[];
-    dtsPhases?: DtsPhaseRecord[];
+    deliverableStatuses?: DeliverableStatus[];
+    decisions?: Decision[];
+    rptiDetails?: RptiDetail[];
   };
 }
 
@@ -54,8 +55,9 @@ export function VersionManager({ isOpen, onClose, onRestore, versions, onUpdateV
       description: newDescription,
       data: structuredClone({
         ...currentData,
-        applicationStatuses: currentData.applicationStatuses || [],
-        dtsPhases: currentData.dtsPhases || [],
+        deliverableStatuses: currentData.deliverableStatuses || [],
+        decisions: currentData.decisions || [],
+        rptiDetails: currentData.rptiDetails || [],
       }),
     };
 
@@ -469,6 +471,48 @@ function VersionComparisonReport({ baseVersion, comparisonData, onClose }: {
                 data={diff.milestones}
                 icon={FileText}
                 colorClass="rose"
+              />
+              <DiffSection
+                title="Deliverables"
+                data={diff.deliverables}
+                icon={Box}
+                colorClass="cyan"
+              />
+              <DiffSection
+                title="Deliverable Segments"
+                data={diff.deliverableSegments}
+                icon={Layers}
+                colorClass="teal"
+              />
+              <DiffSection
+                title="App Statuses"
+                data={diff.deliverableStatuses}
+                icon={Tags}
+                colorClass="orange"
+              />
+              <DiffSection
+                title="Resources"
+                data={diff.resources}
+                icon={Users}
+                colorClass="sky"
+              />
+              <DiffSection
+                title="Categories"
+                data={diff.assetCategories}
+                icon={FolderTree}
+                colorClass="stone"
+              />
+              <DiffSection
+                title="Decisions"
+                data={diff.decisions}
+                icon={Scale}
+                colorClass="fuchsia"
+              />
+              <DiffSection
+                title="RPTI"
+                data={diff.rptiDetails}
+                icon={ClipboardList}
+                colorClass="lime"
               />
             </>
           )}

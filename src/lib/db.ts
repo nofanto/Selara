@@ -1,5 +1,5 @@
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
-import { Asset, Application, ApplicationSegment, ApplicationStatus, DtsPhaseRecord, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Version, Resource } from '../types';
+import { Asset, Deliverable, DeliverableSegment, DeliverableStatus, Decision, RptiDetail, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Version, Resource } from '../types';
 import { createSerialAsyncRunner } from './serialAsync';
 
 interface ITMapDB extends DBSchema {
@@ -7,13 +7,13 @@ interface ITMapDB extends DBSchema {
     key: string;
     value: Asset;
   };
-  applications: {
+  deliverables: {
     key: string;
-    value: Application;
+    value: Deliverable;
   };
-  applicationSegments: {
+  deliverableSegments: {
     key: string;
-    value: ApplicationSegment;
+    value: DeliverableSegment;
   };
   initiatives: {
     key: string;
@@ -51,18 +51,22 @@ interface ITMapDB extends DBSchema {
     key: string;
     value: Resource;
   };
-  applicationStatuses: {
+  deliverableStatuses: {
     key: string;
-    value: ApplicationStatus;
+    value: DeliverableStatus;
   };
-  dtsPhases: {
+  decisions: {
     key: string;
-    value: DtsPhaseRecord;
+    value: Decision;
+  };
+  rptiDetails: {
+    key: string;
+    value: RptiDetail;
   };
 }
 
 const DB_NAME = 'it-initiative-visualiser';
-const DB_VERSION = 13;
+const DB_VERSION = 18;
 
 let dbPromise: Promise<IDBPDatabase<ITMapDB>>;
 
@@ -94,29 +98,29 @@ export const initDB = () => {
         if (oldVersion < 7 && !db.objectStoreNames.contains('resources')) {
           db.createObjectStore('resources', { keyPath: 'id' });
         }
-        if (oldVersion < 8 && !db.objectStoreNames.contains('applications')) {
-          db.createObjectStore('applications', { keyPath: 'id' });
+        if (oldVersion < 8 && !db.objectStoreNames.contains('deliverables')) {
+          db.createObjectStore('deliverables', { keyPath: 'id' });
         }
-        if (oldVersion < 9 && !db.objectStoreNames.contains('applicationSegments')) {
-          db.createObjectStore('applicationSegments', { keyPath: 'id' });
+        if (oldVersion < 9 && !db.objectStoreNames.contains('deliverableSegments')) {
+          db.createObjectStore('deliverableSegments', { keyPath: 'id' });
         }
-        if (oldVersion < 10 && !db.objectStoreNames.contains('applicationStatuses')) {
-          db.createObjectStore('applicationStatuses', { keyPath: 'id' });
+        if (oldVersion < 10 && !db.objectStoreNames.contains('deliverableStatuses')) {
+          db.createObjectStore('deliverableStatuses', { keyPath: 'id' });
         }
         if (oldVersion < 11) {
-          // Migrate assetId-based segments to Application records + applicationId.
-          // Segments that already have applicationId are left untouched.
-          const allSegments = await tx.objectStore('applicationSegments').getAll();
+          // Migrate assetId-based segments to Deliverable records + deliverableId.
+          // Segments that already have deliverableId are left untouched.
+          const allSegments = await tx.objectStore('deliverableSegments').getAll();
           const allAssets = await tx.objectStore('assets').getAll();
           const assetMap = new Map(allAssets.map((a: any) => [a.id, a]));
 
-          // Build a map from "assetId|label" → generated applicationId so that
-          // segments sharing the same asset+label resolve to the same Application.
+          // Build a map from "assetId|label" → generated deliverableId so that
+          // segments sharing the same asset+label resolve to the same Deliverable.
           const appKeyToId = new Map<string, string>();
           let counter = 0;
 
           for (const seg of allSegments) {
-            if ((seg as any).assetId && !(seg as any).applicationId) {
+            if ((seg as any).assetId && !(seg as any).deliverableId) {
               const assetId: string = (seg as any).assetId;
               const label: string = (seg as any).label ?? '';
               const key = `${assetId}|${label}`;
@@ -125,19 +129,19 @@ export const initDB = () => {
                 const appName = label || asset?.name || assetId;
                 const appId = `app-migrated-${assetId}-${counter++}`;
                 appKeyToId.set(key, appId);
-                await tx.objectStore('applications').add({ id: appId, assetId, name: appName });
+                await tx.objectStore('deliverables').add({ id: appId, assetId, name: appName });
               }
             }
           }
 
-          // Rewrite each assetId-based segment to use applicationId.
+          // Rewrite each assetId-based segment to use deliverableId.
           for (const seg of allSegments) {
-            if ((seg as any).assetId && !(seg as any).applicationId) {
+            if ((seg as any).assetId && !(seg as any).deliverableId) {
               const key = `${(seg as any).assetId}|${(seg as any).label ?? ''}`;
-              const applicationId = appKeyToId.get(key);
-              if (applicationId) {
+              const deliverableId = appKeyToId.get(key);
+              if (deliverableId) {
                 const { assetId: _a, label: _l, ...rest } = seg as any;
-                await tx.objectStore('applicationSegments').put({ ...rest, applicationId });
+                await tx.objectStore('deliverableSegments').put({ ...rest, deliverableId });
               }
             }
           }
@@ -153,23 +157,60 @@ export const initDB = () => {
             }
           }
         }
-        if (oldVersion < 13) {
-          if (!db.objectStoreNames.contains('dtsPhases')) {
-            db.createObjectStore('dtsPhases', { keyPath: 'id' });
+        if (oldVersion < 14) {
+          if (!db.objectStoreNames.contains('decisions')) {
+            db.createObjectStore('decisions', { keyPath: 'id' });
           }
-          // Seed default phases for existing DTS workspaces (those with DTS assets).
-          const allAssets = await tx.objectStore('assets').getAll();
-          const hasDts = allAssets.some((a: any) => a.alias?.startsWith('DTS.'));
-          if (hasDts) {
-            const defaults: DtsPhaseRecord[] = [
-              { id: 'phase-1',     name: 'Phase 1 — Register & Expose',  color: 'bg-blue-500' },
-              { id: 'phase-2',     name: 'Phase 2 — Integrate DPI',       color: 'bg-violet-500' },
-              { id: 'phase-3',     name: 'Phase 3 — AI & Legacy Exit',    color: 'bg-emerald-500' },
-              { id: 'back-office', name: 'Back-Office Consolidation',      color: 'bg-amber-500' },
-              { id: 'not-dts',     name: 'Not DTS',                        color: 'bg-slate-400' },
-            ];
-            for (const phase of defaults) {
-              await tx.objectStore('dtsPhases').put(phase);
+        }
+        if (oldVersion < 15) {
+          if (!db.objectStoreNames.contains('rptiDetails')) {
+            db.createObjectStore('rptiDetails', { keyPath: 'id' });
+          }
+        }
+        if (oldVersion < 16) {
+          // Flatten RptiDetail.location into top-level dcCity/dcCountry/drCity/drCountry.
+          const allRptiDetails = await tx.objectStore('rptiDetails').getAll();
+          for (const detail of allRptiDetails) {
+            const loc = (detail as any).location;
+            if (loc) {
+              const { location: _location, ...rest } = detail as any;
+              await tx.objectStore('rptiDetails').put({
+                ...rest,
+                dcCity: loc.dataCenter?.city,
+                dcCountry: loc.dataCenter?.country,
+                drCity: loc.disasterRecoveryCenter?.city,
+                drCountry: loc.disasterRecoveryCenter?.country,
+              });
+            }
+          }
+        }
+        if (oldVersion < 17) {
+          // The Application/ApplicationSegment/ApplicationStatus entities were renamed to
+          // Deliverable/DeliverableSegment/DeliverableStatus. Databases that already passed
+          // v8-v10 under the old names won't hit those blocks again (oldVersion isn't < 8-10
+          // here), so create the new-named stores directly. Old 'applications' /
+          // 'applicationSegments' / 'applicationStatuses' stores (if present) are left in
+          // place, orphaned and unmigrated — same treatment as 'dtsPhases' in v13.
+          if (!db.objectStoreNames.contains('deliverables')) {
+            db.createObjectStore('deliverables', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('deliverableSegments')) {
+            db.createObjectStore('deliverableSegments', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('deliverableStatuses')) {
+            db.createObjectStore('deliverableStatuses', { keyPath: 'id' });
+          }
+        }
+        if (oldVersion < 18) {
+          // Currency is now a single workspace-wide fact (TimelineSettings.defaultCurrency),
+          // not tracked per row — drop the now-redundant per-row currency/IDR-equivalent
+          // fields from RptiDetail. See requirement-specs/rpti-auto-fill-improvements.md.
+          const allRptiDetails = await tx.objectStore('rptiDetails').getAll();
+          for (const detail of allRptiDetails) {
+            const d = detail as any;
+            if (d.capexCurrency !== undefined || d.opexCurrency !== undefined || d.capexIdrEquivalent !== undefined || d.opexIdrEquivalent !== undefined) {
+              const { capexCurrency: _cc, opexCurrency: _oc, capexIdrEquivalent: _cie, opexIdrEquivalent: _oie, ...rest } = d;
+              await tx.objectStore('rptiDetails').put(rest);
             }
           }
         }
@@ -182,8 +223,8 @@ export const initDB = () => {
 export const getAppData = async () => {
   const db = await initDB();
   const assets = await db.getAll('assets');
-  const applications = db.objectStoreNames.contains('applications') ? await db.getAll('applications') : [];
-  const applicationSegments = db.objectStoreNames.contains('applicationSegments') ? await db.getAll('applicationSegments') : [];
+  const deliverables = db.objectStoreNames.contains('deliverables') ? await db.getAll('deliverables') : [];
+  const deliverableSegments = db.objectStoreNames.contains('deliverableSegments') ? await db.getAll('deliverableSegments') : [];
   const initiatives = await db.getAll('initiatives');
   const milestones = await db.getAll('milestones');
   const programmes = await db.getAll('programmes');
@@ -191,8 +232,9 @@ export const getAppData = async () => {
   const dependencies = await db.getAll('dependencies');
   const assetCategories = await db.getAll('assetCategories');
   const resources = db.objectStoreNames.contains('resources') ? await db.getAll('resources') : [];
-  const applicationStatuses = db.objectStoreNames.contains('applicationStatuses') ? await db.getAll('applicationStatuses') : [];
-  const dtsPhases = db.objectStoreNames.contains('dtsPhases') ? await db.getAll('dtsPhases') : [];
+  const deliverableStatuses = db.objectStoreNames.contains('deliverableStatuses') ? await db.getAll('deliverableStatuses') : [];
+  const decisions = db.objectStoreNames.contains('decisions') ? await db.getAll('decisions') : [];
+  const rptiDetails = db.objectStoreNames.contains('rptiDetails') ? await db.getAll('rptiDetails') : [];
 
   // Settings is not a standard list of entities, it's just one config object
   let settingsFromDb = null;
@@ -203,8 +245,8 @@ export const getAppData = async () => {
 
   return {
     assets,
-    applications,
-    applicationSegments,
+    deliverables,
+    deliverableSegments,
     initiatives,
     milestones,
     programmes,
@@ -213,15 +255,16 @@ export const getAppData = async () => {
     assetCategories,
     timelineSettings,
     resources,
-    applicationStatuses,
-    dtsPhases,
+    deliverableStatuses,
+    decisions,
+    rptiDetails,
   };
 };
 
 const saveAppDataImpl = async (data: {
   assets: Asset[];
-  applications: Application[];
-  applicationSegments: ApplicationSegment[];
+  deliverables: Deliverable[];
+  deliverableSegments: DeliverableSegment[];
   initiatives: Initiative[];
   milestones: Milestone[];
   programmes: Programme[];
@@ -230,12 +273,13 @@ const saveAppDataImpl = async (data: {
   assetCategories: AssetCategory[];
   timelineSettings: TimelineSettings;
   resources: Resource[];
-  applicationStatuses: ApplicationStatus[];
+  deliverableStatuses: DeliverableStatus[];
   versions?: Version[];
-  dtsPhases?: DtsPhaseRecord[];
+  decisions?: Decision[];
+  rptiDetails?: RptiDetail[];
 }) => {
   const db = await initDB();
-  const stores: ("assets" | "applications" | "applicationSegments" | "applicationStatuses" | "dtsPhases" | "initiatives" | "milestones" | "programmes" | "strategies" | "dependencies" | "assetCategories" | "settings" | "resources" | "versions")[] = [
+  const stores: ("assets" | "deliverables" | "deliverableSegments" | "deliverableStatuses" | "decisions" | "rptiDetails" | "initiatives" | "milestones" | "programmes" | "strategies" | "dependencies" | "assetCategories" | "settings" | "resources" | "versions")[] = [
     'assets', 'initiatives', 'milestones', 'programmes', 'strategies', 'dependencies', 'assetCategories'
   ];
   if (db.objectStoreNames.contains('settings')) {
@@ -244,17 +288,20 @@ const saveAppDataImpl = async (data: {
   if (db.objectStoreNames.contains('resources')) {
     stores.push('resources');
   }
-  if (db.objectStoreNames.contains('applications')) {
-    stores.push('applications');
+  if (db.objectStoreNames.contains('deliverables')) {
+    stores.push('deliverables');
   }
-  if (db.objectStoreNames.contains('applicationSegments')) {
-    stores.push('applicationSegments');
+  if (db.objectStoreNames.contains('deliverableSegments')) {
+    stores.push('deliverableSegments');
   }
-  if (db.objectStoreNames.contains('applicationStatuses')) {
-    stores.push('applicationStatuses');
+  if (db.objectStoreNames.contains('deliverableStatuses')) {
+    stores.push('deliverableStatuses');
   }
-  if (db.objectStoreNames.contains('dtsPhases')) {
-    stores.push('dtsPhases');
+  if (db.objectStoreNames.contains('decisions')) {
+    stores.push('decisions');
+  }
+  if (db.objectStoreNames.contains('rptiDetails')) {
+    stores.push('rptiDetails');
   }
   if (data.versions && db.objectStoreNames.contains('versions')) {
     stores.push('versions');
@@ -294,21 +341,25 @@ const saveAppDataImpl = async (data: {
       allPromises.push(tx.objectStore('resources').clear());
       (data.resources || []).forEach(item => allPromises.push(tx.objectStore('resources').put(item)));
     }
-    if (db.objectStoreNames.contains('applications')) {
-      allPromises.push(tx.objectStore('applications').clear());
-      (data.applications || []).forEach(item => allPromises.push(tx.objectStore('applications').put(item)));
+    if (db.objectStoreNames.contains('deliverables')) {
+      allPromises.push(tx.objectStore('deliverables').clear());
+      (data.deliverables || []).forEach(item => allPromises.push(tx.objectStore('deliverables').put(item)));
     }
-    if (db.objectStoreNames.contains('applicationSegments')) {
-      allPromises.push(tx.objectStore('applicationSegments').clear());
-      (data.applicationSegments || []).forEach(item => allPromises.push(tx.objectStore('applicationSegments').put(item)));
+    if (db.objectStoreNames.contains('deliverableSegments')) {
+      allPromises.push(tx.objectStore('deliverableSegments').clear());
+      (data.deliverableSegments || []).forEach(item => allPromises.push(tx.objectStore('deliverableSegments').put(item)));
     }
-    if (db.objectStoreNames.contains('applicationStatuses')) {
-      allPromises.push(tx.objectStore('applicationStatuses').clear());
-      (data.applicationStatuses || []).forEach(item => allPromises.push(tx.objectStore('applicationStatuses').put(item)));
+    if (db.objectStoreNames.contains('deliverableStatuses')) {
+      allPromises.push(tx.objectStore('deliverableStatuses').clear());
+      (data.deliverableStatuses || []).forEach(item => allPromises.push(tx.objectStore('deliverableStatuses').put(item)));
     }
-    if (db.objectStoreNames.contains('dtsPhases')) {
-      allPromises.push(tx.objectStore('dtsPhases').clear());
-      (data.dtsPhases || []).forEach(item => allPromises.push(tx.objectStore('dtsPhases').put(item)));
+    if (db.objectStoreNames.contains('decisions')) {
+      allPromises.push(tx.objectStore('decisions').clear());
+      (data.decisions || []).forEach(item => allPromises.push(tx.objectStore('decisions').put(item)));
+    }
+    if (db.objectStoreNames.contains('rptiDetails')) {
+      allPromises.push(tx.objectStore('rptiDetails').clear());
+      (data.rptiDetails || []).forEach(item => allPromises.push(tx.objectStore('rptiDetails').put(item)));
     }
     if (data.versions && db.objectStoreNames.contains('versions')) {
       allPromises.push(tx.objectStore('versions').clear());

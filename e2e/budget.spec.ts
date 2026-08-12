@@ -95,7 +95,7 @@ test.describe('Budget Visualisation', () => {
 
     const bar = page.locator('div[data-initiative-id="i-ciam-sso"]');
     await expect(bar).toBeVisible();
-    await expect(bar).toContainText('CapEx $600k');
+    await expect(bar).toContainText('CapEx IDR 600k');
   });
 });
 
@@ -109,8 +109,8 @@ test.describe('CapEx / OpEx Fields', () => {
     await page.locator('[data-testid^="initiative-bar"]').first().dblclick();
     const panel = page.getByTestId('initiative-panel');
     await expect(panel).toBeVisible();
-    await expect(panel.getByLabel('CapEx ($)')).toBeVisible();
-    await expect(panel.getByLabel('OpEx ($)')).toBeVisible();
+    await expect(panel.getByLabel('CapEx (IDR)')).toBeVisible();
+    await expect(panel.getByLabel('OpEx (IDR)')).toBeVisible();
     await expect(panel.getByLabel('Budget ($)')).not.toBeVisible();
   });
 
@@ -124,8 +124,8 @@ test.describe('CapEx / OpEx Fields', () => {
     await bar.dblclick();
     const panel = page.getByTestId('initiative-panel');
     await expect(panel).toBeVisible();
-    await panel.getByLabel('CapEx ($)').fill('600000');
-    await panel.getByLabel('OpEx ($)').fill('150000');
+    await panel.getByLabel('CapEx (IDR)').fill('600000');
+    await panel.getByLabel('OpEx (IDR)').fill('150000');
     await panel.getByRole('button', { name: 'Save Changes' }).click();
     await expect(panel).not.toBeVisible();
 
@@ -154,8 +154,8 @@ test.describe('CapEx / OpEx Fields', () => {
     }
 
     const targetRow = page.locator('[data-asset-id="a-ciam"]');
-    await expect(targetRow).toContainText('CapEx $350k');
-    await expect(targetRow).toContainText('CapEx $600k');
+    await expect(targetRow).toContainText('CapEx IDR 350k');
+    await expect(targetRow).toContainText('CapEx IDR 600k');
 
     const groupBox = targetRow.getByTestId('initiative-group-box');
     await targetRow.hover();
@@ -163,7 +163,7 @@ test.describe('CapEx / OpEx Fields', () => {
 
     const groupBar = page.getByTestId('project-group-bar');
     await expect(groupBar).toBeVisible();
-    await expect(groupBar).toContainText('CapEx $950k');
+    await expect(groupBar).toContainText('CapEx IDR 950k');
 
     const color = await groupBar.getByTestId('capex-label').last().evaluate(
       el => getComputedStyle(el).color

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Initiative, Asset, Application, Programme, Strategy, Dependency, Resource, DtsPhase, DtsPhaseRecord } from '../types';
-import { X, Save, Trash2 } from 'lucide-react';
+import { Initiative, Asset, Deliverable, Programme, Strategy, Dependency, Resource, Decision } from '../types';
+import { X, Save, Trash2, ExternalLink } from 'lucide-react';
 import { validateInitiative, ValidationErrors } from '../lib/validation';
 import { ConfirmModal } from './ConfirmModal';
 import { useFocusTrap } from '../lib/useFocusTrap';
@@ -8,7 +8,7 @@ import { useFocusTrap } from '../lib/useFocusTrap';
 interface InitiativePanelProps {
     initiative: Initiative | null;
     assets: Asset[];
-    applications?: Application[];
+    deliverables?: Deliverable[];
     programmes: Programme[];
     strategies: Strategy[];
     dependencies?: Dependency[];
@@ -18,12 +18,13 @@ interface InitiativePanelProps {
     onSave: (initiative: Initiative) => void;
     onDelete?: (initiative: Initiative) => void;
     isOpen: boolean;
-    hasDtsAssets?: boolean;
-    dtsPhases?: DtsPhaseRecord[];
+    decisions?: Decision[];
+    onOpenDecision?: (decisionId: string) => void;
     isNew?: boolean;
+    defaultCurrency?: string;
 }
 
-export function InitiativePanel({ initiative, assets, applications = [], programmes, strategies, dependencies = [], initiatives = [], resources = [], onClose, onSave, onDelete, isOpen, hasDtsAssets = false, dtsPhases = [], isNew = false }: InitiativePanelProps) {
+export function InitiativePanel({ initiative, assets, deliverables = [], programmes, strategies, dependencies = [], initiatives = [], resources = [], onClose, onSave, onDelete, isOpen, decisions = [], onOpenDecision, isNew = false, defaultCurrency = 'USD' }: InitiativePanelProps) {
     const [formData, setFormData] = useState<Initiative | null>(null);
     const [errors, setErrors] = useState<ValidationErrors>({});
     const [confirmDelete, setConfirmDelete] = useState(false);
@@ -108,7 +109,7 @@ export function InitiativePanel({ initiative, assets, applications = [], program
                                 required
                                 className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm bg-white"
                                 value={formData.assetId}
-                                onChange={(e) => setFormData({ ...formData, assetId: e.target.value, applicationId: undefined })}
+                                onChange={(e) => setFormData({ ...formData, assetId: e.target.value, deliverableId: undefined })}
                             >
                                 <option value="">Select an Asset...</option>
                                 {assets.map(asset => (
@@ -118,21 +119,21 @@ export function InitiativePanel({ initiative, assets, applications = [], program
                         </div>
 
                         {(() => {
-                            const assetApps = applications.filter(a => a.assetId === formData.assetId);
+                            const assetApps = deliverables.filter(a => a.assetId === formData.assetId);
                             return (
                                 <div>
-                                    <label htmlFor="applicationId" className="block text-sm font-medium text-slate-700 mb-1">
-                                        Application <span className="text-slate-400 font-normal">(optional)</span>
+                                    <label htmlFor="deliverableId" className="block text-sm font-medium text-slate-700 mb-1">
+                                        Deliverable <span className="text-slate-400 font-normal">(optional)</span>
                                     </label>
                                     <select
-                                        id="applicationId"
-                                        data-testid="initiative-application"
+                                        id="deliverableId"
+                                        data-testid="initiative-deliverable"
                                         className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm bg-white"
-                                        value={formData.applicationId || ''}
-                                        onChange={(e) => setFormData({ ...formData, applicationId: e.target.value || undefined })}
+                                        value={formData.deliverableId || ''}
+                                        onChange={(e) => setFormData({ ...formData, deliverableId: e.target.value || undefined })}
                                         disabled={assetApps.length === 0}
                                     >
-                                        <option value="">{assetApps.length === 0 ? 'No applications for this asset' : 'None (asset-level)'}</option>
+                                        <option value="">{assetApps.length === 0 ? 'No deliverables for this asset' : 'None (asset-level)'}</option>
                                         {assetApps.map(app => (
                                             <option key={app.id} value={app.id}>{app.name}</option>
                                         ))}
@@ -210,18 +211,18 @@ export function InitiativePanel({ initiative, assets, applications = [], program
                         <div className="grid grid-cols-2 gap-3">
                             <div>
                                 <label htmlFor="capex" className="block text-sm font-medium text-slate-700 mb-1">
-                                    CapEx ($)
+                                    CapEx ({defaultCurrency})
                                 </label>
                                 <div className="relative">
                                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                        <span className="text-slate-500 sm:text-sm">$</span>
+                                        <span className="text-slate-500 sm:text-sm">{defaultCurrency}</span>
                                     </div>
                                     <input
                                         id="capex"
                                         type="number"
                                         inputMode="numeric"
                                         step="1000"
-                                        className={`w-full pl-7 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm ${errors.capex ? 'border-red-400' : 'border-slate-300'}`}
+                                        className={`w-full pl-12 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm ${errors.capex ? 'border-red-400' : 'border-slate-300'}`}
                                         value={formData.capex || ''}
                                         onChange={(e) => { const val = e.target.value === '' ? 0 : parseInt(e.target.value, 10) || 0; setFormData({ ...formData, capex: val }); setErrors(prev => { const { capex: _c, ...rest } = prev; return rest; }); }}
                                     />
@@ -230,18 +231,18 @@ export function InitiativePanel({ initiative, assets, applications = [], program
                             </div>
                             <div>
                                 <label htmlFor="opex" className="block text-sm font-medium text-slate-700 mb-1">
-                                    OpEx ($)
+                                    OpEx ({defaultCurrency})
                                 </label>
                                 <div className="relative">
                                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                        <span className="text-slate-500 sm:text-sm">$</span>
+                                        <span className="text-slate-500 sm:text-sm">{defaultCurrency}</span>
                                     </div>
                                     <input
                                         id="opex"
                                         type="number"
                                         inputMode="numeric"
                                         step="1000"
-                                        className={`w-full pl-7 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm ${errors.opex ? 'border-red-400' : 'border-slate-300'}`}
+                                        className={`w-full pl-12 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm ${errors.opex ? 'border-red-400' : 'border-slate-300'}`}
                                         value={formData.opex || ''}
                                         onChange={(e) => { const val = e.target.value === '' ? 0 : parseInt(e.target.value, 10) || 0; setFormData({ ...formData, opex: val }); setErrors(prev => { const { opex: _o, ...rest } = prev; return rest; }); }}
                                     />
@@ -391,35 +392,6 @@ export function InitiativePanel({ initiative, assets, applications = [], program
                             </label>
                         </div>
 
-                        {hasDtsAssets && (
-                            <div>
-                                <label htmlFor="dtsPhase" className="block text-sm font-medium text-slate-700 mb-1">
-                                    DTS Phase
-                                </label>
-                                <select
-                                    id="dtsPhase"
-                                    data-testid="initiative-panel-dts-phase"
-                                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm bg-white"
-                                    value={formData.dtsPhase || ''}
-                                    onChange={(e) => setFormData({ ...formData, dtsPhase: (e.target.value as DtsPhase) || undefined })}
-                                >
-                                    <option value="">— Not Set —</option>
-                                    {dtsPhases.length > 0
-                                      ? dtsPhases.map(p => (
-                                          <option key={p.id} value={p.id}>{p.name}</option>
-                                        ))
-                                      : <>
-                                          <option value="phase-1">Phase 1 — Register &amp; Expose</option>
-                                          <option value="phase-2">Phase 2 — Integrate DPI</option>
-                                          <option value="phase-3">Phase 3 — AI &amp; Legacy Exit</option>
-                                          <option value="back-office">Back-Office Consolidation</option>
-                                          <option value="not-dts">Not DTS</option>
-                                        </>
-                                    }
-                                </select>
-                            </div>
-                        )}
-
                         {(() => {
                             const related = dependencies.filter(
                                 d => d.sourceId === formData.id || d.targetId === formData.id
@@ -445,6 +417,43 @@ export function InitiativePanel({ initiative, assets, applications = [], program
                                                 </li>
                                             );
                                         })}
+                                    </ul>
+                                </div>
+                            );
+                        })()}
+
+                        {(() => {
+                            const linked = decisions.filter(
+                                d => d.linkedEntityType === 'initiative' && d.linkedEntityId === formData.id
+                            );
+                            if (linked.length === 0) return null;
+                            const statusBadgeClass = (status: Decision['status']) => ({
+                                proposed: 'bg-slate-100 text-slate-600',
+                                accepted: 'bg-emerald-100 text-emerald-700',
+                                deprecated: 'bg-amber-100 text-amber-700',
+                                superseded: 'bg-slate-200 text-slate-500',
+                            })[status];
+                            return (
+                                <div data-testid="initiative-linked-decisions-section" className="pt-4 border-t border-slate-200 mt-2">
+                                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Linked Decisions</p>
+                                    <ul className="space-y-1.5">
+                                        {linked.map(d => (
+                                            <li key={d.id}>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => onOpenDecision?.(d.id)}
+                                                    className="w-full flex items-center justify-between gap-2 text-sm text-left px-2 py-1.5 rounded-md hover:bg-slate-50 transition-colors"
+                                                >
+                                                    <span className="font-medium text-slate-700 truncate">{d.title}</span>
+                                                    <span className="flex items-center gap-1.5 shrink-0">
+                                                        <span className={`text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded ${statusBadgeClass(d.status)}`}>
+                                                            {d.status}
+                                                        </span>
+                                                        <ExternalLink size={12} className="text-slate-400" />
+                                                    </span>
+                                                </button>
+                                            </li>
+                                        ))}
                                     </ul>
                                 </div>
                             );

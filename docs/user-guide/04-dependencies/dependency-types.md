@@ -2,7 +2,7 @@
 
 ![](../../public/features/dependency-types.png)
 
-Scenia supports three dependency types. The type controls the arrow colour, arrowhead style, and the language used in the dependency report.
+Selara supports three dependency types. The type controls the arrow colour, arrowhead style, and the language used in the dependency report.
 
 ## Requires
 
