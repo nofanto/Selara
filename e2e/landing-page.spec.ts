@@ -76,12 +76,12 @@ test.describe('Landing Page', () => {
     await expect(exportCard).toContainText(/capacity/i);
   });
 
-  test('should display fork attribution link in landing page footer', async ({ page }) => {
-    // The landing page is rendered after the app in the DOM, so its Scenia link is last
-    await expect(page.getByText('Forked from').last()).toBeVisible();
-    const sceniaLink = page.getByRole('link', { name: 'Scenia' }).last();
-    await expect(sceniaLink).toBeVisible();
-    await expect(sceniaLink).toHaveAttribute('href', 'https://github.com/waylonkenning/scenia');
+  test('should display GitHub and licence links in landing page footer', async ({ page }) => {
+    // The landing page is rendered after the app in the DOM, so its GitHub link is last
+    const githubLink = page.getByRole('link', { name: 'GitHub' }).last();
+    await expect(githubLink).toBeVisible();
+    await expect(githubLink).toHaveAttribute('href', 'https://github.com/nofanto/Selara');
+    await expect(page.getByText('Apache 2.0').last()).toBeVisible();
   });
 });
 
@@ -100,17 +100,11 @@ test.describe('App Footer', () => {
 
     // Static text
     await expect(footer).toContainText('Selara IT Portfolio Planner');
-    await expect(footer).toContainText('an open source tool, forked from');
-    await expect(footer).toContainText('by Waylon Kenning');
+    await expect(footer).toContainText('an open source tool');
 
     // "open source" links to this fork's GitHub repo
     const openSourceLink = footer.getByRole('link', { name: 'open source' });
     await expect(openSourceLink).toBeVisible();
     await expect(openSourceLink).toHaveAttribute('href', 'https://github.com/nofanto/Selara');
-
-    // "Scenia" links to the original upstream repo
-    const sceniaLink = footer.getByRole('link', { name: 'Scenia' });
-    await expect(sceniaLink).toBeVisible();
-    await expect(sceniaLink).toHaveAttribute('href', 'https://github.com/waylonkenning/scenia');
   });
 });

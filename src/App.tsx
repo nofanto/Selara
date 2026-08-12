@@ -1489,16 +1489,7 @@ export default function App() {
         >
           open source
         </a>
-        {' '}tool, forked from{' '}
-        <a
-          href="https://github.com/waylonkenning/scenia"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="hover:text-slate-600 transition-colors"
-        >
-          Scenia
-        </a>
-        {' '}by Waylon Kenning
+        {' '}tool
       </footer>
 
       {showFeatures && (

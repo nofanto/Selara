@@ -181,18 +181,6 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
                 <span>·</span>
                 <span>Apache 2.0</span>
               </div>
-              <p className="text-slate-600 text-sm">
-                Forked from{' '}
-                <a
-                  href="https://github.com/waylonkenning/scenia"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-slate-500 hover:text-slate-300 transition-colors"
-                >
-                  Scenia
-                </a>
-                {' '}by Waylon Kenning
-              </p>
               <p className="text-slate-700 text-sm">&copy; {new Date().getFullYear()} Selara.</p>
             </div>
           </div>
