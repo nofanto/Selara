@@ -37,6 +37,12 @@ test.describe('Deliverables — Data Manager tab', () => {
     }
   });
 
+  test('Deliverables tab shows a Description column, which cascades into LKPTI function description', async ({ page }) => {
+    await page.getByTestId('data-manager-tab-deliverables').click();
+    const table = page.getByTestId('data-manager');
+    await expect(table.locator('th').filter({ hasText: 'Description' })).toBeVisible();
+  });
+
   test('Deliverables tab shows demo deliverable rows', async ({ page }) => {
     await page.getByTestId('data-manager-tab-deliverables').click();
     // There should be at least one deliverable in demo data

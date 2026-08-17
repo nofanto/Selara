@@ -3,8 +3,8 @@
 Selara persists all application data client-side in **IndexedDB**, accessed via the `idb` library. The database is defined in a single location: [`src/lib/db.ts`](../src/lib/db.ts).
 
 - **Database name:** `it-initiative-visualiser`
-- **Current schema version:** `18`
-- **Object stores:** 15 (all key-path stores except `settings`, which uses an explicit out-of-line key)
+- **Current schema version:** `19`
+- **Object stores:** 16 (all key-path stores except `settings`, which uses an explicit out-of-line key)
 - **Indexes:** none — all lookups are done via `getAll()` with in-memory filtering/joining on foreign-key-like fields (there is no `createIndex` usage anywhere in the codebase)
 
 ## Entity-Relationship Diagram
@@ -47,6 +47,7 @@ erDiagram
         string assetId FK
         string name
         string type "deliverable kind: application/infrastructure/document/procedure/other; undefined treated as 'application'"
+        string description "optional; what this deliverable does — no category-level default; cascades into LkptiDetail.functionDescription"
         string categoryCode "optional; overrides AssetCategory.categoryCode when set"
         string developer "optional; 'inhouse' or 'PPJTI' — no category-level default"
         string dcCity "optional; overrides AssetCategory.dcCity when set"
@@ -305,6 +306,7 @@ Schema evolution is handled in the `upgrade()` callback of `openDB<ITMapDB>()` i
 - **v17:** `Application`/`ApplicationSegment`/`ApplicationStatus` were renamed to `Deliverable`/`DeliverableSegment`/`DeliverableStatus` throughout the codebase (the entity covers more than software applications — infrastructure, documents, procedures, etc. — see [ADR-0003](adr/0003-rpti-report-and-application-type.md)), and their object stores renamed to match (`applications` → `deliverables`, `applicationSegments` → `deliverableSegments`, `applicationStatuses` → `deliverableStatuses`). `RptiTargetType`'s `'application'` value became `'deliverable'`. **No data migration was performed** — new stores are created under the new names (for both fresh databases and existing ones upgrading through v17), and the old `applications`/`applicationSegments`/`applicationStatuses` stores are left in place, orphaned and unmigrated, on any database that already had them — same treatment as `dtsPhases` at v13.
 - **v18:** Currency became a single workspace-wide fact (`SETTINGS.defaultCurrency`) instead of a per-row one — `RptiDetail.capexCurrency`, `opexCurrency`, `capexIdrEquivalent`, and `opexIdrEquivalent` were removed from the type. Existing `rptiDetails` records with any of those four fields set have them stripped in place (read-all/rewrite-all, same pattern as v16). `AssetCategory` and `Deliverable` both gained new optional auto-fill fields (`categoryCode`, `dcCity`/`dcCountry`/`drCity`/`drCountry`; `Deliverable` additionally `developer`) — additive, no migration needed. See [ADR-0006](adr/0006-rpti-auto-fill-and-single-currency.md).
 - **v19:** Added the `lkptiDetails` store (no seeding) to support the LKPTI Format 3.2.6 Report — additive, no data migration needed. See `requirement-specs/lkpti-integration.md`.
+- **No version bump:** `Deliverable` gained a new optional `description` field, cascading into `LkptiDetail.functionDescription` at generation time — additive field on an existing store, no schema/index change. See [ADR-0008](adr/0008-deliverable-description-field.md).
 
 ## Source of Truth
 

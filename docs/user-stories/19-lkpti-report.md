@@ -28,6 +28,7 @@ LKPTI Format 3.2.6 is a second OJK regulatory report, distinct from RPTI (Format
 - [x] Generation is **not** scoped to a report year, unlike RPTI — it always reflects current state.
 - [x] **Category**, **Developer**, and the four DC/DR location fields cascade Deliverable → AssetCategory, reusing the same resolution logic RPTI generation already uses.
 - [x] **Developer** only auto-fills to `'inhouse'`; when the Deliverable's developer is a third party, the row is left blank for the provider's actual name (LKPTI wants the name, not a generic marker).
+- [x] **Function Description** auto-fills from the Deliverable's own `description` field, when set (see ADR-0008).
 - [x] **Go-Live Date** is auto-suggested from the earliest live segment's start date, converted to `dd-mm-yyyy`.
 - [x] Regenerating replaces all existing rows (same wipe-and-rebuild tradeoff as RPTI generation — no reconciliation with prior manual edits).
 
@@ -59,7 +60,7 @@ LKPTI Format 3.2.6 is a second OJK regulatory report, distinct from RPTI (Format
 
 | File | Change |
 |---|---|
-| `src/types.ts` | `LkptiDetail`, `LkptiCategoryCode`, `LkptiBackupStrategy`, `LkptiOwnership` |
+| `src/types.ts` | `LkptiDetail`, `LkptiCategoryCode`, `LkptiBackupStrategy`, `LkptiOwnership`, `Deliverable.description` (ADR-0008) |
 | `src/lib/rpti.ts` | Exported `isLiveStatusId` and `resolveAssetCategory` for reuse |
 | `src/lib/lkpti.ts` | New: generation, `suggestGoLiveDate`, cascade helper, Excel export |
 | `src/lib/db.ts` | New `lkptiDetails` store (`DB_VERSION` 18 → 19) |

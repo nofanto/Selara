@@ -39,3 +39,4 @@ An ADR is never edited to reverse its outcome — if circumstances change, write
 | [0005](0005-rpti-data-manager-tab.md) | Make RPTI rows first-class via a Data Manager tab | Accepted |
 | [0006](0006-rpti-auto-fill-and-single-currency.md) | Auto-fill RPTI category/developer/location; move CapEx/OpEx to a single workspace currency | Accepted |
 | [0007](0007-lkpti-report.md) | Add the LKPTI Report as its own entity, not an extended Deliverable | Accepted |
+| [0008](0008-deliverable-description-field.md) | Elevate LKPTI's function description to `Deliverable.description` | Accepted |

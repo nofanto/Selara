@@ -147,6 +147,7 @@ export interface Deliverable {
   assetId: string;
   name: string;
   type?: DeliverableType; // Undefined is treated as 'application' (legacy records predate this field)
+  description?: string; // What this deliverable does — no category-level default; cascades into LkptiDetail.functionDescription
   categoryCode?: RptiCategoryCode; // Overrides the parent AssetCategory's default RPTI category when set
   developer?: RptiDeveloper; // No category-level default — varies too much within one architectural category to make one trustworthy
   dcCity?: string;   // Overrides the parent AssetCategory's default RPTI data center location when set, per field

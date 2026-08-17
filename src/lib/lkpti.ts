@@ -74,6 +74,7 @@ export function generateLkptiDetails(
       dcCountry: deliverable.dcCountry ?? category?.dcCountry,
       drCity: deliverable.drCity ?? category?.drCity,
       drCountry: deliverable.drCountry ?? category?.drCountry,
+      functionDescription: deliverable.description,
       goLiveDate: suggestGoLiveDate(deliverable.id, deliverableSegments, deliverableStatuses),
     });
   }

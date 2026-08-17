@@ -21,6 +21,7 @@ Instead of adding rows by hand, click **Generate LKPTI Rows** at the top of the 
 
 - A row is generated for every Deliverable that has at least one lifecycle segment marked as live (In Production by default, or any status your workspace has marked as the live status) — a Deliverable that's only ever been Planned or Funded doesn't qualify yet, since LKPTI requires a go-live date that isn't in the future.
 - **Category**, **Developer**, and the **DC/DR City/Country** fields auto-fill the same Deliverable-first, Asset-Category-fallback pattern as RPTI generation — see [Recording an RPTI Row](../14-rpti-report/recording-an-rpti-row.md) for how that cascade works. **Developer** specifically only auto-fills to `inhouse`; when the Deliverable's developer is a third party, the actual provider name has to be entered manually here, since LKPTI wants the provider's name, not just a generic marker.
+- **Function Description** auto-fills from the application's own **Description** field (set on the [Applications tab](../05-applications/adding-applications.md)) when one is set.
 - **Go-Live Date** is suggested from the earliest live-status lifecycle segment's start date, converted to the `dd-mm-yyyy` format the LKPTI form expects.
 - **Platform**, **Database**, **DC/DRC Provider**, **Backup Strategy**, **System Owner**, and **Ownership** have no auto-fill source in Selara's data model — these always need to be entered manually.
 

@@ -358,6 +358,7 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery 
       key: 'assetId', label: 'Asset', type: 'select', width: '160px',
       options: data.assets.map(a => ({ value: a.id, label: a.name })),
     },
+    { key: 'description', label: 'Description', type: 'textarea', width: '220px' },
     {
       key: 'categoryCode', label: 'RPTI Category Override', type: 'select', width: '220px',
       options: [

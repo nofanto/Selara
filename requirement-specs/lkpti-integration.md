@@ -100,3 +100,11 @@ All design questions are resolved — proceed to Step 1 of the standard lifecycl
 ## Implemented
 
 See [ADR-0007](../docs/adr/0007-lkpti-report.md) for the final data-model record and [User Story 19](../docs/user-stories/19-lkpti-report.md) for the acceptance criteria. Covered by `src/lib/lkpti.test.ts` and `e2e/lkpti-report.spec.ts`.
+
+## Addendum: `functionDescription` elevated to `Deliverable.description`
+
+Unlike the other nine net-new LKPTI-only fields (`platform`, `database`, `dcProvider`, `drcProvider`, `backupStrategy`, `systemOwner`, `goLiveDate`, `ownership`), `functionDescription` — "what does this application do" — isn't a report-specific technical detail the way those are. It's core descriptive metadata about the Deliverable itself, true regardless of which regulatory report is being filed, and useful independent of LKPTI (tooltips, an application catalog view, search).
+
+**Decision:** add `Deliverable.description?: string`, and have `LkptiDetail.functionDescription` cascade from it at generation time (`deliverable.description`), the same override-wins pattern already used for `categoryCode`/`developer`/`dcCity`. No `AssetCategory`-level fallback — description is specific to one Deliverable, same as `developer`.
+
+See [ADR-0008](../docs/adr/0008-deliverable-description-field.md) for the full record.

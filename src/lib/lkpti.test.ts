@@ -121,6 +121,21 @@ describe('generateLkptiDetails', () => {
     expect(rows[0].categoryCode).toBeUndefined();
   });
 
+  it('cascades functionDescription from Deliverable.description', () => {
+    const deliverables = [makeDeliverable({ description: 'Handles customer onboarding.' })];
+    const segments = [makeSegment({ status: 'appstatus-in-production' })];
+    const rows = generateLkptiDetails(makeContext({ deliverables, deliverableSegments: segments }));
+
+    expect(rows[0].functionDescription).toBe('Handles customer onboarding.');
+  });
+
+  it('leaves functionDescription undefined when the Deliverable has no description', () => {
+    const segments = [makeSegment({ status: 'appstatus-in-production' })];
+    const rows = generateLkptiDetails(makeContext({ deliverableSegments: segments }));
+
+    expect(rows[0].functionDescription).toBeUndefined();
+  });
+
   it('auto-suggests goLiveDate (dd-mm-yyyy) from the earliest live segment', () => {
     const segments = [
       makeSegment({ id: 'seg-late', status: 'appstatus-in-production', startDate: '2026-08-15' }),
