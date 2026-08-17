@@ -13,6 +13,8 @@ adapters/aws/         — Lambda + DynamoDB
 
 Each adapter directory has its own `package.json` and `DEPLOY.md` with the exact commands to stand it up. None of this is deployed yet — the Share feature stays disabled (`SHARING_ENABLED = false` in `src/components/DataControls.tsx`) until one adapter is actually deployed and `API_URL` in `src/lib/share.ts` points at it.
 
+**Deploying this for real?** Start with [`SETUP.md`](SETUP.md) — it walks through picking a provider, deploying it, wiring the frontend to it, and verifying it end-to-end. The per-adapter `DEPLOY.md` files are the command reference `SETUP.md` links out to, not a starting point on their own.
+
 ## Working on this
 
 - Run `backend/core`'s tests from the repo root: `npm run test:backend`.
