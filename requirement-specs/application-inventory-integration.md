@@ -1,13 +1,16 @@
 # Application Inventory Report Integration (LKPTI Format 3.2.6) — Design Notes
 
-> **Status:** Decided, not yet implemented. This doc resolves the two open design questions raised in [issue #4](https://github.com/nofanto/Selara/issues/4) — see `requirement-specs/application-inventory-schema.md` for the underlying field spec (unchanged by this doc). No code has been written yet; see "Next Step."
+> **Status:** Decided, not yet implemented. This doc resolves all open design questions raised in [issue #4](https://github.com/nofanto/Selara/issues/4) — see `requirement-specs/application-inventory-schema.md` for the underlying field spec (unchanged by this doc). No code has been written yet; see "Next Step."
 
 ## Context and Problem Statement
 
-`requirement-specs/application-inventory-schema.md` specifies OJK's **LKPTI Format 3.2.6 — Daftar Aplikasi** (Application List), a second regulatory report distinct from RPTI (Format 3.1). Before any implementation, two design questions needed resolving:
+`requirement-specs/application-inventory-schema.md` specifies OJK's **LKPTI Format 3.2.6 — Daftar Aplikasi** (Application List), a second regulatory report distinct from RPTI (Format 3.1). Before any implementation, five design questions needed resolving:
 
 1. A category-code label mismatch between that spec and the existing `rpti-schema.md`.
 2. How the 15 LKPTI fields map onto Selara's existing `Deliverable`/`AssetCategory`/`RptiDetail` data model.
+3. What triggers a generated row.
+4. Where the report lives in the UI.
+5. How export is wired.
 
 ---
 
@@ -60,17 +63,36 @@ export interface ApplicationInventoryDetail {
 
 **Rejected alternative — extend `Deliverable` directly.** Simpler (one entity, no new generation logic to design), but bloats every `Deliverable` record — including the ~majority that aren't `'application'` type — with 10 fields that only ever apply to this one report. Rejected in favor of keeping the precedent `RptiDetail` already set.
 
+### 3. Row generation rule — live Deliverables only, no year-scoping
+
+**Decision:** one row per `Deliverable` (`type: 'application'`, or `undefined` which is treated as `'application'`) that has at least one `DeliverableSegment` classified `'live'` (in-production) by `classifySegmentKind()` — mirroring the helper `rpti.ts` already uses for its own "has this deliverable gone live" check. Unlike RPTI generation, this is **not scoped to a report year**: LKPTI 3.2.6 is a point-in-time inventory of what's currently running, not a plan of activity within a year, so "Generate Application Inventory Rows" always wipes and rebuilds from current Deliverable/DeliverableSegment state (same wipe-and-rebuild semantics as RPTI generation, minus the year parameter).
+
+**Why:** the schema's own validation rule 5.3 — *"`go_live_date` must ... not be in the future relative to the reporting period end date"* — only makes sense if every row already represents an application that has actually gone live. Including still-planned/funded-but-not-live deliverables would produce rows that fail the schema's own validation until they go live, requiring manual pruning later. Requiring a live segment upfront keeps every generated row valid by construction.
+
+`goLiveDate` (required, no auto-fill source per the field table) is **auto-suggested** from the earliest `'live'`-classified segment's `startDate` — a new `suggestGoLiveDate()` helper mirroring `suggestDeliverableQuarter()` — but stays a plain editable field afterward, same override-wins pattern as everywhere else in this data model.
+
+**Rejected alternative — every `'application'`-type Deliverable regardless of status.** Simpler generation rule, but produces regulatory-invalid rows (missing/future `go_live_date`) for anything not yet live, undermining the point of the schema's own validation.
+
+### 4. Report UI placement — mirror the RPTI Data Manager tab + Reports card pattern
+
+**Decision:** exactly the twin-surface pattern RPTI already established, not a new pattern:
+- **Data Manager** gets a new `'applicationInventory'` tab (label "Application Inventory" or "LKPTI 3.2.6") with a "Generate Application Inventory Rows" button (→ the rule in §3) and an `EditableTable` for manual edits afterward — same shape as the existing `'rpti'` tab (`src/components/DataManager.tsx`).
+- **Reports view** gets a new `'application-inventory'` `ReportSlug` and card, rendering a new `ApplicationInventoryReportView` component — a read-only summary table + "Export to Excel" button, structurally identical to `RptiReportView.tsx`.
+
+**Why:** Selara already has exactly one precedent for "a regulatory report backed by a generated, editable entity" (RPTI), and it's a good fit — reusing it outright avoids inventing a second UI pattern for what's structurally the same kind of feature (generate → edit → export).
+
+### 5. Export wiring — dedicated exporter in a new `src/lib/applicationInventory.ts`
+
+**Decision:** a new `exportApplicationInventoryToExcel()` function, co-located with the generation logic in `src/lib/applicationInventory.ts` (mirroring `rpti.ts`, which houses both `generateRptiDetails()` and `exportRptiReportToExcel()` together). It builds a single-sheet workbook using `XLSX.utils.aoa_to_sheet()` with the exact Indonesian header row and 1–15 column order mandated by `application-inventory-schema.md` §8, downloaded as `application-inventory-<date>.xlsx` — the same shape as `exportRptiReportToExcel()`, not routed through the general multi-entity `src/lib/excel.ts` workbook exporter (RPTI's report export isn't either — it's a separate, self-contained single-report download, and this report should follow the same convention for consistency).
+
 ---
 
-## Open Questions (deferred — not blocking, but need their own design pass before implementation)
+## Open Questions
 
-- **Row generation rule.** Unlike RPTI's segment/initiative-driven generation, LKPTI 3.2.6 looks like a point-in-time inventory of applications — what triggers a row (every live `Deliverable` of type `'application'`? user-curated?), and does it regenerate per reporting period the way RPTI does per year?
-- **Report UI placement.** Where does this live in the Reports view — a new tab alongside RPTI, or folded into an existing one?
-- **Export wiring.** The schema's §8 mandates an exact 15-column order and Indonesian-language header row for CSV/XLSX export — how this integrates with the existing `src/lib/excel.ts` export path hasn't been scoped.
-- **Scope/timing relative to other in-flight work** — issue #3 (RPTI Detail auto-fill logic review) and issue #5 (sharing backend) are both open; this feature doesn't obviously depend on either, but hasn't been sequenced against them.
+- **Scope/timing relative to other in-flight work** — issue #3 (RPTI Detail auto-fill logic review) and issue #5 (sharing backend) are both open; this feature doesn't obviously depend on either, but hasn't been sequenced against them. Non-blocking.
 
 ---
 
 ## Next Step
 
-Once the open questions above are resolved, proceed to Step 1 of the standard lifecycle. This is primarily **pure logic** (a new `src/lib/applicationInventory.ts`, generation rule with no DOM dependency) — the primary test is a **Vitest unit test**, written Red before implementation, following the same pattern as `src/lib/rpti.test.ts`. Any report-view UI work that follows would separately need a Playwright E2E test per the usual UI-facing rule.
+All design questions are resolved — proceed to Step 1 of the standard lifecycle. This is primarily **pure logic** (`src/lib/applicationInventory.ts`: the entity type, `generateApplicationInventoryDetails()`, `suggestGoLiveDate()`, `exportApplicationInventoryToExcel()` — no DOM dependency) — the primary test is a **Vitest unit test**, written Red before implementation, following the same pattern as `src/lib/rpti.test.ts`. The Data Manager tab and Reports card/view that follow are UI-facing and separately need Playwright E2E tests per the usual rule.
