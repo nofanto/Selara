@@ -4,7 +4,7 @@ import { Asset, Deliverable, DeliverableSegment, DeliverableStatus, Decision, In
 import { differenceInDays, format, parseISO, isValid, addQuarters, getYear, getQuarter, addDays, startOfMonth, lastDayOfMonth, addMonths, addWeeks } from 'date-fns';
 import { cn, reorder } from '../lib/utils';
 import { AlertTriangle, Star, Info, ChevronRight, ChevronDown, ChevronUp, Boxes, Trash2 } from 'lucide-react';
-import { geanzAreas, GEANZ_CATEGORY_ID, GeanzArea } from '../lib/geanzCatalogue';
+import { rptiCatalogueAreas, rptiCatalogueAssetCategories, RptiCatalogueArea } from '../lib/rptiCatalogue';
 import { InitiativePanel } from './InitiativePanel';
 import { InitiativeBar } from './InitiativeBar';
 import { DeliverableSegmentPanel } from './DeliverableSegmentPanel';
@@ -140,38 +140,38 @@ export function Timeline({ assets, deliverables = [], initiatives, milestones, p
   const [selectedDependencyId, setSelectedDependencyId] = useState<string | null>(null);
   const [disambiguateAt, setDisambiguateAt] = useState<{ x: number; y: number; candidates: Dependency[] } | null>(null);
 
-  // GEANZ catalogue state
+  // RPTI asset catalogue state
   type PendingConfirm =
     | { type: 'delete-asset'; assetId: string; assetName: string; hasLinkedData: boolean }
-    | { type: 'remove-area'; areaAlias: string; areaName: string; assetCount: number };
+    | { type: 'remove-area'; areaCategoryId: string; areaName: string; assetCount: number };
   const [pendingConfirm, setPendingConfirm] = useState<PendingConfirm | null>(null);
 
-  const geanzAssetAliases = useMemo(() => new Set(
-    geanzAreas.flatMap(area => area.assets.map(asset => asset.alias))
+  const rptiCatalogueExternalIds = useMemo(() => new Set(
+    rptiCatalogueAreas.flatMap(area => area.assets.map(asset => asset.externalId))
   ), []);
-  const isGeanzCatalogueEnabled = settings.showGeanzCatalogue !== false;
+  const rptiCatalogueCategoryIds = useMemo(() => new Set(
+    rptiCatalogueAssetCategories.map(c => c.id)
+  ), []);
+  const isRptiCatalogueEnabled = settings.showRptiCatalogue !== false;
 
-  const isGeanzCatalogueAsset = (asset: Asset): boolean => {
-    if (!asset.alias) return false;
-    return isGeanzCatalogueEnabled && geanzAssetAliases.has(asset.alias) && asset.categoryId === GEANZ_CATEGORY_ID;
+  const isRptiCatalogueAsset = (asset: Asset): boolean => {
+    if (!asset.externalId) return false;
+    return isRptiCatalogueEnabled && rptiCatalogueExternalIds.has(asset.externalId) && rptiCatalogueCategoryIds.has(asset.categoryId);
   };
 
-  // Separate canonical GEANZ catalogue assets from user assets
-  const geanzAssets = useMemo(
-    () => assets.filter(isGeanzCatalogueAsset),
-    [assets, geanzAssetAliases, isGeanzCatalogueEnabled]
+  // Separate canonical RPTI catalogue assets from user assets
+  const rptiCatalogueAssets = useMemo(
+    () => assets.filter(isRptiCatalogueAsset),
+    [assets, rptiCatalogueExternalIds, rptiCatalogueCategoryIds, isRptiCatalogueEnabled]
   );
-  const geanzAssetsByArea = useMemo(() => {
+  const rptiAssetsByArea = useMemo(() => {
     const map: Record<string, Asset[]> = {};
-    geanzAssets.forEach(a => {
-      const m = a.alias!.match(/^(TAP\.\d+)/);
-      if (m) {
-        if (!map[m[1]]) map[m[1]] = [];
-        map[m[1]].push(a);
-      }
+    rptiCatalogueAssets.forEach(a => {
+      if (!map[a.categoryId]) map[a.categoryId] = [];
+      map[a.categoryId].push(a);
     });
     return map;
-  }, [geanzAssets]);
+  }, [rptiCatalogueAssets]);
   const depSegmentsRef = useRef<Map<string, number[][]>>(new Map()); // depId → [[x1,y1,x2,y2], ...]
   useEffect(() => {
     const liveIds = new Set(dependencies.map(d => d.id));
@@ -296,12 +296,12 @@ export function Timeline({ assets, deliverables = [], initiatives, milestones, p
     });
   }, [initiatives, searchQuery, assets, programmes, strategies]);
 
-  // Group assets by category ID — canonical GEANZ assets are rendered separately
+  // Group assets by category ID — canonical RPTI catalogue assets are rendered separately
   const assetsByCategory = useMemo<Record<string, Asset[]>>(() => {
     const grouped: Record<string, Asset[]> = {};
     assets.forEach(a => {
-      // Canonical GEANZ assets are rendered in the dedicated GEANZ section, not here
-      if (isGeanzCatalogueAsset(a)) return;
+      // Canonical RPTI catalogue assets are rendered in the dedicated catalogue section, not here
+      if (isRptiCatalogueAsset(a)) return;
 
       // Hide assets with no matching initiatives when searching
       if (searchQuery) {
@@ -314,7 +314,7 @@ export function Timeline({ assets, deliverables = [], initiatives, milestones, p
       grouped[catId].push(a);
     });
     return grouped;
-  }, [assets, searchQuery, filteredInitiatives, isGeanzCatalogueEnabled]);
+  }, [assets, searchQuery, filteredInitiatives, isRptiCatalogueEnabled]);
 
   const sortedCategoryIds = useMemo(() => {
     const categoryIds = Object.keys(assetsByCategory);
@@ -1922,7 +1922,6 @@ export function Timeline({ assets, deliverables = [], initiatives, milestones, p
                         {/* Asset Name Sidebar — spans both Initiatives and Deliverables swimlanes */}
                         <div
                           data-testid="asset-swimlane-label"
-                          data-alias={asset.alias}
                           draggable
                           onDragStart={(e) => handleAssetDragStart(e, asset.id)}
                           onDragEnd={handleAssetDragEnd}
@@ -2293,30 +2292,29 @@ export function Timeline({ assets, deliverables = [], initiatives, milestones, p
               );
             })}
 
-            {/* GEANZ Application Technology section */}
-            {groupBy === 'asset' && settings.showGeanzCatalogue !== false && (
-              <div data-testid="geanz-section">
+            {/* Indonesian Bank Technology Catalogue section */}
+            {groupBy === 'asset' && settings.showRptiCatalogue !== false && (
+              <div data-testid="rpti-catalogue-section">
                 {/* Section header */}
                 <div className="flex z-30 bg-indigo-50 border-y border-indigo-100 w-max">
                   <div className="sticky left-0 flex-shrink-0 px-4 py-1.5 text-xs font-bold text-indigo-500 uppercase tracking-wider flex items-center gap-2 bg-indigo-50 z-40 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.1)]" style={{ width: SIDEBAR_WIDTH }}>
-                    <span>GEANZ Application Technology</span>
-                    <span className="text-[9px] font-normal text-indigo-300 normal-case tracking-normal">© Crown copyright, CC BY 4.0</span>
+                    <span>Indonesian Bank Technology Catalogue</span>
                   </div>
                   <div className="flex-shrink-0" style={{ width: totalWidth }} />
                 </div>
 
                 {/* eslint-disable-next-line react-hooks/refs */}
-                {geanzAreas.map((area: GeanzArea) => {
-                  const areaAssets = geanzAssetsByArea[area.alias] || [];
+                {rptiCatalogueAreas.map((area: RptiCatalogueArea) => {
+                  const areaAssets = rptiAssetsByArea[area.categoryId] || [];
                   const isPopulated = areaAssets.length > 0;
 
                   return (
-                    <div key={area.alias} data-testid={`geanz-area-entry-${area.alias}`}>
+                    <div key={area.categoryId} data-testid={`rpti-catalogue-area-entry-${area.code}`}>
                       {/* Unpopulated: show area row with pre-populate button */}
                       {!isPopulated && (
                         <div
-                          data-testid={`geanz-area-row-${area.alias}`}
-                          data-row-type="geanz-area"
+                          data-testid={`rpti-catalogue-area-row-${area.code}`}
+                          data-row-type="rpti-catalogue-area"
                           className="flex w-max border-b border-slate-100 bg-slate-50/60 hover:bg-slate-50 transition-colors"
                         >
                           <div
@@ -2328,14 +2326,13 @@ export function Timeline({ assets, deliverables = [], initiatives, milestones, p
                             </div>
                             {area.assets.length > 0 ? (
                               <button
-                                data-testid={`geanz-prepopulate-btn-${area.alias}`}
+                                data-testid={`rpti-catalogue-prepopulate-btn-${area.code}`}
                                 onClick={() => {
                                   if (!onAddAssets) return;
                                   const newAssets: Asset[] = area.assets.map(entry => ({
-                                    id: `geanz-${entry.externalId}`,
+                                    id: entry.externalId,
                                     name: entry.name,
-                                    categoryId: GEANZ_CATEGORY_ID,
-                                    alias: entry.alias,
+                                    categoryId: area.categoryId,
                                     externalId: entry.externalId,
                                   }));
                                   onAddAssets(newAssets);
@@ -2361,10 +2358,10 @@ export function Timeline({ assets, deliverables = [], initiatives, milestones, p
                           >
                             <div className="text-[10px] font-semibold text-indigo-400 flex-1">{area.name}</div>
                             <button
-                              data-testid={`geanz-remove-btn-${area.alias}`}
+                              data-testid={`rpti-catalogue-remove-btn-${area.code}`}
                               onClick={() => setPendingConfirm({
                                 type: 'remove-area',
-                                areaAlias: area.alias,
+                                areaCategoryId: area.categoryId,
                                 areaName: area.name,
                                 assetCount: areaAssets.length,
                               })}
@@ -2390,7 +2387,7 @@ export function Timeline({ assets, deliverables = [], initiatives, milestones, p
                             >
                               <div
                                 data-testid="asset-swimlane-label"
-                                data-alias={asset.alias}
+                                data-category-code={area.code}
                                 className="sticky left-0 flex-shrink-0 px-4 py-3 border-r border-slate-200 bg-white z-30 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.1)] group-hover:bg-slate-50 transition-colors flex items-center gap-2 self-stretch"
                                 style={{ width: SIDEBAR_WIDTH }}
                               >
@@ -2474,7 +2471,7 @@ export function Timeline({ assets, deliverables = [], initiatives, milestones, p
         </div>
       </div>
 
-      {/* GEANZ confirm modals */}
+      {/* RPTI catalogue confirm modals */}
       {pendingConfirm?.type === 'delete-asset' && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[200] flex items-center justify-center p-4" data-testid="confirm-modal">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm flex flex-col animate-in zoom-in-95 duration-150">
@@ -2509,8 +2506,8 @@ export function Timeline({ assets, deliverables = [], initiatives, milestones, p
             <div className="flex gap-2 p-4 pt-2 justify-end">
               <button data-testid="confirm-modal-cancel" onClick={() => setPendingConfirm(null)} className="px-4 py-2 text-sm font-medium text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors">Cancel</button>
               <button data-testid="confirm-modal-confirm" onClick={() => {
-                const areaAlias = pendingConfirm.areaAlias;
-                const toDelete = (geanzAssetsByArea[areaAlias] || []).map(a => a.id);
+                const areaCategoryId = pendingConfirm.areaCategoryId;
+                const toDelete = (rptiAssetsByArea[areaCategoryId] || []).map(a => a.id);
                 onBulkDeleteAssets?.(toDelete);
                 setPendingConfirm(null);
               }} className="px-4 py-2 text-sm font-medium bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors">Remove all</button>

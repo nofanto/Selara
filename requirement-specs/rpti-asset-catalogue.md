@@ -45,12 +45,16 @@ Same shape as GEANZ today — each area lists a handful of canonical Indonesian-
 
 ### 3. Technical shape — simplify, don't just re-skin
 
-GEANZ's `Asset.alias` used a two-level dotted scheme (`TAP.02.03`) that `Timeline.tsx` parsed with a regex (`/^(TAP\.\d+)/`) to recover the parent area for swimlane grouping. RPTI codes are flat (one level: code → asset), and — importantly — `Asset` already has a purpose-built `categoryCode?: RptiCategoryCode` field (`types.ts:151`) for exactly this classification. So:
+**Correction (resolved 2026-08-17):** this section originally assumed `Asset` has a `categoryCode?: RptiCategoryCode` field at `types.ts:151` — it doesn't. That line is `Deliverable.categoryCode`. `Asset` carries no RPTI classification field of its own, and `generateRptiDetails()` (`src/lib/rpti.ts:145-153`) never reads one from `Asset` — its auto-fill chain is `deliverable?.categoryCode ?? category?.categoryCode`, where `category` is resolved via `asset.categoryId → AssetCategory`. So the original plan's "asset added from this catalogue can have its categoryCode pre-filled" doesn't work as written; classification has to flow through `AssetCategory`, the only place it actually lives above the Deliverable level.
 
-- **Area grouping uses `asset.categoryCode` directly** instead of parsing a hierarchical alias. This removes the regex-parsing hack and means a catalogue-added asset's classification is immediately usable by RPTI reporting, not a separate cosmetic label.
-- `Asset.alias` is no longer populated by the catalogue (drop the GEANZ-specific dotted-alias concept; nothing else in the codebase depends on `alias` except GEANZ's own logic — confirmed by search).
-- `Asset.externalId` is kept — it's a generic dedup field also used by Excel import (`App.tsx:589-591`), not GEANZ-specific. Catalogue-added assets keep populating it with a stable synthetic id (e.g. `rpti-catalogue-05-payment-gateway`) so "+ Add all" stays idempotent.
-- `GEANZ_CATEGORY_ID` (`'cat-geanz-app-tech'`) → new constant, e.g. `RPTI_CATALOGUE_CATEGORY_ID` (`'cat-rpti-catalogue'`).
+**Decided fix:** one `AssetCategory` per RPTI area (18 total, `id: 'cat-rpti-05'` etc., `categoryCode` set to match) instead of a field on `Asset`. Catalogue-added assets get `categoryId` pointing at the matching area's category. This reuses the existing `AssetCategory.categoryCode` default-inheritance `rpti.ts` already implements — any Deliverable later added under a catalogue asset auto-classifies with zero new code paths — and it also gives the swimlane area grouping to Timeline's existing `categoryId`-based grouping for free, instead of a bespoke lookup. Rejected: adding a new `categoryCode` field to `Asset` and teaching `rpti.ts` to read it — works, but duplicates a classification path that `AssetCategory` already provides and the existing `assetsByCategory` grouping already assumes.
+
+Consequences for the plan below:
+- `rptiCatalogue.ts` exports both the flat asset-entry data (`rptiCatalogueAreas`) **and** the 18 `AssetCategory` records (`rptiCatalogueAssetCategories`) so callers can seed `assetCategories` state with them.
+- Area grouping in `Timeline.tsx` keys off `asset.categoryId` (matching one of the 18 catalogue category ids) instead of parsing a hierarchical alias — same simplification as originally intended, different mechanism.
+- `Asset.alias` is no longer populated by the catalogue (drop the GEANZ-specific dotted-alias concept entirely — confirmed by search that nothing else in the codebase reads `Asset.alias`, so the field itself is removed from `types.ts`, not just left unpopulated).
+- `Asset.externalId` is kept — it's a generic dedup field also used by Excel import (`App.tsx:589-591`), not GEANZ-specific. Catalogue-added assets keep populating it with a stable synthetic id (e.g. `rpti-catalogue-05-payment-gateway`), which now doubles as the "is this a catalogue asset" detection signal (previously `categoryId === GEANZ_CATEGORY_ID`, which doesn't work once catalogue assets have 18 different category ids).
+- `GEANZ_CATEGORY_ID` (`'cat-geanz-app-tech'`, a single shared id with no real `AssetCategory` behind it) has no direct replacement — superseded by the 18 real `AssetCategory` records above.
 
 ### 4. Renames (proposed — adjust freely during implementation)
 
@@ -58,10 +62,10 @@ GEANZ's `Asset.alias` used a two-level dotted scheme (`TAP.02.03`) that `Timelin
 |---|---|
 | `src/lib/geanzCatalogue.ts` | `src/lib/rptiCatalogue.ts` |
 | `GeanzArea`, `GeanzAssetEntry` | `RptiCatalogueArea`, `RptiCatalogueAssetEntry` |
-| `geanzAreas` | `rptiCatalogueAreas` |
-| `GEANZ_CATEGORY_ID` | `RPTI_CATALOGUE_CATEGORY_ID` |
+| `geanzAreas` | `rptiCatalogueAreas` (+ new `rptiCatalogueAssetCategories: AssetCategory[]`, see §3) |
+| `GEANZ_CATEGORY_ID` (single shared id) | superseded by 18 real `AssetCategory` ids, `'cat-rpti-01'`…`'cat-rpti-99'` (see §3) |
 | `TemplateId = 'geanz' \| 'viewer' \| 'blank'` | `'rpti' \| 'viewer' \| 'blank'` |
-| Template name "GEANZ Technology Catalogue" | "RPTI Application Catalogue" |
+| Template name "GEANZ Technology Catalogue" | "Indonesian Bank Technology Catalogue" |
 | `TimelineSettings.showGeanzCatalogue` | `showRptiCatalogue` |
 | `data-testid="geanz-*"` | `data-testid="rpti-catalogue-*"` |
 
@@ -113,10 +117,15 @@ Same footprint as the original GEANZ feature (`docs/user-stories/13`, `14`): `sr
 
 ---
 
+## Decided (continued)
+
+### 7. Template naming
+
+"Indonesian Bank Technology Catalogue" — chosen over "RPTI Application Catalogue" and "OJK Application Catalogue" to mirror GEANZ's original naming pattern (org/domain + "Technology Catalogue") rather than naming it after the specific report it feeds.
+
 ## Open Questions
 
 - **Exact final wording** for the catalogue's 18 areas' example asset lists (the table above is a first draft) — refine collaboratively during implementation rather than treating it as final.
-- **Template naming** ("RPTI Application Catalogue" vs. "OJK Application Catalogue" vs. something else) — not yet bikeshed.
 
 ---
 

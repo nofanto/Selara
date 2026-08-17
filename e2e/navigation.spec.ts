@@ -53,7 +53,7 @@ test.describe('Navigation & State Management', () => {
     // clear-all-stores-then-add-all-records path in db.ts
     await page.getByTestId('nav-data-manager').click();
     await page.getByTestId('clear-and-start-again-btn').click();
-    await page.getByTestId('template-select-with-demo-btn-geanz').click();
+    await page.getByTestId('template-select-with-demo-btn-rpti').click();
     // Brief pause to let the DB write begin before reloading (intentional — tests write atomicity)
     await page.waitForTimeout(500);
 
@@ -63,7 +63,7 @@ test.describe('Navigation & State Management', () => {
 
     // Initiatives store must have been written (not cleared and abandoned)
     const initiativeRows = page.locator('table tbody tr[data-real="true"]');
-    await expect(initiativeRows).toHaveCount(48); // 22 original + 26 GEANZ initiatives
+    await expect(initiativeRows).toHaveCount(48); // 22 original + 26 RPTI catalogue initiatives
 
     // Assets store must also be intact
     await page.getByRole('button', { name: /Assets/ }).click();
@@ -80,7 +80,7 @@ test.describe('Navigation & State Management', () => {
     // Check if defaults exist
     await page.getByRole('button', { name: 'Data Manager' }).click();
     const realRows = page.locator('table tbody tr[data-real="true"]');
-    await expect(realRows).toHaveCount(48); // 22 original + 26 GEANZ initiatives
+    await expect(realRows).toHaveCount(48); // 22 original + 26 RPTI catalogue initiatives
 
     // Total rows = 48 defaults + 1 blank row
     await expect(page.locator('table tbody tr')).toHaveCount(49);

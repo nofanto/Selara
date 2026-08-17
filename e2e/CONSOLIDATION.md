@@ -26,7 +26,7 @@ meaningful tests. Reduce redundancy and lower timeouts.
 5. **Add DataManager waitForSelector** — DataManager is lazy-loaded; always wait for a real
    element after clicking the Data tab before calling `.count()` or reading values
 6. **Extract shared helpers** where the same multi-step setup appears in 3+ files (e.g.
-   `loadGeanzTemplate`)
+   `loadRptiTemplate`)
 7. **Keep all persistence tests** — "persists after reload" tests catch a whole class of bugs that
    non-reload tests can't. Do not drop these
 
@@ -44,7 +44,7 @@ meaningful tests. Reduce redundancy and lower timeouts.
 | 8 | dependencies | dependencies-core, dependencies-data, dependencies-display | dependencies.spec.ts | 🔲 |
 | 9 | display | display-mode, display-mode-empty-rows, display-toggles, description-display, colour-by-status, collapsible-rows, visualiser-only-controls | display.spec.ts | ✅ PR #15 |
 | 10 | features | features-modal, features-modal-cards, validate-feature-animations | features.spec.ts | 🔲 |
-| 11 | geanz | geanz-demo-data, geanz-catalogue | geanz.spec.ts | 🔲 |
+| 11 | rpti-catalogue | rpti-catalogue | rpti-catalogue.spec.ts | 🔲 |
 | 12 | grouped | grouped_initiative_description, grouped-description-narrow-bar, grouped-description-legacy-data, grouped-description-no-truncation, grouped-bullet-description, initiative-edit-grouping, initiative-grouping | grouped.spec.ts | 🔲 |
 | 13 | import-export | import-merge, import-schema-validation, excel-import-validation, import-error-paths, export-all-entities, import-export-notifications, jpg-export, pdf-legend, data-controls | import-export.spec.ts | 🔲 |
 | 14 | initiatives | initiative-panel, initiative-panel-related, initiative-panel-date-fields-mobile, initiative-create-edit, initiative-deletion, initiative-drag, initiative-bar-parity, initiative-bar-layout, initiative-bar-ux, initiative-position-stability, duplicate-initiative-id, entity-id-uniqueness, intra-asset-spacing | initiatives.spec.ts | 🔲 |

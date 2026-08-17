@@ -6,15 +6,15 @@ When you open Selara for the first time, a **template picker** appears. Choose t
 
 | Template | Best for |
 |----------|----------|
-| **GEANZ Technology Catalogue** | Agencies building an application portfolio using the NZ government GEANZ taxonomy. Loads a representative GEANZ demo portfolio across 13 of 17 TAP areas, with the full catalogue browsable in the GEANZ section. |
+| **Indonesian Bank Technology Catalogue** | Banks building an application portfolio aligned to OJK's RPTI category codes. Loads a representative demo portfolio across 11 of 18 RPTI areas, with the full catalogue browsable in the catalogue section. |
 | **Viewer** | Uploading an Excel file shared by a colleague to view their portfolio. |
-| **Blank** | Agencies with their own internal taxonomy. Starts completely empty. |
+| **Blank** | Banks with their own internal taxonomy. Starts completely empty. |
 
 ![Template picker modal](../../public/features/template-picker-modal.png)
 
 ## With or without demo data
 
-For the GEANZ template you can choose how to start:
+For the Indonesian Bank Technology Catalogue template you can choose how to start:
 
 - **With demo data** — loads the template's asset categories and assets, plus a set of example initiatives, milestones, and application lifecycle segments. Use this to explore how Selara works before adding your own data.
 - **Without demo data** — loads only the template's structural elements (asset categories and assets) with no initiatives, milestones, or segments. Use this when you are ready to start building your real portfolio from day one.
@@ -25,7 +25,7 @@ A tutorial modal appears automatically. It walks through the key features in fiv
 
 ## The demo data
 
-The GEANZ template loads a representative NZ government portfolio across 13 of 17 TAP areas, with initiatives, applications, lifecycle segments, resources, and budget figures.
+The Indonesian Bank Technology Catalogue template loads a representative bank portfolio across 11 of 18 RPTI areas, with initiatives, applications, lifecycle segments, resources, and budget figures.
 
 The demo data is safe to experiment with. You can:
 

@@ -61,15 +61,15 @@ test.describe('In-app ConfirmModal — no browser dialogs', () => {
     await expect(rows).toHaveCount(1);
   });
 
-  test('DataManager "Clear data and start again" with GEANZ demo data populates tables', async ({ page }) => {
+  test('DataManager "Clear data and start again" with RPTI catalogue demo data populates tables', async ({ page }) => {
     await openDataManager(page);
     await page.getByTestId('clear-and-start-again-btn').click();
     await expect(page.getByTestId('template-picker-modal')).toBeVisible();
-    await page.getByTestId('template-select-with-demo-btn-geanz').click();
+    await page.getByTestId('template-select-with-demo-btn-rpti').click();
     await expect(page.getByTestId('template-picker-modal')).not.toBeVisible();
 
     const rows = page.locator('table tbody tr');
-    await expect(rows).toHaveCount(49); // 22 original + 26 GEANZ initiatives + 1 ghost row
+    await expect(rows).toHaveCount(49); // 22 original + 26 RPTI catalogue initiatives + 1 ghost row
   });
 
   test('DependencyPanel delete shows confirm modal', async ({ page }) => {

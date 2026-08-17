@@ -20,7 +20,7 @@ import {
   demoTimelineSettings,
 } from '../demoData';
 
-export type TemplateId = 'geanz' | 'viewer' | 'blank';
+export type TemplateId = 'rpti' | 'viewer' | 'blank';
 
 export interface WorkspaceTemplate {
   id: TemplateId;
@@ -31,10 +31,10 @@ export interface WorkspaceTemplate {
 
 export const WORKSPACE_TEMPLATES: WorkspaceTemplate[] = [
   {
-    id: 'geanz',
-    name: 'GEANZ Technology Catalogue',
-    description: 'Browse 17 TAP application areas and add the ones relevant to your agency.',
-    tagline: '17 areas · 300+ asset types',
+    id: 'rpti',
+    name: 'Indonesian Bank Technology Catalogue',
+    description: 'Browse 18 OJK RPTI application areas and add the ones relevant to your bank.',
+    tagline: '18 areas · 39 asset types',
   },
   {
     id: 'viewer',
@@ -91,7 +91,7 @@ export function getTemplateData(templateId: TemplateId | string, withDemoData = 
         deliverableStatuses: [],
         decisions: [],
         rptiDetails: [],
-        timelineSettings: { ...baseSettings, showGeanzCatalogue: false },
+        timelineSettings: { ...baseSettings, showRptiCatalogue: false },
       };
 
     case 'blank':
@@ -109,10 +109,10 @@ export function getTemplateData(templateId: TemplateId | string, withDemoData = 
         deliverableStatuses: [],
         decisions: [],
         rptiDetails: [],
-        timelineSettings: { ...baseSettings, showGeanzCatalogue: false },
+        timelineSettings: { ...baseSettings, showRptiCatalogue: false },
       };
 
-    case 'geanz':
+    case 'rpti':
     default:
       return {
         assetCategories: demoAssetCategories,
@@ -128,7 +128,7 @@ export function getTemplateData(templateId: TemplateId | string, withDemoData = 
         deliverableStatuses: demoDeliverableStatuses,
         decisions: [],
         rptiDetails: [],
-        timelineSettings: { ...baseSettings, showGeanzCatalogue: true },
+        timelineSettings: { ...baseSettings, showRptiCatalogue: true },
       };
   }
 }
