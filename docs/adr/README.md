@@ -42,3 +42,4 @@ An ADR is never edited to reverse its outcome — if circumstances change, write
 | [0008](0008-deliverable-description-field.md) | Elevate LKPTI's function description to `Deliverable.description` | Accepted |
 | [0009](0009-rpti-status-allow-list.md) | RPTI status classification becomes an allow-list, not a deny-list | Accepted |
 | [0010](0010-lkpti-import-onboarding.md) | Import an existing LKPTI report as a workspace template, and make LKPTI generation merge-preserving | Accepted |
+| [0011](0011-share-backend-multi-cloud-plugin-architecture.md) | Multi-cloud plugin architecture for the Share backend | Accepted |

@@ -1,0 +1,19 @@
+{
+  "name": "selara-share-backend-gcp",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "build": "tsc && node write-dist-package.mjs",
+    "typecheck": "tsc --noEmit",
+    "start": "npm run build && npx --package=@google-cloud/functions-framework functions-framework --source=dist/adapters/gcp/src --target=handleShare",
+    "deploy": "npm run build && gcloud functions deploy handleShare --gen2 --runtime=nodejs20 --trigger-http --allow-unauthenticated --source=dist --entry-point=handleShare"
+  },
+  "dependencies": {
+    "@google-cloud/firestore": "^7.0.0"
+  },
+  "devDependencies": {
+    "@google-cloud/functions-framework": "^3.4.0",
+    "@types/node": "^22.14.0",
+    "typescript": "~5.8.2"
+  }
+}
