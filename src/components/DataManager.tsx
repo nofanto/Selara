@@ -420,8 +420,10 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery 
   };
 
   const deliverableStatusColumns: Column<DeliverableStatus>[] = [
-    { key: 'name', label: 'Status Name', type: 'text', width: '60%' },
-    { key: 'color', label: 'Color', type: 'color', width: '40%' },
+    { key: 'name', label: 'Status Name', type: 'text', width: '40%' },
+    { key: 'color', label: 'Color', type: 'color', width: '20%' },
+    { key: 'isLiveStatus', label: 'Live?', type: 'boolean', width: '20%' },
+    { key: 'isPreLaunchStatus', label: 'Pre-Launch?', type: 'boolean', width: '20%' },
   ];
 
   const rptiColumns: Column<RptiDetail>[] = [

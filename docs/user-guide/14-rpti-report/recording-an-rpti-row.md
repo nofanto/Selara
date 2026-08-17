@@ -29,6 +29,8 @@ Generated rows auto-fill as much as they can from the Deliverable being reported
 
 Set these defaults once on a Deliverable or its Asset Category (in Data Manager → Deliverables / Categories) and every row generated from that deliverable inherits them — no need to re-enter the same values every report year.
 
+Only a lifecycle segment whose status is recognized as **live** or **pre-launch** (planned/funded) work counts toward generation — a status like "Cancelled" or "On Hold" is excluded by default, so it never produces a false report row. Selara recognizes the built-in Planned/Funded/In Production statuses automatically; if you add a custom status of your own, mark it explicitly using the **Live?** / **Pre-Launch?** checkboxes in Data Manager → App Statuses so generation knows how to treat it.
+
 ## Default Currency
 
 All CapEx/OpEx figures in this report are assumed to be in a single currency for the whole workspace. Set it once via the **Default Currency** field at the top of the RPTI tab (e.g. `IDR`, `USD`) — it's a label, not a converter, so if your CapEx/OpEx values aren't already in that currency, convert them yourself before entering them.

@@ -44,7 +44,24 @@
 
 ## Decided, not yet implemented
 
-- **Strategy/Programme generation filter (rule 3):** original framing was that initiatives should be "triggered by an Initiative that belongs to a Strategy or Programme." `Initiative.programmeId` is already **mandatory** on every real Initiative, so that's trivially true already except for `isPlaceholder` initiatives (empty markers, not real work) — resolved as: **exclude `isPlaceholder` initiatives from generation** (folded into rule 3 above). A stricter reading — additionally requiring `strategyId` to be set — was considered and rejected for now: it would exclude real initiatives that never got a Strategy tag, and `strategyId` is optional by design elsewhere in the app.
+- **Strategy/Programme generation filter (rule 3):** original framing was that initiatives should be "triggered by an Initiative that belongs to a Strategy or Programme." `Initiative.programmeId` is already **mandatory** on every real Initiative, so that's trivially true already except for `isPlaceholder` initiatives (empty markers, not real work) — resolved as: **exclude `isPlaceholder` initiatives from generation** (folded into rule 3 above; implemented — see "Review findings" below). A stricter reading — additionally requiring `strategyId` to be set — was considered and rejected for now: it would exclude real initiatives that never got a Strategy tag, and `strategyId` is optional by design elsewhere in the app.
+
+## Review findings (issue #3) — allow-list status classification, placeholder exclusion
+
+A review of this generation logic (issue #3) found two gaps between this spec and `generateRptiDetails`'s actual behavior:
+
+1. **Rule 3's status qualification was implemented as a deny-list, not the allow-list the rule describes.** `classifySegmentKind` excluded only statuses matching a `sunset|out-of-support|retired|decommission` name pattern and treated *everything else* — including any custom `DeliverableStatus` a workspace adds later (`"Cancelled"`, `"On Hold"`, `"Blocked"`, ...) — as `'new'` by default. Since `Deliverable Statuses` is a fully user-editable Data Manager tab, this silently produced false regulatory-report rows for any status that wasn't literally "live" and didn't happen to match the exclusion pattern.
+2. **Placeholder-initiative exclusion** (the item directly above) was never actually implemented, despite being marked decided.
+
+**Decision:** flip status classification to a genuine allow-list, mirroring the explicit-flag-first / pattern-fallback-second design `isLiveStatusId` already uses:
+
+- `DeliverableStatus` gains a new optional `isPreLaunchStatus?: boolean` flag (parallel to the existing `isLiveStatus?: boolean`), marking a status as representing planned/funded pre-launch work.
+- `isPreLaunchStatusId(statusId, deliverableStatuses)`: an explicit `isPreLaunchStatus: true` always wins. If **no** status in the workspace has the flag explicitly set (legacy/demo data predating this flag), fall back to recognizing the default `appstatus-planned`/`appstatus-funded` ids or a name containing "planned"/"funded" — same escape-hatch shape as `isLiveStatusId`'s existing fallback, so pre-existing workspaces keep working without a migration.
+- `classifySegmentKind` becomes a strict 3-way allow-list: `isLiveStatusId` → `'live'`; else `isPreLaunchStatusId` → `'new'`; else `'excluded'` — the deny-list regex is removed entirely, since "not live and not planned/funded" is now the correct default for `'excluded'` rather than a special case to detect.
+- The Deliverable Statuses tab in Data Manager gains **Live?** and **Pre-Launch?** checkbox columns, so a workspace can classify a custom status explicitly instead of relying on name-pattern guessing — closing the gap where neither flag had any UI before this change.
+- `qualifying` in `generateRptiDetails` now excludes segments whose `initiativeId` resolves to an `isPlaceholder: true` Initiative — folded into the same existence-check `Set` already used to guard against dangling `initiativeId` references, so a placeholder-linked segment is treated exactly like an orphaned one (correctly excluded).
+
+See [ADR-0009](../docs/adr/0009-rpti-status-allow-list.md) for the full record.
 
 ## Considered and rejected
 

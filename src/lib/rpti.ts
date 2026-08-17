@@ -40,21 +40,29 @@ export function isLiveStatusId(statusId: string, deliverableStatuses: Deliverabl
   return statusId === LIVE_STATUS_FALLBACK_ID;
 }
 
-const EXCLUDED_STATUS_FALLBACK_IDS = new Set(['appstatus-sunset', 'appstatus-out-of-support', 'appstatus-retired']);
-const EXCLUDED_STATUS_PATTERN = /sunset|out.of.support|retired|decommission/i;
+const PRE_LAUNCH_STATUS_FALLBACK_IDS = new Set(['appstatus-planned', 'appstatus-funded']);
+const PRE_LAUNCH_STATUS_FALLBACK_PATTERN = /planned|funded/i;
+
+// Mirrors isLiveStatusId's shape: an explicit isPreLaunchStatus flag always wins. Only
+// when no status in the workspace has that flag explicitly set does a legacy/demo id or
+// a "planned"/"funded" name get trusted instead, so existing workspaces keep working
+// without a migration.
+export function isPreLaunchStatusId(statusId: string, deliverableStatuses: DeliverableStatus[]): boolean {
+  const status = deliverableStatuses.find(s => s.id === statusId);
+  if (status) return !!status.isPreLaunchStatus || (!deliverableStatuses.some(s => s.isPreLaunchStatus) && (PRE_LAUNCH_STATUS_FALLBACK_IDS.has(statusId) || PRE_LAUNCH_STATUS_FALLBACK_PATTERN.test(status.name)));
+  return PRE_LAUNCH_STATUS_FALLBACK_IDS.has(statusId);
+}
 
 type SegmentKind = 'new' | 'live' | 'excluded';
 
-// Classifies a segment's status for RPTI generation. Live status wins first (it's the
-// only classification with a real data signal, DeliverableStatus.isLiveStatus); anything
-// matching a known decommission-ish id/name is excluded; everything else is treated as a
-// pre-launch ("new") phase — see requirement-specs/rpti-auto-generation.md.
+// Classifies a segment's status for RPTI generation as an allow-list: only a status
+// recognized as live or pre-launch (planned/funded) qualifies — everything else,
+// including any custom status a workspace adds later (Cancelled, On Hold, ...), is
+// excluded by default. See requirement-specs/rpti-auto-generation.md rule 3 / ADR-0009.
 function classifySegmentKind(statusId: string, deliverableStatuses: DeliverableStatus[]): SegmentKind {
   if (isLiveStatusId(statusId, deliverableStatuses)) return 'live';
-  const status = deliverableStatuses.find(s => s.id === statusId);
-  const name = status?.name ?? '';
-  if (EXCLUDED_STATUS_FALLBACK_IDS.has(statusId) || EXCLUDED_STATUS_PATTERN.test(name)) return 'excluded';
-  return 'new';
+  if (isPreLaunchStatusId(statusId, deliverableStatuses)) return 'new';
+  return 'excluded';
 }
 
 export interface GenerateRptiDetailsInput {
@@ -99,7 +107,8 @@ export function generateRptiDetails(
   const overlapsReportYear = (seg: DeliverableSegment) => seg.startDate <= yearEnd && seg.endDate >= yearStart;
   // Deleting an Initiative doesn't clean up DeliverableSegment.initiativeId, so a segment
   // can carry a dangling reference to an initiative that no longer exists — skip those.
-  const initiativeIds = new Set(initiatives.map(i => i.id));
+  // Placeholder initiatives (empty markers, not real work) are excluded the same way.
+  const initiativeIds = new Set(initiatives.filter(i => i.isPlaceholder !== true).map(i => i.id));
 
   // A deliverable that already went live in a prior, non-overlapping year already
   // exists — a planned/funded segment this year is an upgrade to it, not a

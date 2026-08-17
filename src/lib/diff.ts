@@ -200,6 +200,9 @@ export function computeDiff(baseVersion: Version, currentData: Version['data']):
       if (!!b.isLiveStatus !== !!c.isLiveStatus) {
         changes.push(`Live status flag: ${b.isLiveStatus ? 'on' : 'off'} → ${c.isLiveStatus ? 'on' : 'off'}`);
       }
+      if (!!b.isPreLaunchStatus !== !!c.isPreLaunchStatus) {
+        changes.push(`Pre-launch status flag: ${b.isPreLaunchStatus ? 'on' : 'off'} → ${c.isPreLaunchStatus ? 'on' : 'off'}`);
+      }
       return changes;
     }
   );
