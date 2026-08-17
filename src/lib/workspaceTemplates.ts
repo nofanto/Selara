@@ -4,7 +4,7 @@
  * Each template defines the initial data loaded into IndexedDB on first run.
  */
 
-import { Asset, AssetCategory, Decision, RptiDetail, Initiative, Milestone, DeliverableSegment, Programme, Strategy, Dependency, Resource, DeliverableStatus, TimelineSettings, Deliverable } from '../types';
+import { Asset, AssetCategory, Decision, RptiDetail, LkptiDetail, Initiative, Milestone, DeliverableSegment, Programme, Strategy, Dependency, Resource, DeliverableStatus, TimelineSettings, Deliverable } from '../types';
 import {
   demoAssets,
   demoInitiatives,
@@ -64,6 +64,7 @@ export interface TemplateAppData {
   deliverableStatuses: DeliverableStatus[];
   decisions: Decision[];
   rptiDetails: RptiDetail[];
+  lkptiDetails: LkptiDetail[];
   timelineSettings: TimelineSettings;
 }
 
@@ -91,6 +92,7 @@ export function getTemplateData(templateId: TemplateId | string, withDemoData = 
         deliverableStatuses: [],
         decisions: [],
         rptiDetails: [],
+        lkptiDetails: [],
         timelineSettings: { ...baseSettings, showRptiCatalogue: false },
       };
 
@@ -109,6 +111,7 @@ export function getTemplateData(templateId: TemplateId | string, withDemoData = 
         deliverableStatuses: [],
         decisions: [],
         rptiDetails: [],
+        lkptiDetails: [],
         timelineSettings: { ...baseSettings, showRptiCatalogue: false },
       };
 
@@ -128,6 +131,7 @@ export function getTemplateData(templateId: TemplateId | string, withDemoData = 
         deliverableStatuses: demoDeliverableStatuses,
         decisions: [],
         rptiDetails: [],
+        lkptiDetails: [],
         timelineSettings: { ...baseSettings, showRptiCatalogue: true },
       };
   }

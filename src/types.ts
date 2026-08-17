@@ -206,6 +206,39 @@ export interface RptiDetail {
   remarks?: string;
 }
 
+// LKPTI 3.2.6's own category_code enum excludes RPTI's infrastructure-only codes
+// (51-54, 99) — Daftar Aplikasi is application-only. See requirement-specs/lkpti-schema.md §2.
+export type LkptiCategoryCode = Exclude<RptiCategoryCode, '51' | '52' | '53' | '54' | '99'>;
+export type LkptiBackupStrategy = 'HA_ACTIVE_ACTIVE' | 'HA_ACTIVE_PASSIVE' | 'BACKUP_REALTIME' | 'BACKUP_PERIODIC';
+export type LkptiOwnership = 'LEASE' | 'OUTRIGHT_PURCHASE';
+
+/**
+ * One row of the LKPTI Format 3.2.6 (Daftar Aplikasi / Application List) regulatory
+ * report — an inventory entry for a single live Deliverable. Unlike RptiDetail, this
+ * isn't tied to an Initiative or a report year — it's a point-in-time snapshot of
+ * applications currently in production. See requirement-specs/lkpti-integration.md.
+ */
+export interface LkptiDetail {
+  id: string;
+  targetId: string; // Deliverable.id — LKPTI 3.2.6 is scoped to applications only, unlike RptiDetail which also targets bare Assets
+  categoryCode?: LkptiCategoryCode; // Cascades: this row's value ?? Deliverable.categoryCode ?? AssetCategory.categoryCode, narrowed to application-eligible codes
+  developer?: string; // 'inhouse', or the IT service provider's name — free text per the LKPTI form (unlike RptiDetail.developer's two-value enum, which only marks *that* it's third-party, not who). Auto-suggested as 'inhouse' when Deliverable.developer === 'inhouse'; left blank for manual entry (the provider name) otherwise.
+  dcCity?: string;   // Cascades: this row's value ?? Deliverable.dcCity ?? AssetCategory.dcCity
+  dcCountry?: string;
+  drCity?: string;   // Cascades: this row's value ?? Deliverable.drCity ?? AssetCategory.drCity
+  drCountry?: string;
+  // No auto-fill source — always manual entry:
+  platform?: string;
+  database?: string;
+  dcProvider?: string;  // company name, or 'self'
+  drcProvider?: string; // company name, or 'self'
+  backupStrategy?: LkptiBackupStrategy;
+  systemOwner?: string;
+  goLiveDate?: string; // dd-mm-yyyy per the LKPTI form; auto-suggested via suggestGoLiveDate() but not written automatically
+  ownership?: LkptiOwnership;
+  functionDescription?: string;
+}
+
 /**
  * Internal type used for rendering the timeline grid columns.
  */
@@ -268,5 +301,6 @@ export interface Version {
     deliverableStatuses?: DeliverableStatus[];
     decisions?: Decision[];
     rptiDetails?: RptiDetail[];
+    lkptiDetails?: LkptiDetail[];
   };
 }

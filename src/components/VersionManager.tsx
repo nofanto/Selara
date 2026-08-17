@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Version, Asset, Deliverable, DeliverableSegment, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource, DeliverableStatus, Decision, RptiDetail } from '../types';
+import { Version, Asset, Deliverable, DeliverableSegment, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource, DeliverableStatus, Decision, RptiDetail, LkptiDetail } from '../types';
 import { X, Save, History, Trash2, ArrowRight, FileText, AlertCircle, LayoutGrid, Check, Users, GitBranch, Box, Layers, Tags, FolderTree, Scale, ClipboardList } from 'lucide-react';
 import { saveVersion, deleteVersion } from '../lib/db';
 import { ConfirmModal } from './ConfirmModal';
@@ -28,6 +28,7 @@ interface VersionManagerProps {
     deliverableStatuses?: DeliverableStatus[];
     decisions?: Decision[];
     rptiDetails?: RptiDetail[];
+    lkptiDetails?: LkptiDetail[];
   };
 }
 
@@ -58,6 +59,7 @@ export function VersionManager({ isOpen, onClose, onRestore, versions, onUpdateV
         deliverableStatuses: currentData.deliverableStatuses || [],
         decisions: currentData.decisions || [],
         rptiDetails: currentData.rptiDetails || [],
+        lkptiDetails: currentData.lkptiDetails || [],
       }),
     };
 
@@ -513,6 +515,12 @@ function VersionComparisonReport({ baseVersion, comparisonData, onClose }: {
                 data={diff.rptiDetails}
                 icon={ClipboardList}
                 colorClass="lime"
+              />
+              <DiffSection
+                title="LKPTI"
+                data={diff.lkptiDetails}
+                icon={ClipboardList}
+                colorClass="amber"
               />
             </>
           )}

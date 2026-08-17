@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx';
-import { Asset, Deliverable, DeliverableSegment, DeliverableStatus, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource, Version, RptiDetail } from '../types';
+import { Asset, Deliverable, DeliverableSegment, DeliverableStatus, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource, Version, RptiDetail, LkptiDetail } from '../types';
 
 interface AppData {
   assets: Asset[];
@@ -16,6 +16,7 @@ interface AppData {
   resources?: Resource[];
   versions?: Version[];
   rptiDetails?: RptiDetail[];
+  lkptiDetails?: LkptiDetail[];
 }
 
 
@@ -139,6 +140,9 @@ export const exportToExcel = (data: AppData) => {
   // 12. RPTI Details (raw backup copy — the pretty Format 3.1 export is a separate, report-scoped export)
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(flatten(data.rptiDetails, 'rptiDetails')), 'RptiDetails');
 
+  // 12b. LKPTI Report Details (raw backup copy — the pretty LKPTI 3.2.6 export is a separate, report-scoped export)
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(flatten(data.lkptiDetails, 'lkptiDetails')), 'LkptiDetails');
+
   // 13. Timeline Settings (versioned)
   const settingsList = [];
   if (data.timelineSettings) settingsList.push({ ...data.timelineSettings, versionId: '' });
@@ -194,6 +198,7 @@ export const importFromExcel = async (file: File): Promise<Partial<AppData>> => 
           deliverableStatuses: getSheetData<any>('DeliverableStatuses'),
           resources: getSheetData<any>('Resources'),
           rptiDetails: getSheetData<any>('RptiDetails'),
+          lkptiDetails: getSheetData<any>('LkptiDetails'),
           timelineSettings: getSheetData<any>('TimelineSettings'),
           versions: getSheetData<any>('Versions'),
         };
@@ -250,6 +255,9 @@ export const importFromExcel = async (file: File): Promise<Partial<AppData>> => 
         const rptiDetailSplit = split<RptiDetail>(raw.rptiDetails);
         result.rptiDetails = rptiDetailSplit.current;
 
+        const appInvDetailSplit = split<LkptiDetail>(raw.lkptiDetails);
+        result.lkptiDetails = appInvDetailSplit.current;
+
         const settingsSplit = split<TimelineSettings>(raw.timelineSettings);
         result.timelineSettings = sanitizeTimelineSettings(settingsSplit.current[0]);
 
@@ -275,6 +283,7 @@ export const importFromExcel = async (file: File): Promise<Partial<AppData>> => 
                 deliverableStatuses: statSplit.byVersion[vid] || [],
                 resources: resSplit.byVersion[vid] || [],
                 rptiDetails: rptiDetailSplit.byVersion[vid] || [],
+                lkptiDetails: appInvDetailSplit.byVersion[vid] || [],
                 timelineSettings: sanitizeTimelineSettings(settingsSplit.byVersion[vid]?.[0]) || {},
               }
             };

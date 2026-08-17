@@ -38,3 +38,4 @@ An ADR is never edited to reverse its outcome — if circumstances change, write
 | [0004](0004-remove-dts.md) | Remove the DTS (NZ Digital Target State) workspace feature | Accepted |
 | [0005](0005-rpti-data-manager-tab.md) | Make RPTI rows first-class via a Data Manager tab | Accepted |
 | [0006](0006-rpti-auto-fill-and-single-currency.md) | Auto-fill RPTI category/developer/location; move CapEx/OpEx to a single workspace currency | Accepted |
+| [0007](0007-lkpti-report.md) | Add the LKPTI Report as its own entity, not an extended Deliverable | Accepted |

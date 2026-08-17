@@ -28,7 +28,7 @@ import {
   demoDeliverableSegments as initialDeliverableSegments,
   demoDeliverableStatuses as initialDeliverableStatuses,
 } from './demoData';
-import { Asset, Deliverable, DeliverableSegment, DeliverableStatus, Decision, RptiDetail, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource, Version } from './types';
+import { Asset, Deliverable, DeliverableSegment, DeliverableStatus, Decision, RptiDetail, LkptiDetail, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource, Version } from './types';
 import { cn } from './lib/utils';
 import { getAppData, saveAppData, getAllVersions } from './lib/db';
 import { importFromExcel } from './lib/excel';
@@ -61,6 +61,7 @@ type AppState = {
   deliverableStatuses: DeliverableStatus[];
   decisions: Decision[];
   rptiDetails: RptiDetail[];
+  lkptiDetails: LkptiDetail[];
   versions?: Version[];
 };
 
@@ -80,6 +81,7 @@ function isValidSharedAppState(data: unknown): data is AppState {
     && Array.isArray(record.deliverableStatuses)
     && Array.isArray(record.decisions)
     && Array.isArray(record.rptiDetails)
+    && Array.isArray(record.lkptiDetails)
     && !!record.timelineSettings
     && typeof record.timelineSettings === 'object';
 }
@@ -140,6 +142,7 @@ export default function App() {
   const [deliverableStatuses, setDeliverableStatuses] = useState<DeliverableStatus[]>([]);
   const [decisions, setDecisions] = useState<Decision[]>([]);
   const [rptiDetails, setRptiDetails] = useState<RptiDetail[]>([]);
+  const [lkptiDetails, setLkptiDetails] = useState<LkptiDetail[]>([]);
   const [selectedDecisionId, setSelectedDecisionId] = useState<string | null>(null);
   const [versions, setVersions] = useState<Version[]>([]);
 
@@ -165,7 +168,7 @@ export default function App() {
   const redoRef = useRef<() => void>(() => {});
 
   const getCurrentState = (): AppState => ({
-    assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails
+    assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails
   });
 
   const getCurrentStateRef = useRef(getCurrentState);
@@ -218,6 +221,7 @@ export default function App() {
             setDeliverableStatuses((dbData as any).deliverableStatuses || []);
             setDecisions((dbData as any).decisions || []);
             setRptiDetails((dbData as any).rptiDetails || []);
+            setLkptiDetails((dbData as any).lkptiDetails || []);
             setTimelineSettings(sanitizeTimelineSettings({ ...defaultTimelineSettings, ...(dbData.timelineSettings || {}) }));
             setVersions(await getAllVersions());
             setIsImportingShare(false);
@@ -256,6 +260,7 @@ export default function App() {
               deliverableStatuses: initialDeliverableStatuses,
               decisions: [],
               rptiDetails: [],
+              lkptiDetails: [],
             };
             await saveAppData(defaults);
             setAssets(defaults.assets);
@@ -272,6 +277,7 @@ export default function App() {
             setDeliverableStatuses(defaults.deliverableStatuses);
             setDecisions(defaults.decisions);
             setRptiDetails(defaults.rptiDetails);
+            setLkptiDetails(defaults.lkptiDetails);
           } else {
             // First real run: let the user pick a template
             setShowTemplatePicker(true);
@@ -290,6 +296,7 @@ export default function App() {
           setDeliverableStatuses((dbData as any).deliverableStatuses || []);
           setDecisions((dbData as any).decisions || []);
           setRptiDetails((dbData as any).rptiDetails || []);
+          setLkptiDetails((dbData as any).lkptiDetails || []);
           const rawSettings = dbData.timelineSettings || {};
           // Migration: if we have legacy startYear but no startDate, convert it
           const migratedSettings = ('startYear' in rawSettings && !('startDate' in rawSettings))
@@ -348,6 +355,7 @@ export default function App() {
     setDeliverableStatuses(data.deliverableStatuses);
     setDecisions(data.decisions || []);
     setRptiDetails(data.rptiDetails || []);
+    setLkptiDetails(data.lkptiDetails || []);
     setVersions([]);
     setShowTemplatePicker(false);
     setTemplatePickerIsReset(false);
@@ -389,6 +397,7 @@ export default function App() {
         deliverableStatuses: imported.deliverableStatuses ?? blank.deliverableStatuses,
         decisions: (imported as any).decisions ?? blank.decisions,
         rptiDetails: (imported as any).rptiDetails ?? blank.rptiDetails,
+        lkptiDetails: (imported as any).lkptiDetails ?? blank.lkptiDetails,
         timelineSettings: { ...blank.timelineSettings, ...(imported.timelineSettings ?? {}) },
         versions: imported.versions ?? [],
       };
@@ -407,6 +416,7 @@ export default function App() {
       setDeliverableStatuses(data.deliverableStatuses);
       setDecisions(data.decisions || []);
       setRptiDetails(data.rptiDetails || []);
+      setLkptiDetails(data.lkptiDetails || []);
       setVersions(data.versions || []);
       setShowTemplatePicker(false);
       setTemplatePickerIsReset(false);
@@ -440,6 +450,7 @@ export default function App() {
     setDeliverableStatuses(data.deliverableStatuses || []);
     setDecisions((data as any).decisions || []);
     setRptiDetails((data as any).rptiDetails || []);
+    setLkptiDetails((data as any).lkptiDetails || []);
     if (data.versions) setVersions(data.versions);
 
     // Persist to DB
@@ -496,55 +507,55 @@ export default function App() {
 
   const handleAddInitiative = useCallback((newInit: Initiative) => {
     if (initiatives.some(i => i.id === newInit.id)) return;
-    handleUpdate({ assets, deliverables, deliverableSegments, initiatives: [...initiatives, newInit], milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails });
-  }, [assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails, handleUpdate]);
+    handleUpdate({ assets, deliverables, deliverableSegments, initiatives: [...initiatives, newInit], milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails });
+  }, [assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails, handleUpdate]);
 
   const handleUpdateInitiative = useCallback((updatedInit: Initiative) => {
-    handleUpdate({ assets, deliverables, deliverableSegments, initiatives: initiatives.map(i => i.id === updatedInit.id ? updatedInit : i), milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails });
-  }, [assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails, handleUpdate]);
+    handleUpdate({ assets, deliverables, deliverableSegments, initiatives: initiatives.map(i => i.id === updatedInit.id ? updatedInit : i), milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails });
+  }, [assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails, handleUpdate]);
 
   const handleUpdateAssets = useCallback((updatedAssets: Asset[]) => {
-    handleUpdate({ assets: updatedAssets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails });
-  }, [deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails, handleUpdate]);
+    handleUpdate({ assets: updatedAssets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails });
+  }, [deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails, handleUpdate]);
 
   const handleUpdateAsset = useCallback((updatedAsset: Asset) => {
-    handleUpdate({ assets: assets.map(a => a.id === updatedAsset.id ? updatedAsset : a), deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails });
-  }, [assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails, handleUpdate]);
+    handleUpdate({ assets: assets.map(a => a.id === updatedAsset.id ? updatedAsset : a), deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails });
+  }, [assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails, handleUpdate]);
 
   const handleUpdateDependencies = useCallback((updatedDependencies: Dependency[]) => {
-    handleUpdate({ assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies: updatedDependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails });
-  }, [assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails, handleUpdate]);
+    handleUpdate({ assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies: updatedDependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails });
+  }, [assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails, handleUpdate]);
 
   const handleUpdateMilestone = useCallback((updatedMilestone: Milestone) => {
-    handleUpdate({ assets, deliverables, deliverableSegments, initiatives, milestones: milestones.map(m => m.id === updatedMilestone.id ? updatedMilestone : m), programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails });
-  }, [assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails, handleUpdate]);
+    handleUpdate({ assets, deliverables, deliverableSegments, initiatives, milestones: milestones.map(m => m.id === updatedMilestone.id ? updatedMilestone : m), programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails });
+  }, [assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails, handleUpdate]);
 
   const handleDeleteInitiative = useCallback((deletedInit: Initiative) => {
-    handleUpdate({ assets, deliverables, deliverableSegments, initiatives: initiatives.filter(i => i.id !== deletedInit.id), milestones, programmes, strategies, dependencies: dependencies.filter(d => d.sourceId !== deletedInit.id && d.targetId !== deletedInit.id), assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails });
-  }, [assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails, handleUpdate]);
+    handleUpdate({ assets, deliverables, deliverableSegments, initiatives: initiatives.filter(i => i.id !== deletedInit.id), milestones, programmes, strategies, dependencies: dependencies.filter(d => d.sourceId !== deletedInit.id && d.targetId !== deletedInit.id), assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails });
+  }, [assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails, handleUpdate]);
 
   const handleUpdateSettings = useCallback((updatedSettings: TimelineSettings) => {
-    handleUpdate({ assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: updatedSettings, resources, deliverableStatuses, decisions, rptiDetails });
-  }, [assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, resources, deliverableStatuses, decisions, rptiDetails, handleUpdate]);
+    handleUpdate({ assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: updatedSettings, resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails });
+  }, [assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails, handleUpdate]);
 
   const handleRestoreVersion = useCallback((version: import('./types').Version) => {
-    handleUpdate({ ...version.data, deliverableStatuses: version.data.deliverableStatuses ?? [], decisions: version.data.decisions ?? [], rptiDetails: version.data.rptiDetails ?? [] });
+    handleUpdate({ ...version.data, deliverableStatuses: version.data.deliverableStatuses ?? [], decisions: version.data.decisions ?? [], rptiDetails: version.data.rptiDetails ?? [], lkptiDetails: version.data.lkptiDetails ?? [] });
   }, [handleUpdate]);
 
   const handleSaveDeliverableSegment = useCallback((seg: import('./types').DeliverableSegment) => {
     const exists = deliverableSegments.some(s => s.id === seg.id);
     const savedSeg = exists ? seg : { ...seg, id: `seg-${Date.now()}` };
     const next = exists ? deliverableSegments.map(s => s.id === seg.id ? savedSeg : s) : [...deliverableSegments, savedSeg];
-    handleUpdate({ assets, deliverables, deliverableSegments: next, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails });
-  }, [assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails, handleUpdate]);
+    handleUpdate({ assets, deliverables, deliverableSegments: next, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails });
+  }, [assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails, handleUpdate]);
 
   const handleDeleteDeliverableSegment = useCallback((seg: import('./types').DeliverableSegment) => {
-    handleUpdate({ assets, deliverables, deliverableSegments: deliverableSegments.filter(s => s.id !== seg.id), initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails });
-  }, [assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails, handleUpdate]);
+    handleUpdate({ assets, deliverables, deliverableSegments: deliverableSegments.filter(s => s.id !== seg.id), initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails });
+  }, [assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails, handleUpdate]);
 
   const handleUpdateDeliverableSegments = useCallback((segs: import('./types').DeliverableSegment[]) => {
-    handleUpdate({ assets, deliverables, deliverableSegments: segs, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails });
-  }, [assets, deliverables, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails, handleUpdate]);
+    handleUpdate({ assets, deliverables, deliverableSegments: segs, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails });
+  }, [assets, deliverables, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails, handleUpdate]);
 
   const handleDeleteAsset = useCallback((assetId: string) => {
     const assetAppIds = new Set(deliverables.filter(a => a.assetId === assetId).map(a => a.id));
@@ -559,9 +570,9 @@ export default function App() {
         const deletedInitIds = new Set(initiatives.filter(i => i.assetId === assetId).map(i => i.id));
         return !deletedInitIds.has(d.sourceId) && !deletedInitIds.has(d.targetId);
       }),
-      assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails,
+      assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails,
     });
-  }, [assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails, handleUpdate]);
+  }, [assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails, handleUpdate]);
 
   const handleBulkDeleteAssets = useCallback((assetIds: string[]) => {
     const idSet = new Set(assetIds);
@@ -581,29 +592,29 @@ export default function App() {
       dependencies: dependencies.filter(d =>
         !deletedInitIds.has(d.sourceId) && !deletedInitIds.has(d.targetId)
       ),
-      assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails,
+      assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails,
     });
-  }, [assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails, handleUpdate]);
+  }, [assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails, handleUpdate]);
 
   const handleAddAssets = useCallback((newAssets: Asset[]) => {
     // Skip any assets already present (matched by externalId to prevent duplicates)
     const existingExternalIds = new Set(assets.map(a => a.externalId).filter(Boolean));
     const toAdd = newAssets.filter(a => !a.externalId || !existingExternalIds.has(a.externalId));
     if (toAdd.length === 0) return;
-    handleUpdate({ assets: [...assets, ...toAdd], deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails });
-  }, [assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails, handleUpdate]);
+    handleUpdate({ assets: [...assets, ...toAdd], deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails });
+  }, [assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails, handleUpdate]);
 
   const handleAddDecision = useCallback((newDecision: Decision) => {
-    handleUpdate({ assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions: [...decisions, newDecision], rptiDetails });
-  }, [assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails, handleUpdate]);
+    handleUpdate({ assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions: [...decisions, newDecision], rptiDetails, lkptiDetails });
+  }, [assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails, handleUpdate]);
 
   const handleUpdateDecision = useCallback((updatedDecision: Decision) => {
-    handleUpdate({ assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions: decisions.map(d => d.id === updatedDecision.id ? updatedDecision : d), rptiDetails });
-  }, [assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails, handleUpdate]);
+    handleUpdate({ assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions: decisions.map(d => d.id === updatedDecision.id ? updatedDecision : d), rptiDetails, lkptiDetails });
+  }, [assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails, handleUpdate]);
 
   const handleDeleteDecision = useCallback((deletedDecision: Decision) => {
-    handleUpdate({ assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions: decisions.filter(d => d.id !== deletedDecision.id), rptiDetails });
-  }, [assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails, handleUpdate]);
+    handleUpdate({ assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions: decisions.filter(d => d.id !== deletedDecision.id), rptiDetails, lkptiDetails });
+  }, [assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails, handleUpdate]);
 
   const handleOpenDecision = useCallback((decisionId: string) => {
     setSelectedDecisionId(decisionId);
@@ -813,7 +824,7 @@ export default function App() {
               handleUpdate({
                 assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories,
                 timelineSettings: { ...timelineSettings, startDate: e.target.value },
-                resources, deliverableStatuses, decisions, rptiDetails,
+                resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails,
               });
             }}
             className="px-1.5 py-1 bg-slate-50 border border-slate-200 rounded text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -828,7 +839,7 @@ export default function App() {
               handleUpdate({
                 assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories,
                 timelineSettings: { ...timelineSettings, monthsToShow: parseInt(e.target.value) as 3 | 6 | 12 | 24 | 36 },
-                resources, deliverableStatuses, decisions, rptiDetails,
+                resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails,
               });
             }}
             className="px-1.5 py-1 bg-slate-50 border border-slate-200 rounded text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -866,7 +877,7 @@ export default function App() {
                 data-active={conflictsOn ? 'true' : 'false'}
                 aria-label="Conflict Detection"
                 aria-pressed={conflictsOn}
-                onClick={() => handleUpdate({ assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, conflictDetection: conflictsOn ? 'off' : 'on' }, resources, deliverableStatuses, decisions, rptiDetails })}
+                onClick={() => handleUpdate({ assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, conflictDetection: conflictsOn ? 'off' : 'on' }, resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails })}
                 className={toggleClass(conflictsOn)}
                 title="Conflict Detection"
               >
@@ -877,7 +888,7 @@ export default function App() {
                 data-active={relationshipsOn ? 'true' : 'false'}
                 aria-label="Relationship Lines"
                 aria-pressed={relationshipsOn}
-                onClick={() => handleUpdate({ assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, showRelationships: relationshipsOn ? 'off' : 'on' }, resources, deliverableStatuses, decisions, rptiDetails })}
+                onClick={() => handleUpdate({ assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, showRelationships: relationshipsOn ? 'off' : 'on' }, resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails })}
                 className={toggleClass(relationshipsOn)}
                 title="Relationship Lines"
               >
@@ -888,7 +899,7 @@ export default function App() {
                 data-active={descriptionsOn ? 'true' : 'false'}
                 aria-label="Descriptions"
                 aria-pressed={descriptionsOn}
-                onClick={() => handleUpdate({ assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, descriptionDisplay: descriptionsOn ? 'off' : 'on' }, resources, deliverableStatuses, decisions, rptiDetails })}
+                onClick={() => handleUpdate({ assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, descriptionDisplay: descriptionsOn ? 'off' : 'on' }, resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails })}
                 className={toggleClass(descriptionsOn)}
                 title="Descriptions"
               >
@@ -899,7 +910,7 @@ export default function App() {
                 data-mode={budgetMode}
                 aria-label={`Budget visualisation: ${budgetMode}`}
                 aria-pressed={budgetMode !== 'off'}
-                onClick={() => handleUpdate({ assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, budgetVisualisation: nextBudget }, resources, deliverableStatuses, decisions, rptiDetails })}
+                onClick={() => handleUpdate({ assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, budgetVisualisation: nextBudget }, resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails })}
                 className={toggleClass(budgetMode !== 'off')}
                 title={`Budget: ${budgetMode}`}
               >
@@ -910,7 +921,7 @@ export default function App() {
                 data-active={criticalPathOn ? 'true' : 'false'}
                 aria-label="Critical Path"
                 aria-pressed={criticalPathOn}
-                onClick={() => handleUpdate({ assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, criticalPath: criticalPathOn ? 'off' : 'on' }, resources, deliverableStatuses, decisions, rptiDetails })}
+                onClick={() => handleUpdate({ assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, criticalPath: criticalPathOn ? 'off' : 'on' }, resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails })}
                 className={toggleClass(criticalPathOn)}
                 title="Critical Path"
               >
@@ -921,7 +932,7 @@ export default function App() {
                 data-active={showResourcesOn ? 'true' : 'false'}
                 aria-label="Show Resources"
                 aria-pressed={showResourcesOn}
-                onClick={() => handleUpdate({ assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, showResources: showResourcesOn ? 'off' : 'on' }, resources, deliverableStatuses, decisions, rptiDetails })}
+                onClick={() => handleUpdate({ assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, showResources: showResourcesOn ? 'off' : 'on' }, resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails })}
                 className={toggleClass(showResourcesOn)}
                 title="Show Resources"
               >
@@ -943,7 +954,7 @@ export default function App() {
                       data-testid="zoom-out"
                       aria-label="Zoom out"
                       disabled={!canZoomOut}
-                      onClick={() => handleUpdate({ assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, columnZoom: ZOOM_STEPS[idx - 1] }, resources, deliverableStatuses, decisions, rptiDetails })}
+                      onClick={() => handleUpdate({ assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, columnZoom: ZOOM_STEPS[idx - 1] }, resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails })}
                       className={cn(toggleClass(false), !canZoomOut && 'opacity-30 cursor-not-allowed')}
                       title="Zoom out"
                     >
@@ -953,7 +964,7 @@ export default function App() {
                       data-testid="zoom-in"
                       aria-label="Zoom in"
                       disabled={!canZoomIn}
-                      onClick={() => handleUpdate({ assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, columnZoom: ZOOM_STEPS[idx + 1] }, resources, deliverableStatuses, decisions, rptiDetails })}
+                      onClick={() => handleUpdate({ assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, columnZoom: ZOOM_STEPS[idx + 1] }, resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails })}
                       className={cn(toggleClass(false), !canZoomIn && 'opacity-30 cursor-not-allowed')}
                       title="Zoom in"
                     >
@@ -997,7 +1008,7 @@ export default function App() {
                               handleUpdate({
                                 assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories,
                                 timelineSettings: { ...timelineSettings, [key]: e.target.value },
-                                resources, deliverableStatuses, decisions, rptiDetails,
+                                resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails,
                               });
                             }}
                             className="px-1.5 py-1 bg-slate-50 border border-slate-200 rounded text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -1019,7 +1030,7 @@ export default function App() {
                             handleUpdate({
                               assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories,
                               timelineSettings: { ...timelineSettings, clusterName: e.target.value || undefined },
-                              resources, deliverableStatuses, decisions, rptiDetails,
+                              resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails,
                             });
                           }}
                           placeholder="e.g. Digital First Cluster"
@@ -1202,7 +1213,7 @@ export default function App() {
 
         {/* Data Controls (PDF, Export, Import) */}
         <DataControls
-          data={{ assets, deliverables, deliverableSegments, deliverableStatuses, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, versions, decisions, rptiDetails }}
+          data={{ assets, deliverables, deliverableSegments, deliverableStatuses, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, versions, decisions, rptiDetails, lkptiDetails }}
           onImport={handleUpdate}
           onError={setDbSaveError}
           timelineId={view === 'visualiser' ? 'timeline-visualiser' : undefined}
@@ -1293,7 +1304,7 @@ export default function App() {
               <input
                 type="date"
                 value={timelineSettings.startDate}
-                onChange={(e) => handleUpdate({ assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, startDate: e.target.value }, resources, deliverableStatuses, decisions, rptiDetails })}
+                onChange={(e) => handleUpdate({ assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, startDate: e.target.value }, resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails })}
                 className="px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
             </label>
@@ -1301,7 +1312,7 @@ export default function App() {
               Months
               <select
                 value={timelineSettings.monthsToShow || 36}
-                onChange={(e) => handleUpdate({ assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, monthsToShow: parseInt(e.target.value) as 3 | 6 | 12 | 24 | 36 }, resources, deliverableStatuses, decisions, rptiDetails })}
+                onChange={(e) => handleUpdate({ assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, monthsToShow: parseInt(e.target.value) as 3 | 6 | 12 | 24 | 36 }, resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails })}
                 className="px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
               >
                 <option value="3">3</option>
@@ -1322,7 +1333,7 @@ export default function App() {
                     <button
                       key={mode}
                       data-testid={`bucket-mode-${mode}`}
-                      onClick={() => handleUpdate({ assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, mobileBucketMode: mode }, resources, deliverableStatuses, decisions, rptiDetails })}
+                      onClick={() => handleUpdate({ assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, mobileBucketMode: mode }, resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails })}
                       className={cn(
                         'px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors',
                         active ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-slate-50 border-slate-200 text-slate-500'
@@ -1348,10 +1359,10 @@ export default function App() {
               );
               return (
                 <div className="flex flex-wrap gap-2">
-                  <button data-testid="mobile-toggle-conflicts" aria-pressed={conflictsOn} className={sheetToggleClass(conflictsOn)} onClick={() => handleUpdate({ assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, conflictDetection: conflictsOn ? 'off' : 'on' }, resources, deliverableStatuses, decisions, rptiDetails })}>Conflicts</button>
-                  <button data-testid="mobile-toggle-relationships" aria-pressed={relationshipsOn} className={sheetToggleClass(relationshipsOn)} onClick={() => handleUpdate({ assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, showRelationships: relationshipsOn ? 'off' : 'on' }, resources, deliverableStatuses, decisions, rptiDetails })}>Relationships</button>
-                  <button data-testid="mobile-toggle-descriptions" aria-pressed={descriptionsOn} className={sheetToggleClass(descriptionsOn)} onClick={() => handleUpdate({ assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, descriptionDisplay: descriptionsOn ? 'off' : 'on' }, resources, deliverableStatuses, decisions, rptiDetails })}>Descriptions</button>
-                  <button data-testid="mobile-toggle-budget" aria-pressed={budgetMode !== 'off'} className={sheetToggleClass(budgetMode !== 'off')} onClick={() => handleUpdate({ assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, budgetVisualisation: nextBudget }, resources, deliverableStatuses, decisions, rptiDetails })}>Budget: {budgetMode}</button>
+                  <button data-testid="mobile-toggle-conflicts" aria-pressed={conflictsOn} className={sheetToggleClass(conflictsOn)} onClick={() => handleUpdate({ assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, conflictDetection: conflictsOn ? 'off' : 'on' }, resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails })}>Conflicts</button>
+                  <button data-testid="mobile-toggle-relationships" aria-pressed={relationshipsOn} className={sheetToggleClass(relationshipsOn)} onClick={() => handleUpdate({ assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, showRelationships: relationshipsOn ? 'off' : 'on' }, resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails })}>Relationships</button>
+                  <button data-testid="mobile-toggle-descriptions" aria-pressed={descriptionsOn} className={sheetToggleClass(descriptionsOn)} onClick={() => handleUpdate({ assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, descriptionDisplay: descriptionsOn ? 'off' : 'on' }, resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails })}>Descriptions</button>
+                  <button data-testid="mobile-toggle-budget" aria-pressed={budgetMode !== 'off'} className={sheetToggleClass(budgetMode !== 'off')} onClick={() => handleUpdate({ assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: { ...timelineSettings, budgetVisualisation: nextBudget }, resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails })}>Budget: {budgetMode}</button>
                 </div>
               );
             })()}
@@ -1433,7 +1444,7 @@ export default function App() {
         ) : view === 'data' ? (
           <Suspense fallback={<LoadingFallback />}>
             <DataManager
-              data={{ assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails }}
+              data={{ assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails }}
               onUpdate={handleUpdate}
               onOpenTemplatePicker={() => { setTemplatePickerIsReset(true); setShowTemplatePicker(true); }}
               searchQuery={searchQuery}
@@ -1455,6 +1466,7 @@ export default function App() {
               deliverableSegments={deliverableSegments}
               deliverableStatuses={deliverableStatuses}
               rptiDetails={rptiDetails}
+              lkptiDetails={lkptiDetails}
               onSaveAsset={handleUpdateAsset}
             />
           </Suspense>
@@ -1525,7 +1537,7 @@ export default function App() {
                   handleUpdate({
                     assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories,
                     timelineSettings: { ...timelineSettings, hasSeenTutorial: true },
-                    resources, deliverableStatuses, decisions, rptiDetails,
+                    resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails,
                   });
                 }
               }} 
@@ -1569,6 +1581,7 @@ export default function App() {
             deliverableStatuses,
             decisions,
             rptiDetails,
+            lkptiDetails,
           }}
         />
       </ModalErrorBoundary>

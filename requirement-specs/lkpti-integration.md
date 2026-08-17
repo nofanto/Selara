@@ -1,10 +1,10 @@
-# Application Inventory Report Integration (LKPTI Format 3.2.6) — Design Notes
+# LKPTI Report Integration (Format 3.2.6) — Design Notes
 
-> **Status:** Decided, not yet implemented. This doc resolves all open design questions raised in [issue #4](https://github.com/nofanto/Selara/issues/4) — see `requirement-specs/application-inventory-schema.md` for the underlying field spec (unchanged by this doc). No code has been written yet; see "Next Step."
+> **Status:** Decided, not yet implemented. This doc resolves all open design questions raised in [issue #4](https://github.com/nofanto/Selara/issues/4) — see `requirement-specs/lkpti-schema.md` for the underlying field spec (unchanged by this doc). No code has been written yet; see "Next Step."
 
 ## Context and Problem Statement
 
-`requirement-specs/application-inventory-schema.md` specifies OJK's **LKPTI Format 3.2.6 — Daftar Aplikasi** (Application List), a second regulatory report distinct from RPTI (Format 3.1). Before any implementation, five design questions needed resolving:
+`requirement-specs/lkpti-schema.md` specifies OJK's **LKPTI Format 3.2.6 — Daftar Aplikasi** (Application List), a second regulatory report distinct from RPTI (Format 3.1). Before any implementation, five design questions needed resolving:
 
 1. A category-code label mismatch between that spec and the existing `rpti-schema.md`.
 2. How the 15 LKPTI fields map onto Selara's existing `Deliverable`/`AssetCategory`/`RptiDetail` data model.
@@ -18,15 +18,15 @@
 
 ### 1. Category code `09` label — fixed in `rpti-schema.md`
 
-**The mismatch:** `rpti-schema.md` glossed code `09` as *"AML-CFT and PPPSPM (payment system provider compliance)"*; `application-inventory-schema.md` glossed the same code as *"AML/CFT and CPF of WMD"* (Indonesian: *"APU-PPT dan PPPSPM"*).
+**The mismatch:** `rpti-schema.md` glossed code `09` as *"AML-CFT and PPPSPM (payment system provider compliance)"*; `lkpti-schema.md` glossed the same code as *"AML/CFT and CPF of WMD"* (Indonesian: *"APU-PPT dan PPPSPM"*).
 
-**Resolution:** `application-inventory-schema.md` was correct. **PPPSPM** stands for **P**encegahan **P**endanaan **P**roliferasi **S**enjata **P**emusnah **M**assal — "Prevention of Proliferation Financing of Weapons of Mass Destruction" — confirmed by OJK's own regulation **POJK 8/2023**, *"Penerapan Program APU, PPT, dan PPPSPM di Sektor Jasa Keuangan"* (and its 2025 successor SEOJK 16/SEOJK.07/2025), both titled around exactly this expansion. `rpti-schema.md`'s "(payment system provider compliance)" was a mistranslation of the acronym — there is no OJK program literally named that.
+**Resolution:** `lkpti-schema.md` was correct. **PPPSPM** stands for **P**encegahan **P**endanaan **P**roliferasi **S**enjata **P**emusnah **M**assal — "Prevention of Proliferation Financing of Weapons of Mass Destruction" — confirmed by OJK's own regulation **POJK 8/2023**, *"Penerapan Program APU, PPT, dan PPPSPM di Sektor Jasa Keuangan"* (and its 2025 successor SEOJK 16/SEOJK.07/2025), both titled around exactly this expansion. `rpti-schema.md`'s "(payment system provider compliance)" was a mistranslation of the acronym — there is no OJK program literally named that.
 
 **Change made:** `rpti-schema.md` code `09` now reads *"AML-CFT and PPPSPM (prevention of proliferation financing of weapons of mass destruction)"*, matching the confirmed meaning. `RPTI_CATEGORY_LABELS` in `src/lib/rpti.ts` already just says `'AML-CFT and PPPSPM'` with no expansion — no code change needed there.
 
 Sources: [POJK 8/2023](https://www.ojk.go.id/id/regulasi/Documents/Pages/POJK-APU-PPT-dan-PPPSPM-di-SJK/POJK%208-2023%20-%20APU%20PPT%20dan%20PPPSPM%20di%20SJK.pdf), [FAQ — POJK 8/2023](https://www.ojk.go.id/id/regulasi/Documents/Pages/POJK-APU-PPT-dan-PPPSPM-di-SJK/FAQ%20POJK%208%20TAHUN%202023%20-%20PENERAPAN%20PROGRAM%20APU%20PPT%20DAN%20PPSPM%20DI%20SJK.pdf).
 
-### 2. Data model shape — new `ApplicationInventoryDetail` entity, not an extended `Deliverable`
+### 2. Data model shape — new `LkptiDetail` entity, not an extended `Deliverable`
 
 Of the 15 LKPTI fields, 4 already exist as cascading defaults on `Deliverable`/`AssetCategory` (added for RPTI): `categoryCode`, `developer`, `dcCity`/`dcCountry`, `drCity`/`drCountry`. The other 10 are net-new: `platform`, `database`, `dc_provider`, `drc_provider`, `backup_strategy`, `system_owner`, `go_live_date`, `ownership`, `function_description` (`row_number` is presentational only — a sequential export-time index, not a stored field).
 
@@ -36,7 +36,7 @@ Of the 15 LKPTI fields, 4 already exist as cascading defaults on `Deliverable`/`
 export type BackupStrategy = 'HA_ACTIVE_ACTIVE' | 'HA_ACTIVE_PASSIVE' | 'BACKUP_REALTIME' | 'BACKUP_PERIODIC';
 export type Ownership = 'LEASE' | 'OUTRIGHT_PURCHASE';
 
-export interface ApplicationInventoryDetail {
+export interface LkptiDetail {
   id: string;
   targetId: string;                  // Deliverable.id — LKPTI 3.2.6 is scoped to applications, unlike RptiDetail which also targets bare Assets
   categoryCode?: RptiCategoryCode;    // Cascades: this row's value ?? Deliverable.categoryCode ?? AssetCategory.categoryCode
@@ -65,7 +65,7 @@ export interface ApplicationInventoryDetail {
 
 ### 3. Row generation rule — live Deliverables only, no year-scoping
 
-**Decision:** one row per `Deliverable` (`type: 'application'`, or `undefined` which is treated as `'application'`) that has at least one `DeliverableSegment` classified `'live'` (in-production) by `classifySegmentKind()` — mirroring the helper `rpti.ts` already uses for its own "has this deliverable gone live" check. Unlike RPTI generation, this is **not scoped to a report year**: LKPTI 3.2.6 is a point-in-time inventory of what's currently running, not a plan of activity within a year, so "Generate Application Inventory Rows" always wipes and rebuilds from current Deliverable/DeliverableSegment state (same wipe-and-rebuild semantics as RPTI generation, minus the year parameter).
+**Decision:** one row per `Deliverable` (`type: 'application'`, or `undefined` which is treated as `'application'`) that has at least one `DeliverableSegment` classified `'live'` (in-production) by `classifySegmentKind()` — mirroring the helper `rpti.ts` already uses for its own "has this deliverable gone live" check. Unlike RPTI generation, this is **not scoped to a report year**: LKPTI 3.2.6 is a point-in-time inventory of what's currently running, not a plan of activity within a year, so "Generate LKPTI Rows" always wipes and rebuilds from current Deliverable/DeliverableSegment state (same wipe-and-rebuild semantics as RPTI generation, minus the year parameter).
 
 **Why:** the schema's own validation rule 5.3 — *"`go_live_date` must ... not be in the future relative to the reporting period end date"* — only makes sense if every row already represents an application that has actually gone live. Including still-planned/funded-but-not-live deliverables would produce rows that fail the schema's own validation until they go live, requiring manual pruning later. Requiring a live segment upfront keeps every generated row valid by construction.
 
@@ -76,14 +76,14 @@ export interface ApplicationInventoryDetail {
 ### 4. Report UI placement — mirror the RPTI Data Manager tab + Reports card pattern
 
 **Decision:** exactly the twin-surface pattern RPTI already established, not a new pattern:
-- **Data Manager** gets a new `'applicationInventory'` tab (label "Application Inventory" or "LKPTI 3.2.6") with a "Generate Application Inventory Rows" button (→ the rule in §3) and an `EditableTable` for manual edits afterward — same shape as the existing `'rpti'` tab (`src/components/DataManager.tsx`).
-- **Reports view** gets a new `'application-inventory'` `ReportSlug` and card, rendering a new `ApplicationInventoryReportView` component — a read-only summary table + "Export to Excel" button, structurally identical to `RptiReportView.tsx`.
+- **Data Manager** gets a new `'lkpti'` tab (label "LKPTI") with a "Generate LKPTI Rows" button (→ the rule in §3) and an `EditableTable` for manual edits afterward — same shape as the existing `'rpti'` tab (`src/components/DataManager.tsx`).
+- **Reports view** gets a new `'lkpti'` `ReportSlug` and card, rendering a new `LkptiReportView` component — a read-only summary table + "Export to Excel" button, structurally identical to `RptiReportView.tsx`.
 
 **Why:** Selara already has exactly one precedent for "a regulatory report backed by a generated, editable entity" (RPTI), and it's a good fit — reusing it outright avoids inventing a second UI pattern for what's structurally the same kind of feature (generate → edit → export).
 
-### 5. Export wiring — dedicated exporter in a new `src/lib/applicationInventory.ts`
+### 5. Export wiring — dedicated exporter in a new `src/lib/lkpti.ts`
 
-**Decision:** a new `exportApplicationInventoryToExcel()` function, co-located with the generation logic in `src/lib/applicationInventory.ts` (mirroring `rpti.ts`, which houses both `generateRptiDetails()` and `exportRptiReportToExcel()` together). It builds a single-sheet workbook using `XLSX.utils.aoa_to_sheet()` with the exact Indonesian header row and 1–15 column order mandated by `application-inventory-schema.md` §8, downloaded as `application-inventory-<date>.xlsx` — the same shape as `exportRptiReportToExcel()`, not routed through the general multi-entity `src/lib/excel.ts` workbook exporter (RPTI's report export isn't either — it's a separate, self-contained single-report download, and this report should follow the same convention for consistency).
+**Decision:** a new `exportLkptiReportToExcel()` function, co-located with the generation logic in `src/lib/lkpti.ts` (mirroring `rpti.ts`, which houses both `generateRptiDetails()` and `exportRptiReportToExcel()` together). It builds a single-sheet workbook using `XLSX.utils.aoa_to_sheet()` with the exact Indonesian header row and 1–15 column order mandated by `lkpti-schema.md` §8, downloaded as `lkpti-report-<date>.xlsx` — the same shape as `exportRptiReportToExcel()`, not routed through the general multi-entity `src/lib/excel.ts` workbook exporter (RPTI's report export isn't either — it's a separate, self-contained single-report download, and this report should follow the same convention for consistency).
 
 ---
 
@@ -95,4 +95,8 @@ export interface ApplicationInventoryDetail {
 
 ## Next Step
 
-All design questions are resolved — proceed to Step 1 of the standard lifecycle. This is primarily **pure logic** (`src/lib/applicationInventory.ts`: the entity type, `generateApplicationInventoryDetails()`, `suggestGoLiveDate()`, `exportApplicationInventoryToExcel()` — no DOM dependency) — the primary test is a **Vitest unit test**, written Red before implementation, following the same pattern as `src/lib/rpti.test.ts`. The Data Manager tab and Reports card/view that follow are UI-facing and separately need Playwright E2E tests per the usual rule.
+All design questions are resolved — proceed to Step 1 of the standard lifecycle. This is primarily **pure logic** (`src/lib/lkpti.ts`: the entity type, `generateLkptiDetails()`, `suggestGoLiveDate()`, `exportLkptiReportToExcel()` — no DOM dependency) — the primary test is a **Vitest unit test**, written Red before implementation, following the same pattern as `src/lib/rpti.test.ts`. The Data Manager tab and Reports card/view that follow are UI-facing and separately need Playwright E2E tests per the usual rule.
+
+## Implemented
+
+See [ADR-0007](../docs/adr/0007-lkpti-report.md) for the final data-model record and [User Story 19](../docs/user-stories/19-lkpti-report.md) for the acceptance criteria. Covered by `src/lib/lkpti.test.ts` and `e2e/lkpti-report.spec.ts`.

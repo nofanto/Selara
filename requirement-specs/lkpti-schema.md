@@ -1,4 +1,4 @@
-# Application Inventory Schema (LKPTI Format 3.2.6)
+# LKPTI Report Schema (Format 3.2.6)
 
 Source: OJK LKPTI reporting template, **Format 3.2.6 — Daftar Aplikasi** ("Application List").
 This document is the English-language specification for a single row of the application inventory.
@@ -94,8 +94,8 @@ This document is the English-language specification for a single row of the appl
 ```json
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://example.org/schemas/lkpti-application-inventory.json",
-  "title": "LKPTI Format 3.2.6 Application Inventory",
+  "$id": "https://example.org/schemas/lkpti-report.json",
+  "title": "LKPTI Format 3.2.6 Report",
   "type": "object",
   "required": ["applications"],
   "properties": {
