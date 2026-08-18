@@ -55,6 +55,7 @@ export interface DeliverableStatus {
   name: string;
   color: string;
   isLiveStatus?: boolean; // Marks this status as "live/in production" — used to auto-derive RPTI planned implementation quarter
+  isPreLaunchStatus?: boolean; // Marks this status as "planned/funded" pre-launch work — RPTI generation's allow-list, see requirement-specs/rpti-auto-generation.md
 }
 
 /**

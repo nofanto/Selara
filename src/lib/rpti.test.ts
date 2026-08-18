@@ -161,6 +161,46 @@ describe('generateRptiDetails', () => {
     expect(rows).toHaveLength(0);
   });
 
+  it('excludes a segment with an unrecognized custom status — generation is an allow-list, not a deny-list', () => {
+    const customStatuses = [...statuses, { id: 'appstatus-cancelled', name: 'Cancelled', color: 'red' }];
+    const segments = [makeSegment({ status: 'appstatus-cancelled' })];
+    const rows = generateRptiDetails(makeContext({ deliverableSegments: segments, deliverableStatuses: customStatuses }), 2026);
+
+    expect(rows).toHaveLength(0);
+  });
+
+  it('trusts an explicit isPreLaunchStatus flag over the default id/name fallback', () => {
+    const customStatuses = [
+      { id: 'appstatus-in-production', name: 'In Production', color: 'green', isLiveStatus: true },
+      { id: 'status-custom-approved', name: 'Budget Approved', color: 'blue', isPreLaunchStatus: true },
+    ];
+    const segments = [makeSegment({ status: 'status-custom-approved' })];
+    const rows = generateRptiDetails(makeContext({ deliverableSegments: segments, deliverableStatuses: customStatuses }), 2026);
+
+    expect(rows).toHaveLength(1);
+  });
+
+  it('stops guessing from id/name once any status has isPreLaunchStatus explicitly set', () => {
+    const customStatuses = [
+      { id: 'appstatus-planned', name: 'Planned', color: 'slate' }, // no explicit flag
+      { id: 'status-custom-approved', name: 'Budget Approved', color: 'blue', isPreLaunchStatus: true },
+    ];
+    const segments = [makeSegment({ status: 'appstatus-planned' })];
+    const rows = generateRptiDetails(makeContext({ deliverableSegments: segments, deliverableStatuses: customStatuses }), 2026);
+
+    // Once the workspace has opted in explicitly anywhere, the unflagged "Planned" id no
+    // longer qualifies via fallback guessing.
+    expect(rows).toHaveLength(0);
+  });
+
+  it('excludes a segment linked to a placeholder Initiative', () => {
+    const initiatives = [makeInitiative({ isPlaceholder: true })];
+    const segments = [makeSegment()];
+    const rows = generateRptiDetails(makeContext({ deliverableSegments: segments, initiatives }), 2026);
+
+    expect(rows).toHaveLength(0);
+  });
+
   it('excludes segments entirely outside the report year (no overlap)', () => {
     const segments = [makeSegment({ id: 'seg-2025', startDate: '2025-06-01', endDate: '2025-07-01' })];
     const rows = generateRptiDetails(makeContext({ deliverableSegments: segments }), 2026);

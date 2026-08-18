@@ -55,6 +55,28 @@ test.describe('Deliverable segment visual distinction & status management', () =
     }
   });
 
+  // AC6: Live?/Pre-Launch? checkbox columns exist and reflect the demo data's RPTI generation flags
+  test('App Statuses tab shows Live? and Pre-Launch? checkbox columns, checked for the right statuses', async ({ page }) => {
+    await page.getByTestId('nav-data-manager').click();
+    await page.getByTestId('data-manager-tab-deliverableStatuses').click();
+
+    const table = page.getByTestId('data-manager');
+    await expect(table.locator('th').filter({ hasText: 'Live?' })).toBeVisible();
+    await expect(table.locator('th').filter({ hasText: 'Pre-Launch?' })).toBeVisible();
+
+    const rowFor = (name: string) => table.locator('tbody tr').filter({ has: page.locator(`td[data-key="name"] input[value="${name}"]`) });
+
+    await expect(rowFor('In Production').locator('td[data-key="isLiveStatus"] input[type="checkbox"]')).toBeChecked();
+    await expect(rowFor('In Production').locator('td[data-key="isPreLaunchStatus"] input[type="checkbox"]')).not.toBeChecked();
+
+    await expect(rowFor('Planned').locator('td[data-key="isPreLaunchStatus"] input[type="checkbox"]')).toBeChecked();
+    await expect(rowFor('Funded').locator('td[data-key="isPreLaunchStatus"] input[type="checkbox"]')).toBeChecked();
+    await expect(rowFor('Planned').locator('td[data-key="isLiveStatus"] input[type="checkbox"]')).not.toBeChecked();
+
+    await expect(rowFor('Sunset').locator('td[data-key="isLiveStatus"] input[type="checkbox"]')).not.toBeChecked();
+    await expect(rowFor('Sunset').locator('td[data-key="isPreLaunchStatus"] input[type="checkbox"]')).not.toBeChecked();
+  });
+
   // AC5: Renaming a status updates the label on segment bars
   test('renaming a status in Data Manager updates segment bar labels', async ({ page }) => {
     await page.getByTestId('nav-data-manager').click();

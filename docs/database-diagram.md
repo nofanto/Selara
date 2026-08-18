@@ -72,6 +72,7 @@ erDiagram
         string name
         string color
         boolean isLiveStatus "marks this status as live/in-production"
+        boolean isPreLaunchStatus "marks this status as planned/funded pre-launch work — RPTI generation's allow-list"
     }
 
     RESOURCE {
@@ -307,6 +308,7 @@ Schema evolution is handled in the `upgrade()` callback of `openDB<ITMapDB>()` i
 - **v18:** Currency became a single workspace-wide fact (`SETTINGS.defaultCurrency`) instead of a per-row one — `RptiDetail.capexCurrency`, `opexCurrency`, `capexIdrEquivalent`, and `opexIdrEquivalent` were removed from the type. Existing `rptiDetails` records with any of those four fields set have them stripped in place (read-all/rewrite-all, same pattern as v16). `AssetCategory` and `Deliverable` both gained new optional auto-fill fields (`categoryCode`, `dcCity`/`dcCountry`/`drCity`/`drCountry`; `Deliverable` additionally `developer`) — additive, no migration needed. See [ADR-0006](adr/0006-rpti-auto-fill-and-single-currency.md).
 - **v19:** Added the `lkptiDetails` store (no seeding) to support the LKPTI Format 3.2.6 Report — additive, no data migration needed. See `requirement-specs/lkpti-integration.md`.
 - **No version bump:** `Deliverable` gained a new optional `description` field, cascading into `LkptiDetail.functionDescription` at generation time — additive field on an existing store, no schema/index change. See [ADR-0008](adr/0008-deliverable-description-field.md).
+- **No version bump:** `DeliverableStatus` gained a new optional `isPreLaunchStatus` field, flipping RPTI generation's status classification from a deny-list to an allow-list — additive field on an existing store, no schema/index change. See [ADR-0009](adr/0009-rpti-status-allow-list.md).
 
 ## Source of Truth
 

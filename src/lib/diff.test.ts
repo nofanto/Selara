@@ -159,6 +159,22 @@ describe('computeDiff', () => {
     ]);
   });
 
+  it('reports deliverable status flag changes', () => {
+    const base = makeVersion({
+      deliverableStatuses: [{ id: 'status-planned', name: 'Planned', color: 'slate' }],
+    });
+    const current = {
+      ...base.data,
+      deliverableStatuses: [{ id: 'status-planned', name: 'Planned', color: 'slate', isPreLaunchStatus: true }],
+    };
+
+    const diff = computeDiff(base, current);
+
+    expect(diff.deliverableStatuses.modified).toEqual([
+      { name: 'Planned', changes: ['Pre-launch status flag: off → on'] },
+    ]);
+  });
+
   it('reports resource role changes', () => {
     const base = makeVersion({
       resources: [{ id: 'res-1', name: 'Jane Smith', role: 'Business Analyst' }],

@@ -597,9 +597,9 @@ export const demoResources: Resource[] = [
 ];
 
 export const demoDeliverableStatuses: DeliverableStatus[] = [
-    { id: 'appstatus-planned',        name: 'Planned',          color: 'bg-slate-400' },
-    { id: 'appstatus-funded',         name: 'Funded',           color: 'bg-blue-400' },
-    { id: 'appstatus-in-production',  name: 'In Production',    color: 'bg-emerald-500' },
+    { id: 'appstatus-planned',        name: 'Planned',          color: 'bg-slate-400', isPreLaunchStatus: true },
+    { id: 'appstatus-funded',         name: 'Funded',           color: 'bg-blue-400', isPreLaunchStatus: true },
+    { id: 'appstatus-in-production',  name: 'In Production',    color: 'bg-emerald-500', isLiveStatus: true },
     { id: 'appstatus-sunset',         name: 'Sunset',           color: 'bg-amber-500' },
     { id: 'appstatus-out-of-support', name: 'Out of Support',   color: 'bg-orange-500' },
     { id: 'appstatus-retired',        name: 'Retired',          color: 'bg-slate-300' },
