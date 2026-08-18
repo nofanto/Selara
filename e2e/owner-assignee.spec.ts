@@ -68,7 +68,7 @@ test.describe('Owner / Assignee', () => {
   });
 
   test('owner badges appear for initiatives with ownerId set', async ({ page }) => {
-    // All initiative bars (including GEANZ catalogue bars) render owner badges when ownerId is set.
+    // All initiative bars (including RPTI catalogue bars) render owner badges when ownerId is set.
     // We verify at least one badge is visible and all badges show 1–2 uppercase initials.
     const badges = page.locator('[data-testid="owner-badge"]');
     await expect(badges.first()).toBeVisible();

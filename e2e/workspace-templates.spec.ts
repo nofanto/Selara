@@ -4,10 +4,10 @@ import { test, expect } from '@playwright/test';
  * User Story 15: Workspace Templates (Multi-Taxonomy Support)
  *
  * AC1: TemplatePickerModal shown on first load (empty DB, no scenia-e2e flag)
- * AC2: Modal shows 3 template cards: geanz, viewer, blank
- * AC4: GEANZ template loads GEANZ demo portfolio; GEANZ section visible
+ * AC2: Modal shows 3 template cards: rpti, viewer, blank
+ * AC4: RPTI catalogue template loads RPTI demo portfolio; catalogue section visible
  * AC5: Viewer card has single "Upload file" button; triggers file chooser; closes picker after import
- * AC6: Blank template loads empty workspace; GEANZ section hidden
+ * AC6: Blank template loads empty workspace; catalogue section hidden
  * AC7: Template picker NOT shown in E2E mode (scenia-e2e flag)
  * AC8: Template picker NOT shown on subsequent loads (non-empty DB)
  */
@@ -51,22 +51,22 @@ test.describe('Workspace Templates', () => {
     await page.goto('/');
     await simulateFirstRun(page);
     await page.waitForSelector('[data-testid="template-picker-modal"]', { timeout: 20000 });
-    await expect(page.getByTestId('template-card-geanz')).toBeVisible();
+    await expect(page.getByTestId('template-card-rpti')).toBeVisible();
     await expect(page.getByTestId('template-card-viewer')).toBeVisible();
     await expect(page.getByTestId('template-card-blank')).toBeVisible();
     // Mixed card must no longer exist
     await expect(page.getByTestId('template-card-mixed')).not.toBeVisible();
   });
 
-  // AC4: GEANZ template
-  test('AC4: GEANZ template loads demo portfolio and shows GEANZ section', async ({ page }) => {
+  // AC4: RPTI catalogue template
+  test('AC4: RPTI catalogue template loads demo portfolio and shows catalogue section', async ({ page }) => {
     await page.goto('/');
     await simulateFirstRun(page);
     await page.waitForSelector('[data-testid="template-picker-modal"]', { timeout: 20000 });
-    await page.getByTestId('template-select-with-demo-btn-geanz').click();
+    await page.getByTestId('template-select-with-demo-btn-rpti').click();
     await page.waitForSelector('[data-testid="asset-row-content"]', { timeout: 20000 });
-    // GEANZ section must be visible
-    await expect(page.getByTestId('geanz-section')).toBeVisible();
+    // Catalogue section must be visible
+    await expect(page.getByTestId('rpti-catalogue-section')).toBeVisible();
   });
 
   // AC5: Viewer mode
@@ -127,7 +127,7 @@ test.describe('Workspace Templates', () => {
   });
 
   // AC6: Blank template
-  test('AC6: Blank template loads empty workspace; GEANZ section hidden', async ({ page }) => {
+  test('AC6: Blank template loads empty workspace; catalogue section hidden', async ({ page }) => {
     await page.goto('/');
     await simulateFirstRun(page);
     await page.waitForSelector('[data-testid="template-picker-modal"]', { timeout: 20000 });
@@ -138,13 +138,13 @@ test.describe('Workspace Templates', () => {
     await expect(page.getByTestId('nav-visualiser')).toBeVisible();
     // No asset swimlanes
     await expect(page.locator('[data-testid="asset-row-content"]')).toHaveCount(0);
-    // GEANZ section hidden
-    await expect(page.getByTestId('geanz-section')).not.toBeVisible();
+    // Catalogue section hidden
+    await expect(page.getByTestId('rpti-catalogue-section')).not.toBeVisible();
   });
 
   // AC8: picker not shown on subsequent loads
   test('AC8: template picker not shown when DB already has data', async ({ page }) => {
-    // Load with GEANZ (default E2E behavior) — DB is populated
+    // Load with the RPTI catalogue (default E2E behavior) — DB is populated
     await page.goto('/');
     await page.waitForSelector('[data-testid="asset-row-content"]', { timeout: 20000 });
     // Remove the scenia-e2e flag — but DB is non-empty now

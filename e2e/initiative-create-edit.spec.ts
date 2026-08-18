@@ -6,7 +6,7 @@ import { test, expect, Page } from '@playwright/test';
 // AC2: Opening a saved initiative shows the Delete Initiative button
 // AC3: The new initiative appears in the Data Manager initiatives table
 
-async function loadGeanzWithDemo(page: Page) {
+async function loadRptiWithDemo(page: Page) {
   await page.goto('/');
   await page.evaluate(async () => {
     await new Promise<void>((resolve) => {
@@ -20,7 +20,7 @@ async function loadGeanzWithDemo(page: Page) {
   });
   await page.reload();
   await page.waitForSelector('[data-testid="template-picker-modal"]', { timeout: 20000 });
-  await page.getByTestId('template-select-with-demo-btn-geanz').click();
+  await page.getByTestId('template-select-with-demo-btn-rpti').click();
   await page.waitForSelector('[data-testid="asset-row-content"]', { timeout: 20000 });
   const tutorialModal = page.getByTestId('tutorial-modal');
   if (await tutorialModal.isVisible()) {
@@ -59,7 +59,7 @@ async function createInitiativeViaDoubleClick(page: Page): Promise<string> {
 
 test.describe('US-BUG-01: Newly created initiative edit mode', () => {
   test.beforeEach(async ({ page }) => {
-    await loadGeanzWithDemo(page);
+    await loadRptiWithDemo(page);
   });
 
   test('AC1: re-opening a saved new initiative shows "Edit Initiative" title', async ({ page }) => {

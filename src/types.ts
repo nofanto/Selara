@@ -134,8 +134,7 @@ export interface Asset {
   name: string;
   categoryId: string;
   maturity?: number; // 1–5: Emergent → Optimised. Omitted means unrated.
-  alias?: string;      // GEANZ alias code, e.g. "TAP.16.01" — present only on GEANZ-sourced assets
-  externalId?: string; // GEANZ GUID — used for idempotent re-import
+  externalId?: string; // Stable external identifier — used for idempotent re-import and catalogue dedup
 }
 
 export type DeliverableType = 'application' | 'infrastructure' | 'document' | 'procedure' | 'other';
@@ -241,7 +240,7 @@ export interface TimelineSettings {
   showResources?: 'on' | 'off';
   display?: 'both' | 'initiatives' | 'deliverables';
   templateId?: string;           // Which workspace template was selected on first load
-  showGeanzCatalogue?: boolean;  // When false, the GEANZ catalogue section is hidden (default: true)
+  showRptiCatalogue?: boolean;   // When false, the RPTI asset catalogue section is hidden (default: true)
   clusterName?: string;          // Agency cluster name — shown in the timeline header
   defaultCurrency?: string;      // Single workspace-wide currency for RptiDetail.capexAmount/opexAmount, e.g. 'USD', 'IDR'
 }

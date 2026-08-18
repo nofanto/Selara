@@ -143,7 +143,7 @@ test.describe('Data Manager — reset buttons', () => {
   test('delete table rows clears only the active tab', async ({ page }) => {
     const rows = page.locator('table tbody tr');
     const initCount = await rows.count();
-    expect(initCount).toBe(49); // 22 original + 26 GEANZ + 1 ghost
+    expect(initCount).toBe(49); // 22 original + 26 RPTI catalogue + 1 ghost
 
     await page.getByRole('button', { name: 'Delete all rows for this table' }).click();
     await page.locator(CONFIRM).click();
@@ -169,12 +169,12 @@ test.describe('Data Manager — reset buttons', () => {
     }
   });
 
-  test('"Clear data and start again" with GEANZ demo data repopulates', async ({ page }) => {
+  test('"Clear data and start again" with RPTI catalogue demo data repopulates', async ({ page }) => {
     await page.getByTestId('clear-and-start-again-btn').click();
     await expect(page.getByTestId('template-picker-modal')).toBeVisible();
-    await page.getByTestId('template-select-with-demo-btn-geanz').click();
+    await page.getByTestId('template-select-with-demo-btn-rpti').click();
 
     const count = await page.locator('table tbody tr').count();
-    expect(count).toBe(49); // 22 original + 26 GEANZ + 1 ghost
+    expect(count).toBe(49); // 22 original + 26 RPTI catalogue + 1 ghost
   });
 });

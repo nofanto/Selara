@@ -237,10 +237,10 @@ export default function App() {
         setVersions(loadedVersions);
 
         // If the workspace has no user-authored data yet, show the template picker
-        // (or auto-load GEANZ in E2E mode).
+        // (or auto-load the RPTI catalogue template in E2E mode).
         if (isWorkspaceEmpty(dbData)) {
           if (localStorage.getItem('scenia-e2e')) {
-            // E2E mode: auto-load GEANZ template so existing tests keep working
+            // E2E mode: auto-load the RPTI catalogue template so existing tests keep working
             const defaults: AppState = {
               assets: initialAssets,
               deliverables: initialDeliverables,

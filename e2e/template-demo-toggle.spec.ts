@@ -11,7 +11,7 @@ import { test, expect } from '@playwright/test';
  * AC6: "Without demo data" loads only asset categories and assets — no initiatives, milestones, or segments
  * AC7: First-time onboarding flow shows the updated template picker (with/without demo data buttons)
  * AC8: After selecting a template during first run, the tutorial modal is shown
- * AC9: E2E mode is unchanged (auto-loads GEANZ with demo data, suppresses picker)
+ * AC9: E2E mode is unchanged (auto-loads the RPTI catalogue with demo data, suppresses picker)
  */
 
 async function simulateFirstRun(page: import('@playwright/test').Page) {
@@ -64,7 +64,7 @@ test.describe('US-18: Template Demo Data Toggle', () => {
     await simulateFirstRun(page);
     await page.waitForSelector('[data-testid="template-picker-modal"]', { timeout: 20000 });
 
-    for (const templateId of ['geanz']) {
+    for (const templateId of ['rpti']) {
       await expect(page.getByTestId(`template-select-with-demo-btn-${templateId}`)).toBeVisible();
       await expect(page.getByTestId(`template-select-no-demo-btn-${templateId}`)).toBeVisible();
     }
@@ -82,11 +82,11 @@ test.describe('US-18: Template Demo Data Toggle', () => {
   });
 
   // ── AC5 ──────────────────────────────────────────────────────────────────
-  test('AC5: GEANZ "With demo data" loads categories, assets, initiatives, and segments', async ({ page }) => {
+  test('AC5: RPTI catalogue "With demo data" loads categories, assets, initiatives, and segments', async ({ page }) => {
     await page.goto('/');
     await simulateFirstRun(page);
     await page.waitForSelector('[data-testid="template-picker-modal"]', { timeout: 20000 });
-    await page.getByTestId('template-select-with-demo-btn-geanz').click();
+    await page.getByTestId('template-select-with-demo-btn-rpti').click();
 
     await page.waitForSelector('[data-testid="asset-row-content"]', { timeout: 20000 });
 
@@ -100,11 +100,11 @@ test.describe('US-18: Template Demo Data Toggle', () => {
   });
 
   // ── AC6 ──────────────────────────────────────────────────────────────────
-  test('AC6: GEANZ "Without demo data" loads only categories and assets — no initiatives or segments', async ({ page }) => {
+  test('AC6: RPTI catalogue "Without demo data" loads only categories and assets — no initiatives or segments', async ({ page }) => {
     await page.goto('/');
     await simulateFirstRun(page);
     await page.waitForSelector('[data-testid="template-picker-modal"]', { timeout: 20000 });
-    await page.getByTestId('template-select-no-demo-btn-geanz').click();
+    await page.getByTestId('template-select-no-demo-btn-rpti').click();
 
     await page.waitForSelector('[data-testid="asset-row-content"]', { timeout: 20000 });
 
@@ -124,8 +124,8 @@ test.describe('US-18: Template Demo Data Toggle', () => {
     await page.waitForSelector('[data-testid="template-picker-modal"]', { timeout: 20000 });
 
     // The updated dual-button structure must appear in the first-run context too
-    await expect(page.getByTestId('template-select-with-demo-btn-geanz')).toBeVisible();
-    await expect(page.getByTestId('template-select-no-demo-btn-geanz')).toBeVisible();
+    await expect(page.getByTestId('template-select-with-demo-btn-rpti')).toBeVisible();
+    await expect(page.getByTestId('template-select-no-demo-btn-rpti')).toBeVisible();
     await expect(page.getByTestId('template-start-blank-btn')).toBeVisible();
   });
 
@@ -135,7 +135,7 @@ test.describe('US-18: Template Demo Data Toggle', () => {
     // Fresh DB means hasSeenTutorial = false, so tutorial auto-opens after template selection
     await simulateFirstRun(page);
     await page.waitForSelector('[data-testid="template-picker-modal"]', { timeout: 20000 });
-    await page.getByTestId('template-select-with-demo-btn-geanz').click();
+    await page.getByTestId('template-select-with-demo-btn-rpti').click();
 
     // Tutorial modal must appear (identified by its data-testid added in implementation)
     await expect(page.getByTestId('tutorial-modal')).toBeVisible({ timeout: 10000 });

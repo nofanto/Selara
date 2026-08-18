@@ -57,7 +57,7 @@
 
 ### Timeline.tsx — Unified Grouping and Colouring
 
-The `groupBy` feature is currently implemented as separate rendering branches in `Timeline.tsx`. Each branch independently filters initiatives, calls `layoutAsset()`, and renders initiative bars — meaning a fix or improvement made in one branch (e.g. `asset`) does not automatically apply to the others (`programme`, `strategy`, GEANZ). There are also multiple copies of the colour-selection logic.
+The `groupBy` feature is currently implemented as separate rendering branches in `Timeline.tsx`. Each branch independently filters initiatives, calls `layoutAsset()`, and renders initiative bars — meaning a fix or improvement made in one branch (e.g. `asset`) does not automatically apply to the others (`programme`, `strategy`, RPTI catalogue). There are also multiple copies of the colour-selection logic.
 
 The refactor below consolidates all groupBy modes into a single rendering path.
 
@@ -94,7 +94,7 @@ The refactor below consolidates all groupBy modes into a single rendering path.
   ```
 - For `programme` / `strategy`: each group maps directly to one `GroupRow`.
 - For `asset`: each asset under each category becomes a `GroupRow` (preserving the existing category-header structure as a separate pass).
-- The GEANZ catalogue rows become `GroupRow` entries with `isGeanz: true`.
+- The RPTI catalogue rows become `GroupRow` entries with `isRptiCatalogue: true`.
 
 #### Step 4 — Extract `<InitiativeSwimLane>` component
 
@@ -108,11 +108,11 @@ The refactor below consolidates all groupBy modes into a single rendering path.
 - The component calls `layoutAsset()` (or `getAssetLayout()` for drag stability) internally.
 - The main JSX becomes a single `{groups.map(group => <InitiativeSwimLane ... />)}`.
 
-#### Step 5 — Fix GEANZ initiative bars to use `<InitiativeBar>`
+#### Step 5 — Fix RPTI catalogue initiative bars to use `<InitiativeBar>`
 
-- The GEANZ branch (lines ~2376–2387) renders initiative bars as raw `<div>` elements, bypassing `<InitiativeBar>` entirely.
+- The RPTI catalogue branch (in the "Indonesian Bank Technology Catalogue section" of `Timeline.tsx`) renders initiative bars as raw `<div>` elements, bypassing `<InitiativeBar>` entirely.
 - Replace with `<InitiativeBar>` — the same component used in every other branch.
-- This brings GEANZ bars into parity: resize handles, drag-to-relate, budget height, description display, critical path highlighting, and owner badges all start working for GEANZ initiatives automatically.
+- This brings RPTI catalogue bars into parity: resize handles, drag-to-relate, budget height, description display, critical path highlighting, and owner badges all start working for RPTI catalogue initiatives automatically.
 
 ---
 

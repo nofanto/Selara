@@ -39,8 +39,7 @@ erDiagram
         string categoryId FK
         string name
         int maturity
-        string alias
-        string externalId
+        string externalId "optional; stable id for idempotent re-import and catalogue dedup"
     }
 
     DELIVERABLE {
@@ -183,7 +182,7 @@ erDiagram
         string showResources "optional"
         string display "optional; 'both'/'initiatives'/'deliverables'"
         string templateId "optional; which workspace template was chosen"
-        boolean showGeanzCatalogue "optional, default true"
+        boolean showRptiCatalogue "optional, default true"
         string clusterName "optional"
         string defaultCurrency "optional; single workspace-wide currency for RptiDetail.capexAmount/opexAmount"
     }
@@ -294,24 +293,25 @@ There are three templates:
 
 | id | Name | Demo-data toggle? | Source data |
 |---|---|---|---|
-| `geanz` | GEANZ Technology Catalogue | Yes | [`src/demoData.ts`](../src/demoData.ts) |
+| `rpti` | Indonesian Bank Technology Catalogue | Yes | [`src/demoData.ts`](../src/demoData.ts) |
 | `viewer` | Viewer (upload & view a file) | No | none — empty shell, populated later from an imported Excel file |
 | `blank` | Blank | No | none — empty shell |
 
 Each template exercises a different *subset* of the schema described above. The diagrams below show, per template, exactly which stores get populated and which relationships are actually exercised — as opposed to the full schema diagram, which shows everything the app is *capable* of storing.
 
-No template pre-seeds `decisions` or `rptiDetails` — every template (`geanz`, `viewer`, `blank`, with or without demo data) sets both to `[]`. Decisions and RPTI report rows are user-authored records added after the workspace is set up, so they're omitted from the per-template diagrams below.
+No template pre-seeds `decisions` or `rptiDetails` — every template (`rpti`, `viewer`, `blank`, with or without demo data) sets both to `[]`. Decisions and RPTI report rows are user-authored records added after the workspace is set up, so they're omitted from the per-template diagrams below.
 
-### `geanz` — GEANZ Technology Catalogue (with demo data)
+### `rpti` — Indonesian Bank Technology Catalogue (with demo data)
 
 ```mermaid
 erDiagram
     ASSET_CATEGORY {
-        int count "6"
+        int count "24"
+        string breakdown "6 banking + 18 RPTI catalogue areas"
     }
     ASSET {
         int count "42"
-        string breakdown "16 banking + 26 GEANZ/TAP-catalogue"
+        string breakdown "16 banking + 26 RPTI catalogue"
     }
     PROGRAMME {
         int count "6"
@@ -327,7 +327,7 @@ erDiagram
     }
     DELIVERABLE {
         int count "17"
-        string breakdown "8 banking + 9 GEANZ"
+        string breakdown "8 banking + 9 RPTI catalogue"
     }
     DELIVERABLE_SEGMENT {
         int count "35"
@@ -340,7 +340,7 @@ erDiagram
     }
     MILESTONE {
         int count "14"
-        string breakdown "8 banking + 6 GEANZ"
+        string breakdown "8 banking + 6 RPTI catalogue"
     }
     DEPENDENCY {
         int count "9"
@@ -360,15 +360,15 @@ erDiagram
     INITIATIVE }o--o{ DEPENDENCY : "source/target"
 ```
 
-`timelineSettings.showGeanzCatalogue` is `true` in this template, which lets the user browse and add from the live 17-area / 140-asset-type GEANZ taxonomy in [`src/lib/geanzCatalogue.ts`](../src/lib/geanzCatalogue.ts) — that catalogue is rendered directly by the Timeline UI and is **not** seeded into IndexedDB.
+`timelineSettings.showRptiCatalogue` is `true` in this template, which lets the user browse and add from the live 18-area / 39-asset-type RPTI taxonomy in [`src/lib/rptiCatalogue.ts`](../src/lib/rptiCatalogue.ts) — `rptiCatalogueAreas` (the example asset lists) is rendered directly by the Timeline UI and is **not** seeded into IndexedDB, but `rptiCatalogueAssetCategories` (the 18 backing `AssetCategory` records) **is** seeded, so any Deliverable a user adds under a catalogue asset auto-classifies for RPTI reporting.
 
-### `geanz` — without demo data
+### `rpti` — without demo data
 
-Selecting `geanz` with the demo-data toggle off still seeds the lookup/config stores (categories, assets, programmes, strategies, statuses) but leaves all relationship-bearing record stores empty for the user to fill in:
+Selecting `rpti` with the demo-data toggle off still seeds the lookup/config stores (categories, assets, programmes, strategies, statuses) but leaves all relationship-bearing record stores empty for the user to fill in:
 
 | Store | Count |
 |---|---|
-| `assetCategories` | 6 |
+| `assetCategories` | 24 |
 | `assets` | 42 |
 | `programmes` | 6 |
 | `strategies` | 6 |
