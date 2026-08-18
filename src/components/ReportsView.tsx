@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Asset, Initiative, Dependency, Milestone, Version, Programme, Strategy, AssetCategory, Resource, Deliverable, DeliverableSegment, DeliverableStatus, RptiDetail } from '../types';
+import { Asset, Initiative, Dependency, Milestone, Version, Programme, Strategy, AssetCategory, Resource, Deliverable, DeliverableSegment, DeliverableStatus, RptiDetail, LkptiDetail } from '../types';
 import { getAllVersions } from '../lib/db';
 import { computeDiff, DiffResult } from '../lib/diff';
-import { History, DollarSign, GitBranch, Users, ChevronLeft, Grid, ClipboardList } from 'lucide-react';
+import { History, DollarSign, GitBranch, Users, ChevronLeft, Grid, ClipboardList, ListChecks } from 'lucide-react';
 import { MaturityHeatmap } from './MaturityHeatmap';
 import { AssetPanel } from './AssetPanel';
 import { RptiReportView } from './RptiReportView';
+import { LkptiReportView } from './LkptiReportView';
 
 interface ReportsViewProps {
   assets: Asset[];
@@ -21,10 +22,11 @@ interface ReportsViewProps {
   deliverableSegments?: DeliverableSegment[];
   deliverableStatuses?: DeliverableStatus[];
   rptiDetails?: RptiDetail[];
+  lkptiDetails?: LkptiDetail[];
   onSaveAsset?: (asset: Asset) => void;
 }
 
-type ReportSlug = 'version-history' | 'budget' | 'initiatives-dependencies' | 'capacity' | 'maturity-heatmap' | 'rpti';
+type ReportSlug = 'version-history' | 'budget' | 'initiatives-dependencies' | 'capacity' | 'maturity-heatmap' | 'rpti' | 'lkpti';
 
 
 function BackButton({ onBack }: { onBack: () => void }) {
@@ -87,7 +89,7 @@ function depSentence(dep: Dependency, src: Initiative, tgt: Initiative, perspect
   return `${src.name} and ${tgt.name} are related.`;
 }
 
-export function ReportsView({ assets, initiatives, milestones, dependencies, currentData, programmes, strategies, assetCategories, resources = [], deliverables = [], deliverableSegments = [], deliverableStatuses = [], rptiDetails = [], onSaveAsset }: ReportsViewProps) {
+export function ReportsView({ assets, initiatives, milestones, dependencies, currentData, programmes, strategies, assetCategories, resources = [], deliverables = [], deliverableSegments = [], deliverableStatuses = [], rptiDetails = [], lkptiDetails = [], onSaveAsset }: ReportsViewProps) {
   const [selectedReport, setSelectedReport] = useState<ReportSlug | null>(null);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [assetPanelOpen, setAssetPanelOpen] = useState(false);
@@ -152,6 +154,12 @@ export function ReportsView({ assets, initiatives, milestones, dependencies, cur
       icon: <ClipboardList size={28} className="text-teal-500" />,
       title: 'RPTI Report',
       description: 'Indonesian OJK IT Development Plan Report (Format 3.1) — track planned application and infrastructure development.',
+    },
+    {
+      slug: 'lkpti',
+      icon: <ListChecks size={28} className="text-fuchsia-500" />,
+      title: 'LKPTI Report',
+      description: 'Indonesian OJK LKPTI Application List (Format 3.2.6) — an inventory of currently live applications.',
     },
   ];
 
@@ -595,6 +603,27 @@ export function ReportsView({ assets, initiatives, milestones, dependencies, cur
             deliverableSegments={deliverableSegments}
             deliverableStatuses={deliverableStatuses}
             defaultCurrency={currentData.timelineSettings.defaultCurrency || 'USD'}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // ── LKPTI Report ─────────────────────────────────────────────
+  if (selectedReport === 'lkpti') {
+    return (
+      <div data-testid="report-view-lkpti" className="h-full overflow-y-auto p-6 bg-slate-50">
+        <div className="max-w-6xl mx-auto">
+          <BackButton onBack={() => setSelectedReport(null)} />
+          <div className="mb-6">
+            <h1 className="text-xl font-bold text-slate-800">LKPTI Report</h1>
+            <p className="text-sm text-slate-500 mt-1">
+              Indonesian OJK LKPTI Application List (Format 3.2.6) — an inventory of currently live applications.
+            </p>
+          </div>
+          <LkptiReportView
+            lkptiDetails={lkptiDetails}
+            deliverables={deliverables}
           />
         </div>
       </div>

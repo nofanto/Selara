@@ -1,5 +1,5 @@
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
-import { Asset, Deliverable, DeliverableSegment, DeliverableStatus, Decision, RptiDetail, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Version, Resource } from '../types';
+import { Asset, Deliverable, DeliverableSegment, DeliverableStatus, Decision, RptiDetail, LkptiDetail, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Version, Resource } from '../types';
 import { createSerialAsyncRunner } from './serialAsync';
 
 interface ITMapDB extends DBSchema {
@@ -63,10 +63,14 @@ interface ITMapDB extends DBSchema {
     key: string;
     value: RptiDetail;
   };
+  lkptiDetails: {
+    key: string;
+    value: LkptiDetail;
+  };
 }
 
 const DB_NAME = 'it-initiative-visualiser';
-const DB_VERSION = 18;
+const DB_VERSION = 19;
 
 let dbPromise: Promise<IDBPDatabase<ITMapDB>>;
 
@@ -214,6 +218,11 @@ export const initDB = () => {
             }
           }
         }
+        if (oldVersion < 19) {
+          if (!db.objectStoreNames.contains('lkptiDetails')) {
+            db.createObjectStore('lkptiDetails', { keyPath: 'id' });
+          }
+        }
       },
     });
   }
@@ -235,6 +244,7 @@ export const getAppData = async () => {
   const deliverableStatuses = db.objectStoreNames.contains('deliverableStatuses') ? await db.getAll('deliverableStatuses') : [];
   const decisions = db.objectStoreNames.contains('decisions') ? await db.getAll('decisions') : [];
   const rptiDetails = db.objectStoreNames.contains('rptiDetails') ? await db.getAll('rptiDetails') : [];
+  const lkptiDetails = db.objectStoreNames.contains('lkptiDetails') ? await db.getAll('lkptiDetails') : [];
 
   // Settings is not a standard list of entities, it's just one config object
   let settingsFromDb = null;
@@ -258,6 +268,7 @@ export const getAppData = async () => {
     deliverableStatuses,
     decisions,
     rptiDetails,
+    lkptiDetails,
   };
 };
 
@@ -277,9 +288,10 @@ const saveAppDataImpl = async (data: {
   versions?: Version[];
   decisions?: Decision[];
   rptiDetails?: RptiDetail[];
+  lkptiDetails?: LkptiDetail[];
 }) => {
   const db = await initDB();
-  const stores: ("assets" | "deliverables" | "deliverableSegments" | "deliverableStatuses" | "decisions" | "rptiDetails" | "initiatives" | "milestones" | "programmes" | "strategies" | "dependencies" | "assetCategories" | "settings" | "resources" | "versions")[] = [
+  const stores: ("assets" | "deliverables" | "deliverableSegments" | "deliverableStatuses" | "decisions" | "rptiDetails" | "lkptiDetails" | "initiatives" | "milestones" | "programmes" | "strategies" | "dependencies" | "assetCategories" | "settings" | "resources" | "versions")[] = [
     'assets', 'initiatives', 'milestones', 'programmes', 'strategies', 'dependencies', 'assetCategories'
   ];
   if (db.objectStoreNames.contains('settings')) {
@@ -302,6 +314,9 @@ const saveAppDataImpl = async (data: {
   }
   if (db.objectStoreNames.contains('rptiDetails')) {
     stores.push('rptiDetails');
+  }
+  if (db.objectStoreNames.contains('lkptiDetails')) {
+    stores.push('lkptiDetails');
   }
   if (data.versions && db.objectStoreNames.contains('versions')) {
     stores.push('versions');
@@ -360,6 +375,10 @@ const saveAppDataImpl = async (data: {
     if (db.objectStoreNames.contains('rptiDetails')) {
       allPromises.push(tx.objectStore('rptiDetails').clear());
       (data.rptiDetails || []).forEach(item => allPromises.push(tx.objectStore('rptiDetails').put(item)));
+    }
+    if (db.objectStoreNames.contains('lkptiDetails')) {
+      allPromises.push(tx.objectStore('lkptiDetails').clear());
+      (data.lkptiDetails || []).forEach(item => allPromises.push(tx.objectStore('lkptiDetails').put(item)));
     }
     if (data.versions && db.objectStoreNames.contains('versions')) {
       allPromises.push(tx.objectStore('versions').clear());

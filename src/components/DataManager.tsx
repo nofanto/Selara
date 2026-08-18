@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Asset, Deliverable, DeliverableSegment, DeliverableStatus, DeliverableType, Decision, RptiDetail, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource } from '../types';
+import { Asset, Deliverable, DeliverableSegment, DeliverableStatus, DeliverableType, Decision, RptiDetail, LkptiDetail, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource } from '../types';
 import { EditableTable, Column } from './EditableTable';
 import { cn } from '../lib/utils';
-import { Database, Layers, Calendar, Flag, Target, Link2, FolderTree, LayoutTemplate, Users, Box, ClipboardList, RefreshCw } from 'lucide-react';
+import { Database, Layers, Calendar, Flag, Target, Link2, FolderTree, LayoutTemplate, Users, Box, ClipboardList, ListChecks, RefreshCw } from 'lucide-react';
 import { ConfirmModal } from './ConfirmModal';
 import { clearDeliverablesAndSegments, removeDeliverableAndSegments } from '../lib/deliverableCascade';
 import { rptiCascadeOnInitiativeDelete, rptiCascadeOnDeliverableDelete, rptiCascadeOnAssetDelete, RPTI_CATEGORY_LABELS, generateRptiDetails } from '../lib/rpti';
+import { lkptiCascadeOnDeliverableDelete, generateLkptiDetails, LKPTI_CATEGORY_CODES } from '../lib/lkpti';
 
 interface DataManagerProps {
   data: {
@@ -23,6 +24,7 @@ interface DataManagerProps {
     deliverableStatuses: DeliverableStatus[];
     decisions: Decision[];
     rptiDetails: RptiDetail[];
+    lkptiDetails: LkptiDetail[];
   };
   onUpdate: (data: {
     assets: Asset[];
@@ -39,12 +41,13 @@ interface DataManagerProps {
     deliverableStatuses: DeliverableStatus[];
     decisions: Decision[];
     rptiDetails: RptiDetail[];
+    lkptiDetails: LkptiDetail[];
   }) => void;
   onOpenTemplatePicker: () => void;
   searchQuery?: string;
 }
 
-type Tab = 'initiatives' | 'dependencies' | 'assets' | 'assetCategories' | 'programmes' | 'strategies' | 'milestones' | 'resources' | 'deliverables' | 'deliverableStatuses' | 'rpti';
+type Tab = 'initiatives' | 'dependencies' | 'assets' | 'assetCategories' | 'programmes' | 'strategies' | 'milestones' | 'resources' | 'deliverables' | 'deliverableStatuses' | 'rpti' | 'lkpti';
 
 export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery }: DataManagerProps) {
   const [activeTab, setActiveTab] = useState<Tab>('initiatives');
@@ -203,6 +206,24 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery 
     confirm('Generate RPTI Rows', message, () => updateData('rptiDetails', generated));
   };
 
+  // Wipes and rebuilds all LKPTI rows from currently-live Deliverables —
+  // see requirement-specs/lkpti-integration.md §3. Unlike RPTI, this isn't
+  // scoped to a report year: it's a point-in-time inventory, not a plan of activity.
+  const handleGenerateLkpti = () => {
+    const generated = generateLkptiDetails({
+      deliverableSegments: data.deliverableSegments || [],
+      deliverableStatuses: data.deliverableStatuses || [],
+      deliverables: data.deliverables || [],
+      assets: data.assets,
+      assetCategories: data.assetCategories,
+    });
+    const existingCount = (data.lkptiDetails || []).length;
+    const message = existingCount
+      ? `This replaces all ${existingCount} existing LKPTI row(s) with ${generated.length} row(s) generated from currently-live deliverables. Any manual edits will be lost. Continue?`
+      : `Generate ${generated.length} LKPTI row(s) from currently-live deliverables?`;
+    confirm('Generate LKPTI Rows', message, () => updateData('lkptiDetails', generated));
+  };
+
   const initiativeColumns: Column<Initiative>[] = [
     { key: 'name', label: 'Initiative Name', type: 'text', width: '180px' },
     { key: 'assetId', label: 'Asset', type: 'select', options: assetOptions, width: '120px' },
@@ -337,6 +358,7 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery 
       key: 'assetId', label: 'Asset', type: 'select', width: '160px',
       options: data.assets.map(a => ({ value: a.id, label: a.name })),
     },
+    { key: 'description', label: 'Description', type: 'textarea', width: '220px' },
     {
       key: 'categoryCode', label: 'RPTI Category Override', type: 'select', width: '220px',
       options: [
@@ -361,9 +383,11 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery 
   const handleDeleteDeliverable = (deliverable: Deliverable): boolean => {
     const affectedSegments = data.deliverableSegments.filter(segment => segment.deliverableId === deliverable.id);
     const affectedRpti = data.rptiDetails.filter(r => r.targetType === 'deliverable' && r.targetId === deliverable.id).length;
+    const affectedAppInv = (data.lkptiDetails || []).filter(r => r.targetId === deliverable.id).length;
     const parts = [];
     if (affectedSegments.length) parts.push(`${affectedSegments.length} segment(s)`);
     if (affectedRpti) parts.push(`${affectedRpti} RPTI report row(s)`);
+    if (affectedAppInv) parts.push(`${affectedAppInv} LKPTI report row(s)`);
     const msg = parts.length
       ? `Deleting "${deliverable.name}" will also remove ${parts.join(', ')}. Continue?`
       : undefined;
@@ -373,19 +397,23 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery 
         deliverable.id,
       ),
       rptiDetails: rptiCascadeOnDeliverableDelete(data.rptiDetails, deliverable.id),
+      lkptiDetails: lkptiCascadeOnDeliverableDelete(data.lkptiDetails || [], deliverable.id),
     }, msg);
   };
 
   const handleClearDeliverables = (): boolean => {
     const segmentCount = data.deliverableSegments.length;
     const affectedRpti = data.rptiDetails.filter(r => r.targetType === 'deliverable').length;
+    const affectedAppInv = (data.lkptiDetails || []).length;
     const parts = [];
     if ((data.deliverables || []).length) parts.push(`${(data.deliverables || []).length} deliverable(s)`);
     if (segmentCount) parts.push(`${segmentCount} segment(s)`);
     if (affectedRpti) parts.push(`${affectedRpti} RPTI report row(s)`);
+    if (affectedAppInv) parts.push(`${affectedAppInv} LKPTI report row(s)`);
     return cascadeDelete('Delete All Deliverables', 'all deliverables', parts, {
       ...clearDeliverablesAndSegments(),
       rptiDetails: data.rptiDetails.filter(r => r.targetType !== 'deliverable'),
+      lkptiDetails: [],
     }, parts.length
       ? `Deleting all deliverables will also remove ${parts.join(', ')}. Continue?`
       : 'Delete all deliverables?');
@@ -441,6 +469,47 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery 
     { key: 'remarks', label: 'Remarks', type: 'textarea', width: '200px' },
   ];
 
+  const lkptiColumns: Column<LkptiDetail>[] = [
+    { key: 'targetId', label: 'Deliverable', type: 'select', options: deliverableOptions, width: '160px' },
+    {
+      key: 'categoryCode', label: 'Category', type: 'select', width: '220px',
+      options: [
+        { value: '', label: '— Not set —' },
+        ...LKPTI_CATEGORY_CODES.map(code => ({ value: code, label: `${code} — ${RPTI_CATEGORY_LABELS[code]}` })),
+      ],
+    },
+    { key: 'functionDescription', label: 'Function Description', type: 'textarea', width: '220px' },
+    { key: 'platform', label: 'Platform', type: 'text', width: '150px' },
+    { key: 'database', label: 'Database', type: 'text', width: '150px' },
+    { key: 'dcCity', label: 'DC City', type: 'text', width: '110px' },
+    { key: 'dcCountry', label: 'DC Country', type: 'text', width: '110px' },
+    { key: 'dcProvider', label: 'DC Provider', type: 'text', width: '140px', placeholder: "'self' or company name" },
+    { key: 'drCity', label: 'DR City', type: 'text', width: '110px' },
+    { key: 'drCountry', label: 'DR Country', type: 'text', width: '110px' },
+    { key: 'drcProvider', label: 'DRC Provider', type: 'text', width: '140px', placeholder: "'self' or company name" },
+    {
+      key: 'backupStrategy', label: 'Backup Strategy', type: 'select', width: '180px',
+      options: [
+        { value: '', label: '— Not set —' },
+        { value: 'HA_ACTIVE_ACTIVE', label: 'HA Active-Active' },
+        { value: 'HA_ACTIVE_PASSIVE', label: 'HA Active-Passive' },
+        { value: 'BACKUP_REALTIME', label: 'Backup Realtime' },
+        { value: 'BACKUP_PERIODIC', label: 'Backup Periodic' },
+      ],
+    },
+    { key: 'systemOwner', label: 'System Owner', type: 'text', width: '150px' },
+    { key: 'developer', label: 'Developer', type: 'text', width: '150px', placeholder: "'inhouse' or provider name" },
+    { key: 'goLiveDate', label: 'Go-Live Date (dd-mm-yyyy)', type: 'text', width: '150px' },
+    {
+      key: 'ownership', label: 'Ownership', type: 'select', width: '130px',
+      options: [
+        { value: '', label: '— Not set —' },
+        { value: 'LEASE', label: 'Lease' },
+        { value: 'OUTRIGHT_PURCHASE', label: 'Outright Purchase' },
+      ],
+    },
+  ];
+
   const tabs = [
     { id: 'initiatives', label: 'Initiatives', icon: Layers, count: data.initiatives.length },
     { id: 'dependencies', label: 'Dependencies', icon: Link2, count: data.dependencies.length },
@@ -453,6 +522,7 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery 
     { id: 'resources', label: 'Resources', icon: Users, count: (data.resources || []).length },
     { id: 'deliverableStatuses', label: 'Deliverable Statuses', icon: Layers, count: (data.deliverableStatuses || []).length },
     { id: 'rpti', label: 'RPTI', icon: ClipboardList, count: (data.rptiDetails || []).length },
+    { id: 'lkpti', label: 'LKPTI', icon: ListChecks, count: (data.lkptiDetails || []).length },
   ];
 
   return (
@@ -638,6 +708,32 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery 
               idField="id"
               tableId="rpti"
               onColumnResize={(col, w) => handleColumnResize('rpti', col, w)}
+            />
+          </div>
+        )}
+        {activeTab === 'lkpti' && (
+          <div className="flex flex-col h-full">
+            <div className="flex items-center gap-2 mb-3">
+              <button
+                onClick={handleGenerateLkpti}
+                data-testid="lkpti-generate-btn"
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-sm font-medium text-sm"
+              >
+                <RefreshCw size={16} />
+                Generate LKPTI Rows
+              </button>
+              <p className="text-xs text-slate-500">
+                Rebuilds rows from currently-live deliverables — replaces all rows below.
+              </p>
+            </div>
+            <EditableTable
+              data={data.lkptiDetails || []}
+              columns={getColumnsWithWidths('lkpti', lkptiColumns)}
+              onUpdate={(newData) => updateData('lkptiDetails', newData)}
+              onDelete={(row) => { updateData('lkptiDetails', (data.lkptiDetails || []).filter(r => r.id !== row.id)); return true; }}
+              idField="id"
+              tableId="lkpti"
+              onColumnResize={(col, w) => handleColumnResize('lkpti', col, w)}
             />
           </div>
         )}

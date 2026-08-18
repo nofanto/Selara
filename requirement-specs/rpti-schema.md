@@ -36,7 +36,7 @@
 | 06 | Digital services |
 | 07 | Treasury |
 | 08 | Trade finance |
-| 09 | AML-CFT and PPPSPM (payment system provider compliance) |
+| 09 | AML-CFT and PPPSPM (prevention of proliferation financing of weapons of mass destruction) |
 | 10 | Management information/reporting systems |
 | 11 | Risk management |
 | 12 | Internal management |

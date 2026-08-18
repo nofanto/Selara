@@ -14,6 +14,7 @@ export type DiffResult = {
   assetCategories: EntityDiff;
   decisions: EntityDiff;
   rptiDetails: EntityDiff;
+  lkptiDetails: EntityDiff;
   hasChanges: boolean;
 };
 
@@ -277,6 +278,29 @@ export function computeDiff(baseVersion: Version, currentData: Version['data']):
     }
   );
 
+  const getLkptiTargetName = (targetId: string) =>
+    currentData.deliverables.find(d => d.id === targetId)?.name
+    || baseVersion.data.deliverables.find(d => d.id === targetId)?.name
+    || 'Unknown deliverable';
+
+  const lkptiDetails = compareEntities(
+    baseVersion.data.lkptiDetails ?? [],
+    currentData.lkptiDetails ?? [],
+    (r) => getLkptiTargetName(r.targetId),
+    (b, c) => {
+      const changes: string[] = [];
+      if (b.categoryCode !== c.categoryCode) changes.push(`Category code: ${b.categoryCode} → ${c.categoryCode}`);
+      if (b.developer !== c.developer) changes.push(`Developer: ${b.developer} → ${c.developer}`);
+      if ((b.platform ?? '') !== (c.platform ?? '')) changes.push(`Platform: ${b.platform ?? 'Unset'} → ${c.platform ?? 'Unset'}`);
+      if ((b.database ?? '') !== (c.database ?? '')) changes.push(`Database: ${b.database ?? 'Unset'} → ${c.database ?? 'Unset'}`);
+      if ((b.backupStrategy ?? '') !== (c.backupStrategy ?? '')) changes.push(`Backup strategy: ${b.backupStrategy ?? 'Unset'} → ${c.backupStrategy ?? 'Unset'}`);
+      if ((b.systemOwner ?? '') !== (c.systemOwner ?? '')) changes.push(`System owner: ${b.systemOwner ?? 'Unset'} → ${c.systemOwner ?? 'Unset'}`);
+      if ((b.goLiveDate ?? '') !== (c.goLiveDate ?? '')) changes.push(`Go-live date: ${b.goLiveDate ?? 'Unset'} → ${c.goLiveDate ?? 'Unset'}`);
+      if ((b.ownership ?? '') !== (c.ownership ?? '')) changes.push(`Ownership: ${b.ownership ?? 'Unset'} → ${c.ownership ?? 'Unset'}`);
+      return changes;
+    }
+  );
+
   const hasChanges =
     assets.added.length > 0 || assets.removed.length > 0 || assets.modified.length > 0 ||
     programmes.added.length > 0 || programmes.removed.length > 0 || programmes.modified.length > 0 ||
@@ -290,11 +314,13 @@ export function computeDiff(baseVersion: Version, currentData: Version['data']):
     resources.added.length > 0 || resources.removed.length > 0 || resources.modified.length > 0 ||
     assetCategories.added.length > 0 || assetCategories.removed.length > 0 || assetCategories.modified.length > 0 ||
     decisions.added.length > 0 || decisions.removed.length > 0 || decisions.modified.length > 0 ||
-    rptiDetails.added.length > 0 || rptiDetails.removed.length > 0 || rptiDetails.modified.length > 0;
+    rptiDetails.added.length > 0 || rptiDetails.removed.length > 0 || rptiDetails.modified.length > 0 ||
+    lkptiDetails.added.length > 0 || lkptiDetails.removed.length > 0 || lkptiDetails.modified.length > 0;
 
   return {
     assets, programmes, strategies, initiatives, dependencies, milestones,
     deliverables, deliverableSegments, deliverableStatuses, resources, assetCategories, decisions, rptiDetails,
+    lkptiDetails,
     hasChanges,
   };
 }

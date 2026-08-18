@@ -3,8 +3,8 @@
 Selara persists all application data client-side in **IndexedDB**, accessed via the `idb` library. The database is defined in a single location: [`src/lib/db.ts`](../src/lib/db.ts).
 
 - **Database name:** `it-initiative-visualiser`
-- **Current schema version:** `18`
-- **Object stores:** 15 (all key-path stores except `settings`, which uses an explicit out-of-line key)
+- **Current schema version:** `19`
+- **Object stores:** 16 (all key-path stores except `settings`, which uses an explicit out-of-line key)
 - **Indexes:** none — all lookups are done via `getAll()` with in-memory filtering/joining on foreign-key-like fields (there is no `createIndex` usage anywhere in the codebase)
 
 ## Entity-Relationship Diagram
@@ -47,6 +47,7 @@ erDiagram
         string assetId FK
         string name
         string type "deliverable kind: application/infrastructure/document/procedure/other; undefined treated as 'application'"
+        string description "optional; what this deliverable does — no category-level default; cascades into LkptiDetail.functionDescription"
         string categoryCode "optional; overrides AssetCategory.categoryCode when set"
         string developer "optional; 'inhouse' or 'PPJTI' — no category-level default"
         string dcCity "optional; overrides AssetCategory.dcCity when set"
@@ -152,6 +153,26 @@ erDiagram
         string remarks
     }
 
+    LKPTI_DETAIL {
+        string id PK
+        string targetId FK "Deliverable.id — application-scoped only, unlike RptiDetail"
+        string categoryCode "narrowed to the 13 LKPTI-eligible codes (excludes 51-54, 99)"
+        string developer "'inhouse', or the IT service provider's name (free text)"
+        string dcCity
+        string dcCountry
+        string drCity
+        string drCountry
+        string platform
+        string database
+        string dcProvider "company name, or 'self'"
+        string drcProvider "company name, or 'self'"
+        string backupStrategy
+        string systemOwner
+        string goLiveDate "dd-mm-yyyy"
+        string ownership
+        string functionDescription
+    }
+
     VERSION {
         string id PK
         string name
@@ -215,11 +236,15 @@ erDiagram
     ASSET }o--o| RPTI_DETAIL : "polymorphic target"
     DELIVERABLE_SEGMENT |o..o{ RPTI_DETAIL : "auto-derives planned quarter (optional)"
 
+    DELIVERABLE ||--o{ LKPTI_DETAIL : "target"
+    DELIVERABLE_SEGMENT |o..o{ LKPTI_DETAIL : "auto-derives go-live date (optional)"
+
     VERSION }o..o{ ASSET : "snapshot copy"
     VERSION }o..o{ INITIATIVE : "snapshot copy"
     VERSION }o..o{ DELIVERABLE : "snapshot copy"
     VERSION }o..o{ DECISION : "snapshot copy"
     VERSION }o..o{ RPTI_DETAIL : "snapshot copy"
+    VERSION }o..o{ LKPTI_DETAIL : "snapshot copy"
 ```
 
 ## Object Stores
@@ -242,6 +267,7 @@ erDiagram
 | `dtsPhases` | `id` | `DtsPhaseRecord` | v13 — orphaned; see Migration Notes |
 | `decisions` | `id` | `Decision` | v14 |
 | `rptiDetails` | `id` | `RptiDetail` | v15 |
+| `lkptiDetails` | `id` | `LkptiDetail` | v19 |
 
 ## Relationships
 
@@ -264,7 +290,8 @@ Since IndexedDB has no native foreign-key enforcement, all relationships below a
 - `RptiDetail.initiativeId` → `Initiative.id`
 - `RptiDetail.targetId` (with `targetType: 'deliverable' | 'asset'`) → polymorphic; resolved to `Deliverable.id` or `Asset.id`. In Data Manager, `targetType` is not directly editable — it's re-derived automatically from whichever list (`deliverables` or `assets`) the current `targetId` is found in, so the two fields can never fall out of sync via inline editing.
 - `RptiDetail.deliverableSegmentId` (optional) → `DeliverableSegment.id` — set when the row's quarter was auto-derived from a lifecycle segment at export time (see [ADR-0005](adr/0005-rpti-data-manager-tab.md)).
-- `Version.data` embeds a denormalized, point-in-time snapshot of every other store (assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails) — this is how backup/restore and version history are implemented. `dtsPhases` is not included — it was dropped from `Version.data` when DTS was removed (see Migration Notes). The `versions` store itself is not part of the regular `getAppData`/`saveAppData` load-save cycle; it's managed separately via `saveVersion`/`getAllVersions`/`deleteVersion`.
+- `LkptiDetail.targetId` → `Deliverable.id` — application-scoped only, unlike `RptiDetail`'s polymorphic target.
+- `Version.data` embeds a denormalized, point-in-time snapshot of every other store (assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails) — this is how backup/restore and version history are implemented. `dtsPhases` is not included — it was dropped from `Version.data` when DTS was removed (see Migration Notes). The `versions` store itself is not part of the regular `getAppData`/`saveAppData` load-save cycle; it's managed separately via `saveVersion`/`getAllVersions`/`deleteVersion`.
 
 ## Migration Notes
 
@@ -278,6 +305,8 @@ Schema evolution is handled in the `upgrade()` callback of `openDB<ITMapDB>()` i
 - **v16:** Flattened `RptiDetail.location` (a nested `{ dataCenter: {city, country}, disasterRecoveryCenter: {city, country} }` object) into four top-level fields — `dcCity`, `dcCountry`, `drCity`, `drCountry` — so the field could be edited inline in Data Manager, whose `EditableTable` component only supports flat columns. Existing `rptiDetails` records with a `location` value are rewritten in place: their nested fields are copied to the new top-level fields and `location` is removed. See [ADR-0005](adr/0005-rpti-data-manager-tab.md).
 - **v17:** `Application`/`ApplicationSegment`/`ApplicationStatus` were renamed to `Deliverable`/`DeliverableSegment`/`DeliverableStatus` throughout the codebase (the entity covers more than software applications — infrastructure, documents, procedures, etc. — see [ADR-0003](adr/0003-rpti-report-and-application-type.md)), and their object stores renamed to match (`applications` → `deliverables`, `applicationSegments` → `deliverableSegments`, `applicationStatuses` → `deliverableStatuses`). `RptiTargetType`'s `'application'` value became `'deliverable'`. **No data migration was performed** — new stores are created under the new names (for both fresh databases and existing ones upgrading through v17), and the old `applications`/`applicationSegments`/`applicationStatuses` stores are left in place, orphaned and unmigrated, on any database that already had them — same treatment as `dtsPhases` at v13.
 - **v18:** Currency became a single workspace-wide fact (`SETTINGS.defaultCurrency`) instead of a per-row one — `RptiDetail.capexCurrency`, `opexCurrency`, `capexIdrEquivalent`, and `opexIdrEquivalent` were removed from the type. Existing `rptiDetails` records with any of those four fields set have them stripped in place (read-all/rewrite-all, same pattern as v16). `AssetCategory` and `Deliverable` both gained new optional auto-fill fields (`categoryCode`, `dcCity`/`dcCountry`/`drCity`/`drCountry`; `Deliverable` additionally `developer`) — additive, no migration needed. See [ADR-0006](adr/0006-rpti-auto-fill-and-single-currency.md).
+- **v19:** Added the `lkptiDetails` store (no seeding) to support the LKPTI Format 3.2.6 Report — additive, no data migration needed. See `requirement-specs/lkpti-integration.md`.
+- **No version bump:** `Deliverable` gained a new optional `description` field, cascading into `LkptiDetail.functionDescription` at generation time — additive field on an existing store, no schema/index change. See [ADR-0008](adr/0008-deliverable-description-field.md).
 
 ## Source of Truth
 
@@ -299,7 +328,7 @@ There are three templates:
 
 Each template exercises a different *subset* of the schema described above. The diagrams below show, per template, exactly which stores get populated and which relationships are actually exercised — as opposed to the full schema diagram, which shows everything the app is *capable* of storing.
 
-No template pre-seeds `decisions` or `rptiDetails` — every template (`rpti`, `viewer`, `blank`, with or without demo data) sets both to `[]`. Decisions and RPTI report rows are user-authored records added after the workspace is set up, so they're omitted from the per-template diagrams below.
+No template pre-seeds `decisions`, `rptiDetails`, or `lkptiDetails` — every template (`rpti`, `viewer`, `blank`, with or without demo data) sets all three to `[]`. Decisions and both regulatory reports' rows are user-authored (or generated on demand) records added after the workspace is set up, so they're omitted from the per-template diagrams below.
 
 ### `rpti` — Indonesian Bank Technology Catalogue (with demo data)
 

@@ -33,7 +33,7 @@ export function deriveQuarterFromDate(iso: string): RptiQuarter {
   return 'Q4';
 }
 
-function isLiveStatusId(statusId: string, deliverableStatuses: DeliverableStatus[]): boolean {
+export function isLiveStatusId(statusId: string, deliverableStatuses: DeliverableStatus[]): boolean {
   const status = deliverableStatuses.find(s => s.id === statusId);
   if (status) return !!status.isLiveStatus || (!deliverableStatuses.some(s => s.isLiveStatus) && (statusId === LIVE_STATUS_FALLBACK_ID || LIVE_STATUS_FALLBACK_PATTERN.test(status.name)));
   // No matching DeliverableStatus record (e.g. legacy default id with no record) — fall back to id/name pattern.
@@ -68,7 +68,7 @@ export interface GenerateRptiDetailsInput {
 
 // Resolves the AssetCategory backing a Deliverable's auto-fill defaults, via
 // Deliverable.assetId -> Asset.categoryId. Undefined when any link is missing.
-function resolveAssetCategory(
+export function resolveAssetCategory(
   deliverable: Deliverable | undefined,
   assets: Asset[],
   assetCategories: AssetCategory[],

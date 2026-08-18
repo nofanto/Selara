@@ -9,7 +9,7 @@ import { shareWorkspace } from '../lib/share';
 // own Google Cloud Function and Firestore, inherited from Scenia. Disabled
 // until Selara has its own backend to point at — flip this once one exists.
 const SHARING_ENABLED = false;
-import { Asset, Deliverable, DeliverableSegment, DeliverableStatus, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource, Version, Decision, RptiDetail } from '../types';
+import { Asset, Deliverable, DeliverableSegment, DeliverableStatus, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource, Version, Decision, RptiDetail, LkptiDetail } from '../types';
 
 interface DataControlsProps {
   data: {
@@ -28,6 +28,7 @@ interface DataControlsProps {
     versions?: Version[];
     decisions?: Decision[];
     rptiDetails?: RptiDetail[];
+    lkptiDetails?: LkptiDetail[];
   };
   onImport: (data: {
     assets: Asset[];
@@ -45,6 +46,7 @@ interface DataControlsProps {
     versions?: Version[];
     decisions?: Decision[];
     rptiDetails?: RptiDetail[];
+    lkptiDetails?: LkptiDetail[];
   }) => void;
   onError?: (message: string | null) => void;
   timelineId?: string; // ID of the element to capture for PDF
@@ -174,6 +176,7 @@ export function DataControls({ data, onImport, onError, timelineId }: DataContro
       versions: importPreviewData.versions || [],
       decisions: importPreviewData.decisions || [],
       rptiDetails: importPreviewData.rptiDetails || [],
+      lkptiDetails: importPreviewData.lkptiDetails || [],
     });
     setShowImportModal(false);
     setImportPreviewData(null);
@@ -214,6 +217,7 @@ export function DataControls({ data, onImport, onError, timelineId }: DataContro
       versions: mergeArrays(data.versions || [], importPreviewData.versions || []),
       decisions: mergeArrays(data.decisions || [], importPreviewData.decisions),
       rptiDetails: mergeArrays(data.rptiDetails || [], importPreviewData.rptiDetails),
+      lkptiDetails: mergeArrays(data.lkptiDetails || [], importPreviewData.lkptiDetails),
     });
     setShowImportModal(false);
     setImportPreviewData(null);
@@ -399,6 +403,7 @@ export function DataControls({ data, onImport, onError, timelineId }: DataContro
               {importPreviewData.dependencies && <li><span className="font-semibold">{importPreviewData.dependencies.length}</span> Dependencies</li>}
               {importPreviewData.assetCategories && <li><span className="font-semibold">{importPreviewData.assetCategories.length}</span> Categories</li>}
               {importPreviewData.rptiDetails && importPreviewData.rptiDetails.length > 0 && <li><span className="font-semibold">{importPreviewData.rptiDetails.length}</span> RPTI Details</li>}
+              {importPreviewData.lkptiDetails && importPreviewData.lkptiDetails.length > 0 && <li><span className="font-semibold">{importPreviewData.lkptiDetails.length}</span> LKPTI Details</li>}
               {importPreviewData.decisions && importPreviewData.decisions.length > 0 && <li><span className="font-semibold">{importPreviewData.decisions.length}</span> Decisions</li>}
               {importPreviewData.versions && importPreviewData.versions.length > 0 && <li><span className="font-semibold text-indigo-600">{importPreviewData.versions.length}</span> History Snapshots</li>}
             </ul>

@@ -21,4 +21,4 @@ Go to **Reports → RPTI Report** and click **Export to Excel** to download a sp
 ---
 
 - Previous: [Recording an RPTI Row](recording-an-rpti-row.md)
-- This is the last page in the guide.
+- Next: [Recording LKPTI Rows](../15-lkpti-report/recording-lkpti-rows.md)
