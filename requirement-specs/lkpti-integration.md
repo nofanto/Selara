@@ -101,6 +101,8 @@ All design questions are resolved — proceed to Step 1 of the standard lifecycl
 
 See [ADR-0007](../docs/adr/0007-lkpti-report.md) for the final data-model record and [User Story 19](../docs/user-stories/19-lkpti-report.md) for the acceptance criteria. Covered by `src/lib/lkpti.test.ts` and `e2e/lkpti-report.spec.ts`.
 
+**Pending amendment:** `lkpti-import-onboarding.md` §5 changes `generateLkptiDetails()` from wipe-and-rebuild to merge-preserving, so that regenerating after an LKPTI import doesn't discard the 7 manual-only fields the import just populated. Not yet implemented — see that doc for the full reasoning. Once built, §3 above ("always wipes and rebuilds from current Deliverable/DeliverableSegment state") should be updated to describe the merge-preserving rule instead.
+
 ## Addendum: `functionDescription` elevated to `Deliverable.description`
 
 Unlike the other nine net-new LKPTI-only fields (`platform`, `database`, `dcProvider`, `drcProvider`, `backupStrategy`, `systemOwner`, `goLiveDate`, `ownership`), `functionDescription` — "what does this application do" — isn't a report-specific technical detail the way those are. It's core descriptive metadata about the Deliverable itself, true regardless of which regulatory report is being filed, and useful independent of LKPTI (tooltips, an application catalog view, search).

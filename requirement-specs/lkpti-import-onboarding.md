@@ -7,12 +7,13 @@
 
 Selara's LKPTI feature (`src/lib/lkpti.ts`, `LkptiReportView.tsx`, see `lkpti-integration.md`/`lkpti-schema.md`) currently only *exports* the regulator-facing 15-column Format 3.2.6 sheet — nothing reads that shape back in. The three existing workspace templates (`src/lib/workspaceTemplates.ts`) don't help a new user either: `rpti` is demo data, `blank` is empty, and `viewer`'s upload only accepts Selara's own multi-sheet export format (`importFromExcel` in `src/lib/excel.ts` matches fixed sheet names — an OJK-format file has none of them and would silently import as empty).
 
-Four design questions needed resolving before implementation:
+Five design questions needed resolving before implementation:
 
 1. How strict should the parser be about the input file's shape?
 2. What entities can be derived from a bare LKPTI row, and what has to be invented?
 3. Should a lifecycle segment be auto-created from `goLiveDate`?
 4. Where does this live in the UI?
+5. What happens when the user later clicks "Generate LKPTI Rows" on a workspace they just imported?
 
 ---
 
@@ -79,6 +80,20 @@ This mirrors `isLiveStatusId`/`isPreLaunchStatusId`'s existing explicit-flag-fir
 
 The new template card is the natural fit because it matches the actual moment being designed for: `TemplatePickerModal` is shown exactly once, at first launch, before any workspace exists — the same moment a new bank user is deciding how to start.
 
+### 5. Import writes `LkptiDetail` directly; "Generate LKPTI Rows" must not wipe it on regenerate
+
+**The problem:** import derives `AssetCategory`/`Asset`/`Deliverable`/`DeliverableSegment` (§2–3), but the row also carries 7 columns that only ever live on `LkptiDetail` and have **no cascade source from `Deliverable`** at all: `platform`, `database`, `dcProvider`, `drcProvider`, `backupStrategy`, `systemOwner`, `ownership` (see the column table in §1 and the cascade table in `lkpti-integration.md` §2). If import doesn't write an `LkptiDetail` row directly, that data has nowhere to go. And per `lkpti-integration.md` §3, **"Generate LKPTI Rows" wipes all existing rows and rebuilds from scratch** from `Deliverable`/`DeliverableSegment` state alone — so even if import *did* stash this data temporarily, the first time the user (or the app) regenerates, those 7 fields would come back blank, silently destroying the exact data this feature exists to preserve.
+
+**Decision:**
+- Import writes an `LkptiDetail` row directly for every imported row — all 15 columns, not just the ones that also happen to seed `Deliverable`/`AssetCategory`.
+- `generateLkptiDetails()` (`src/lib/lkpti.ts`) changes from wipe-and-rebuild to **merge-preserving**: for each eligible `Deliverable`, create a new `LkptiDetail` row only if none exists for that `targetId`; if a row already exists (from import, from a prior generation, or from manual entry), only the cascade-derived fields (`categoryCode`, `developer`, `dcCity`/`dcCountry`, `drCity`/`drCountry`, `functionDescription`) are refreshed on it — the 7 manual-only fields plus `goLiveDate` are never touched once a row exists, regardless of how it was created.
+
+**Reasoning:** this is exactly the `lkpti-integration.md`/`rpti-auto-generation.md` "wipe-and-rebuild... revisit if losing edits on regenerate turns out to be painful in practice" caveat, arriving early — before this import feature, "regenerate wipes everything" was harmless because generation was the *only* way an `LkptiDetail` row's manual fields ever got populated, so there was nothing to lose that the user hadn't already re-entered by hand since the last generate. Import changes that: it's now possible to have real, non-reconstructable data in those fields the moment a workspace exists, so "regenerate" can no longer mean "discard and start over." Two alternatives were considered and rejected:
+- **Import creates rows, Generate skips deliverables that already have an imported row (via a provenance flag):** rejected — it special-cases "imported" data over "manually edited" data, when the actual invariant that matters is simpler and already general: never discard a field generation can't re-derive, regardless of where the row came from.
+- **Import doesn't touch `LkptiDetail` at all, user re-enters the 7 fields after clicking Generate:** rejected — defeats the stated purpose of the feature (avoid re-typing a report the bank already filed).
+
+**Consequence:** this changes the behavior of `generateLkptiDetails()`, which is already implemented and shipped (see `lkpti-integration.md`'s "Implemented" section, ADR-0007, `src/lib/lkpti.test.ts`). Implementing this design doc therefore also means amending `lkpti-integration.md` §3's regeneration rule and updating/adding to `lkpti.test.ts` for the new merge-preserving behavior — not purely additive new-file work.
+
 ---
 
 ## What this import does *not* attempt to derive
@@ -95,4 +110,4 @@ None blocking — the four questions raised in Context are all resolved above. S
 
 ## Next Step
 
-Per `CLAUDE.md` Step 1: this needs a User Story (`docs/user-stories/`) for the onboarding-facing behavior (template picker → upload → populated workspace), since it's a UI-facing feature — the parsing/derivation logic underneath it is complex enough to also warrant unit tests in `src/lib/` (a new `lkptiImport.ts` alongside `lkpti.ts`) ahead of the E2E test, but the E2E test is what proves the actual user-facing acceptance criteria per this doc's decisions. No code has been written yet.
+Per `CLAUDE.md` Step 1: this needs a User Story (`docs/user-stories/`) for the onboarding-facing behavior (template picker → upload → populated workspace), since it's a UI-facing feature — the parsing/derivation logic underneath it is complex enough to also warrant unit tests in `src/lib/` (a new `lkptiImport.ts` alongside `lkpti.ts`) ahead of the E2E test, but the E2E test is what proves the actual user-facing acceptance criteria per this doc's decisions. §5's change to `generateLkptiDetails()`'s regeneration behavior needs its own Red test in the existing `src/lib/lkpti.test.ts` (covering: generate-after-import preserves the 7 manual-only fields; generate still refreshes cascade fields on an existing row; generate still creates a fresh row for a deliverable with none) before that function is touched. No code has been written yet.
