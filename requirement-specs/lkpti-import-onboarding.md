@@ -111,3 +111,5 @@ None blocking — the four questions raised in Context are all resolved above. S
 ## Next Step
 
 Per `CLAUDE.md` Step 1: this needs a User Story (`docs/user-stories/`) for the onboarding-facing behavior (template picker → upload → populated workspace), since it's a UI-facing feature — the parsing/derivation logic underneath it is complex enough to also warrant unit tests in `src/lib/` (a new `lkptiImport.ts` alongside `lkpti.ts`) ahead of the E2E test, but the E2E test is what proves the actual user-facing acceptance criteria per this doc's decisions. §5's change to `generateLkptiDetails()`'s regeneration behavior needs its own Red test in the existing `src/lib/lkpti.test.ts` (covering: generate-after-import preserves the 7 manual-only fields; generate still refreshes cascade fields on an existing row; generate still creates a fresh row for a deliverable with none) before that function is touched. No code has been written yet.
+
+See [User Story 20](../docs/user-stories/20-lkpti-import-onboarding.md) for the acceptance criteria derived from this doc.
