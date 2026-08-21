@@ -4,11 +4,13 @@ import { WORKSPACE_TEMPLATES, TemplateId } from '../lib/workspaceTemplates';
 interface TemplatePickerModalProps {
   onSelect: (templateId: TemplateId, withDemoData: boolean) => void;
   onViewerImport: (file: File) => void;
+  onLkptiImport: (file: File) => void;
   isReset?: boolean;
 }
 
-export function TemplatePickerModal({ onSelect, onViewerImport, isReset = false }: TemplatePickerModalProps) {
+export function TemplatePickerModal({ onSelect, onViewerImport, onLkptiImport, isReset = false }: TemplatePickerModalProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const lkptiFileInputRef = useRef<HTMLInputElement>(null);
 
   return (
     <div
@@ -63,6 +65,28 @@ export function TemplatePickerModal({ onSelect, onViewerImport, isReset = false 
                   <button
                     data-testid="template-viewer-upload-btn"
                     onClick={() => fileInputRef.current?.click()}
+                    className="mt-2 px-4 py-2 text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"
+                  >
+                    Upload file
+                  </button>
+                </>
+              ) : template.id === 'lkpti-import' ? (
+                <>
+                  <input
+                    ref={lkptiFileInputRef}
+                    type="file"
+                    accept=".xlsx,.xls"
+                    data-testid="template-lkpti-import-file-input"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) onLkptiImport(file);
+                      e.currentTarget.value = '';
+                    }}
+                  />
+                  <button
+                    data-testid="template-lkpti-import-upload-btn"
+                    onClick={() => lkptiFileInputRef.current?.click()}
                     className="mt-2 px-4 py-2 text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"
                   >
                     Upload file

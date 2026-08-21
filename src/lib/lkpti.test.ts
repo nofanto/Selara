@@ -41,6 +41,7 @@ function makeContext(overrides: Partial<GenerateLkptiDetailsInput> = {}): Genera
     deliverables: [makeDeliverable()],
     assets: [makeAsset()],
     assetCategories: [makeAssetCategory()],
+    existingDetails: [],
     ...overrides,
   };
 }
@@ -144,6 +145,61 @@ describe('generateLkptiDetails', () => {
     const rows = generateLkptiDetails(makeContext({ deliverableSegments: segments }));
 
     expect(rows[0].goLiveDate).toBe('10-03-2026');
+  });
+});
+
+describe('generateLkptiDetails — merge-preserving regeneration (issue #9 / User Story 20 AC5)', () => {
+  it('preserves the 7 manual-only fields and goLiveDate on a row that already exists', () => {
+    const existingDetails = [{
+      id: 'lk-imported-1',
+      targetId: 'deliv-1',
+      platform: 'Custom Platform',
+      database: 'Custom DB',
+      dcProvider: 'Self',
+      drcProvider: 'Self',
+      backupStrategy: 'HA_ACTIVE_ACTIVE',
+      systemOwner: 'Jane Doe',
+      ownership: 'LEASE',
+      goLiveDate: '01-01-2020',
+    }] as any;
+    const segments = [makeSegment({ status: 'appstatus-in-production', startDate: '2026-08-15' })];
+    const rows = generateLkptiDetails(makeContext({ deliverableSegments: segments, existingDetails }));
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      id: 'lk-imported-1',
+      platform: 'Custom Platform',
+      database: 'Custom DB',
+      dcProvider: 'Self',
+      drcProvider: 'Self',
+      backupStrategy: 'HA_ACTIVE_ACTIVE',
+      systemOwner: 'Jane Doe',
+      ownership: 'LEASE',
+      goLiveDate: '01-01-2020', // not overwritten by the freshly-suggested date from the segment above
+    });
+  });
+
+  it('still refreshes cascade-derived fields on an existing row', () => {
+    const existingDetails = [{ id: 'lk-imported-1', targetId: 'deliv-1', categoryCode: '05' }] as any;
+    const deliverables = [makeDeliverable({ categoryCode: '01' })];
+    const segments = [makeSegment({ status: 'appstatus-in-production' })];
+    const rows = generateLkptiDetails(makeContext({ deliverables, deliverableSegments: segments, existingDetails }));
+
+    expect(rows[0].categoryCode).toBe('01'); // refreshed from the Deliverable, not left stale at '05'
+  });
+
+  it('creates a fresh, fully cascade-filled row when no existing LkptiDetail exists for the deliverable', () => {
+    const segments = [makeSegment({ status: 'appstatus-in-production', startDate: '2026-05-01' })];
+    const rows = generateLkptiDetails(makeContext({ deliverableSegments: segments, existingDetails: [] }));
+
+    expect(rows[0]).toMatchObject({ id: 'lkpti-gen-deliv-1', targetId: 'deliv-1', goLiveDate: '01-05-2026' });
+  });
+
+  it('drops a deliverable that no longer qualifies, even if an existing row was present for it', () => {
+    const existingDetails = [{ id: 'lk-imported-1', targetId: 'deliv-1', platform: 'Custom Platform' }] as any;
+    const rows = generateLkptiDetails(makeContext({ deliverableSegments: [], existingDetails }));
+
+    expect(rows).toHaveLength(0);
   });
 });
 

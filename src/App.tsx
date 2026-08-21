@@ -32,6 +32,7 @@ import { Asset, Deliverable, DeliverableSegment, DeliverableStatus, Decision, Rp
 import { cn } from './lib/utils';
 import { getAppData, saveAppData, getAllVersions } from './lib/db';
 import { importFromExcel } from './lib/excel';
+import { parseLkptiImportFile, deriveWorkspaceFromLkptiImport } from './lib/lkptiImport';
 import { validateImportSchema } from './lib/importValidation';
 import { importSharedWorkspace } from './lib/share';
 import { getTemplateData, TemplateId } from './lib/workspaceTemplates';
@@ -423,6 +424,57 @@ export default function App() {
     } catch (error) {
       console.error('Viewer import failed:', error instanceof Error ? `${error.name}: ${error.message}` : error);
       setDbSaveError('Failed to import the file. Please check it is a valid Selara Excel export.');
+    }
+  }, []);
+
+  // See requirement-specs/lkpti-import-onboarding.md and docs/user-stories/20-lkpti-import-onboarding.md.
+  const handleLkptiImport = useCallback(async (file: File) => {
+    try {
+      const { rows, skipped } = await parseLkptiImportFile(file);
+      if (rows.length === 0) {
+        setDbSaveError(skipped.length > 0
+          ? `No rows could be imported — every row had a problem (e.g. row ${skipped[0].rowNumber}: ${skipped[0].reason}).`
+          : 'No data rows found in this file.');
+        return;
+      }
+
+      const derived = deriveWorkspaceFromLkptiImport(rows);
+      const blank = getTemplateData('lkpti-import', false);
+      const data: AppState = {
+        ...blank,
+        assetCategories: derived.assetCategories,
+        assets: derived.assets,
+        deliverables: derived.deliverables,
+        deliverableSegments: derived.deliverableSegments,
+        deliverableStatuses: derived.deliverableStatuses,
+        lkptiDetails: derived.lkptiDetails,
+        versions: [],
+      };
+      await saveAppData(data);
+      setAssets(data.assets);
+      setDeliverables(data.deliverables);
+      setDeliverableSegments(data.deliverableSegments);
+      setInitiatives(data.initiatives);
+      setMilestones(data.milestones);
+      setProgrammes(data.programmes);
+      setStrategies(data.strategies);
+      setDependencies(data.dependencies);
+      setAssetCategories(data.assetCategories);
+      setTimelineSettings(sanitizeTimelineSettings(data.timelineSettings));
+      setResources(data.resources);
+      setDeliverableStatuses(data.deliverableStatuses);
+      setDecisions(data.decisions || []);
+      setRptiDetails(data.rptiDetails || []);
+      setLkptiDetails(data.lkptiDetails || []);
+      setVersions([]);
+      setShowTemplatePicker(false);
+      setTemplatePickerIsReset(false);
+      if (skipped.length > 0) {
+        setDbSaveError(`Imported ${rows.length} row(s). Skipped ${skipped.length} row(s) with problems (e.g. row ${skipped[0].rowNumber}: ${skipped[0].reason}).`);
+      }
+    } catch (error) {
+      console.error('LKPTI import failed:', error instanceof Error ? `${error.name}: ${error.message}` : error);
+      setDbSaveError(error instanceof Error ? error.message : 'Failed to import this file as an LKPTI Format 3.2.6 report.');
     }
   }, []);
 
@@ -1522,7 +1574,7 @@ export default function App() {
       {showTemplatePicker && !showLandingPage && (
         <ModalErrorBoundary onDismiss={() => { setShowTemplatePicker(false); setTemplatePickerIsReset(false); }}>
           <Suspense fallback={null}>
-            <TemplatePickerModal onSelect={handleSelectTemplate} onViewerImport={handleViewerImport} isReset={templatePickerIsReset} />
+            <TemplatePickerModal onSelect={handleSelectTemplate} onViewerImport={handleViewerImport} onLkptiImport={handleLkptiImport} isReset={templatePickerIsReset} />
           </Suspense>
         </ModalErrorBoundary>
       )}
