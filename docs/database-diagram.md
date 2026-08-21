@@ -320,17 +320,18 @@ All database access is centralized in [`src/lib/db.ts`](../src/lib/db.ts); entit
 
 On first load (or when re-opened from Data Manager's "change template" action), an empty workspace is offered a choice of **starter templates** via `TemplatePickerModal` (`src/components/TemplatePickerModal.tsx`). The selection is handled by `getTemplateData(templateId, withDemoData)` in [`src/lib/workspaceTemplates.ts`](../src/lib/workspaceTemplates.ts), which assembles a full `TemplateAppData` payload that is written into every IndexedDB store via `saveAppData`. `TimelineSettings.templateId` records which template was chosen (informational only).
 
-There are three templates:
+There are four templates:
 
 | id | Name | Demo-data toggle? | Source data |
 |---|---|---|---|
 | `rpti` | Indonesian Bank Technology Catalogue | Yes | [`src/demoData.ts`](../src/demoData.ts) |
 | `viewer` | Viewer (upload & view a file) | No | none — empty shell, populated later from an imported Excel file |
 | `blank` | Blank | No | none — empty shell |
+| `lkpti-import` | Import LKPTI Report | No | none — empty shell, populated later from an imported LKPTI Format 3.2.6 file |
 
 Each template exercises a different *subset* of the schema described above. The diagrams below show, per template, exactly which stores get populated and which relationships are actually exercised — as opposed to the full schema diagram, which shows everything the app is *capable* of storing.
 
-No template pre-seeds `decisions`, `rptiDetails`, or `lkptiDetails` — every template (`rpti`, `viewer`, `blank`, with or without demo data) sets all three to `[]`. Decisions and both regulatory reports' rows are user-authored (or generated on demand) records added after the workspace is set up, so they're omitted from the per-template diagrams below.
+`getTemplateData()` itself never pre-seeds `decisions`, `rptiDetails`, or `lkptiDetails` for any template — it always sets all three to `[]`. Decisions and RPTI rows are user-authored (or generated on demand) records added after the workspace is set up, so they're omitted from the per-template diagrams below. `lkptiDetails` is the one exception in practice: choosing `lkpti-import` is immediately followed by `deriveWorkspaceFromLkptiImport()` (`src/lib/lkptiImport.ts`, see [ADR-0010](adr/0010-lkpti-import-onboarding.md)), which populates `lkptiDetails` — along with `assetCategories`, `assets`, `deliverables`, `deliverableSegments`, and `deliverableStatuses` — from the uploaded file, the same two-step "empty shell, then populate from an external file" pattern `viewer` already uses for its own stores.
 
 ### `rpti` — Indonesian Bank Technology Catalogue (with demo data)
 
@@ -425,3 +426,37 @@ Both templates produce an identical, fully-empty `TemplateAppData` payload — n
 
 - **`blank`** stays empty; the user builds the workspace manually from the UI.
 - **`viewer`** is immediately followed by an Excel-file import (`handleViewerImport` in `src/App.tsx`), which parses the uploaded file into the same entity shape and populates the stores from that external source rather than from `getTemplateData`.
+
+### `lkpti-import` — populated from an uploaded LKPTI Format 3.2.6 file
+
+`getTemplateData('lkpti-import', false)` itself returns the same fully-empty shell as `viewer`/`blank`. Selecting the card is immediately followed by `handleLkptiImport` (`src/App.tsx`), which parses the uploaded file (`parseLkptiImportFile`) and derives real content (`deriveWorkspaceFromLkptiImport`, `src/lib/lkptiImport.ts`) — one row of the imported report becomes one full vertical slice through the schema:
+
+```mermaid
+erDiagram
+    ASSET_CATEGORY {
+        int count "1 per distinct category code across all rows"
+    }
+    ASSET {
+        int count "1 per row (placeholder, maturity 1)"
+    }
+    DELIVERABLE {
+        int count "1 per row"
+    }
+    DELIVERABLE_SEGMENT {
+        int count "1 per row (open-ended, live)"
+    }
+    DELIVERABLE_STATUS {
+        int count "1 (shared 'Live' status, isLiveStatus true)"
+    }
+    LKPTI_DETAIL {
+        int count "1 per row, all 15 fields populated"
+    }
+
+    ASSET_CATEGORY ||--o{ ASSET : categorizes
+    ASSET ||--o{ DELIVERABLE : hosts
+    DELIVERABLE ||--o{ DELIVERABLE_SEGMENT : "has one open-ended segment"
+    DELIVERABLE_STATUS ||--o{ DELIVERABLE_SEGMENT : "status of (the shared Live status)"
+    DELIVERABLE ||--|| LKPTI_DETAIL : "target (1:1)"
+```
+
+No `Programme`, `Strategy`, `Initiative`, `Resource`, `Dependency`, `Milestone`, or `Decision` records are created — nothing in an LKPTI row supports deriving them (see [ADR-0010](adr/0010-lkpti-import-onboarding.md)). `versions` is also reset to `[]`, same as any first-load template choice.

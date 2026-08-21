@@ -9,6 +9,7 @@ When you open Selara for the first time, a **template picker** appears. Choose t
 | **Indonesian Bank Technology Catalogue** | Banks building an application portfolio aligned to OJK's RPTI category codes. Loads a representative demo portfolio across 11 of 18 RPTI areas, with the full catalogue browsable in the catalogue section. |
 | **Viewer** | Uploading an Excel file shared by a colleague to view their portfolio. |
 | **Blank** | Banks with their own internal taxonomy. Starts completely empty. |
+| **Import LKPTI Report** | Banks that have already filed an LKPTI Format 3.2.6 report. Builds a starting workspace directly from that file — see [Importing an Existing LKPTI Report](../15-lkpti-report/importing-an-lkpti-report.md). |
 
 ![Template picker modal](../../public/features/template-picker-modal.png)
 

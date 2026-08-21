@@ -1,6 +1,6 @@
 # Import an Existing LKPTI Report as a Workspace Template — Design Notes
 
-> **Status:** Decided, not yet implemented. No code has been written yet; see "Next Step."
+> **Status:** Implemented. See [ADR-0010](../docs/adr/0010-lkpti-import-onboarding.md) for the final record and [User Story 20](../docs/user-stories/20-lkpti-import-onboarding.md) for the acceptance criteria.
 > **Context:** Brainstormed from the observation that most banks adopting Selara will already have a filed LKPTI Format 3.2.6 report — starting them from a blank workspace or hand-typing that data in makes the existing report the obvious onboarding source instead.
 
 ## Context and Problem Statement
@@ -108,8 +108,6 @@ Explicitly out of scope, because nothing in an LKPTI row provides a basis for it
 
 None blocking — the four questions raised in Context are all resolved above. Smaller field-level defaults (exact `Asset.maturity` placeholder value, generated-id prefixes/format for the new `AssetCategory`/`Asset`/`DeliverableStatus`/`DeliverableSegment` records, the final `TemplateId` string and card copy) are implementation details to settle during Step 1/2, not architectural forks requiring sign-off here.
 
-## Next Step
+## Implemented
 
-Per `CLAUDE.md` Step 1: this needs a User Story (`docs/user-stories/`) for the onboarding-facing behavior (template picker → upload → populated workspace), since it's a UI-facing feature — the parsing/derivation logic underneath it is complex enough to also warrant unit tests in `src/lib/` (a new `lkptiImport.ts` alongside `lkpti.ts`) ahead of the E2E test, but the E2E test is what proves the actual user-facing acceptance criteria per this doc's decisions. §5's change to `generateLkptiDetails()`'s regeneration behavior needs its own Red test in the existing `src/lib/lkpti.test.ts` (covering: generate-after-import preserves the 7 manual-only fields; generate still refreshes cascade fields on an existing row; generate still creates a fresh row for a deliverable with none) before that function is touched. No code has been written yet.
-
-See [User Story 20](../docs/user-stories/20-lkpti-import-onboarding.md) for the acceptance criteria derived from this doc.
+Built per [User Story 20](../docs/user-stories/20-lkpti-import-onboarding.md) and recorded in [ADR-0010](../docs/adr/0010-lkpti-import-onboarding.md). Covered by `src/lib/lkptiImport.test.ts` (18 tests), 4 new merge-preserving-regeneration cases in `src/lib/lkpti.test.ts`, and `e2e/lkpti-import-onboarding.spec.ts` (4 tests). `lkpti-integration.md` §3 and §"Implemented" have been amended to describe the merge-preserving regeneration rule.

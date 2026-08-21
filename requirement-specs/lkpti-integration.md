@@ -65,7 +65,9 @@ export interface LkptiDetail {
 
 ### 3. Row generation rule — live Deliverables only, no year-scoping
 
-**Decision:** one row per `Deliverable` (`type: 'application'`, or `undefined` which is treated as `'application'`) that has at least one `DeliverableSegment` classified `'live'` (in-production) by `classifySegmentKind()` — mirroring the helper `rpti.ts` already uses for its own "has this deliverable gone live" check. Unlike RPTI generation, this is **not scoped to a report year**: LKPTI 3.2.6 is a point-in-time inventory of what's currently running, not a plan of activity within a year, so "Generate LKPTI Rows" always wipes and rebuilds from current Deliverable/DeliverableSegment state (same wipe-and-rebuild semantics as RPTI generation, minus the year parameter).
+**Decision:** one row per `Deliverable` (`type: 'application'`, or `undefined` which is treated as `'application'`) that has at least one `DeliverableSegment` classified `'live'` (in-production) by `classifySegmentKind()` — mirroring the helper `rpti.ts` already uses for its own "has this deliverable gone live" check. Unlike RPTI generation, this is **not scoped to a report year**: LKPTI 3.2.6 is a point-in-time inventory of what's currently running, not a plan of activity within a year, so "Generate LKPTI Rows" always re-evaluates against current Deliverable/DeliverableSegment state.
+
+> **Amended by [ADR-0010](../docs/adr/0010-lkpti-import-onboarding.md):** the original version of this rule wiped and rebuilt every row from scratch on each generate (matching RPTI generation, minus the year parameter). Since the LKPTI import-onboarding feature made it possible for `LkptiDetail` rows to carry real, non-reconstructable manual data (the 7 fields with no cascade source) from the moment a workspace exists, generation is now **merge-preserving**: a new row is created only for a `Deliverable` that has none yet; an existing row (from import, a prior generation, or manual entry) has only its cascade-derived fields (`categoryCode`, `developer`, `dcCity`/`dcCountry`, `drCity`/`drCountry`, `functionDescription`) refreshed — the 7 manual-only fields and `goLiveDate` are never touched once a row exists.
 
 **Why:** the schema's own validation rule 5.3 — *"`go_live_date` must ... not be in the future relative to the reporting period end date"* — only makes sense if every row already represents an application that has actually gone live. Including still-planned/funded-but-not-live deliverables would produce rows that fail the schema's own validation until they go live, requiring manual pruning later. Requiring a live segment upfront keeps every generated row valid by construction.
 
@@ -101,7 +103,7 @@ All design questions are resolved — proceed to Step 1 of the standard lifecycl
 
 See [ADR-0007](../docs/adr/0007-lkpti-report.md) for the final data-model record and [User Story 19](../docs/user-stories/19-lkpti-report.md) for the acceptance criteria. Covered by `src/lib/lkpti.test.ts` and `e2e/lkpti-report.spec.ts`.
 
-**Pending amendment:** `lkpti-import-onboarding.md` §5 changes `generateLkptiDetails()` from wipe-and-rebuild to merge-preserving, so that regenerating after an LKPTI import doesn't discard the 7 manual-only fields the import just populated. Not yet implemented — see that doc for the full reasoning. Once built, §3 above ("always wipes and rebuilds from current Deliverable/DeliverableSegment state") should be updated to describe the merge-preserving rule instead.
+**Amendment implemented:** `lkpti-import-onboarding.md` §5 changed `generateLkptiDetails()` from wipe-and-rebuild to merge-preserving, so that regenerating after an LKPTI import doesn't discard the 7 manual-only fields the import just populated. See [ADR-0010](../docs/adr/0010-lkpti-import-onboarding.md) and the amended §3 above.
 
 ## Addendum: `functionDescription` elevated to `Deliverable.description`
 

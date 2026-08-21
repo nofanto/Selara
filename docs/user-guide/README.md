@@ -135,6 +135,13 @@ Follow these three pages to get up and running quickly:
 | [Recording an RPTI Row](14-rpti-report/recording-an-rpti-row.md) | Managing RPTI rows in Data Manager to build the Indonesian OJK IT Development Plan Report |
 | [Exporting the RPTI Report](14-rpti-report/exporting-the-rpti-report.md) | How a missing quarter is filled in at export time, and exporting to Excel |
 
+### 15 LKPTI Report
+
+| Page | Description |
+|------|-------------|
+| [Recording LKPTI Report Rows](15-lkpti-report/recording-lkpti-rows.md) | Managing LKPTI rows in Data Manager to build the Indonesian OJK Application List Report |
+| [Importing an Existing LKPTI Report](15-lkpti-report/importing-an-lkpti-report.md) | Building a starting workspace directly from an already-filed LKPTI Format 3.2.6 file |
+
 ---
 
 ## Feature Reference
@@ -155,6 +162,8 @@ An alphabetical index of capabilities and where to find them.
 | Grouping | [Grouping Modes](06-display-settings/grouping-modes.md) |
 | Keyboard Shortcuts | [Navigating the App](01-getting-started/navigating-the-app.md) |
 | Lifecycle Segments | [Lifecycle Segments](05-applications/lifecycle-segments.md) |
+| LKPTI Report | [Recording LKPTI Report Rows](15-lkpti-report/recording-lkpti-rows.md) |
+| LKPTI Report Import | [Importing an Existing LKPTI Report](15-lkpti-report/importing-an-lkpti-report.md) |
 | Milestones | [Milestone Dependencies](04-dependencies/milestone-dependencies.md) |
 | PDF Export | [PDF & SVG Export](11-import-export/pdf-svg-export.md) |
 | Reports | [Reports Overview](09-reports/overview.md) |

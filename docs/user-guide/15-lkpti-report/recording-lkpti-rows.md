@@ -25,7 +25,7 @@ Instead of adding rows by hand, click **Generate LKPTI Rows** at the top of the 
 - **Go-Live Date** is suggested from the earliest live-status lifecycle segment's start date, converted to the `dd-mm-yyyy` format the LKPTI form expects.
 - **Platform**, **Database**, **DC/DRC Provider**, **Backup Strategy**, **System Owner**, and **Ownership** have no auto-fill source in Selara's data model — these always need to be entered manually.
 
-This replaces all existing rows, so any manual edits made since the last generation are lost.
+Generating is safe to run repeatedly: it never removes or blanks out an existing row. A new row is only created for an application that doesn't have one yet — for a row that already exists (whether from a prior generation, manual entry, or an [LKPTI report import](importing-an-lkpti-report.md)), only the auto-fillable fields above are refreshed; anything with no auto-fill source is left exactly as you last set it.
 
 ## Editing and Deleting
 
@@ -35,7 +35,9 @@ Edit any cell inline, the same as any other Data Manager table. Click the trash 
 
 Go to **Reports → LKPTI Report** and click **Export to Excel** to download a spreadsheet matching the exact LKPTI Format 3.2.6 layout — one row per application, with all 15 required columns and Indonesian headers. This is separate from the general workspace Excel export (which includes a raw backup copy of your LKPTI data alongside every other entity type, for full round-trip import/export).
 
+Already have a filed LKPTI report? See [Importing an Existing LKPTI Report](importing-an-lkpti-report.md) to build your starting workspace from it instead of adding rows by hand.
+
 ---
 
 - Previous: [Exporting the RPTI Report](../14-rpti-report/exporting-the-rpti-report.md)
-- This is the last page in the guide.
+- Next: [Importing an Existing LKPTI Report](importing-an-lkpti-report.md)
