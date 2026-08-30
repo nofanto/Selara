@@ -396,6 +396,24 @@ export function Timeline({ assets, deliverables = [], initiatives, milestones, p
     }
   }, [deliverableSegmentsProp, movingSegment, resizingSegment, resizingSegmentVertical]);
 
+  // If the Initiative or Segment an open panel is editing disappears from underneath
+  // it (deleted in this tab, or — see requirement-specs/cross-tab-sync.md — by
+  // another tab's save reflected here via cross-tab sync), close the panel rather
+  // than leave it showing a dangling record.
+  useEffect(() => {
+    if (initiativePanelId && !initiatives.some(i => i.id === initiativePanelId)) {
+      setInitiativePanelId(null);
+      setSelectedInitiativeId(null);
+    }
+  }, [initiatives, initiativePanelId]);
+
+  useEffect(() => {
+    if (segmentPanelId && !localSegments.some(s => s.id === segmentPanelId)) {
+      setSegmentPanelId(null);
+      setSelectedSegmentId(null);
+    }
+  }, [localSegments, segmentPanelId]);
+
   useEffect(() => {
     if (!movingMilestone) {
       setLocalMilestones(milestones);

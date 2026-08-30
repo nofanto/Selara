@@ -38,6 +38,7 @@ import { importSharedWorkspace } from './lib/share';
 import { getTemplateData, TemplateId } from './lib/workspaceTemplates';
 import { isWorkspaceEmpty } from './lib/workspaceState';
 import { HealthIssueLocation, DataManagerTab } from './lib/dataHealth';
+import { SYNC_CHANNEL_NAME, generateTabId, isRemoteSaveMessage, notifyDataSaved } from './lib/tabSync';
 
 // Lazy load modals and heavy components for code splitting
 const FeaturesModal = lazy(() => import('./components/FeaturesModal').then(m => ({ default: m.FeaturesModal })));
@@ -152,6 +153,12 @@ export default function App() {
   const [undoStack, setUndoStack] = useState<AppState[]>([]);
   const [redoStack, setRedoStack] = useState<AppState[]>([]);
   const [dbSaveError, setDbSaveError] = useState<string | null>(null);
+
+  // Cross-tab sync (active/passive) — see requirement-specs/cross-tab-sync.md.
+  const tabIdRef = useRef(generateTabId());
+  const syncChannelRef = useRef<BroadcastChannel | null>(null);
+  const [syncToast, setSyncToast] = useState<string | null>(null);
+  const syncToastTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [isVersionManagerOpen, setIsVersionManagerOpen] = useState(false);
@@ -510,11 +517,67 @@ export default function App() {
     // Persist to DB
     try {
       await saveAppData(data);
+      if (syncChannelRef.current) notifyDataSaved(syncChannelRef.current, tabIdRef.current);
     } catch (error) {
       console.error('Failed to save data to DB:', error instanceof Error ? `${error.name}: ${error.message}` : error);
       setDbSaveError('Failed to save changes. Your data may not persist after a reload. If this keeps happening, try refreshing the page.');
     }
   }, []);
+
+  // Reloads full state from IndexedDB in response to another tab's save (see
+  // requirement-specs/cross-tab-sync.md). Unlike handleUpdate, this never re-saves
+  // (the source tab already did) and never pushes onto the undo stack — instead it
+  // clears both stacks, since their snapshots no longer correspond to the DB's
+  // current baseline once a remote change has landed.
+  const applyRemoteSync = useCallback(async () => {
+    let data: Awaited<ReturnType<typeof getAppData>>;
+    try {
+      data = await getAppData();
+    } catch (error) {
+      console.error('Failed to reload data for cross-tab sync:', error instanceof Error ? `${error.name}: ${error.message}` : error);
+      return;
+    }
+    setAssets(data.assets);
+    setDeliverables(data.deliverables || []);
+    setDeliverableSegments(data.deliverableSegments || []);
+    setInitiatives(data.initiatives);
+    setMilestones(data.milestones);
+    setProgrammes(data.programmes);
+    setStrategies(data.strategies);
+    setDependencies(data.dependencies);
+    setAssetCategories(data.assetCategories);
+    setTimelineSettings(sanitizeTimelineSettings(data.timelineSettings));
+    setResources(data.resources || []);
+    setDeliverableStatuses(data.deliverableStatuses || []);
+    setDecisions(data.decisions || []);
+    setRptiDetails(data.rptiDetails || []);
+    setLkptiDetails(data.lkptiDetails || []);
+
+    setUndoStack([]);
+    setRedoStack([]);
+
+    // Close a decision panel left open on a decision the remote change deleted.
+    setSelectedDecisionId(prev => (prev && !(data.decisions || []).some(d => d.id === prev) ? null : prev));
+
+    setSyncToast('Updated in another tab');
+    if (syncToastTimerRef.current) clearTimeout(syncToastTimerRef.current);
+    syncToastTimerRef.current = setTimeout(() => setSyncToast(null), 4000);
+  }, []);
+
+  useEffect(() => {
+    const channel = new BroadcastChannel(SYNC_CHANNEL_NAME);
+    syncChannelRef.current = channel;
+    channel.onmessage = (event) => {
+      if (isRemoteSaveMessage(event.data, tabIdRef.current)) {
+        applyRemoteSync();
+      }
+    };
+    return () => {
+      channel.close();
+      syncChannelRef.current = null;
+      if (syncToastTimerRef.current) clearTimeout(syncToastTimerRef.current);
+    };
+  }, [applyRemoteSync]);
 
   const handleUndo = useCallback(() => {
     if (undoStack.length === 0) return;
@@ -761,6 +824,19 @@ export default function App() {
           <button
             onClick={() => setDbSaveError(null)}
             className="text-red-500 hover:text-red-700 font-bold text-lg leading-none"
+            title="Dismiss"
+          >×</button>
+        </div>
+      )}
+      {syncToast && (
+        <div
+          data-testid="sync-toast"
+          className="flex items-center gap-3 mb-3 px-4 py-2.5 bg-blue-50 border border-blue-200 rounded-xl text-sm text-blue-800 flex-shrink-0"
+        >
+          <span className="flex-1">{syncToast}</span>
+          <button
+            onClick={() => setSyncToast(null)}
+            className="text-blue-500 hover:text-blue-700 font-bold text-lg leading-none"
             title="Dismiss"
           >×</button>
         </div>

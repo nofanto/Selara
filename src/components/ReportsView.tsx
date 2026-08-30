@@ -105,6 +105,17 @@ export function ReportsView({ assets, initiatives, milestones, dependencies, cur
       : null
   );
 
+  // If the Asset panel is open on an asset that disappears from underneath it —
+  // deleted in this tab, or (see requirement-specs/cross-tab-sync.md) by another
+  // tab's save reflected here via cross-tab sync — close the panel rather than
+  // leave it showing a dangling record.
+  useEffect(() => {
+    if (assetPanelOpen && selectedAsset && !assets.some(a => a.id === selectedAsset.id)) {
+      setAssetPanelOpen(false);
+      setSelectedAsset(null);
+    }
+  }, [assets, selectedAsset, assetPanelOpen]);
+
   useEffect(() => {
     if (versionsError) return;
     getAllVersions().then(loaded => {
