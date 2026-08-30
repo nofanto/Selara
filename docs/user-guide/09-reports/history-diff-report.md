@@ -25,4 +25,4 @@ If the report cannot load the selected versions, an error message is displayed. 
 ---
 
 - Previous: [Maturity Heatmap Report](maturity-heatmap-report.md)
-- Next: [Saving a Version](../10-version-history/saving-a-version.md)
+- Next: [Data Completeness Report](data-completeness-report.md)

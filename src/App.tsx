@@ -37,6 +37,7 @@ import { validateImportSchema } from './lib/importValidation';
 import { importSharedWorkspace } from './lib/share';
 import { getTemplateData, TemplateId } from './lib/workspaceTemplates';
 import { isWorkspaceEmpty } from './lib/workspaceState';
+import { HealthIssueLocation, DataManagerTab } from './lib/dataHealth';
 
 // Lazy load modals and heavy components for code splitting
 const FeaturesModal = lazy(() => import('./components/FeaturesModal').then(m => ({ default: m.FeaturesModal })));
@@ -114,6 +115,7 @@ function LoadingFallback() {
 export default function App() {
   const isMobile = useMediaQuery('(max-width: 767px)');
   const [view, setView] = useState<'visualiser' | 'data' | 'reports' | 'decisions' | 'guide'>('visualiser');
+  const [dataManagerInitialTab, setDataManagerInitialTab] = useState<DataManagerTab | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
   const [isImportingShare, setIsImportingShare] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
@@ -573,6 +575,16 @@ export default function App() {
   const handleUpdateAsset = useCallback((updatedAsset: Asset) => {
     handleUpdate({ assets: assets.map(a => a.id === updatedAsset.id ? updatedAsset : a), deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails });
   }, [assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails, handleUpdate]);
+
+  const handleNavigateFromHealthIssue = useCallback((location: HealthIssueLocation, entityName: string) => {
+    setSearchQuery(entityName);
+    if (location.view === 'decisions') {
+      setView('decisions');
+    } else {
+      setDataManagerInitialTab(location.tab);
+      setView('data');
+    }
+  }, []);
 
   const handleUpdateDependencies = useCallback((updatedDependencies: Dependency[]) => {
     handleUpdate({ assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies: updatedDependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails });
@@ -1500,6 +1512,7 @@ export default function App() {
               onUpdate={handleUpdate}
               onOpenTemplatePicker={() => { setTemplatePickerIsReset(true); setShowTemplatePicker(true); }}
               searchQuery={searchQuery}
+              initialTab={dataManagerInitialTab}
             />
           </Suspense>
         ) : view === 'reports' ? (
@@ -1520,6 +1533,7 @@ export default function App() {
               rptiDetails={rptiDetails}
               lkptiDetails={lkptiDetails}
               onSaveAsset={handleUpdateAsset}
+              onNavigate={handleNavigateFromHealthIssue}
             />
           </Suspense>
         ) : view === 'decisions' ? (

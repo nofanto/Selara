@@ -96,7 +96,9 @@ Follow these three pages to get up and running quickly:
 | [Initiatives & Dependencies Report](09-reports/initiatives-dependencies-report.md) | Written dependency summary grouped by asset |
 | [Budget Report](09-reports/budget-report.md) | Spend breakdown by programme, strategy, and category |
 | [Capacity Report](09-reports/capacity-report.md) | Resource allocation across the timeline |
+| [Maturity Heatmap Report](09-reports/maturity-heatmap-report.md) | IT assets coloured by maturity level, grouped by capability |
 | [History Diff Report](09-reports/history-diff-report.md) | Comparing two saved versions to see what changed |
+| [Data Completeness Report](09-reports/data-completeness-report.md) | Dangling references and report-generation gaps across the whole workspace |
 
 ### 10 Version History
 
@@ -154,6 +156,7 @@ An alphabetical index of capabilities and where to find them.
 | Conflict Detection | [Conflict Detection](02-timeline/conflict-detection.md) |
 | Critical Path | [Critical Path](04-dependencies/critical-path.md) |
 | CSV Import | [CSV Paste](07-data-manager/csv-paste.md) |
+| Data Completeness | [Data Completeness Report](09-reports/data-completeness-report.md) |
 | Decisions | [Recording a Decision](13-decisions/recording-a-decision.md) |
 | Dependencies | [Drawing Dependencies](04-dependencies/drawing-dependencies.md) |
 | Display Modes | [Display Mode](05-applications/display-mode.md) |
@@ -164,6 +167,7 @@ An alphabetical index of capabilities and where to find them.
 | Lifecycle Segments | [Lifecycle Segments](05-applications/lifecycle-segments.md) |
 | LKPTI Report | [Recording LKPTI Report Rows](15-lkpti-report/recording-lkpti-rows.md) |
 | LKPTI Report Import | [Importing an Existing LKPTI Report](15-lkpti-report/importing-an-lkpti-report.md) |
+| Maturity Heatmap | [Maturity Heatmap Report](09-reports/maturity-heatmap-report.md) |
 | Milestones | [Milestone Dependencies](04-dependencies/milestone-dependencies.md) |
 | PDF Export | [PDF & SVG Export](11-import-export/pdf-svg-export.md) |
 | Reports | [Reports Overview](09-reports/overview.md) |

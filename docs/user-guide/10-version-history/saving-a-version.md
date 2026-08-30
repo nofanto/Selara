@@ -32,5 +32,5 @@ Each version entry in the list shows its name, optional description, and creatio
 
 ---
 
-- Previous: [History Diff Report](../09-reports/history-diff-report.md)
+- Previous: [Data Completeness Report](../09-reports/data-completeness-report.md)
 - Next: [Comparing Versions](comparing-versions.md)
