@@ -206,9 +206,12 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery 
     confirm('Generate RPTI Rows', message, () => updateData('rptiDetails', generated));
   };
 
-  // Wipes and rebuilds all LKPTI rows from currently-live Deliverables —
-  // see requirement-specs/lkpti-integration.md §3. Unlike RPTI, this isn't
-  // scoped to a report year: it's a point-in-time inventory, not a plan of activity.
+  // Merge-preserving: builds one row per currently-live Deliverable — see
+  // requirement-specs/lkpti-integration.md §3. Unlike RPTI, this isn't scoped to a
+  // report year: it's a point-in-time inventory, not a plan of activity. A deliverable
+  // with an existing row (from a prior generate, manual entry, or an LKPTI import)
+  // keeps its manual-only fields and goLiveDate untouched — only cascade-derived
+  // fields refresh. See requirement-specs/lkpti-import-onboarding.md §5.
   const handleGenerateLkpti = () => {
     const generated = generateLkptiDetails({
       deliverableSegments: data.deliverableSegments || [],
@@ -216,10 +219,11 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery 
       deliverables: data.deliverables || [],
       assets: data.assets,
       assetCategories: data.assetCategories,
+      existingDetails: data.lkptiDetails || [],
     });
     const existingCount = (data.lkptiDetails || []).length;
     const message = existingCount
-      ? `This replaces all ${existingCount} existing LKPTI row(s) with ${generated.length} row(s) generated from currently-live deliverables. Any manual edits will be lost. Continue?`
+      ? `This generates ${generated.length} LKPTI row(s) from currently-live deliverables, keeping manually-entered fields on rows that already exist. Continue?`
       : `Generate ${generated.length} LKPTI row(s) from currently-live deliverables?`;
     confirm('Generate LKPTI Rows', message, () => updateData('lkptiDetails', generated));
   };

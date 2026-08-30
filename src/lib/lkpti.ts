@@ -5,12 +5,12 @@ import { RPTI_CATEGORY_LABELS, isLiveStatusId, resolveAssetCategory } from './rp
 export const LKPTI_CATEGORY_CODES: LkptiCategoryCode[] = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '49'];
 const LKPTI_CATEGORY_CODE_SET = new Set<string>(LKPTI_CATEGORY_CODES);
 
-function isLkptiCategoryCode(code: string): code is LkptiCategoryCode {
+export function isLkptiCategoryCode(code: string): code is LkptiCategoryCode {
   return LKPTI_CATEGORY_CODE_SET.has(code);
 }
 
 // Converts Selara's internal ISO date (YYYY-MM-DD) to the LKPTI form's dd-mm-yyyy.
-function toDdMmYyyy(iso: string): string {
+export function toDdMmYyyy(iso: string): string {
   const [y, m, d] = iso.split('-');
   return `${d}-${m}-${y}`;
 }
@@ -21,6 +21,11 @@ export interface GenerateLkptiDetailsInput {
   deliverables: Deliverable[];
   assets: Asset[];
   assetCategories: AssetCategory[];
+  // Prior generation output (and/or imported rows) to merge into — see
+  // requirement-specs/lkpti-import-onboarding.md §5. When a row already exists for
+  // a deliverable, only its cascade-derived fields are refreshed; its 7 manual-only
+  // fields and goLiveDate are carried over untouched.
+  existingDetails?: LkptiDetail[];
 }
 
 /**
@@ -45,13 +50,20 @@ export function suggestGoLiveDate(
  * requirement-specs/lkpti-integration.md §3 for the generation rule.
  * Unlike generateRptiDetails, this isn't scoped to a report year: it's a point-in-time
  * inventory of Deliverables that have actually gone live, not a plan of activity within
- * a year. Wipe-and-rebuild: callers replace all existing rows with this function's
- * output, same v1 no-reconciliation tradeoff as RPTI generation.
+ * a year.
+ *
+ * Merge-preserving, not wipe-and-rebuild (see requirement-specs/lkpti-import-onboarding.md
+ * §5): a deliverable with no existing row gets a brand-new, fully cascade-filled one; a
+ * deliverable that already has a row (from a prior generate, manual entry, or an LKPTI
+ * import) keeps its id, its 7 manual-only fields, and its goLiveDate untouched — only the
+ * cascade-derived fields (categoryCode, developer, dcCity/dcCountry, drCity/drCountry,
+ * functionDescription) are refreshed. A deliverable that no longer qualifies drops out of
+ * the result even if it had an existing row.
  */
 export function generateLkptiDetails(
   input: GenerateLkptiDetailsInput,
 ): LkptiDetail[] {
-  const { deliverableSegments, deliverableStatuses, deliverables, assets, assetCategories } = input;
+  const { deliverableSegments, deliverableStatuses, deliverables, assets, assetCategories, existingDetails = [] } = input;
 
   const results: LkptiDetail[] = [];
   for (const deliverable of deliverables) {
@@ -65,9 +77,7 @@ export function generateLkptiDetails(
     const category = resolveAssetCategory(deliverable, assets, assetCategories);
     const resolvedCategoryCode = deliverable.categoryCode ?? category?.categoryCode;
 
-    results.push({
-      id: `lkpti-gen-${deliverable.id}`,
-      targetId: deliverable.id,
+    const cascadedFields = {
       categoryCode: resolvedCategoryCode && isLkptiCategoryCode(resolvedCategoryCode) ? resolvedCategoryCode : undefined,
       developer: deliverable.developer === 'inhouse' ? 'inhouse' : undefined,
       dcCity: deliverable.dcCity ?? category?.dcCity,
@@ -75,8 +85,17 @@ export function generateLkptiDetails(
       drCity: deliverable.drCity ?? category?.drCity,
       drCountry: deliverable.drCountry ?? category?.drCountry,
       functionDescription: deliverable.description,
-      goLiveDate: suggestGoLiveDate(deliverable.id, deliverableSegments, deliverableStatuses),
-    });
+    };
+
+    const existing = existingDetails.find(d => d.targetId === deliverable.id);
+    results.push(existing
+      ? { ...existing, ...cascadedFields }
+      : {
+          id: `lkpti-gen-${deliverable.id}`,
+          targetId: deliverable.id,
+          ...cascadedFields,
+          goLiveDate: suggestGoLiveDate(deliverable.id, deliverableSegments, deliverableStatuses),
+        });
   }
 
   return results;
@@ -89,17 +108,37 @@ export function lkptiCascadeOnDeliverableDelete(
   return details.filter(d => d.targetId !== deliverableId);
 }
 
-const BACKUP_STRATEGY_LABELS: Record<LkptiBackupStrategy, string> = {
+export const LKPTI_BACKUP_STRATEGY_LABELS: Record<LkptiBackupStrategy, string> = {
   HA_ACTIVE_ACTIVE: 'High Availability Active - Active',
   HA_ACTIVE_PASSIVE: 'High Availability Active - Passive',
   BACKUP_REALTIME: 'Backup Realtime',
   BACKUP_PERIODIC: 'Backup Periodically',
 };
 
-const OWNERSHIP_LABELS: Record<LkptiOwnership, string> = {
+export const LKPTI_OWNERSHIP_LABELS: Record<LkptiOwnership, string> = {
   LEASE: 'Sewa',
   OUTRIGHT_PURCHASE: 'Beli Putus',
 };
+
+export const LKPTI_SHEET_NAME = 'LKPTI Format 3.2.6';
+
+export const LKPTI_EXPORT_HEADERS = [
+  'No.',
+  'Kategori Aplikasi',
+  'Nama Aplikasi',
+  'Deskripsi Fungsi Aplikasi',
+  'Platform',
+  'Pangkalan Data',
+  'Lokasi DC',
+  'Penyelenggara DC',
+  'Lokasi DRC',
+  'Penyelenggara DRC',
+  'Strategi Backup',
+  'System Owner',
+  'Pengembang Aplikasi',
+  'Tanggal Implementasi (Go Live)',
+  'Kepemilikan',
+];
 
 /**
  * Builds the LKPTI Format 3.2.6 report as a standalone Excel file, matching the
@@ -112,23 +151,7 @@ export function exportLkptiReportToExcel(
   details: LkptiDetail[],
   deliverables: Deliverable[],
 ) {
-  const headers = [
-    'No.',
-    'Kategori Aplikasi',
-    'Nama Aplikasi',
-    'Deskripsi Fungsi Aplikasi',
-    'Platform',
-    'Pangkalan Data',
-    'Lokasi DC',
-    'Penyelenggara DC',
-    'Lokasi DRC',
-    'Penyelenggara DRC',
-    'Strategi Backup',
-    'System Owner',
-    'Pengembang Aplikasi',
-    'Tanggal Implementasi (Go Live)',
-    'Kepemilikan',
-  ];
+  const headers = LKPTI_EXPORT_HEADERS;
 
   const rows = details.map((detail, index) => {
     const deliverable = deliverables.find(d => d.id === detail.targetId);
@@ -143,16 +166,16 @@ export function exportLkptiReportToExcel(
       detail.dcProvider ?? '',
       [detail.drCity, detail.drCountry].filter(Boolean).join(', '),
       detail.drcProvider ?? '',
-      detail.backupStrategy ? BACKUP_STRATEGY_LABELS[detail.backupStrategy] : '',
+      detail.backupStrategy ? LKPTI_BACKUP_STRATEGY_LABELS[detail.backupStrategy] : '',
       detail.systemOwner ?? '',
       detail.developer ?? '',
       detail.goLiveDate ?? '',
-      detail.ownership ? OWNERSHIP_LABELS[detail.ownership] : '',
+      detail.ownership ? LKPTI_OWNERSHIP_LABELS[detail.ownership] : '',
     ];
   });
 
   const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'LKPTI Format 3.2.6');
+  XLSX.utils.book_append_sheet(wb, ws, LKPTI_SHEET_NAME);
   XLSX.writeFile(wb, `lkpti-report-${new Date().toISOString().split('T')[0]}.xlsx`);
 }

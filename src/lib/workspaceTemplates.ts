@@ -20,7 +20,7 @@ import {
   demoTimelineSettings,
 } from '../demoData';
 
-export type TemplateId = 'rpti' | 'viewer' | 'blank';
+export type TemplateId = 'rpti' | 'viewer' | 'blank' | 'lkpti-import';
 
 export interface WorkspaceTemplate {
   id: TemplateId;
@@ -41,6 +41,12 @@ export const WORKSPACE_TEMPLATES: WorkspaceTemplate[] = [
     name: 'Viewer',
     description: 'Upload an Excel file shared by a colleague to view their portfolio.',
     tagline: 'Upload & view a shared file',
+  },
+  {
+    id: 'lkpti-import',
+    name: 'Import LKPTI Report',
+    description: 'Already filed an LKPTI Format 3.2.6 report? Upload it to build your starting workspace.',
+    tagline: 'Skip re-typing what you’ve already filed',
   },
   {
     id: 'blank',
@@ -78,6 +84,29 @@ export function getTemplateData(templateId: TemplateId | string, withDemoData = 
     case 'viewer':
       // Viewer mode loads data from an uploaded Excel file — no preset data needed.
       // Return a blank workspace as the fallback.
+      return {
+        assetCategories: [],
+        assets: [],
+        initiatives: [],
+        milestones: [],
+        deliverableSegments: [],
+        programmes: [],
+        strategies: [],
+        dependencies: [],
+        resources: [],
+        deliverables: [],
+        deliverableStatuses: [],
+        decisions: [],
+        rptiDetails: [],
+        lkptiDetails: [],
+        timelineSettings: { ...baseSettings, showRptiCatalogue: false },
+      };
+
+    case 'lkpti-import':
+      // Real content for this template comes from deriveWorkspaceFromLkptiImport()
+      // (src/lib/lkptiImport.ts), applied on top of a blank workspace by the upload
+      // handler — this fallback only matters if getTemplateData is ever called
+      // directly for this id before that derivation runs.
       return {
         assetCategories: [],
         assets: [],
