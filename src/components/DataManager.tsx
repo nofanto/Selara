@@ -7,6 +7,7 @@ import { ConfirmModal } from './ConfirmModal';
 import { clearDeliverablesAndSegments, removeDeliverableAndSegments } from '../lib/deliverableCascade';
 import { rptiCascadeOnInitiativeDelete, rptiCascadeOnDeliverableDelete, rptiCascadeOnAssetDelete, RPTI_CATEGORY_LABELS, generateRptiDetails } from '../lib/rpti';
 import { lkptiCascadeOnDeliverableDelete, generateLkptiDetails, LKPTI_CATEGORY_CODES } from '../lib/lkpti';
+import { DataManagerTab } from '../lib/dataHealth';
 
 interface DataManagerProps {
   data: {
@@ -45,12 +46,17 @@ interface DataManagerProps {
   }) => void;
   onOpenTemplatePicker: () => void;
   searchQuery?: string;
+  // Set by a caller that wants to land on a specific tab on mount (e.g. the Data
+  // Completeness report's "jump to this record" links) — read once, not controlled,
+  // since DataManager unmounts/remounts whenever `view` in App.tsx leaves and returns
+  // to 'data'.
+  initialTab?: DataManagerTab;
 }
 
-type Tab = 'initiatives' | 'dependencies' | 'assets' | 'assetCategories' | 'programmes' | 'strategies' | 'milestones' | 'resources' | 'deliverables' | 'deliverableStatuses' | 'rpti' | 'lkpti';
+type Tab = DataManagerTab;
 
-export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery }: DataManagerProps) {
-  const [activeTab, setActiveTab] = useState<Tab>('initiatives');
+export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery, initialTab }: DataManagerProps) {
+  const [activeTab, setActiveTab] = useState<Tab>(initialTab ?? 'initiatives');
   const [pendingConfirm, setPendingConfirm] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
 
   const confirm = (title: string, message: string, action: () => void) => {

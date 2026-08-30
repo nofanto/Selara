@@ -2,11 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { Asset, Initiative, Dependency, Milestone, Version, Programme, Strategy, AssetCategory, Resource, Deliverable, DeliverableSegment, DeliverableStatus, RptiDetail, LkptiDetail } from '../types';
 import { getAllVersions } from '../lib/db';
 import { computeDiff, DiffResult } from '../lib/diff';
-import { History, DollarSign, GitBranch, Users, ChevronLeft, Grid, ClipboardList, ListChecks } from 'lucide-react';
+import { HealthIssueLocation } from '../lib/dataHealth';
+import { History, DollarSign, GitBranch, Users, ChevronLeft, Grid, ClipboardList, ListChecks, HeartPulse } from 'lucide-react';
 import { MaturityHeatmap } from './MaturityHeatmap';
 import { AssetPanel } from './AssetPanel';
 import { RptiReportView } from './RptiReportView';
 import { LkptiReportView } from './LkptiReportView';
+import { DataHealthReportView } from './DataHealthReportView';
 
 interface ReportsViewProps {
   assets: Asset[];
@@ -24,9 +26,10 @@ interface ReportsViewProps {
   rptiDetails?: RptiDetail[];
   lkptiDetails?: LkptiDetail[];
   onSaveAsset?: (asset: Asset) => void;
+  onNavigate?: (location: HealthIssueLocation, entityName: string) => void;
 }
 
-type ReportSlug = 'version-history' | 'budget' | 'initiatives-dependencies' | 'capacity' | 'maturity-heatmap' | 'rpti' | 'lkpti';
+type ReportSlug = 'version-history' | 'budget' | 'initiatives-dependencies' | 'capacity' | 'maturity-heatmap' | 'rpti' | 'lkpti' | 'data-health';
 
 
 function BackButton({ onBack }: { onBack: () => void }) {
@@ -89,7 +92,7 @@ function depSentence(dep: Dependency, src: Initiative, tgt: Initiative, perspect
   return `${src.name} and ${tgt.name} are related.`;
 }
 
-export function ReportsView({ assets, initiatives, milestones, dependencies, currentData, programmes, strategies, assetCategories, resources = [], deliverables = [], deliverableSegments = [], deliverableStatuses = [], rptiDetails = [], lkptiDetails = [], onSaveAsset }: ReportsViewProps) {
+export function ReportsView({ assets, initiatives, milestones, dependencies, currentData, programmes, strategies, assetCategories, resources = [], deliverables = [], deliverableSegments = [], deliverableStatuses = [], rptiDetails = [], lkptiDetails = [], onSaveAsset, onNavigate }: ReportsViewProps) {
   const [selectedReport, setSelectedReport] = useState<ReportSlug | null>(null);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [assetPanelOpen, setAssetPanelOpen] = useState(false);
@@ -160,6 +163,12 @@ export function ReportsView({ assets, initiatives, milestones, dependencies, cur
       icon: <ListChecks size={28} className="text-fuchsia-500" />,
       title: 'LKPTI Report',
       description: 'Indonesian OJK LKPTI Application List (Format 3.2.6) — an inventory of currently live applications.',
+    },
+    {
+      slug: 'data-health',
+      icon: <HeartPulse size={28} className="text-red-500" />,
+      title: 'Data Completeness',
+      description: 'Dangling references and report-generation gaps across the whole workspace.',
     },
   ];
 
@@ -624,6 +633,40 @@ export function ReportsView({ assets, initiatives, milestones, dependencies, cur
           <LkptiReportView
             lkptiDetails={lkptiDetails}
             deliverables={deliverables}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // ── Data Completeness ────────────────────────────────────────────────────────
+  if (selectedReport === 'data-health') {
+    return (
+      <div data-testid="report-view-data-health" className="h-full overflow-y-auto p-6 bg-slate-50">
+        <div className="max-w-4xl mx-auto">
+          <BackButton onBack={() => setSelectedReport(null)} />
+          <div className="mb-6">
+            <h1 className="text-xl font-bold text-slate-800">Data Completeness</h1>
+            <p className="text-sm text-slate-500 mt-1">
+              Dangling references and report-generation gaps that aren't visible anywhere else in the app.
+            </p>
+          </div>
+          <DataHealthReportView
+            assets={assets}
+            assetCategories={assetCategories}
+            deliverables={deliverables}
+            deliverableSegments={deliverableSegments}
+            deliverableStatuses={deliverableStatuses}
+            initiatives={initiatives}
+            milestones={milestones}
+            dependencies={dependencies}
+            decisions={currentData.decisions ?? []}
+            resources={resources}
+            programmes={programmes}
+            strategies={strategies}
+            rptiDetails={rptiDetails}
+            lkptiDetails={lkptiDetails}
+            onNavigate={(location, entityName) => onNavigate?.(location, entityName)}
           />
         </div>
       </div>
