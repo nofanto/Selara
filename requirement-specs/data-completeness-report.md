@@ -1,6 +1,6 @@
 # Data Completeness Report — Design Notes
 
-> **Status:** Decided, not yet implemented. No code has been written yet; see "Next Step."
+> **Status:** Implemented. See [User Story 21](../docs/user-stories/21-data-completeness-report.md) for the acceptance criteria and `src/lib/dataHealth.test.ts` (29 tests) + `e2e/data-health-report.spec.ts` (3 tests) for coverage. No ADR — no new dependency, no IndexedDB schema change, no infra change, and no prior decision reversed (this is a pure read model, same category as the Budget/Capacity reports), so it didn't meet `docs/adr/README.md`'s bar for one.
 > **Context:** Raised as a companion to `lkpti-import-onboarding.md` — that import explicitly leaves gaps behind (no Programme/Strategy/Initiative, no lifecycle history before go-live, 9 of 15 LKPTI columns with no auto-fill source), and there was no way in the app to see what those gaps actually are. Broadened during discussion into a general workspace completeness check, not an LKPTI-import-specific one.
 
 ## Context and Problem Statement
@@ -94,6 +94,8 @@ Grouped by entity. Every soft check is scoped to only the records actually eligi
 - `requirement-specs/lkpti-import-onboarding.md` — the feature that prompted this; once implemented, its post-import flow should link into this report pre-scoped to the gaps it left (Programme/Strategy/Initiative, Resources, Dependencies, Milestones, pre-go-live lifecycle history — see that doc's "What this import does not attempt to derive" section, which maps directly onto several of the soft checks above).
 - `src/lib/importValidation.ts` — closest existing precedent for the issue shape (`{entity, issue, severity}`); this feature is effectively that pattern generalized from "one import payload" to "the live workspace, all the time."
 
-## Next Step
+## Implemented
 
-Per `CLAUDE.md` Step 1: the check logic (`src/lib/` — likely `dataHealth.ts`, a pure `computeDataHealth(appState): HealthIssue[]`) is exactly the kind of pure derivation logic that gets a Vitest unit test per check, written and confirmed red before implementation. The `ReportsView` card and click-to-navigate behavior are UI-facing and need an E2E test. No code has been written yet.
+`computeDataHealth()` in `src/lib/dataHealth.ts` implements the full check list in "Decided" §3 exactly, with one navigation simplification worth recording: the "click-to-navigate" decision in §2/§4 said clicking an issue "navigates to the relevant record's row" — in practice this means landing on the correct Data Manager tab (or the Decisions view, for decision-linked issues) with the record's name pre-filled into the existing global search box, which the search-filterable tabs already use to narrow their table to that name. It does **not** scroll to or highlight the specific row — building that would mean threading a highlight/scroll prop through the shared `EditableTable` and every tab that renders it, for a v1 whose own reasoning (§4) already argues against building new UI surface area when an existing mechanism gets most of the way there. Worth reconsidering only if usage shows the search-box handoff isn't precise enough in practice.
+
+Note also: `DataManagerTab` (the tab-id union) now lives in `src/lib/dataHealth.ts`, imported by `src/components/DataManager.tsx`, rather than the other way around — a pure-lib module shouldn't depend on a component file, so the type moved to be the shared source of truth.

@@ -1,12 +1,12 @@
 # Reports
 
-![Reports home screen showing six report cards](../../public/features/reports-home-screen.png)
+![Reports home screen showing report cards](../../public/features/reports-home-screen.png)
 
-The Reports section provides six analytical views of your portfolio data. Each report is self-contained and opens in full-width to give you a focused, uncluttered reading experience.
+The Reports section provides eight analytical views of your portfolio data. Each report is self-contained and opens in full-width to give you a focused, uncluttered reading experience.
 
 ## Accessing Reports
 
-Open the Reports section from the main navigation. You will see a selection screen with six cards:
+Open the Reports section from the main navigation. You will see a selection screen with eight cards:
 
 - **History** — compare differences between saved portfolio versions
 - **Budget** — break down spend by programme, strategy, and asset category
@@ -14,6 +14,8 @@ Open the Reports section from the main navigation. You will see a selection scre
 - **Capacity** — see resource allocation across the timeline period
 - **Maturity Heatmap** — view all IT assets coloured by their maturity level, grouped by capability
 - **RPTI Report** — Indonesian OJK IT Development Plan Report (Format 3.1), tracking planned application and infrastructure development
+- **LKPTI Report** — Indonesian OJK LKPTI Application List (Format 3.2.6), an inventory of currently live applications
+- **Data Completeness** — dangling references and report-generation gaps across the whole workspace
 
 Click any card to open that report. Use the back button to return to the selection screen.
 
