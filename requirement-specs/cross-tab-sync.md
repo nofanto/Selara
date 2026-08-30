@@ -1,6 +1,6 @@
 # Cross-Tab Sync — Design Notes
 
-> **Status:** Decided, not yet implemented. All design questions are resolved — see "Next Step". No code has been written yet. Tracked as [issue #13](https://github.com/nofanto/Selara/issues/13).
+> **Status:** Implemented. See [User Story 22](../docs/user-stories/22-cross-tab-sync.md) for the acceptance criteria and `src/lib/tabSync.test.ts` (6 tests) + `e2e/cross-tab-sync.spec.ts` (2 tests) for coverage. Tracked as [issue #13](https://github.com/nofanto/Selara/issues/13).
 
 ## Context and Problem Statement
 
@@ -61,6 +61,10 @@ Two shapes of "multi-tab support" came up during discussion:
 
 ---
 
-## Next Step
+## Implemented
 
-All design questions are resolved — proceed to Step 1 of the standard lifecycle. This is a mix of pure logic (the broadcast/reload wiring, plausibly testable via Vitest with a mocked `BroadcastChannel`) and UI-facing behavior (the stale-panel auto-close, the toast), which needs Playwright coverage — likely two linked browser contexts against the same origin in one test, since existing e2e tests already seed IndexedDB directly via `page.evaluate()` and real cross-tab `BroadcastChannel` delivery needs a second `page`/context to receive it.
+`src/lib/tabSync.ts` implements §1–2 as designed, using a *real* `BroadcastChannel` in tests rather than a mock — Node has had a global `BroadcastChannel` since v18, and two separate instances of the same channel name in one process deliver to each other exactly like two real tabs would, so the cross-instance delivery test in `tabSync.test.ts` needed no mocking at all.
+
+One implementation note on §4 (stale open panels): rather than adding sync-specific "close on remote update" signal plumbing, each panel-owning component (`Timeline.tsx` for the Initiative/Segment panels, `ReportsView.tsx` for the Asset panel) got a small `useEffect` that closes the panel whenever its own entity-id state no longer resolves against the current props array. This is *not* sync-specific — it fires the same way regardless of why the array changed — which is arguably the more correct fix anyway (the same staleness was already reachable via same-tab actions, e.g. undo; see the "Rejected alternatives" note in §4 in the original decision). `DecisionsView`'s own edit form already resets whenever its `selectedId` prop changes, so clearing `App.tsx`'s `selectedDecisionId` when the selected decision disappears was enough to reuse that existing behavior — no changes needed inside `DecisionsView` itself.
+
+The e2e test (`e2e/cross-tab-sync.spec.ts`) uses two Playwright `page`s in one `browserContext`, which share localStorage and IndexedDB exactly like two real tabs on one profile — the setup real `BroadcastChannel` delivery needs, unlike the direct-IndexedDB seeding other e2e specs use (which never goes through the save path, so never triggers a broadcast).
