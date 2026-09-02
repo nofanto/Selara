@@ -1,6 +1,6 @@
 # Setting up infrastructure for the Share feature
 
-This is the top-level walkthrough for turning on Selara's zero-knowledge Share Links feature ([issue #5](https://github.com/nofanto/Selara/issues/5)) — from "nothing deployed" to `SHARING_ENABLED = true`. For the architecture behind why there are three interchangeable backends, see [`requirement-specs/share-backend-multi-cloud.md`](../requirement-specs/share-backend-multi-cloud.md) and [ADR-0007](../docs/adr/0007-share-backend-multi-cloud-plugin-architecture.md) — this doc is the practical "how," not the "why."
+This is the top-level walkthrough for turning on Selara's zero-knowledge Share Links feature ([issue #5](https://github.com/nofanto/Selara/issues/5)) — from "nothing deployed" to `SHARING_ENABLED = true`. For the architecture behind why there are three interchangeable backends, see [`requirement-specs/share-backend-multi-cloud.md`](../requirement-specs/share-backend-multi-cloud.md) and [ADR-0011](../docs/adr/0011-share-backend-multi-cloud-plugin-architecture.md) — this doc is the practical "how," not the "why."
 
 ## 1. Pick a provider
 

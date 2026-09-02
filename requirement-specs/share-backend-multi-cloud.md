@@ -1,6 +1,6 @@
 # Zero-Knowledge Share Backend: Multi-Cloud Plugin Architecture (Design Notes)
 
-> **Status:** Decided, implementing. Resolves the "which cloud?" part of [issue #5](https://github.com/nofanto/Selara/issues/5) by not picking one — instead making the backend deployable to any of GCP, Cloudflare, or AWS from the same core logic. Deployment itself (actually standing up a project on one of these) is a separate, later step the user does themselves — see "Out of scope."
+> **Status:** Implemented — the code is complete and green; **deployment is not done and remains the user's own step**. Resolves the "which cloud?" part of [issue #5](https://github.com/nofanto/Selara/issues/5) by not picking one — instead making the backend deployable to any of GCP, Cloudflare, or AWS from the same core logic. Deployment itself (actually standing up a project on one of these) is a separate, later step the user does themselves — see "Out of scope." Decision record: [ADR-0011](../docs/adr/0011-share-backend-multi-cloud-plugin-architecture.md). Walkthrough to actually turn the feature on: [`backend/SETUP.md`](../backend/SETUP.md). Coverage: `backend/core/src/handleShare.test.ts` (11 Vitest cases), run via `npm run test:backend`.
 
 ## Context and Problem Statement
 
