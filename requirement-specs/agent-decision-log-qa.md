@@ -2,6 +2,7 @@
 
 > **Status:** Idea — not yet started. No design discussion has happened yet; this is a placeholder capturing the idea so it isn't lost, per the brainstorm in issue-#9's follow-up conversation about read-only AI agent capabilities for Selara.
 > **Context:** Part of a family of read-only agent use cases (alongside [Filing Readiness Check](agent-filing-readiness-check.md), [Version Diff Narrative](agent-version-diff-narrative.md), and [Capacity/Budget Query](agent-capacity-budget-query.md)).
+> **Last refreshed:** 2026-09-02.
 
 ## The idea
 
@@ -10,6 +11,10 @@ Let an agent answer questions like "why did we decide to do X" or "what's the cu
 ## Why this, specifically
 
 This is retrieval Selara can do that a plain spreadsheet fundamentally can't — the decision log already captures the *why*, not just the *what*, matching `CLAUDE.md`'s own philosophy point 4 ("rejected alternatives are as valuable as decisions"). An agent that can answer "why was the X approach rejected for this initiative" turns a record that today only gets read if someone happens to open the right decision manually into something actually queryable.
+
+## What the codebase already provides
+
+The shipped [Data Completeness Report](data-completeness-report.md) now validates `Decision.linkedEntityId` and `Decision.supersededBy` as hard dangling-reference checks. That doesn't implement any of this feature, but it does mean a workspace that passes the health check has a decision graph whose links and supersession chains actually resolve — one less failure mode for a traversal-based answer to hit.
 
 ## Questions to resolve before a real Step 0 design discussion
 
@@ -21,4 +26,4 @@ This is retrieval Selara can do that a plain spreadsheet fundamentally can't —
 
 ## Next step
 
-None yet — this needs its own Step 0 design discussion (per `CLAUDE.md`) once prioritized against the other open issues (#5, #9, #10) and the other agent-use-case placeholders above. No code or schema decisions have been made.
+None yet — this needs its own Step 0 design discussion (per `CLAUDE.md`) once prioritized. Of the issues these placeholders were originally weighed against, [#9](https://github.com/nofanto/Selara/issues/9) (LKPTI import) and [#10](https://github.com/nofanto/Selara/issues/10) (data completeness report) have since shipped, as has [#13](https://github.com/nofanto/Selara/issues/13) (cross-tab sync); the only open issue is [#5](https://github.com/nofanto/Selara/issues/5) (zero-knowledge share backend, PR #15). No code or schema decisions have been made.
