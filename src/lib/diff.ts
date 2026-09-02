@@ -18,27 +18,47 @@ export type DiffResult = {
   hasChanges: boolean;
 };
 
+/**
+ * Identity for one entity in a diff. `assetId` is resolved here rather than by
+ * the consumer because computeDiff holds both snapshots — it can still place a
+ * segment or LKPTI row whose owning deliverable has since been deleted, which a
+ * consumer given only the current workspace could not. Unset for portfolio-level
+ * types (programmes, strategies, resources, categories, statuses, decisions) and
+ * for dependencies, which join two initiatives that may sit under different assets.
+ */
+export type DiffEntry = {
+  id: string;
+  name: string;
+  assetId?: string;
+};
+
 export type EntityDiff = {
-  added: string[];
-  removed: string[];
-  modified: { name: string; changes: string[] }[];
+  added: DiffEntry[];
+  removed: DiffEntry[];
+  modified: (DiffEntry & { changes: string[] })[];
 };
 
 function compareEntities<T extends { id: string }>(
   base: T[],
   curr: T[],
   getDisplayName: (item: T) => string,
-  getChanges: (b: T, c: T) => string[]
+  getChanges: (b: T, c: T) => string[],
+  getAssetId?: (item: T) => string | undefined
 ): EntityDiff {
-  const added = curr.filter(ci => !base.some(bi => bi.id === ci.id)).map(i => getDisplayName(i));
-  const removed = base.filter(bi => !curr.some(ci => ci.id === bi.id)).map(i => getDisplayName(i));
-  const modified: { name: string; changes: string[] }[] = [];
+  const toEntry = (item: T): DiffEntry => {
+    const assetId = getAssetId?.(item);
+    return { id: item.id, name: getDisplayName(item), ...(assetId !== undefined && { assetId }) };
+  };
+
+  const added = curr.filter(ci => !base.some(bi => bi.id === ci.id)).map(toEntry);
+  const removed = base.filter(bi => !curr.some(ci => ci.id === bi.id)).map(toEntry);
+  const modified: (DiffEntry & { changes: string[] })[] = [];
 
   curr.forEach(ci => {
     const bi = base.find(b => b.id === ci.id);
     if (bi) {
       const changes = getChanges(bi, ci);
-      if (changes.length > 0) modified.push({ name: getDisplayName(ci), changes });
+      if (changes.length > 0) modified.push({ ...toEntry(ci), changes });
     }
   });
 
@@ -66,7 +86,8 @@ export function computeDiff(baseVersion: Version, currentData: Version['data']):
         changes.push(`Maturity: ${b.maturity ?? 'Unrated'} → ${c.maturity ?? 'Unrated'}`);
       }
       return changes;
-    }
+    },
+    (asset) => asset.id
   );
 
   const programmes = compareEntities(
@@ -110,7 +131,8 @@ export function computeDiff(baseVersion: Version, currentData: Version['data']):
         changes.push(`Moved from Asset "${oldAsset}" to "${newAsset}"`);
       }
       return changes;
-    }
+    },
+    (i) => i.assetId
   );
 
   const dependencies = compareEntities(
@@ -143,7 +165,8 @@ export function computeDiff(baseVersion: Version, currentData: Version['data']):
       if (b.date !== c.date) changes.push(`Date: ${b.date} → ${c.date}`);
       if (b.type !== c.type) changes.push(`Type: ${b.type} → ${c.type}`);
       return changes;
-    }
+    },
+    (m) => m.assetId
   );
 
   const deliverables = compareEntities(
@@ -162,13 +185,18 @@ export function computeDiff(baseVersion: Version, currentData: Version['data']):
         changes.push(`Moved from Asset "${oldAsset}" to "${newAsset}"`);
       }
       return changes;
-    }
+    },
+    (d) => d.assetId
   );
 
   const getSegmentDeliverableName = (deliverableId: string) =>
     currentData.deliverables.find(a => a.id === deliverableId)?.name
     || baseVersion.data.deliverables.find(a => a.id === deliverableId)?.name
     || 'Unknown deliverable';
+
+  const getDeliverableAssetId = (deliverableId: string) =>
+    currentData.deliverables.find(d => d.id === deliverableId)?.assetId
+    ?? baseVersion.data.deliverables.find(d => d.id === deliverableId)?.assetId;
 
   const getSegmentStatusName = (statusId: string) =>
     (currentData.deliverableStatuses ?? []).find(s => s.id === statusId)?.name
@@ -186,7 +214,8 @@ export function computeDiff(baseVersion: Version, currentData: Version['data']):
       if (b.status !== c.status) changes.push(`Status: ${getSegmentStatusName(b.status)} → ${getSegmentStatusName(c.status)}`);
       if (b.deliverableId !== c.deliverableId) changes.push(`Moved to deliverable "${getSegmentDeliverableName(c.deliverableId)}"`);
       return changes;
-    }
+    },
+    (s) => getDeliverableAssetId(s.deliverableId)
   );
 
   const deliverableStatuses = compareEntities(
@@ -278,7 +307,8 @@ export function computeDiff(baseVersion: Version, currentData: Version['data']):
       if ((b.opexAmount ?? 0) !== (c.opexAmount ?? 0)) changes.push(`OpEx: ${b.opexAmount ?? 0} → ${c.opexAmount ?? 0}`);
       if ((b.remarks ?? '') !== (c.remarks ?? '')) changes.push('Remarks updated');
       return changes;
-    }
+    },
+    (r) => (r.targetType === 'asset' ? r.targetId : getDeliverableAssetId(r.targetId))
   );
 
   const getLkptiTargetName = (targetId: string) =>
@@ -301,7 +331,8 @@ export function computeDiff(baseVersion: Version, currentData: Version['data']):
       if ((b.goLiveDate ?? '') !== (c.goLiveDate ?? '')) changes.push(`Go-live date: ${b.goLiveDate ?? 'Unset'} → ${c.goLiveDate ?? 'Unset'}`);
       if ((b.ownership ?? '') !== (c.ownership ?? '')) changes.push(`Ownership: ${b.ownership ?? 'Unset'} → ${c.ownership ?? 'Unset'}`);
       return changes;
-    }
+    },
+    (l) => getDeliverableAssetId(l.targetId)
   );
 
   const hasChanges =
