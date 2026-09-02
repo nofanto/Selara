@@ -104,7 +104,7 @@ Note also: `DataManagerTab` (the tab-id union) now lives in `src/lib/dataHealth.
 
 ## Phase 2 — Validity checks (decided 2026-09-02, tracked as issue #16)
 
-> Tracked as [issue #16](https://github.com/nofanto/Selara/issues/16). The shipped report above becomes **phase 1**; this section records the decision to add a **phase 2** on top of it.
+> Tracked as [issue #16](https://github.com/nofanto/Selara/issues/16), with the user-facing half in [User Story 23](../docs/user-stories/23-data-health-phase-2.md). The shipped report above becomes **phase 1**; this section records the decision to add a **phase 2** on top of it.
 
 ### Context
 
@@ -239,3 +239,22 @@ Same reasoning as the phase-1 feature: no new dependency, no IndexedDB schema ch
 ### Agent exposure — explicitly out of scope here
 
 The rule engine is a deterministic pure function with unit tests; that is where the regulatory truth lives, and no schema rule should end up encoded only in a prompt. An agent narrating or triaging `computeDataHealth`'s output remains a separate, much smaller idea, tracked outside this document.
+
+### Implemented (phase 2)
+
+`computeDataHealth()` implements §6/§6a exactly, with three notes worth recording:
+
+- **`phase` is stamped on at return, not at each push site.** The function collects into two
+  internal arrays and tags them on the way out. Phase-1 issue ids, ordering and messages are
+  byte-for-byte unchanged, so the shipped E2E cases stayed valid as regression guards.
+- **`DataHealthInput.timelineSettings` is `Pick<TimelineSettings, 'defaultCurrency'>`,** not the
+  whole settings object — the check reads exactly one field, and a pure-lib input should ask for
+  no more than it uses.
+- **The synthetic `Workspace` entity navigates with an empty search string.** §5 kept the entity
+  fields non-nullable so the list stays uniform, but pre-filling `"Workspace settings"` into the
+  Data Manager search box would filter the RPTI table to nothing. `DataHealthReportView` passes
+  `''` for that entity type; the navigation handler in `App.tsx` needed no special case.
+
+One consequence for the UI worth noting: with two composable filters, a combination can now match
+zero issues while the workspace is not clean, so the empty state distinguishes "no issues match
+the current filters" from "the workspace is clean."

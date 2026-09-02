@@ -32,5 +32,5 @@ Each version entry in the list shows its name, optional description, and creatio
 
 ---
 
-- Previous: [Data Completeness Report](../09-reports/data-completeness-report.md)
+- Previous: [Data Health Report](../09-reports/data-health-report.md)
 - Next: [Comparing Versions](comparing-versions.md)

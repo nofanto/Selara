@@ -13,6 +13,7 @@ function baseInput(overrides: Partial<DataHealthInput> = {}): DataHealthInput {
     assets: [], assetCategories: [], deliverables: [], deliverableSegments: [],
     deliverableStatuses: statuses, initiatives: [], milestones: [], dependencies: [],
     decisions: [], resources: [], programmes: [], strategies: [], rptiDetails: [], lkptiDetails: [],
+    timelineSettings: {},
     ...overrides,
   };
 }
@@ -242,5 +243,211 @@ describe('computeDataHealth — soft checks (report-generation gaps)', () => {
 describe('computeDataHealth — empty workspace', () => {
   it('returns no issues for a fully empty workspace', () => {
     expect(computeDataHealth(baseInput())).toEqual([]);
+  });
+});
+
+// ── Phase 2: value validity ──────────────────────────────────────────────────
+// See requirement-specs/data-completeness-report.md § "Phase 2 — Validity checks"
+// and docs/user-stories/23-data-health-phase-2.md.
+
+/** An LKPTI-eligible deliverable: application type, with a live-status segment. */
+const liveSegment = {
+  id: 'seg-live', deliverableId: 'deliv-1', startDate: '2020-01-01', endDate: '2027-01-01',
+  status: 'appstatus-in-production',
+};
+
+/** A fully-populated LkptiDetail, so completeness warnings never mask a validity check. */
+const fullLkpti = {
+  id: 'lkpti-1', targetId: 'deliv-1', platform: 'Linux', database: 'Postgres',
+  dcProvider: 'self', drcProvider: 'self', backupStrategy: 'HA_ACTIVE_ACTIVE' as const,
+  systemOwner: 'IT Ops', ownership: 'OUTRIGHT_PURCHASE' as const, goLiveDate: '01-01-2020',
+  developer: 'inhouse', functionDescription: 'Core ledger.',
+  dcCity: 'Jakarta', dcCountry: 'Indonesia', drCity: 'Surabaya', drCountry: 'Indonesia',
+};
+
+function lkptiInput(overrides: Partial<typeof fullLkpti> = {}, extra: Partial<DataHealthInput> = {}) {
+  return baseInput({
+    assets: [asset], assetCategories: [cat], deliverables: [deliverable],
+    deliverableSegments: [liveSegment], lkptiDetails: [{ ...fullLkpti, ...overrides }],
+    ...extra,
+  });
+}
+
+describe('computeDataHealth — phase tagging', () => {
+  it('tags every pre-existing completeness check as phase "completeness"', () => {
+    const issues = computeDataHealth(baseInput({ deliverables: [deliverable] }));
+    expect(issues.length).toBeGreaterThan(0);
+    expect(issues.every(i => i.phase === 'completeness')).toBe(true);
+  });
+
+  it('tags a validity check as phase "validity"', () => {
+    const issues = computeDataHealth(lkptiInput({ goLiveDate: '31-02-2021' }));
+    expect(findIssue(issues, `lkpti-golive-invalid:${fullLkpti.id}`)?.phase).toBe('validity');
+  });
+
+  it('runs validity checks even when the workspace is full of completeness gaps', () => {
+    // A bare LkptiDetail row: missing nearly every manual field *and* holding a bad date.
+    const l = { id: 'lkpti-1', targetId: 'deliv-1', goLiveDate: '31-02-2021' };
+    const issues = computeDataHealth(baseInput({ deliverables: [deliverable], lkptiDetails: [l] }));
+    expect(findIssue(issues, `lkpti-incomplete:${l.id}`)?.phase).toBe('completeness');
+    expect(findIssue(issues, `lkpti-golive-invalid:${l.id}`)?.phase).toBe('validity');
+  });
+});
+
+describe('computeDataHealth — validity: goLiveDate', () => {
+  it('flags a goLiveDate that is not dd-mm-yyyy', () => {
+    const issues = computeDataHealth(lkptiInput({ goLiveDate: '2021-02-28' }));
+    expect(findIssue(issues, `lkpti-golive-invalid:${fullLkpti.id}`)?.severity).toBe('error');
+  });
+
+  it('flags a well-formed goLiveDate that is not a real calendar date', () => {
+    const issues = computeDataHealth(lkptiInput({ goLiveDate: '31-02-2021' }));
+    expect(findIssue(issues, `lkpti-golive-invalid:${fullLkpti.id}`)?.severity).toBe('error');
+  });
+
+  it('flags a goLiveDate in the future', () => {
+    const issues = computeDataHealth(lkptiInput({ goLiveDate: '01-01-2099' }));
+    expect(findIssue(issues, `lkpti-golive-future:${fullLkpti.id}`)?.severity).toBe('error');
+  });
+
+  it('accepts a real, past goLiveDate', () => {
+    const issues = computeDataHealth(lkptiInput({ goLiveDate: '29-02-2020' }));
+    expect(findIssue(issues, `lkpti-golive-invalid:${fullLkpti.id}`)).toBeUndefined();
+    expect(findIssue(issues, `lkpti-golive-future:${fullLkpti.id}`)).toBeUndefined();
+  });
+
+  it('does not raise a validity issue for an absent goLiveDate — that is a completeness gap', () => {
+    const issues = computeDataHealth(lkptiInput({ goLiveDate: undefined }));
+    expect(findIssue(issues, `lkpti-golive-invalid:${fullLkpti.id}`)).toBeUndefined();
+    expect(findIssue(issues, `lkpti-golive-future:${fullLkpti.id}`)).toBeUndefined();
+    expect(findIssue(issues, `lkpti-incomplete:${fullLkpti.id}`)?.phase).toBe('completeness');
+  });
+});
+
+describe('computeDataHealth — validity: length caps', () => {
+  it('flags a functionDescription over 500 characters', () => {
+    const issues = computeDataHealth(lkptiInput({ functionDescription: 'x'.repeat(501) }));
+    expect(findIssue(issues, `lkpti-too-long:${fullLkpti.id}:functionDescription`)?.severity).toBe('error');
+  });
+
+  it('accepts a functionDescription of exactly 500 characters', () => {
+    const issues = computeDataHealth(lkptiInput({ functionDescription: 'x'.repeat(500) }));
+    expect(findIssue(issues, `lkpti-too-long:${fullLkpti.id}:functionDescription`)).toBeUndefined();
+  });
+
+  it('flags a stored row field over its 100-character cap', () => {
+    const issues = computeDataHealth(lkptiInput({ platform: 'x'.repeat(101) }));
+    expect(findIssue(issues, `lkpti-too-long:${fullLkpti.id}:platform`)?.severity).toBe('error');
+  });
+
+  it('caps applicationName by reading Deliverable.name, and reports it on the Deliverables tab', () => {
+    const longName = { ...deliverable, name: 'x'.repeat(101) };
+    const issues = computeDataHealth(lkptiInput({}, { deliverables: [longName] }));
+    const issue = findIssue(issues, `lkpti-too-long:${fullLkpti.id}:applicationName`);
+    expect(issue?.severity).toBe('error');
+    expect(issue?.location).toEqual({ view: 'data', tab: 'deliverables' });
+  });
+
+  it('caps dcLocation on the composed "City, Country" value, not on either part', () => {
+    // 60 + 60 each pass a per-part check; the composed cell is 122 and would be rejected.
+    const issues = computeDataHealth(lkptiInput({ dcCity: 'x'.repeat(60), dcCountry: 'y'.repeat(60) }));
+    const issue = findIssue(issues, `lkpti-too-long:${fullLkpti.id}:dcLocation`);
+    expect(issue?.severity).toBe('error');
+    expect(issue?.location).toEqual({ view: 'data', tab: 'lkpti' });
+  });
+
+  it('accepts a composed dcLocation within the cap', () => {
+    const issues = computeDataHealth(lkptiInput({ dcCity: 'x'.repeat(60), dcCountry: 'y'.repeat(30) }));
+    expect(findIssue(issues, `lkpti-too-long:${fullLkpti.id}:dcLocation`)).toBeUndefined();
+  });
+
+  it('caps drcLocation on the composed value too', () => {
+    const issues = computeDataHealth(lkptiInput({ drCity: 'x'.repeat(60), drCountry: 'y'.repeat(60) }));
+    expect(findIssue(issues, `lkpti-too-long:${fullLkpti.id}:drcLocation`)?.severity).toBe('error');
+  });
+});
+
+describe('computeDataHealth — validity: free-text hygiene', () => {
+  it('flags a line break in a free-text field', () => {
+    const issues = computeDataHealth(lkptiInput({ functionDescription: 'Core ledger.\nHandles postings.' }));
+    expect(findIssue(issues, `lkpti-untidy-text:${fullLkpti.id}:functionDescription`)?.severity).toBe('warning');
+  });
+
+  it('flags untrimmed whitespace in a free-text field', () => {
+    const issues = computeDataHealth(lkptiInput({ systemOwner: 'IT Ops ' }));
+    expect(findIssue(issues, `lkpti-untidy-text:${fullLkpti.id}:systemOwner`)?.severity).toBe('warning');
+  });
+
+  it('flags untidy text in Deliverable.name, which exports as applicationName', () => {
+    const untidy = { ...deliverable, name: ' App One' };
+    const issues = computeDataHealth(lkptiInput({}, { deliverables: [untidy] }));
+    const issue = findIssue(issues, `lkpti-untidy-text:${fullLkpti.id}:applicationName`);
+    expect(issue?.severity).toBe('warning');
+    expect(issue?.location).toEqual({ view: 'data', tab: 'deliverables' });
+  });
+
+  it('does not flag tidy free text', () => {
+    const issues = computeDataHealth(lkptiInput());
+    expect(issues.some(i => i.id.startsWith('lkpti-untidy-text:'))).toBe(false);
+  });
+
+  it('does not flag the enum-backed or date columns as untidy text', () => {
+    const issues = computeDataHealth(lkptiInput({ goLiveDate: '01-01-2020' }));
+    expect(findIssue(issues, `lkpti-untidy-text:${fullLkpti.id}:goLiveDate`)).toBeUndefined();
+    expect(findIssue(issues, `lkpti-untidy-text:${fullLkpti.id}:ownership`)).toBeUndefined();
+  });
+});
+
+describe('computeDataHealth — validity: duplicate application names', () => {
+  const second = { id: 'deliv-2', assetId: 'asset-1', name: 'app one ', type: 'application' as const };
+  const secondSeg = { ...liveSegment, id: 'seg-live-2', deliverableId: 'deliv-2' };
+  const secondLkpti = { ...fullLkpti, id: 'lkpti-2', targetId: 'deliv-2' };
+
+  it('flags every member of a duplicate group, comparing trimmed and case-insensitively', () => {
+    const issues = computeDataHealth(baseInput({
+      assets: [asset], assetCategories: [cat], deliverables: [deliverable, second],
+      deliverableSegments: [liveSegment, secondSeg], lkptiDetails: [fullLkpti, secondLkpti],
+    }));
+    expect(findIssue(issues, `lkpti-duplicate-name:${deliverable.id}`)?.severity).toBe('warning');
+    expect(findIssue(issues, `lkpti-duplicate-name:${second.id}`)?.severity).toBe('warning');
+  });
+
+  it('ignores a name collision with a deliverable that has no LkptiDetail row', () => {
+    const issues = computeDataHealth(baseInput({
+      assets: [asset], assetCategories: [cat], deliverables: [deliverable, second],
+      deliverableSegments: [liveSegment, secondSeg], lkptiDetails: [fullLkpti],
+    }));
+    expect(findIssue(issues, `lkpti-duplicate-name:${deliverable.id}`)).toBeUndefined();
+    expect(findIssue(issues, `lkpti-duplicate-name:${second.id}`)).toBeUndefined();
+  });
+
+  it('does not flag distinct application names', () => {
+    const distinct = { ...second, name: 'App Two' };
+    const issues = computeDataHealth(baseInput({
+      assets: [asset], assetCategories: [cat], deliverables: [deliverable, distinct],
+      deliverableSegments: [liveSegment, secondSeg], lkptiDetails: [fullLkpti, secondLkpti],
+    }));
+    expect(issues.some(i => i.id.startsWith('lkpti-duplicate-name:'))).toBe(false);
+  });
+});
+
+describe('computeDataHealth — validity: RPTI workspace currency', () => {
+  it('flags a defaultCurrency that is set and is not IDR', () => {
+    const issues = computeDataHealth(baseInput({ timelineSettings: { defaultCurrency: 'USD' } }));
+    const issue = findIssue(issues, 'workspace-currency-not-idr');
+    expect(issue?.severity).toBe('warning');
+    expect(issue?.phase).toBe('validity');
+    expect(issue?.entityType).toBe('Workspace');
+    expect(issue?.location).toEqual({ view: 'data', tab: 'rpti' });
+  });
+
+  it('does not flag IDR', () => {
+    const issues = computeDataHealth(baseInput({ timelineSettings: { defaultCurrency: 'IDR' } }));
+    expect(findIssue(issues, 'workspace-currency-not-idr')).toBeUndefined();
+  });
+
+  it('does not flag an unset defaultCurrency — that is not a validity problem', () => {
+    const issues = computeDataHealth(baseInput({ timelineSettings: {} }));
+    expect(findIssue(issues, 'workspace-currency-not-idr')).toBeUndefined();
   });
 });

@@ -27,36 +27,36 @@ issue #16.
 
 ### AC1 — The report is renamed, and says whether the workspace can be filed
 
-- [ ] The Reports card and the report heading both read **Data Health**, not "Data Completeness" — phase 2 is not completeness. The `data-health` slug, `report-view-data-health` test id and `dataHealth.ts` module name are already correct and do not change.
-- [ ] A verdict line sits above the issue list, summarising both phases at once — e.g. *"Not ready to file — 2 validity errors, 5 completeness gaps."*
-- [ ] A workspace with no issues at all still reads as clean, and one carrying only completeness gaps is not reported as file-ready.
+- [x] The Reports card and the report heading both read **Data Health**, not "Data Completeness" — phase 2 is not completeness. The `data-health` slug, `report-view-data-health` test id and `dataHealth.ts` module name are already correct and do not change.
+- [x] A verdict line sits above the issue list, summarising both phases at once — e.g. *"Not ready to file — 2 validity errors, 5 completeness gaps."*
+- [x] A workspace with no issues at all still reads as clean, and one carrying only completeness gaps is not reported as file-ready.
 
 ### AC2 — Validity checks run alongside completeness checks, never behind them
 
-- [ ] `HealthIssue` carries `phase: 'completeness' | 'validity'` alongside its existing `severity`. Every issue the shipped report already produces is `phase: 'completeness'`.
-- [ ] Both phases always run. Phase never gates: a workspace full of completeness warnings still surfaces its validity errors.
-- [ ] Each validity check is guarded on the value being *present* — an absent `goLiveDate` is a completeness gap, not an invalid date, and is never reported twice.
+- [x] `HealthIssue` carries `phase: 'completeness' | 'validity'` alongside its existing `severity`. Every issue the shipped report already produces is `phase: 'completeness'`.
+- [x] Both phases always run. Phase never gates: a workspace full of completeness warnings still surfaces its validity errors.
+- [x] Each validity check is guarded on the value being *present* — an absent `goLiveDate` is a completeness gap, not an invalid date, and is never reported twice.
 
 ### AC3 — LKPTI value validity
 
-- [ ] A `goLiveDate` that is not `dd-mm-yyyy`, or is not a real calendar date (`31-02-2021`), is an `error`.
-- [ ] A `goLiveDate` later than today is an `error`. (Accepted limitation, see spec §2: a filing prepared for an already-closed period will not flag a go-live date falling after that period's end.)
-- [ ] Length caps are an `error`: `functionDescription` ≤ 500; `applicationName`, `platform`, `database`, `dcLocation`, `dcProvider`, `drcLocation`, `drcProvider`, `systemOwner`, `developer` ≤ 100.
-- [ ] Caps are measured against the **composed export value** — `applicationName` reads `Deliverable.name` via `targetId`, and `dcLocation`/`drcLocation` are the joined `"City, Country"` strings the exporter builds — so a 60-char city plus a 60-char country is correctly flagged.
-- [ ] A free-text value containing a line break, or leading/trailing whitespace, is a `warning`. Applies to `functionDescription`, `platform`, `database`, `dcProvider`, `drcProvider`, `systemOwner`, `developer`, `dcCity`, `dcCountry`, `drCity`, `drCountry` and `Deliverable.name`; the enum-backed columns and `goLiveDate` are excluded.
-- [ ] Two applications sharing a name are a `warning`, compared as `name.trim().toLowerCase()` across only those deliverables that have an `LkptiDetail` row. **Every** member of a duplicate group is flagged, not all-but-the-first.
+- [x] A `goLiveDate` that is not `dd-mm-yyyy`, or is not a real calendar date (`31-02-2021`), is an `error`.
+- [x] A `goLiveDate` later than today is an `error`. (Accepted limitation, see spec §2: a filing prepared for an already-closed period will not flag a go-live date falling after that period's end.)
+- [x] Length caps are an `error`: `functionDescription` ≤ 500; `applicationName`, `platform`, `database`, `dcLocation`, `dcProvider`, `drcLocation`, `drcProvider`, `systemOwner`, `developer` ≤ 100.
+- [x] Caps are measured against the **composed export value** — `applicationName` reads `Deliverable.name` via `targetId`, and `dcLocation`/`drcLocation` are the joined `"City, Country"` strings the exporter builds — so a 60-char city plus a 60-char country is correctly flagged.
+- [x] A free-text value containing a line break, or leading/trailing whitespace, is a `warning`. Applies to `functionDescription`, `platform`, `database`, `dcProvider`, `drcProvider`, `systemOwner`, `developer`, `dcCity`, `dcCountry`, `drCity`, `drCountry` and `Deliverable.name`; the enum-backed columns and `goLiveDate` are excluded.
+- [x] Two applications sharing a name are a `warning`, compared as `name.trim().toLowerCase()` across only those deliverables that have an `LkptiDetail` row. **Every** member of a duplicate group is flagged, not all-but-the-first.
 
 ### AC4 — RPTI workspace validity
 
-- [ ] A `TimelineSettings.defaultCurrency` that is set and is not `IDR` is a `warning`: the export cannot carry the IDR-equivalent the schema requires, because [ADR-0006](../adr/0006-rpti-auto-fill-and-single-currency.md) removed those fields by design. This is not fixable row-by-row.
-- [ ] Being workspace-level rather than record-level, it uses a synthetic `entityType: 'Workspace'` entity so the list stays uniform, and clicking it navigates to the RPTI tab where `defaultCurrency` is edited.
+- [x] A `TimelineSettings.defaultCurrency` that is set and is not `IDR` is a `warning`: the export cannot carry the IDR-equivalent the schema requires, because [ADR-0006](../adr/0006-rpti-auto-fill-and-single-currency.md) removed those fields by design. This is not fixable row-by-row.
+- [x] Being workspace-level rather than record-level, it uses a synthetic `entityType: 'Workspace'` entity so the list stays uniform, and clicking it navigates to the RPTI tab where `defaultCurrency` is edited.
 
 ### AC5 — Filtering and navigation
 
-- [ ] A phase filter (All / Validity / Completeness) sits beside the existing severity filter, matching its button-group pattern (`aria-pressed`, `data-testid="data-health-filter-*"`).
-- [ ] The two filters compose: all four severity×phase combinations are reachable, including "every error regardless of phase".
-- [ ] Validity issues navigate the same way phase-1 issues do — Data Manager, on the tab where the offending value is *editable*: the Deliverables tab for an `applicationName` problem, the LKPTI tab for a row-field problem.
-- [ ] The report stays read-only; no inline quick-fix editing.
+- [x] A phase filter (All / Validity / Completeness) sits beside the existing severity filter, matching its button-group pattern (`aria-pressed`, `data-testid="data-health-filter-*"`).
+- [x] The two filters compose: all four severity×phase combinations are reachable, including "every error regardless of phase".
+- [x] Validity issues navigate the same way phase-1 issues do — Data Manager, on the tab where the offending value is *editable*: the Deliverables tab for an `applicationName` problem, the LKPTI tab for a row-field problem.
+- [x] The report stays read-only; no inline quick-fix editing.
 
 ---
 
@@ -74,10 +74,26 @@ issue #16.
 
 | File | Change |
 |---|---|
-| `src/lib/dataHealth.ts` | `phase` on `HealthIssue`; `'completeness'` on all existing issues; new validity checks; `TimelineSettings` added to `DataHealthInput` |
+| `src/lib/dataHealth.ts` | `HealthPhase` + `phase` on `HealthIssue`; new validity checks; `timelineSettings` added to `DataHealthInput`, narrowed to `Pick<TimelineSettings, 'defaultCurrency'>` |
 | `src/lib/dataHealth.test.ts` | Vitest cases per validity check, including the composed-value caps and the duplicate-name grouping |
 | `src/components/DataHealthReportView.tsx` | Verdict line; phase filter button group; title |
 | `src/components/ReportsView.tsx` | Card + heading title/description → "Data Health"; pass `timelineSettings` down as a new `DataHealthReportView` prop (it already holds `currentData.timelineSettings`) |
 | `src/App.tsx` | Handle the synthetic `Workspace` entity in `handleNavigateFromHealthIssue` (route to the RPTI tab) |
 | `e2e/data-health-report.spec.ts` | Cases for the verdict line and the phase filter |
-| `docs/user-guide/09-reports/data-completeness-report.md` | User-facing guide update + rename |
+| `docs/user-guide/09-reports/data-health-report.md` | User-facing guide, rewritten and renamed from `data-completeness-report.md`; the four inbound links updated |
+
+---
+
+## Implementation notes
+
+- **`phase` is stamped on at the end, not at each push site.** `computeDataHealth` collects into two internal arrays and tags them `'completeness'` / `'validity'` on return, rather than repeating `phase:` at each of the ~30 existing push sites. Phase-1 issue ordering and ids are unchanged.
+- **`DataHealthInput.timelineSettings` is `Pick<TimelineSettings, 'defaultCurrency'>`.** The check reads one field; narrowing keeps fixtures and callers from having to supply the whole settings object.
+- **The workspace issue navigates with an empty search string.** `HealthIssue` keeps its uniform `entityName`, but the view passes `''` to `onNavigate` for the synthetic `Workspace` entity — typing "Workspace settings" into the Data Manager search box would filter the RPTI table to nothing. `App.tsx`'s handler needed no special-casing.
+- **The empty state now reads "No issues match the current filters."** With two composable filters, the old "No warnings to show." wording could no longer describe why the list was empty.
+- **E2E: absence is asserted against `data-health-report-view`, not the issue list.** A filter combination matching nothing renders the empty state *instead of* the list, and Playwright's `not.toContainText` fails on a missing element rather than passing.
+
+## Verification
+
+- `npm run test:unit` — 162 passed (13 files), including 26 new cases in `src/lib/dataHealth.test.ts`.
+- `npx playwright test` — 620 passed, 4 skipped (pre-existing), 0 failed.
+- `npx tsc --noEmit` — clean for every file this story touches. One pre-existing error in `src/lib/excel.ts` (a `timelineSettings: {}` literal) is unrelated and present on `main`.

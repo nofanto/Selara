@@ -178,8 +178,8 @@ export function ReportsView({ assets, initiatives, milestones, dependencies, cur
     {
       slug: 'data-health',
       icon: <HeartPulse size={28} className="text-red-500" />,
-      title: 'Data Completeness',
-      description: 'Dangling references and report-generation gaps across the whole workspace.',
+      title: 'Data Health',
+      description: 'Dangling references, report-generation gaps, and values that would be rejected at filing time.',
     },
   ];
 
@@ -650,16 +650,16 @@ export function ReportsView({ assets, initiatives, milestones, dependencies, cur
     );
   }
 
-  // ── Data Completeness ────────────────────────────────────────────────────────
+  // ── Data Health ──────────────────────────────────────────────────────────────
   if (selectedReport === 'data-health') {
     return (
       <div data-testid="report-view-data-health" className="h-full overflow-y-auto p-6 bg-slate-50">
         <div className="max-w-4xl mx-auto">
           <BackButton onBack={() => setSelectedReport(null)} />
           <div className="mb-6">
-            <h1 className="text-xl font-bold text-slate-800">Data Completeness</h1>
+            <h1 className="text-xl font-bold text-slate-800">Data Health</h1>
             <p className="text-sm text-slate-500 mt-1">
-              Dangling references and report-generation gaps that aren't visible anywhere else in the app.
+              Dangling references, report-generation gaps, and values that would be rejected at filing time.
             </p>
           </div>
           <DataHealthReportView
@@ -677,6 +677,7 @@ export function ReportsView({ assets, initiatives, milestones, dependencies, cur
             strategies={strategies}
             rptiDetails={rptiDetails}
             lkptiDetails={lkptiDetails}
+            timelineSettings={currentData.timelineSettings}
             onNavigate={(location, entityName) => onNavigate?.(location, entityName)}
           />
         </div>
