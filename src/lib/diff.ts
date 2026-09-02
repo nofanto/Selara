@@ -18,7 +18,7 @@ export type DiffResult = {
   hasChanges: boolean;
 };
 
-type EntityDiff = {
+export type EntityDiff = {
   added: string[];
   removed: string[];
   modified: { name: string; changes: string[] }[];

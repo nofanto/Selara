@@ -21,7 +21,13 @@ The report groups changes into three categories:
 | **Removed** | Items present in the baseline but deleted from the current state |
 | **Modified** | Items present in both, where one or more fields have changed |
 
-Each row identifies the item by name and type (initiative, asset, programme, strategy, or milestone). Modified rows show the old and new values for each changed field.
+Each row identifies the item by name, under a heading for its type. Every type the comparison covers gets a section, and sections with nothing to report are omitted:
+
+Assets · Programmes · Strategies · Initiatives · Relationships · Milestones · Deliverables · Deliverable Segments · App Statuses · Resources · Categories · Decisions · RPTI · LKPTI
+
+Modified rows show the old and new values for each changed field.
+
+The **History Differences** report and the **Difference Report** reached from the Version Manager render the same content — they are two entry points to one comparison, so neither shows anything the other hides.
 
 ## Limitations
 
