@@ -1,9 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import { Version, Asset, Deliverable, DeliverableSegment, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource, DeliverableStatus, Decision, RptiDetail, LkptiDetail } from '../types';
-import { X, Save, History, Trash2, ArrowRight, FileText, AlertCircle, LayoutGrid, Check, Users, GitBranch, Box, Layers, Tags, FolderTree, Scale, ClipboardList } from 'lucide-react';
+import { X, Save, History, Trash2, ArrowRight, FileText, AlertCircle, Check } from 'lucide-react';
 import { saveVersion, deleteVersion } from '../lib/db';
 import { ConfirmModal } from './ConfirmModal';
 import { computeDiff } from '../lib/diff';
+import { DiffSections } from './DiffSection';
 import { useFocusTrap } from '../lib/useFocusTrap';
 
 
@@ -343,55 +344,6 @@ export function VersionManager({ isOpen, onClose, onRestore, versions, onUpdateV
   );
 }
 
-function DiffSection({ title, data, icon: Icon }: { title: string, data: any, icon: any, colorClass?: string }) {
-    if (data.added.length === 0 && data.removed.length === 0 && data.modified.length === 0) return null;
-
-    return (
-      <div className="space-y-4">
-        <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
-          <Icon size={18} className="text-slate-400" />
-          <h4 className="font-bold text-slate-800">{title}</h4>
-        </div>
-        
-        <div className="space-y-3">
-          {/* Added */}
-          {data.added.map((name: string, idx: number) => (
-            <div key={`add-${idx}`} className="flex items-start gap-3 p-3 bg-emerald-50 rounded-xl border border-emerald-100 text-sm">
-              <span className="px-1.5 py-0.5 bg-emerald-500 text-white text-[10px] font-bold rounded uppercase mt-0.5">Added</span>
-              <span className="font-medium text-emerald-900">{name}</span>
-            </div>
-          ))}
-
-          {/* Removed */}
-          {data.removed.map((name: string, idx: number) => (
-            <div key={`rem-${idx}`} className="flex items-start gap-3 p-3 bg-red-50 rounded-xl border border-red-100 text-sm opacity-80">
-              <span className="px-1.5 py-0.5 bg-red-500 text-white text-[10px] font-bold rounded uppercase mt-0.5">Removed</span>
-              <span className="font-medium text-red-900 line-through">{name}</span>
-            </div>
-          ))}
-
-          {/* Modified */}
-          {data.modified.map((item: any, idx: number) => (
-            <div key={`mod-${idx}`} className="p-3 bg-amber-50 rounded-xl border border-amber-100 text-sm">
-              <div className="flex items-start gap-3 mb-2">
-                <span className="px-1.5 py-0.5 bg-amber-500 text-white text-[10px] font-bold rounded uppercase mt-0.5">Changed</span>
-                <span className="font-bold text-amber-900">{item.name}</span>
-              </div>
-              <ul className="space-y-1 ml-14">
-                {item.changes.map((c: string, cIdx: number) => (
-                  <li key={cIdx} className="text-xs text-amber-700 flex items-start gap-2">
-                    <span className="opacity-40">•</span>
-                    {c}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-}
-
 // Sub-component for the Report
 function VersionComparisonReport({ baseVersion, comparisonData, onClose }: {
   baseVersion: Version,
@@ -437,92 +389,7 @@ function VersionComparisonReport({ baseVersion, comparisonData, onClose }: {
               <p className="text-sm mt-1">This version exactly matches the current state.</p>
             </div>
           ) : (
-            <>
-              <DiffSection
-                title="Assets"
-                data={diff.assets}
-                icon={LayoutGrid}
-                colorClass="slate"
-              />
-              <DiffSection
-                title="Programmes"
-                data={diff.programmes}
-                icon={Users}
-                colorClass="emerald"
-              />
-              <DiffSection
-                title="Strategies"
-                data={diff.strategies}
-                icon={GitBranch}
-                colorClass="violet"
-              />
-              <DiffSection
-                title="Initiatives"
-                data={diff.initiatives}
-                icon={LayoutGrid}
-                colorClass="indigo"
-              />
-              <DiffSection
-                title="Relationships"
-                data={diff.dependencies}
-                icon={History}
-                colorClass="blue"
-              />
-              <DiffSection
-                title="Milestones"
-                data={diff.milestones}
-                icon={FileText}
-                colorClass="rose"
-              />
-              <DiffSection
-                title="Deliverables"
-                data={diff.deliverables}
-                icon={Box}
-                colorClass="cyan"
-              />
-              <DiffSection
-                title="Deliverable Segments"
-                data={diff.deliverableSegments}
-                icon={Layers}
-                colorClass="teal"
-              />
-              <DiffSection
-                title="App Statuses"
-                data={diff.deliverableStatuses}
-                icon={Tags}
-                colorClass="orange"
-              />
-              <DiffSection
-                title="Resources"
-                data={diff.resources}
-                icon={Users}
-                colorClass="sky"
-              />
-              <DiffSection
-                title="Categories"
-                data={diff.assetCategories}
-                icon={FolderTree}
-                colorClass="stone"
-              />
-              <DiffSection
-                title="Decisions"
-                data={diff.decisions}
-                icon={Scale}
-                colorClass="fuchsia"
-              />
-              <DiffSection
-                title="RPTI"
-                data={diff.rptiDetails}
-                icon={ClipboardList}
-                colorClass="lime"
-              />
-              <DiffSection
-                title="LKPTI"
-                data={diff.lkptiDetails}
-                icon={ClipboardList}
-                colorClass="amber"
-              />
-            </>
+            <DiffSections diff={diff} />
           )}
         </div>
 

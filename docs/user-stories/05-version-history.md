@@ -49,7 +49,7 @@
 
 **Acceptance Criteria:**
 - A "Difference Report" can be generated between a saved baseline version and the current state
-- The diff report shows which initiatives/assets were added, removed, or modified
+- The diff report shows which entities were added, removed, or modified, across every type the comparison covers (assets, programmes, strategies, initiatives, relationships, milestones, deliverables, deliverable segments, app statuses, resources, categories, decisions, RPTI and LKPTI details)
 - The diff report is accessible from the Reports view under "History Differences"
 - An empty state is shown in the report when no versions have been saved
 - A version selector appears once at least one version exists
