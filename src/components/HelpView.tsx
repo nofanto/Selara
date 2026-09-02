@@ -95,7 +95,9 @@ const SECTIONS: GuideSection[] = [
       { title: 'Initiatives & Dependencies',     path: '09-reports/initiatives-dependencies-report' },
       { title: 'Budget Report',                  path: '09-reports/budget-report' },
       { title: 'Capacity Report',                path: '09-reports/capacity-report' },
+      { title: 'Maturity Heatmap',               path: '09-reports/maturity-heatmap-report' },
       { title: 'History Diff Report',            path: '09-reports/history-diff-report' },
+      { title: 'Data Health Report',             path: '09-reports/data-health-report' },
     ],
   },
   {
@@ -112,6 +114,8 @@ const SECTIONS: GuideSection[] = [
       { title: 'Excel Import',     path: '11-import-export/excel-import' },
       { title: 'Excel Export',     path: '11-import-export/excel-export' },
       { title: 'PDF & SVG Export', path: '11-import-export/pdf-svg-export' },
+      { title: 'RPTI Catalogue',   path: '11-import-export/rpti-catalogue' },
+      { title: 'Sharing Links',    path: '11-import-export/sharing-links' },
     ],
   },
   {
@@ -119,6 +123,27 @@ const SECTIONS: GuideSection[] = [
     pages: [
       { title: 'Card View',       path: '12-mobile/card-view' },
       { title: 'Mobile Settings', path: '12-mobile/mobile-settings' },
+    ],
+  },
+  {
+    title: 'Decisions',
+    pages: [
+      { title: 'Recording a Decision', path: '13-decisions/recording-a-decision' },
+      { title: 'Linking Decisions',    path: '13-decisions/linking-decisions' },
+    ],
+  },
+  {
+    title: 'RPTI Report',
+    pages: [
+      { title: 'Recording an RPTI Row',     path: '14-rpti-report/recording-an-rpti-row' },
+      { title: 'Exporting the RPTI Report', path: '14-rpti-report/exporting-the-rpti-report' },
+    ],
+  },
+  {
+    title: 'LKPTI Report',
+    pages: [
+      { title: 'Recording LKPTI Rows',      path: '15-lkpti-report/recording-lkpti-rows' },
+      { title: 'Importing an LKPTI Report', path: '15-lkpti-report/importing-an-lkpti-report' },
     ],
   },
 ];
@@ -185,7 +210,7 @@ export function HelpView() {
     <div className="flex h-full overflow-hidden bg-white">
 
       {/* ── Sidebar ─────────────────────────────────────────────────────── */}
-      <aside className="w-64 shrink-0 border-r border-slate-200 flex flex-col overflow-hidden bg-slate-50">
+      <aside data-testid="guide-sidebar" className="w-64 shrink-0 border-r border-slate-200 flex flex-col overflow-hidden bg-slate-50">
         <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-200">
           <BookOpen size={16} className="text-blue-600 shrink-0" />
           <span className="text-sm font-semibold text-slate-800">User Guide</span>

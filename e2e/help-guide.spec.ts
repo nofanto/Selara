@@ -10,6 +10,8 @@ import { test, expect } from '@playwright/test';
  * 3. Clicking a page in the sidebar loads its markdown content.
  * 4. Images in the rendered content use /features/ paths (not ../../public/...).
  * 5. Navigating back to another view works.
+ * 6. Every section and page in the on-disk guide is reachable from the sidebar —
+ *    including the OJK reporting sections, which are the reason this fork exists.
  */
 test.describe('In-app User Guide', () => {
   test.beforeEach(async ({ page }) => {
@@ -70,6 +72,43 @@ test.describe('In-app User Guide', () => {
         expect(src).toMatch(/^\/(features|tutorial)\//);
       }
     }
+  });
+
+  test('OJK reporting sections are reachable from the sidebar', async ({ page }) => {
+    await page.getByTestId('nav-guide').click();
+    const sidebar = page.getByTestId('guide-sidebar');
+
+    // These sections exist under docs/user-guide/ but were missing from the
+    // in-app guide, leaving the fork's regulatory features undocumented in-product.
+    await expect(sidebar.getByRole('button', { name: 'RPTI Report', exact: true })).toBeVisible();
+    await expect(sidebar.getByRole('button', { name: 'LKPTI Report', exact: true })).toBeVisible();
+    await expect(sidebar.getByRole('button', { name: 'Decisions', exact: true })).toBeVisible();
+  });
+
+  test('reports section lists every report page that exists on disk', async ({ page }) => {
+    await page.getByTestId('nav-guide').click();
+
+    const sidebar = page.getByTestId('guide-sidebar');
+    await expect(sidebar.getByRole('button', { name: 'Maturity Heatmap', exact: true })).toBeVisible();
+    await expect(sidebar.getByRole('button', { name: 'Data Health Report', exact: true })).toBeVisible();
+  });
+
+  test('import & export section lists the catalogue and sharing pages', async ({ page }) => {
+    await page.getByTestId('nav-guide').click();
+
+    const sidebar = page.getByTestId('guide-sidebar');
+    await expect(sidebar.getByRole('button', { name: 'RPTI Catalogue', exact: true })).toBeVisible();
+    await expect(sidebar.getByRole('button', { name: 'Sharing Links', exact: true })).toBeVisible();
+  });
+
+  test('an OJK guide page renders its markdown content', async ({ page }) => {
+    await page.getByTestId('nav-guide').click();
+    await page.getByTestId('guide-sidebar').getByRole('button', { name: 'Recording an RPTI Row', exact: true }).click();
+
+    const guideContent = page.locator('[data-testid="guide-content"]');
+    const heading = guideContent.locator('h1').first();
+    await expect(heading).toBeVisible({ timeout: 5000 });
+    expect(await heading.textContent()).toMatch(/RPTI/i);
   });
 
   test('can navigate back to Visualiser from Guide', async ({ page }) => {
