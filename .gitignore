@@ -8,6 +8,11 @@ test-results/
 .env*
 .claude-flow/
 
+# Share-backend deploy artifacts (produced by backend/adapters/*/DEPLOY.md steps).
+# `dist/` above already covers each adapter's compiled output.
+function.zip
+.wrangler/
+
 # Private deployment documentation
 CLAUDE.md
 AZURE_DEPLOYMENT.md
