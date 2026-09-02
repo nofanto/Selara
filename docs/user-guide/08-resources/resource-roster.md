@@ -2,7 +2,7 @@
 
 ![Resource Roster in the Data Manager](../../public/features/resource-roster-data-manager.png)
 
-The Resource Roster is a central list of people who can be assigned to initiatives. It lives in the Data Manager alongside your other reference data — Applications, Teams, and Statuses — and acts as the source of truth for names and roles used across the planner.
+The Resource Roster is a central list of people who can be assigned to initiatives. It lives in the Data Manager alongside your other reference data — Deliverables, Deliverable Statuses, Programmes, and Strategies — and acts as the source of truth for names and roles used across the planner.
 
 ## Opening the Roster
 

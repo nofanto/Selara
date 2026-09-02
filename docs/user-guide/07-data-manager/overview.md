@@ -4,19 +4,22 @@
 
 The Data Manager is the spreadsheet-style view of all portfolio data. Click **Data Manager** in the navigation to open it.
 
-It has nine tabs:
+It has twelve tabs:
 
 | Tab | What it contains |
 |-----|-----------------|
 | Initiatives | All initiatives — name, dates, status, budget, owner, progress, etc. |
 | Dependencies | All dependency relationships between initiatives and milestones |
 | Assets | IT assets (e.g. CIAM Platform, Mobile App) |
-| Asset Categories | The categories that group assets (e.g. Customer Identity, Mobile) |
+| Deliverables | The applications, infrastructure, documents, and procedures belonging to assets |
+| Categories | The categories that group assets (e.g. Customer Identity, Mobile) |
 | Programmes | Programme definitions used for grouping and colouring |
 | Strategies | Strategic themes |
 | Milestones | Key dates and events |
 | Resources | People and roles (used for Owner and resource assignment) |
-| Applications | Software applications belonging to assets |
+| Deliverable Statuses | The lifecycle statuses and colours used by segments on the timeline |
+| RPTI | Rows for the Indonesian OJK IT Development Plan Report (Format 3.1) |
+| LKPTI | Rows for the Indonesian OJK Application List Report (Format 3.2.6) |
 
 Each tab shows a row count badge. All tabs are reachable without horizontal scrolling on tablet and narrow viewports.
 

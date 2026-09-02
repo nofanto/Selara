@@ -20,14 +20,14 @@ You can draw dependencies between initiatives on different assets. There is no r
 
 You can also draw from a milestone diamond to an initiative bar. See [Milestone Dependencies](milestone-dependencies.md) for details.
 
-## Application Segment Dependencies
+## Deliverable Segment Dependencies
 
-You can link an application lifecycle segment to an initiative to show that the initiative depends on (or is related to) a specific application phase.
+You can link a deliverable's lifecycle segment to an initiative to show that the initiative depends on (or is related to) a specific lifecycle phase.
 
 1. Click a segment bar to select it — a small **⤵** handle appears in the top-right corner.
 2. Drag from the handle and release over an initiative bar.
 
-The arrow is drawn using the same colour coding as other dependencies (blue for **Requires**, red for **Blocks**, grey for **Related**). Clicking the arrow opens the Edit Relationship panel showing the application name and status as the source.
+The arrow is drawn using the same colour coding as other dependencies (blue for **Requires**, red for **Blocks**, grey for **Related**). Clicking the arrow opens the Edit Relationship panel showing the deliverable name and status as the source.
 
 > **Note:** Segment-to-segment linking is not supported. You can link a segment to an initiative but not to another segment.
 
