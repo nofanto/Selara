@@ -99,3 +99,84 @@ Grouped by entity. Every soft check is scoped to only the records actually eligi
 `computeDataHealth()` in `src/lib/dataHealth.ts` implements the full check list in "Decided" §3 exactly, with one navigation simplification worth recording: the "click-to-navigate" decision in §2/§4 said clicking an issue "navigates to the relevant record's row" — in practice this means landing on the correct Data Manager tab (or the Decisions view, for decision-linked issues) with the record's name pre-filled into the existing global search box, which the search-filterable tabs already use to narrow their table to that name. It does **not** scroll to or highlight the specific row — building that would mean threading a highlight/scroll prop through the shared `EditableTable` and every tab that renders it, for a v1 whose own reasoning (§4) already argues against building new UI surface area when an existing mechanism gets most of the way there. Worth reconsidering only if usage shows the search-box handoff isn't precise enough in practice.
 
 Note also: `DataManagerTab` (the tab-id union) now lives in `src/lib/dataHealth.ts`, imported by `src/components/DataManager.tsx`, rather than the other way around — a pure-lib module shouldn't depend on a component file, so the type moved to be the shared source of truth.
+
+---
+
+## Phase 2 — Validity checks (decided 2026-09-02, tracked as issue #16)
+
+> Tracked as [issue #16](https://github.com/nofanto/Selara/issues/16). The shipped report above becomes **phase 1**; this section records the decision to add a **phase 2** on top of it.
+
+### Context
+
+Everything `computeDataHealth` checks today asks one of two questions: *does this reference resolve?* or *is this value present?* — the LKPTI field check is literally a `!l[f.key]` falsiness test. **Nothing asks whether a value that is present is actually legal.** A workspace can therefore report "the workspace is clean" while holding a `goLiveDate` of `31-02-2021`, a 900-character `functionDescription`, and two applications with identical names — all three of which OJK would reject at filing time.
+
+This came out of refining `agent-filing-readiness-check.md`, which proposed a separate agent-facing readiness report. That doc is now **superseded by this section** for its rule-engine content: the validation is deterministic and belongs in `src/lib/` with unit tests, not in an agent.
+
+### Decided
+
+#### 1. Phase is a *classification*, not a gate
+
+**Decision:** `HealthIssue` gains `phase: 'completeness' | 'validity'` alongside the existing `severity`. Both phases always run; the phase is a filter axis in the UI, not control flow. Gating happens *per value* — "validate `goLiveDate` only if it's set" is a guard inside the individual check.
+
+**Reasoning:** the alternative reading — don't run phase 2 until phase 1 is clean — makes phase 2 effectively unreachable. Real workspaces always carry some phase-1 warnings (an Initiative with no owner, a Deliverable with no description), so the validity errors that actually get a filing rejected would stay hidden behind gaps nobody treats as urgent. Severity and phase are genuinely independent axes and should stay that way.
+
+#### 2. No reporting-period input; "not in the future" means relative to today
+
+**Decision:** rule 5.3's "must not be in the future relative to the reporting period end date" is evaluated against the current date. No period parameter, no new `TimelineSettings` field.
+
+**Reasoning:** a reporting period end is not a concept the data model has, and adding one is a schema change for a value that changes every filing cycle. Evaluating against today answers "is this ready to file *now*," which is the question being asked in practice.
+
+**Known limitation, accepted:** preparing a filing for a period that has already closed (filing for the quarter ending 30 June, in July) will not flag an application that went live on 5 July, even though it is legitimately in the future relative to that period end. Revisit if filings are routinely prepared retrospectively.
+
+#### 3. Absorbed into this report, not a separate one
+
+**Decision:** phase 2 extends the existing report and its existing card, rather than shipping a second "filing readiness" report.
+
+**Reasoning:** with the period parameter dropped (§2), nothing about phase 2 is filing-specific enough to need its own home — it is simply more checks over `AppState`. Reusing one `HealthIssue` shape, one navigation contract, and one card avoids duplicating plumbing and avoids the "which report do I open?" question. The concern that this merges "you haven't filled this in yet" with "this filing will be rejected" is answered by the phase axis in §1 rather than by a second report.
+
+**Consequence:** the user-facing title changes from "Data Completeness" to **Data Health**, since phase 2 is not completeness. The code already uses that name (`dataHealth.ts`, `DataHealthReportView`, `report-view-data-health`), so only the display string and the card description change.
+
+#### 4. A verdict line
+
+**Decision:** the report gains a summary line above the list — e.g. *"Not ready to file — 2 validity errors, 5 completeness gaps."* This is where the phase split pays off for the user, and it delivers the filing-readiness answer without a second report.
+
+#### 5. Workspace-level issues get a synthetic entity
+
+**Decision:** the RPTI currency check (§6 below) is a property of `TimelineSettings`, not of any record, but `HealthIssue` requires `entityType`/`entityId`/`entityName` and the click-to-navigate contract assumes a record to search for. Such issues use a synthetic `entityType: 'Workspace'` entity, navigating to the RPTI tab where `defaultCurrency` is edited.
+
+**Rejected:** making the entity fields nullable with a no-op navigate — keeps the list non-uniform and gives the user a dead click.
+
+### 6. The check list
+
+**LKPTI — value validity (all guarded on the value being present):**
+
+| Check | Source rule | Severity |
+|---|---|---|
+| `goLiveDate` matches `^\d{2}-\d{2}-\d{4}$` and is a real calendar date | lkpti-schema §5.3 | `error` |
+| `goLiveDate` is not in the future relative to today | lkpti-schema §5.3 | `error` |
+| Field length caps — `functionDescription` ≤ 500; `applicationName`, `platform`, `database`, `dcLocation`, `dcProvider`, `drcLocation`, `drcProvider`, `systemOwner`, `developer` ≤ 100 | lkpti-schema §6 | `error` |
+| Free-text fields contain no line breaks and no untrimmed whitespace | lkpti-schema §5.9 | `warning` |
+| `applicationName` (from `Deliverable.name`) is unique across the submission | lkpti-schema §5.8 | `warning` |
+
+**RPTI — workspace validity:**
+
+| Check | Source rule | Severity |
+|---|---|---|
+| `TimelineSettings.defaultCurrency` is set and is not `IDR` — the export cannot carry the IDR-equivalent the schema requires, because ADR-0006 removed those fields by design | rpti-schema §10 vs [ADR-0006](../docs/adr/0006-rpti-auto-fill-and-single-currency.md) | `warning` |
+
+**Deliberately not checked, with reasons:**
+
+- **`row_number` unique/sequential, no gaps (lkpti-schema §5.1)** — structurally guaranteed: `exportLkptiReportToExcel` emits `index + 1` over the array (`src/lib/lkpti.ts`), so it is always `1..n` contiguous.
+- **Enum membership — `categoryCode`, `backupStrategy`, `ownership` (§5.2 and the §3/§4 enums)** — compile-time safe via `LkptiCategoryCode`/`LkptiBackupStrategy`/`LkptiOwnership`, and the one runtime entry path (LKPTI import) already validates with `isLkptiCategoryCode` (`src/lib/lkptiImport.ts`). Adding a runtime check would only defend against hand-edited IndexedDB.
+- **`self` / `inhouse` semantics (§5.4, §5.5)** — "any other value must be a legal entity name" is not mechanically decidable.
+- **PPJTI cross-reference (§5.6)** — requires the IT service provider list from a different LKPTI format, which this app does not model.
+
+Note on the go-live date specifically: both *machine* paths already produce correct `dd-mm-yyyy` — import converts via `toDdMmYyyy` and `suggestGoLiveDate` does the same. The only unvalidated entry path is **manual typing**, since `DataManager.tsx` renders `goLiveDate` as a plain text input labelled "(dd-mm-yyyy)" with no validation. That is a narrower gap than "dates are unchecked," but a real one.
+
+### No ADR
+
+Same reasoning as the phase-1 feature: no new dependency, no IndexedDB schema change (`HealthIssue` is a computed read model, never persisted), no infra change, and no prior decision reversed. ADR-0006 in particular is **not** superseded — the currency check surfaces a consequence of that decision, which is a different thing from reversing it.
+
+### Agent exposure — explicitly out of scope here
+
+The rule engine is a deterministic pure function with unit tests; that is where the regulatory truth lives, and no schema rule should end up encoded only in a prompt. An agent narrating or triaging `computeDataHealth`'s output remains a separate, much smaller idea — see `agent-filing-readiness-check.md`.
