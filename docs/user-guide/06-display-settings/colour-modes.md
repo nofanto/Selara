@@ -32,4 +32,4 @@ The **View** popover in the header (click the **View** button) lets you choose h
 
 ---
 
-Previous: [Application Display Mode](../05-applications/display-mode.md) | Next: [Grouping Modes](grouping-modes.md)
+Previous: [Display Mode](../05-applications/display-mode.md) | Next: [Grouping Modes](grouping-modes.md)

@@ -26,4 +26,4 @@ The toggle state persists across page reloads. If you leave the critical path vi
 
 ---
 
-Previous: [Milestone Dependencies](milestone-dependencies.md) | Next: [Adding Applications](../05-applications/adding-applications.md)
+Previous: [Milestone Dependencies](milestone-dependencies.md) | Next: [Adding Deliverables](../05-applications/adding-applications.md)

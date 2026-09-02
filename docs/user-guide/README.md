@@ -22,7 +22,7 @@ Follow these three pages to get up and running quickly:
 |------|-------------|
 | [What is Selara?](01-getting-started/what-is-selara.md) | What Selara is and how your data stays private |
 | [First Launch](01-getting-started/first-launch.md) | What happens when you open the app for the first time |
-| [Navigating the App](01-getting-started/navigating-the-app.md) | The four main views, global search, and keyboard shortcuts |
+| [Navigating the App](01-getting-started/navigating-the-app.md) | The main views, global search, and keyboard shortcuts |
 
 ### 02 Timeline
 
@@ -53,14 +53,14 @@ Follow these three pages to get up and running quickly:
 | [Milestone Dependencies](04-dependencies/milestone-dependencies.md) | Linking a milestone to an initiative |
 | [Critical Path](04-dependencies/critical-path.md) | Highlighting the longest dependency chain |
 
-### 05 Applications
+### 05 Deliverables
 
 | Page | Description |
 |------|-------------|
-| [Adding Applications](05-applications/adding-applications.md) | Recording software applications in the Data Manager |
+| [Adding Deliverables](05-applications/adding-applications.md) | Recording applications, infrastructure, and other deliverables in the Data Manager |
 | [Lifecycle Segments](05-applications/lifecycle-segments.md) | Adding coloured lifecycle segments to the timeline |
 | [Managing Segments](05-applications/managing-segments.md) | Editing, dragging, resizing, and deleting segments |
-| [Display Mode](05-applications/display-mode.md) | Showing initiatives, applications, or both |
+| [Display Mode](05-applications/display-mode.md) | Showing initiatives, deliverables, or both |
 
 ### 06 Display Settings
 
@@ -76,7 +76,7 @@ Follow these three pages to get up and running quickly:
 
 | Page | Description |
 |------|-------------|
-| [Overview](07-data-manager/overview.md) | The nine-tab spreadsheet view of all portfolio data |
+| [Overview](07-data-manager/overview.md) | The twelve-tab spreadsheet view of all portfolio data |
 | [Inline Editing](07-data-manager/inline-editing.md) | Editing cells, adding rows, and resetting data |
 | [CSV Paste](07-data-manager/csv-paste.md) | Bulk importing or updating rows by pasting CSV |
 | [Search and Filter](07-data-manager/search-and-filter.md) | Filtering the timeline and tables with a keyword search |
@@ -92,7 +92,7 @@ Follow these three pages to get up and running quickly:
 
 | Page | Description |
 |------|-------------|
-| [Overview](09-reports/overview.md) | The four available reports and how to navigate them |
+| [Overview](09-reports/overview.md) | The eight available reports and how to navigate them |
 | [Initiatives & Dependencies Report](09-reports/initiatives-dependencies-report.md) | Written dependency summary grouped by asset |
 | [Budget Report](09-reports/budget-report.md) | Spend breakdown by programme, strategy, and category |
 | [Capacity Report](09-reports/capacity-report.md) | Resource allocation across the timeline |
@@ -115,6 +115,8 @@ Follow these three pages to get up and running quickly:
 | [Excel Import](11-import-export/excel-import.md) | Uploading an Excel file to merge or overwrite data |
 | [Excel Export](11-import-export/excel-export.md) | Downloading all portfolio data as a spreadsheet |
 | [PDF & SVG Export](11-import-export/pdf-svg-export.md) | Exporting the timeline canvas as PDF or SVG |
+| [RPTI Catalogue](11-import-export/rpti-catalogue.md) | Adding assets from the pre-built Indonesian bank technology catalogue |
+| [Sharing Links](11-import-export/sharing-links.md) | Zero-knowledge share links (currently disabled) |
 
 ### 12 Mobile
 
@@ -162,17 +164,21 @@ An alphabetical index of capabilities and where to find them.
 | Display Modes | [Display Mode](05-applications/display-mode.md) |
 | Excel Export | [Excel Export](11-import-export/excel-export.md) |
 | Excel Import | [Excel Import](11-import-export/excel-import.md) |
+| Deliverables | [Adding Deliverables](05-applications/adding-applications.md) |
+| Deliverable Statuses | [Lifecycle Segments](05-applications/lifecycle-segments.md) |
 | Grouping | [Grouping Modes](06-display-settings/grouping-modes.md) |
 | Keyboard Shortcuts | [Navigating the App](01-getting-started/navigating-the-app.md) |
 | Lifecycle Segments | [Lifecycle Segments](05-applications/lifecycle-segments.md) |
 | LKPTI Report | [Recording LKPTI Report Rows](15-lkpti-report/recording-lkpti-rows.md) |
 | LKPTI Report Import | [Importing an Existing LKPTI Report](15-lkpti-report/importing-an-lkpti-report.md) |
 | Maturity Heatmap | [Maturity Heatmap Report](09-reports/maturity-heatmap-report.md) |
+| RPTI Catalogue | [RPTI Catalogue](11-import-export/rpti-catalogue.md) |
 | Milestones | [Milestone Dependencies](04-dependencies/milestone-dependencies.md) |
 | PDF Export | [PDF & SVG Export](11-import-export/pdf-svg-export.md) |
 | Reports | [Reports Overview](09-reports/overview.md) |
 | Resources | [Resource Roster](08-resources/resource-roster.md) |
 | RPTI Report | [Recording an RPTI Row](14-rpti-report/recording-an-rpti-row.md) |
+| Sharing Links | [Sharing Links](11-import-export/sharing-links.md) |
 | SVG Export | [PDF & SVG Export](11-import-export/pdf-svg-export.md) |
 | Undo/Redo | [Navigating the App](01-getting-started/navigating-the-app.md) |
 | Version History | [Saving a Version](10-version-history/saving-a-version.md) |

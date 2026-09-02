@@ -10,14 +10,12 @@ Tap the settings icon in the top-right corner of the mobile header to open the s
 
 ## Navigating between views
 
-The tab bar at the bottom of the screen switches between the four main views:
+The tab bar at the bottom of the screen switches between the two views available on mobile:
 
 - **Visualiser** — Card View of your portfolio
-- **Data Manager** — tabular data entry
 - **Reports** — initiative and resource reports
-- **History** — version history and undo
 
-The active tab is indicated by a border highlight.
+The active tab is indicated by a border highlight. The Data Manager, Decisions, and Guide views are desktop-only — open Selara on a wider screen to reach them.
 
 ## Card View bucket mode
 

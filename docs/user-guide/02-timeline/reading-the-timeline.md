@@ -16,9 +16,9 @@ Time runs left to right. Each column represents a period — monthly columns by 
 
 Each bar is one initiative. The width of a bar represents its duration. Its horizontal position reflects the start and end dates. Colour indicates the programme, strategy, or status depending on your current colour mode.
 
-## Application Swimlane
+## Deliverables Swimlane
 
-If an asset has applications defined, an "Applications" swimlane appears below its initiative row. This swimlane displays lifecycle segment bars showing the current state of each application across time.
+If an asset has deliverables defined, a "Deliverables" swimlane appears below its initiative row. This swimlane displays lifecycle segment bars showing the current state of each deliverable across time.
 
 ## Today Line
 

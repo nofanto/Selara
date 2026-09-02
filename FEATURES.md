@@ -98,7 +98,7 @@ Internal reference document. Plain-language master list of everything Selara can
 ## Data Manager
 
 - The Data Manager is a tabbed spreadsheet interface for editing all records directly.
-- Tabs cover: Initiatives, Assets, Asset Categories, Programmes, Strategies, Milestones, and Dependencies.
+- Tabs cover: Initiatives, Dependencies, Assets, Deliverables, Categories, Programmes, Strategies, Milestones, Resources, Deliverable Statuses, RPTI, and LKPTI.
 - Rows behave like a spreadsheet: pressing Tab or Enter moves focus to the next cell.
 - A ghost (blank) row always appears at the bottom of each table, ready for new data entry — a new blank row spawns automatically when you start typing.
 - Internal ID columns are hidden to keep the view clean.
@@ -107,7 +107,7 @@ Internal reference document. Plain-language master list of everything Selara can
 - Asset categories are a dedicated normalised table — not a free-text field on assets.
 - Asset rows can be reordered by dragging within their category.
 - Categories can be reordered by dragging the category header.
-- A "Reset to demo data" button restores the built-in example dataset.
+- A "Clear data and start again" button at the bottom of every tab reopens the template picker, letting you restart from any workspace template with or without demo data.
 - Deleting an asset, category, programme, or strategy shows a confirmation dialog and cascades the deletion to all dependent records.
 - Data validation checks date formats, budget values, and foreign key references, flagging invalid entries inline.
 - An inline notification confirms or reports the outcome of import/export actions (no browser alert dialogs).
@@ -121,8 +121,35 @@ Internal reference document. Plain-language master list of everything Selara can
 - **Budget Summary report** shows total spend broken down by Programme, by Strategy, and by Asset Category, each with a proportional bar chart.
 - A grand total budget figure is shown at the top of the Budget Summary.
 - **Initiatives and Dependencies report** lists every initiative per asset with its plain-language dependency sentences.
-- **Milestone Dependencies report** lists all milestone-to-initiative links with plain-language descriptions.
+- **Capacity and Resources report** shows how allocated each person is across the timeline period.
+- **Maturity Heatmap report** colours every IT asset by its maturity rating, grouped by capability.
+- **RPTI report** builds the Indonesian OJK IT Development Plan filing (Format 3.1) from deliverable lifecycle segments, and exports it to Excel.
+- **LKPTI report** builds the Indonesian OJK Application List filing (Format 3.2.6), an inventory of currently live applications, and can be seeded by importing an already-filed report.
+- **Data Health report** flags dangling references, report-generation gaps, and values that would be rejected at filing time, each linking straight to the record that needs fixing.
 - **History Differences report** lets you compare the current state against any saved version, showing what was added, removed, or changed across every entity type — initiatives, assets, deliverables, segments, milestones, decisions, resources and the RPTI/LKPTI filing details — with a field-level breakdown of each change. It shares one implementation with the Version Manager's Difference Report, so the two always agree.
+
+---
+
+## Decisions
+
+- A dedicated Decisions view records portfolio decisions with a title, context, status, and free-text detail.
+- Each decision carries a status through its lifecycle: Proposed, Accepted, Deprecated, or Superseded.
+- A decision can be linked to the initiative, programme, or asset it applies to, so the reasoning stays attached to the thing it governs.
+- Decisions are captured in version snapshots and included in the History Differences report.
+
+---
+
+## OJK Regulatory Reporting
+
+- **RPTI (Format 3.1)** — the Indonesian OJK IT Development Plan Report. Rows are generated from deliverable lifecycle segments and are editable as a first-class Data Manager tab.
+- RPTI generation uses an allow-list: only statuses explicitly flagged as live or pre-launch produce a row, so a custom status can never silently create a false filing entry.
+- Category code, developer, and data-centre/DR locations auto-fill from the parent asset category, and can be overridden per deliverable.
+- CapEx and OpEx on RPTI rows use a single workspace-wide currency.
+- **LKPTI (Format 3.2.6)** — the OJK Application List Report, an inventory of currently live applications, held as its own entity rather than as extended deliverable fields.
+- An already-filed LKPTI file can be imported to build a starting workspace, and regeneration merges rather than overwriting, so manual edits survive.
+- Function Description on an LKPTI row auto-fills from the deliverable's own Description.
+- Both reports export to Excel in the filing layout.
+- The **Data Health** report checks filing readiness — dangling references, generation gaps, and values the schema would reject — with each finding linking to the record that needs fixing.
 
 ---
 
@@ -134,7 +161,8 @@ Internal reference document. Plain-language master list of everything Selara can
 - The import preview warns about schema issues or missing required fields, flagged by severity.
 - Export the timeline visualiser as a PDF using the browser's print pipeline for crisp, searchable output.
 - Export the timeline visualiser as an SVG vector file for use in presentations or design tools.
-- **Zero-Knowledge Sharable Links:** Generate a secure, temporary URL to share your workspace. Data is encrypted client-side using AES-GCM; the server has no access to your key. Links expire automatically after 24 hours.
+- **Zero-Knowledge Sharable Links** *(currently disabled — see below)*: Generate a secure, temporary URL to share your workspace. Data is encrypted client-side using AES-GCM; the key lives in the URL fragment, which browsers never send to a server. Links expire automatically after 1 week.
+  - The Share button is hidden (`SHARING_ENABLED` in `src/components/DataControls.tsx`) because the endpoint in `backend/` is inherited from Scenia and still points at the upstream author's infrastructure. The feature turns back on once this fork deploys its own backend and `API_URL` in `src/lib/share.ts` points at it.
 
 ---
 
@@ -184,4 +212,5 @@ Internal reference document. Plain-language master list of everything Selara can
 - All destructive actions (delete, overwrite, restore, clear) require confirmation through an in-app modal — no browser alert dialogs.
 - An error boundary catches unexpected crashes and shows a recovery message rather than a blank screen.
 - Data saves are atomic — all related records are committed together to prevent partial or corrupt states.
+- Selara open in several browser tabs stays in sync: a save in one tab notifies the others, which reload and show a brief toast.
 - The app runs entirely in the browser and can be self-hosted; no backend dependencies are required.

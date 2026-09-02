@@ -17,6 +17,11 @@ Selara is a fork of [Scenia](https://github.com/waylonkenning/scenia) by Waylon 
 - **Conflict Detection:** Automatically identifies overlapping initiatives on the same asset and highlights them.
 - **Real-time Persistence:** All changes are saved instantly to your browser's IndexedDB, ensuring your data remains across sessions.
 - **Data Management:** Full CRUD operations for Assets, Initiatives, Milestones, and more, including Excel import/export capabilities.
+- **Deliverable Lifecycles:** Track the applications, infrastructure, documents, and procedures that make up each asset, as coloured lifecycle segments on the timeline.
+- **OJK Regulatory Reporting:** Build the Indonesian OJK **RPTI** (IT Development Plan, Format 3.1) and **LKPTI** (Application List, Format 3.2.6) filings from your portfolio data, and export them to Excel. An existing LKPTI file can be imported to seed a workspace.
+- **Data Health Checks:** Surface dangling references, report-generation gaps, and values that would be rejected at filing time — each linked to the record that needs fixing.
+- **Decision Log:** Record portfolio decisions MADR-style and attach them to the initiative, programme, or asset they govern.
+- **In-App User Guide:** The full [user guide](docs/user-guide/README.md) ships inside the app under the **Guide** tab.
 
 ## 🛠 Tech Stack
 
@@ -34,6 +39,9 @@ The core of the application. It uses a custom layout engine to position initiati
 
 ### Data Management (`src/components/DataManager.tsx`)
 A secondary view that allows for bulk editing of the underlying data in a table format.
+
+### Domain Rules (`src/lib/rpti.ts`, `src/lib/lkpti.ts`, `src/lib/dataHealth.ts`)
+Pure, DOM-free functions holding the regulatory generation and validation rules, each covered by Vitest unit tests alongside the source. The reasoning behind each rule lives in [`requirement-specs/`](requirement-specs/), and the decisions that shaped the data model in [`docs/adr/`](docs/adr/README.md).
 
 ### Persistence Layer (`src/lib/db.ts`)
 Manages the connection to IndexedDB, providing a local-first experience that works without a complex backend while still being more robust than `localStorage`.
@@ -57,9 +65,14 @@ Manages the connection to IndexedDB, providing a local-first experience that wor
     ```bash
     npm run dev
     ```
-4.  **Run tests:**
+4.  **Run tests:** both suites must be green before committing.
     ```bash
-    npm test
+    npm run test:unit   # Vitest — pure logic in src/lib/
+    npm test            # Playwright E2E — install browsers first with: npx playwright install
+    ```
+5.  **Lint and typecheck:**
+    ```bash
+    npm run lint
     ```
 
 ## 🤝 Contributing

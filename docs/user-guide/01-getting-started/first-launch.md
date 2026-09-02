@@ -17,7 +17,7 @@ When you open Selara for the first time, a **template picker** appears. Choose t
 
 For the Indonesian Bank Technology Catalogue template you can choose how to start:
 
-- **With demo data** — loads the template's asset categories and assets, plus a set of example initiatives, milestones, and application lifecycle segments. Use this to explore how Selara works before adding your own data.
+- **With demo data** — loads the template's asset categories and assets, plus a set of example initiatives, milestones, and deliverable lifecycle segments. Use this to explore how Selara works before adding your own data.
 - **Without demo data** — loads only the template's structural elements (asset categories and assets) with no initiatives, milestones, or segments. Use this when you are ready to start building your real portfolio from day one.
 
 ## After choosing a template
@@ -26,7 +26,7 @@ A tutorial modal appears automatically. It walks through the key features in fiv
 
 ## The demo data
 
-The Indonesian Bank Technology Catalogue template loads a representative bank portfolio across 11 of 18 RPTI areas, with initiatives, applications, lifecycle segments, resources, and budget figures.
+The Indonesian Bank Technology Catalogue template loads a representative bank portfolio across 11 of 18 RPTI areas, with initiatives, deliverables, lifecycle segments, resources, and budget figures.
 
 The demo data is safe to experiment with. You can:
 
