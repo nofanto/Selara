@@ -122,7 +122,7 @@ Internal reference document. Plain-language master list of everything Selara can
 - A grand total budget figure is shown at the top of the Budget Summary.
 - **Initiatives and Dependencies report** lists every initiative per asset with its plain-language dependency sentences.
 - **Milestone Dependencies report** lists all milestone-to-initiative links with plain-language descriptions.
-- **History Differences report** lets you compare the current state against any saved version, showing which initiatives were added, removed, or changed (with a field-level breakdown of what changed).
+- **History Differences report** lets you compare the current state against any saved version, showing what was added, removed, or changed across every entity type — initiatives, assets, deliverables, segments, milestones, decisions, resources and the RPTI/LKPTI filing details — with a field-level breakdown of each change. It shares one implementation with the Version Manager's Difference Report, so the two always agree.
 
 ---
 

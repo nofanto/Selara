@@ -1,6 +1,6 @@
 # Version Diff Summary — Design Notes
 
-> **Status:** Decided, not yet built. Tracked as [issue #18](https://github.com/nofanto/Selara/issues/18). Step 0 design discussion held 2026-09-02; no code written. Supersedes the deterministic half of [`agent-version-diff-narrative.md`](agent-version-diff-narrative.md), which now retains only the deferred narration layer.
+> **Status:** §5 (consolidation) built 2026-09-02; §4 (`EntityDiff` ids) and §§2-3 (`summarizeDiff`) decided, not yet built. Tracked as [issue #18](https://github.com/nofanto/Selara/issues/18). Step 0 design discussion held 2026-09-02. Supersedes the deterministic half of [`agent-version-diff-narrative.md`](agent-version-diff-narrative.md), which now retains only the deferred narration layer.
 > **Context:** Came out of reviewing the four read-only AI agent placeholders. The review found that most of what the "narrative" idea was reaching for is a deterministic regrouping, not a language task — the same lesson [`agent-filing-readiness-check.md`](agent-filing-readiness-check.md) learned when its rule engine became Data Health phase 2 ([issue #16](https://github.com/nofanto/Selara/issues/16)).
 
 ## Context and Problem Statement
@@ -94,6 +94,21 @@ So the decision is not "add a third presentation." Lift `DiffSection` into a sha
 
 ## Next step
 
-Per §5 the order is: **consolidate** (defect fix, no new tests needed beyond keeping `e2e/report-history-diff.spec.ts` (5), `e2e/version-history.spec.ts` (8) and `e2e/reports-versions-error.spec.ts` (2) green — they assert on the `report-history-diff` / `diff-result` / `version-select` test IDs, section titles and rendered change strings, all of which the shared component must preserve), then the **`EntityDiff` id extension** (§4) under the existing `diff.test.ts` coverage, then **`summarizeDiff`**.
+§5 is done (see **Built** below). Next is the **`EntityDiff` id extension** (§4) under the existing `diff.test.ts` coverage, then **`summarizeDiff`** (§§2-3).
 
 Only the last needs Step 1 ceremony: a User Story in `docs/user-stories/` for the summary view, then Vitest unit tests (pure logic — `CLAUDE.md` step 2 puts this at unit-test altitude, not E2E), red before green.
+
+## Built
+
+### §5 — consolidation (2026-09-02)
+
+`DiffSection` moved out of `VersionManager.tsx` into `src/components/DiffSection.tsx`, which exports a single `DiffSections` component. `ReportsView.tsx`'s ~175 lines of inline JSX are gone; both surfaces now render `<DiffSections diff={…} />`. All ten gaps closed.
+
+Two notes on how it landed:
+
+- **The section list is data, not JSX.** `VersionManager` previously spelled out 14 `<DiffSection>` calls by hand, which is exactly how `ReportsView` came to cover only 6 — nothing structurally connected the two lists to `DiffResult`. `DIFF_SECTIONS` in the shared module is now a typed array keyed by `Exclude<keyof DiffResult, 'hasChanges'>`, so a new entity type added to `computeDiff` is a compile-time-checked one-line addition that reaches both surfaces at once. The duplication this doc set out to remove could otherwise regrow.
+- **One presentation, and it is `VersionManager`'s.** The two implementations differed cosmetically (the modal's larger cards and per-section icons vs. the report's compact uppercase headings). The modal's version won, because it was the one that was correct. The Reports card is narrower, but the layout is fluid and the e2e assertions are on text, not classes.
+
+`EntityDiff` is now exported from `src/lib/diff.ts` so the shared component can type its prop — the only change to `diff.ts`, and not a behavioural one.
+
+**Regression net.** `e2e/report-history-diff.spec.ts` grew a `full entity coverage` describe block with three tests, red before green, one per shape of gap: a milestone date change (`modified` array guarded but never rendered — the report showed the "Milestones" heading over an empty list), a deliverable rename (an entity type dropped entirely), and an added LKPTI row (the filing-data case, where `diff-result` rendered as an empty `<div>`). The pre-existing 15 tests across `report-history-diff`, `version-history` and `reports-versions-error` passed unchanged, as did the full 620-test suite.

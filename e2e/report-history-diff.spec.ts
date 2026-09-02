@@ -135,3 +135,83 @@ test.describe('History Differences report', () => {
     await expect(diffResult).toContainText(`Renamed from "${originalStrategyName}" to "${renamedStrategyName}"`);
   });
 });
+
+/**
+ * Regression net for issue #18 phase 1: the History Differences report used to
+ * hand-roll its own diff JSX covering only 6 of the 14 entity types in
+ * DiffResult, and rendered neither `dependencies.modified` nor
+ * `milestones.modified` despite guarding on them. Both surfaces now share one
+ * DiffSection, so every entity type the diff computes reaches this report.
+ */
+test.describe('History Differences report — full entity coverage', () => {
+  test.beforeEach(async ({ page }) => {
+    await loadRptiTemplate(page);
+  });
+
+  async function saveBaseline(page: import('@playwright/test').Page, name: string) {
+    await page.getByTestId('nav-history').click();
+    await page.getByRole('button', { name: 'Save Current State' }).click();
+    await page.fill('input[placeholder="e.g., March 2026 Snapshot"]', name);
+    await page.getByRole('button', { name: 'Save Version' }).click();
+    await page.getByTestId('close-version-manager').click();
+  }
+
+  async function runDiff(page: import('@playwright/test').Page, versionName: string) {
+    await page.getByTestId('nav-reports').click();
+    await page.getByTestId('report-card-version-history').click();
+    const section = page.getByTestId('report-history-diff');
+    await section.getByTestId('version-select').selectOption({ label: versionName });
+    await section.getByRole('button', { name: 'Run Difference Report' }).click();
+    const diffResult = section.getByTestId('diff-result');
+    await expect(diffResult).toBeVisible({ timeout: 5000 });
+    return diffResult;
+  }
+
+  test('a milestone date change is listed, not just headed', async ({ page }) => {
+    await saveBaseline(page, 'Milestone Baseline');
+
+    await page.getByTestId('nav-data-manager').click();
+    await page.getByTestId('data-manager-tab-milestones').click();
+    const dateInput = page.locator('input[data-testid^="real-input-date"]').first();
+    await dateInput.waitFor({ timeout: 10000 });
+    const originalDate = await dateInput.inputValue();
+    await dateInput.fill('2027-11-30');
+    await dateInput.press('Enter');
+
+    const diffResult = await runDiff(page, 'Milestone Baseline');
+    await expect(diffResult).toContainText('Milestones');
+    await expect(diffResult).toContainText(`Date: ${originalDate} → 2027-11-30`);
+  });
+
+  test('a deliverable rename reaches the report', async ({ page }) => {
+    await saveBaseline(page, 'Deliverable Baseline');
+
+    await page.getByTestId('nav-data-manager').click();
+    await page.getByTestId('data-manager-tab-deliverables').click();
+    const nameInput = page.locator('input[data-testid^="real-input-name"]').first();
+    await nameInput.waitFor({ timeout: 10000 });
+    const originalName = await nameInput.inputValue();
+    await nameInput.fill(`${originalName} DELIV MOD`);
+    await nameInput.press('Enter');
+
+    const diffResult = await runDiff(page, 'Deliverable Baseline');
+    await expect(diffResult).toContainText('Deliverables');
+    await expect(diffResult).toContainText(`Renamed from "${originalName}" to "${originalName} DELIV MOD"`);
+  });
+
+  test('an added LKPTI row reaches the report', async ({ page }) => {
+    await saveBaseline(page, 'LKPTI Baseline');
+
+    await page.getByTestId('nav-data-manager').click();
+    await page.getByTestId('data-manager-tab-lkpti').click();
+    const targetSelect = page.getByTestId('ghost-select-targetId').first();
+    await targetSelect.waitFor({ timeout: 10000 });
+    const deliverableName = (await targetSelect.locator('option').nth(1).textContent())?.trim() ?? '';
+    expect(deliverableName).not.toBe('');
+    await targetSelect.selectOption({ index: 1 });
+
+    const diffResult = await runDiff(page, 'LKPTI Baseline');
+    await expect(diffResult).toContainText('LKPTI');
+    await expect(diffResult).toContainText(deliverableName);
+  });
+});
