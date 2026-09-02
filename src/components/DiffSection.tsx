@@ -38,24 +38,24 @@ function DiffSection({ title, data, icon: Icon }: { title: string; data: EntityD
 
       <div className="space-y-3">
         {/* Added */}
-        {data.added.map((name, idx) => (
-          <div key={`add-${idx}`} className="flex items-start gap-3 p-3 bg-emerald-50 rounded-xl border border-emerald-100 text-sm">
+        {data.added.map((entry, idx) => (
+          <div key={`add-${entry.id}-${idx}`} className="flex items-start gap-3 p-3 bg-emerald-50 rounded-xl border border-emerald-100 text-sm">
             <span className="px-1.5 py-0.5 bg-emerald-500 text-white text-[10px] font-bold rounded uppercase mt-0.5">Added</span>
-            <span className="font-medium text-emerald-900">{name}</span>
+            <span className="font-medium text-emerald-900">{entry.name}</span>
           </div>
         ))}
 
         {/* Removed */}
-        {data.removed.map((name, idx) => (
-          <div key={`rem-${idx}`} className="flex items-start gap-3 p-3 bg-red-50 rounded-xl border border-red-100 text-sm opacity-80">
+        {data.removed.map((entry, idx) => (
+          <div key={`rem-${entry.id}-${idx}`} className="flex items-start gap-3 p-3 bg-red-50 rounded-xl border border-red-100 text-sm opacity-80">
             <span className="px-1.5 py-0.5 bg-red-500 text-white text-[10px] font-bold rounded uppercase mt-0.5">Removed</span>
-            <span className="font-medium text-red-900 line-through">{name}</span>
+            <span className="font-medium text-red-900 line-through">{entry.name}</span>
           </div>
         ))}
 
         {/* Modified */}
         {data.modified.map((item, idx) => (
-          <div key={`mod-${idx}`} className="p-3 bg-amber-50 rounded-xl border border-amber-100 text-sm">
+          <div key={`mod-${item.id}-${idx}`} className="p-3 bg-amber-50 rounded-xl border border-amber-100 text-sm">
             <div className="flex items-start gap-3 mb-2">
               <span className="px-1.5 py-0.5 bg-amber-500 text-white text-[10px] font-bold rounded uppercase mt-0.5">Changed</span>
               <span className="font-bold text-amber-900">{item.name}</span>

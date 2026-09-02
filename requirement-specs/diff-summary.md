@@ -1,6 +1,6 @@
 # Version Diff Summary — Design Notes
 
-> **Status:** §5 (consolidation) built 2026-09-02; §4 (`EntityDiff` ids) and §§2-3 (`summarizeDiff`) decided, not yet built. Tracked as [issue #18](https://github.com/nofanto/Selara/issues/18). Step 0 design discussion held 2026-09-02. Supersedes the deterministic half of [`agent-version-diff-narrative.md`](agent-version-diff-narrative.md), which now retains only the deferred narration layer.
+> **Status:** §5 (consolidation) and §4 (`EntityDiff` ids) built 2026-09-02; §§2-3 (`summarizeDiff`) decided, not yet built. Tracked as [issue #18](https://github.com/nofanto/Selara/issues/18). Step 0 design discussion held 2026-09-02. Supersedes the deterministic half of [`agent-version-diff-narrative.md`](agent-version-diff-narrative.md), which now retains only the deferred narration layer.
 > **Context:** Came out of reviewing the four read-only AI agent placeholders. The review found that most of what the "narrative" idea was reaching for is a deterministic regrouping, not a language task — the same lesson [`agent-filing-readiness-check.md`](agent-filing-readiness-check.md) learned when its rule engine became Data Health phase 2 ([issue #16](https://github.com/nofanto/Selara/issues/16)).
 
 ## Context and Problem Statement
@@ -66,6 +66,35 @@ Resolution: extend `EntityDiff` **additively** with the entity `id` (and, where 
 
 **Rejected — have `summarizeDiff(baseVersion, currentData)` re-walk the raw data itself.** Avoids touching `computeDiff`, but duplicates the entire comparison, creating two implementations of "what changed" that can disagree. Precisely the failure mode the extracted-pure-function pattern exists to prevent.
 
+#### Revision (2026-09-02): identity moves onto the entries, not alongside them
+
+The decision above says *additive*, and that is no longer the right call. Two things changed:
+
+- **`added` and `removed` are `string[]`.** There is nowhere on them to put an id. "Additive" could only mean parallel `addedIds`/`removedIds` arrays index-aligned with the name arrays — an invariant nothing in the type system enforces, which `summarizeDiff` would then have to zip back together.
+- **The reason additive was valuable is gone.** §4 justified it as "both consumers ignore the new fields unchanged." After §5 there is *one* consumer, `src/components/DiffSection.tsx`, and it touches these arrays on four lines. `src/lib/diff.test.ts` asserts `modified` with exact `toEqual`, so its expectations have to change under any shape, additive included.
+
+**Decision: one `DiffEntry` type carries identity across all three arrays.**
+
+```ts
+type DiffEntry = { id: string; name: string; assetId?: string };
+
+export type EntityDiff = {
+  added: DiffEntry[];
+  removed: DiffEntry[];
+  modified: (DiffEntry & { changes: string[] })[];
+};
+```
+
+`summarizeDiff` then groups with one `assetId` read, uniform across adds, removes and modifications — no index-zipping, no shape that differs by which array an entity came from.
+
+**`assetId` is resolved at diff time, not by the consumer.** `computeDiff` holds both the baseline and the current snapshot, so it can still resolve a segment or LKPTI row through a deliverable that has since been *deleted* — by looking it up in the base data. A consumer handed only the current workspace could not, and those are exactly the removals that matter most to a catch-up summary.
+
+Where it comes from, by type: `initiatives`, `deliverables` and `milestones` carry `assetId` directly (all required). `deliverableSegments` and `lkptiDetails` resolve through their deliverable; `rptiDetails` resolves through its deliverable or, for `targetType: 'asset'`, uses `targetId` directly. An asset's own entry sets `assetId` to its own `id`, so grouping needs no special case for the asset itself. `dependencies` are left unset — a dependency joins two initiatives that may sit under different assets, so it has no single owner. `programmes`, `strategies`, `resources`, `assetCategories`, `deliverableStatuses` and `decisions` are portfolio-level and have none by nature; they land in the portfolio bucket of §2.
+
+**Rejected — parallel `addedIds`/`removedIds` arrays.** Literally additive, and honours §4 as written. Rejected because index-alignment between two arrays is an invariant with no enforcement and no natural place to assert it, and it buys nothing now that the consumer count is one.
+
+**Rejected — put ids on `modified` only.** Genuinely additive with no restructuring. Rejected because adds and removes are *tier 2* of the §3 significance ranking, so leaving them unattributable to an asset would make a whole rank of the summary ungroupable.
+
 ### 5. Consolidate the two diff UIs first; the summary is a view on the merged one
 
 Selara renders this diff in **two places, with two implementations.** `VersionManager.tsx` uses a reusable `DiffSection` (`:346`) called 14× for all 14 entity types. `ReportsView.tsx` hand-rolls ~175 lines of equivalent JSX inline (`:250-426`) covering only **6**.
@@ -94,7 +123,7 @@ So the decision is not "add a third presentation." Lift `DiffSection` into a sha
 
 ## Next step
 
-§5 is done (see **Built** below). Next is the **`EntityDiff` id extension** (§4) under the existing `diff.test.ts` coverage, then **`summarizeDiff`** (§§2-3).
+§5 and §4 are done (see **Built** below). Next is **`summarizeDiff`** (§§2-3) — and it is not unblocked: the two Open questions above (secondary sort within a group; empty and huge groups) are Step 0 items to settle before code.
 
 Only the last needs Step 1 ceremony: a User Story in `docs/user-stories/` for the summary view, then Vitest unit tests (pure logic — `CLAUDE.md` step 2 puts this at unit-test altitude, not E2E), red before green.
 
@@ -112,3 +141,17 @@ Two notes on how it landed:
 `EntityDiff` is now exported from `src/lib/diff.ts` so the shared component can type its prop — the only change to `diff.ts`, and not a behavioural one.
 
 **Regression net.** `e2e/report-history-diff.spec.ts` grew a `full entity coverage` describe block with three tests, red before green, one per shape of gap: a milestone date change (`modified` array guarded but never rendered — the report showed the "Milestones" heading over an empty list), a deliverable rename (an entity type dropped entirely), and an added LKPTI row (the filing-data case, where `diff-result` rendered as an empty `<div>`). The pre-existing 15 tests across `report-history-diff`, `version-history` and `reports-versions-error` passed unchanged, as did the full 620-test suite.
+
+### §4 — entity identity on `EntityDiff` (2026-09-02)
+
+Built as revised above, not as originally written: one `DiffEntry` type (`id`, `name`, optional `assetId`) across `added`, `removed` and `modified`, rather than a literally-additive extension.
+
+`compareEntities` grew an optional fifth parameter, `getAssetId`, and builds every entry through one `toEntry` helper — so identity cannot be present on one array and missing from another, which is the failure mode the parallel-array shape invited. Seven of the fourteen comparisons pass a resolver; the other seven pass none and their entries carry no `assetId`, which is the correct answer for a programme or a resource.
+
+`getDeliverableAssetId` checks the current snapshot and then the baseline. That ordering is the whole reason `assetId` is resolved inside `computeDiff`: a deliverable deleted since the baseline is absent from the current workspace but still present in the base version, so its segments and LKPTI rows can still be placed under the asset that owned them. Those are removals, and removals are tier 2 of the §3 ranking — precisely what a catch-up summary must not drop on the floor.
+
+**Regression net.** Six new tests in `src/lib/diff.test.ts` under `computeDiff — entity identity`, red before green: ids on all three arrays; direct `assetId` for initiatives, deliverables and milestones; resolution through the owning deliverable for segments and LKPTI rows; both RPTI target types; resolution from the *baseline* for a deleted deliverable; and `assetId` left unset for portfolio-level types and for dependencies.
+
+The eleven pre-existing tests asserted `modified` with exact `toEqual`, so all ten that matched an entity had to gain their `id` — the churn that made "additive" a false economy in the first place. Full suite green: 168 unit, 623 e2e passed with 4 skipped.
+
+The only consumer, `src/components/DiffSection.tsx`, changed on four lines (`name` → `entry.name`) and took a small improvement for free: React keys are now `${entry.id}-${idx}` rather than a bare array index.
