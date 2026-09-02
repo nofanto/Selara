@@ -1,7 +1,7 @@
 import {
   Asset, AssetCategory, Deliverable, DeliverableSegment, DeliverableStatus,
   Initiative, Milestone, Dependency, Decision, Resource, Programme, Strategy,
-  RptiDetail, LkptiDetail,
+  RptiDetail, LkptiDetail, TimelineSettings,
 } from '../types';
 import { isLiveStatusId, isPreLaunchStatusId, resolveAssetCategory } from './rpti';
 
@@ -19,9 +19,19 @@ export type HealthIssueLocation =
 
 export type HealthSeverity = 'error' | 'warning';
 
+/**
+ * Which question the check asks. 'completeness' — is this reference resolvable /
+ * is this value present? 'validity' — is the value that *is* present actually legal
+ * under the OJK schema? Independent of severity, and never a gate: both phases always
+ * run, so a validity error is never hidden behind the completeness warnings every real
+ * workspace carries. See requirement-specs/data-completeness-report.md § Phase 2 §1.
+ */
+export type HealthPhase = 'completeness' | 'validity';
+
 export interface HealthIssue {
   id: string; // stable, unique per (check, record) — used for React keys and dedup in tests
   severity: HealthSeverity;
+  phase: HealthPhase;
   entityType: string;
   entityId: string;
   entityName: string; // best-effort human label; also used to pre-fill the Data Manager search box on navigate
@@ -44,6 +54,9 @@ export interface DataHealthInput {
   strategies: Strategy[];
   rptiDetails: RptiDetail[];
   lkptiDetails: LkptiDetail[];
+  // Phase 2 only, and only `defaultCurrency` is read — narrowed rather than taking the
+  // whole TimelineSettings so callers and fixtures need supply no more than the check uses.
+  timelineSettings: Pick<TimelineSettings, 'defaultCurrency'>;
 }
 
 const DATA_TAB: HealthIssueLocation = { view: 'data', tab: 'deliverables' };
@@ -62,7 +75,7 @@ export function computeDataHealth(input: DataHealthInput): HealthIssue[] {
   const {
     assets, assetCategories, deliverables, deliverableSegments, deliverableStatuses,
     initiatives, milestones, dependencies, decisions, resources, programmes, strategies,
-    rptiDetails, lkptiDetails,
+    rptiDetails, lkptiDetails, timelineSettings,
   } = input;
 
   const assetIds = new Set(assets.map(a => a.id));
@@ -81,7 +94,11 @@ export function computeDataHealth(input: DataHealthInput): HealthIssue[] {
   const assetById = new Map(assets.map(a => [a.id, a]));
   const initiativeById = new Map(initiatives.map(i => [i.id, i]));
 
-  const issues: HealthIssue[] = [];
+  // Checks push without a `phase` — it is stamped on at the end from which array the
+  // issue landed in, rather than repeated at every one of the ~30 push sites.
+  type PendingIssue = Omit<HealthIssue, 'phase'>;
+  const issues: PendingIssue[] = [];
+  const validityIssues: PendingIssue[] = [];
 
   // ── Hard: dangling references (severity 'error') ──────────────────────────
 
@@ -379,5 +396,158 @@ export function computeDataHealth(input: DataHealthInput): HealthIssue[] {
     }
   }
 
-  return issues;
+  // ── Phase 2: value validity ───────────────────────────────────────────────
+  // Every check below is guarded on the value being *present* — an absent value is a
+  // completeness gap, already reported above, and must not be reported twice.
+  // See requirement-specs/data-completeness-report.md § Phase 2 §6/§6a.
+
+  const LKPTI_NAME_CAP = 100;
+  const LKPTI_DESCRIPTION_CAP = 500;
+
+  // The go-live column is dd-mm-yyyy per the LKPTI form. Both machine paths (import via
+  // toDdMmYyyy, and suggestGoLiveDate) already emit that shape; the unvalidated entry
+  // path is manual typing into DataManager's plain text input.
+  const DD_MM_YYYY = /^(\d{2})-(\d{2})-(\d{4})$/;
+  const parseDdMmYyyy = (value: string): Date | null => {
+    const match = DD_MM_YYYY.exec(value);
+    if (!match) return null;
+    const [, dd, mm, yyyy] = match;
+    const day = Number(dd), month = Number(mm), year = Number(yyyy);
+    const date = new Date(year, month - 1, day);
+    // Rejects 31-02-2021 and friends: the Date constructor rolls them over silently.
+    const isReal = date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
+    return isReal ? date : null;
+  };
+
+  const todayEnd = new Date();
+  todayEnd.setHours(23, 59, 59, 999);
+
+  const isUntidy = (value: string) => /[\r\n]/.test(value) || value !== value.trim();
+  const compose = (city?: string, country?: string) => [city, country].filter(Boolean).join(', ');
+
+  for (const l of lkptiDetails) {
+    const deliverable = deliverableById.get(l.targetId);
+    const applicationName = deliverable?.name;
+    const label = deliverable?.name ?? l.id;
+    const entityName = label;
+    // The name is edited on the Deliverables tab; every other column on the LKPTI tab.
+    const NAME_TAB = tab('deliverables');
+    const ROW_TAB = tab('lkpti');
+
+    if (l.goLiveDate) {
+      const parsed = parseDdMmYyyy(l.goLiveDate);
+      if (!parsed) {
+        validityIssues.push({
+          id: `lkpti-golive-invalid:${l.id}`, severity: 'error', entityType: 'LkptiDetail', entityId: l.id,
+          entityName, message: `The LKPTI row for "${label}" has a Go-Live Date of "${l.goLiveDate}", which is not a real dd-mm-yyyy date.`,
+          location: ROW_TAB,
+        });
+      } else if (parsed > todayEnd) {
+        validityIssues.push({
+          id: `lkpti-golive-future:${l.id}`, severity: 'error', entityType: 'LkptiDetail', entityId: l.id,
+          entityName, message: `The LKPTI row for "${label}" has a Go-Live Date of "${l.goLiveDate}", which is in the future.`,
+          location: ROW_TAB,
+        });
+      }
+    }
+
+    // Caps are measured against the value that actually lands in the spreadsheet cell:
+    // applicationName reads Deliverable.name, and dc/drcLocation are the composed
+    // "City, Country" strings exportLkptiReportToExcel builds. Capping the parts instead
+    // would let a 60-char city plus a 60-char country through as a 122-char cell.
+    const capped: { field: string; label: string; value?: string; cap: number; location: HealthIssueLocation }[] = [
+      { field: 'applicationName', label: 'Application Name', value: applicationName, cap: LKPTI_NAME_CAP, location: NAME_TAB },
+      { field: 'functionDescription', label: 'Function Description', value: l.functionDescription, cap: LKPTI_DESCRIPTION_CAP, location: ROW_TAB },
+      { field: 'platform', label: 'Platform', value: l.platform, cap: LKPTI_NAME_CAP, location: ROW_TAB },
+      { field: 'database', label: 'Database', value: l.database, cap: LKPTI_NAME_CAP, location: ROW_TAB },
+      { field: 'dcLocation', label: 'DC Location', value: compose(l.dcCity, l.dcCountry), cap: LKPTI_NAME_CAP, location: ROW_TAB },
+      { field: 'dcProvider', label: 'DC Provider', value: l.dcProvider, cap: LKPTI_NAME_CAP, location: ROW_TAB },
+      { field: 'drcLocation', label: 'DRC Location', value: compose(l.drCity, l.drCountry), cap: LKPTI_NAME_CAP, location: ROW_TAB },
+      { field: 'drcProvider', label: 'DRC Provider', value: l.drcProvider, cap: LKPTI_NAME_CAP, location: ROW_TAB },
+      { field: 'systemOwner', label: 'System Owner', value: l.systemOwner, cap: LKPTI_NAME_CAP, location: ROW_TAB },
+      { field: 'developer', label: 'Developer', value: l.developer, cap: LKPTI_NAME_CAP, location: ROW_TAB },
+    ];
+    for (const c of capped) {
+      if (c.value && c.value.length > c.cap) {
+        validityIssues.push({
+          id: `lkpti-too-long:${l.id}:${c.field}`, severity: 'error', entityType: 'LkptiDetail', entityId: l.id,
+          entityName, message: `${c.label} on the LKPTI row for "${label}" is ${c.value.length} characters — the schema caps it at ${c.cap}.`,
+          location: c.location,
+        });
+      }
+    }
+
+    // Free-text columns only: the enum-backed ones and goLiveDate have their own checks.
+    const freeText: { field: string; label: string; value?: string; location: HealthIssueLocation }[] = [
+      { field: 'applicationName', label: 'Application Name', value: applicationName, location: NAME_TAB },
+      { field: 'functionDescription', label: 'Function Description', value: l.functionDescription, location: ROW_TAB },
+      { field: 'platform', label: 'Platform', value: l.platform, location: ROW_TAB },
+      { field: 'database', label: 'Database', value: l.database, location: ROW_TAB },
+      { field: 'dcCity', label: 'DC City', value: l.dcCity, location: ROW_TAB },
+      { field: 'dcCountry', label: 'DC Country', value: l.dcCountry, location: ROW_TAB },
+      { field: 'dcProvider', label: 'DC Provider', value: l.dcProvider, location: ROW_TAB },
+      { field: 'drCity', label: 'DRC City', value: l.drCity, location: ROW_TAB },
+      { field: 'drCountry', label: 'DRC Country', value: l.drCountry, location: ROW_TAB },
+      { field: 'drcProvider', label: 'DRC Provider', value: l.drcProvider, location: ROW_TAB },
+      { field: 'systemOwner', label: 'System Owner', value: l.systemOwner, location: ROW_TAB },
+      { field: 'developer', label: 'Developer', value: l.developer, location: ROW_TAB },
+    ];
+    for (const f of freeText) {
+      if (f.value && isUntidy(f.value)) {
+        validityIssues.push({
+          id: `lkpti-untidy-text:${l.id}:${f.field}`, severity: 'warning', entityType: 'LkptiDetail', entityId: l.id,
+          entityName, message: `${f.label} on the LKPTI row for "${label}" has a line break or untrimmed whitespace — it exports into a flat table cell.`,
+          location: f.location,
+        });
+      }
+    }
+  }
+
+  // Duplicate application names, scoped to deliverables that actually export — "unique
+  // across the submission" means the rows that file, not every Deliverable in the
+  // workspace. Every member of a group is flagged: both records need renaming, and
+  // "all but the first" would depend on array order rather than anything the user sees.
+  const submittedDeliverables = new Map<string, Deliverable>();
+  for (const l of lkptiDetails) {
+    const d = deliverableById.get(l.targetId);
+    if (d) submittedDeliverables.set(d.id, d);
+  }
+  const byNameKey = new Map<string, Deliverable[]>();
+  for (const d of submittedDeliverables.values()) {
+    const key = d.name.trim().toLowerCase();
+    if (!key) continue;
+    const group = byNameKey.get(key);
+    if (group) group.push(d); else byNameKey.set(key, [d]);
+  }
+  for (const group of byNameKey.values()) {
+    if (group.length < 2) continue;
+    for (const d of group) {
+      const others = group.length - 1;
+      validityIssues.push({
+        id: `lkpti-duplicate-name:${d.id}`, severity: 'warning', entityType: 'Deliverable', entityId: d.id,
+        entityName: d.name,
+        message: `"${d.name}" shares its name with ${others} other application${others === 1 ? '' : 's'} in the submission — LKPTI requires it to be unique.`,
+        location: tab('deliverables'),
+      });
+    }
+  }
+
+  // Workspace-level, not row-level: no amount of row-by-row fixing helps, because
+  // ADR-0006 removed the IDR-equivalent fields the RPTI schema (§10) requires.
+  // Uses the synthetic 'Workspace' entity so the list stays uniform and the click
+  // still lands where defaultCurrency is edited.
+  const currency = timelineSettings.defaultCurrency;
+  if (currency && currency !== 'IDR') {
+    validityIssues.push({
+      id: 'workspace-currency-not-idr', severity: 'warning', entityType: 'Workspace', entityId: 'workspace',
+      entityName: 'Workspace settings',
+      message: `The workspace currency is ${currency}. RPTI requires IDR-equivalent amounts, and this app reports in a single currency with no per-row conversion, so the export cannot be schema-compliant until the workspace reports in IDR.`,
+      location: tab('rpti'),
+    });
+  }
+
+  return [
+    ...issues.map(i => ({ ...i, phase: 'completeness' as const })),
+    ...validityIssues.map(i => ({ ...i, phase: 'validity' as const })),
+  ];
 }

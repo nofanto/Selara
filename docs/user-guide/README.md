@@ -98,7 +98,7 @@ Follow these three pages to get up and running quickly:
 | [Capacity Report](09-reports/capacity-report.md) | Resource allocation across the timeline |
 | [Maturity Heatmap Report](09-reports/maturity-heatmap-report.md) | IT assets coloured by maturity level, grouped by capability |
 | [History Diff Report](09-reports/history-diff-report.md) | Comparing two saved versions to see what changed |
-| [Data Completeness Report](09-reports/data-completeness-report.md) | Dangling references and report-generation gaps across the whole workspace |
+| [Data Health Report](09-reports/data-health-report.md) | Dangling references, report-generation gaps, and values that would be rejected at filing time |
 
 ### 10 Version History
 
@@ -156,7 +156,7 @@ An alphabetical index of capabilities and where to find them.
 | Conflict Detection | [Conflict Detection](02-timeline/conflict-detection.md) |
 | Critical Path | [Critical Path](04-dependencies/critical-path.md) |
 | CSV Import | [CSV Paste](07-data-manager/csv-paste.md) |
-| Data Completeness | [Data Completeness Report](09-reports/data-completeness-report.md) |
+| Data Health | [Data Health Report](09-reports/data-health-report.md) |
 | Decisions | [Recording a Decision](13-decisions/recording-a-decision.md) |
 | Dependencies | [Drawing Dependencies](04-dependencies/drawing-dependencies.md) |
 | Display Modes | [Display Mode](05-applications/display-mode.md) |

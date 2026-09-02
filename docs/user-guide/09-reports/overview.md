@@ -15,7 +15,7 @@ Open the Reports section from the main navigation. You will see a selection scre
 - **Maturity Heatmap** — view all IT assets coloured by their maturity level, grouped by capability
 - **RPTI Report** — Indonesian OJK IT Development Plan Report (Format 3.1), tracking planned application and infrastructure development
 - **LKPTI Report** — Indonesian OJK LKPTI Application List (Format 3.2.6), an inventory of currently live applications
-- **Data Completeness** — dangling references and report-generation gaps across the whole workspace
+- **Data Health** — dangling references, report-generation gaps, and values that would be rejected at filing time
 
 Click any card to open that report. Use the back button to return to the selection screen.
 
