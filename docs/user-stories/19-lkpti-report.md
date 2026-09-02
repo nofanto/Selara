@@ -24,7 +24,8 @@ LKPTI Format 3.2.6 is a second OJK regulatory report, distinct from RPTI (Format
 
 ### AC2 — Row generation
 
-- [x] Clicking **Generate LKPTI Rows** builds one row per Deliverable that has at least one lifecycle segment classified as live (in-production) — a Deliverable that's only ever been Planned or Funded doesn't generate a row, since LKPTI requires a non-future go-live date.
+- [x] Clicking **Generate LKPTI Rows** builds one row per Deliverable that has at least one lifecycle segment classified as live (in-production) **and already started** (`startDate <= today`) — a Deliverable that's only ever been Planned or Funded, or whose live phase begins in the future, doesn't generate a row, since LKPTI requires a non-future go-live date.
+- [x] A Deliverable that has gone live stays on the report even once its live segment has ended — the rule is "has gone live", not "is live right now", so a sunset or out-of-support application is still reported until its row is deleted.
 - [x] Generation is **not** scoped to a report year, unlike RPTI — it always reflects current state.
 - [x] **Category**, **Developer**, and the four DC/DR location fields cascade Deliverable → AssetCategory, reusing the same resolution logic RPTI generation already uses.
 - [x] **Developer** only auto-fills to `'inhouse'`; when the Deliverable's developer is a third party, the row is left blank for the provider's actual name (LKPTI wants the name, not a generic marker).

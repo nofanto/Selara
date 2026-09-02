@@ -137,6 +137,70 @@ describe('generateLkptiDetails', () => {
     expect(rows[0].functionDescription).toBeUndefined();
   });
 
+  /**
+   * LKPTI 3.2.6 is an inventory of applications that have ACTUALLY gone live, not a
+   * plan. requirement-specs/lkpti-integration.md §3 requires a live segment precisely
+   * so that every generated row satisfies OJK validation rule 5.3 ("go_live_date must
+   * not be in the future") by construction — but the original check only asked whether
+   * a live segment EXISTED, so a deliverable whose in-production phase begins next year
+   * still generated a row, carrying a future go-live date that dataHealth.ts then
+   * flagged as an error.
+   */
+  it('excludes a deliverable whose only live segment starts in the future', () => {
+    const segments = [makeSegment({
+      status: 'appstatus-in-production', startDate: '2099-04-01', endDate: '2099-12-31',
+    })];
+    const rows = generateLkptiDetails(makeContext({ deliverableSegments: segments }));
+
+    expect(rows).toHaveLength(0);
+  });
+
+  it('includes a deliverable whose live segment has already started', () => {
+    const segments = [makeSegment({
+      status: 'appstatus-in-production', startDate: '2020-01-01', endDate: '2099-12-31',
+    })];
+    const rows = generateLkptiDetails(makeContext({ deliverableSegments: segments }));
+
+    expect(rows).toHaveLength(1);
+  });
+
+  it('includes a deliverable whose live segment starts today (today is not the future)', () => {
+    const today = new Date();
+    const iso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const segments = [makeSegment({
+      status: 'appstatus-in-production', startDate: iso, endDate: '2099-12-31',
+    })];
+    const rows = generateLkptiDetails(makeContext({ deliverableSegments: segments }));
+
+    expect(rows).toHaveLength(1);
+  });
+
+  // "Has gone live", not "is live right now": an application whose in-production phase
+  // has ended is still something the bank ran and must report. Dropping it would
+  // under-report to the regulator, and would silently discard the row's manual-only
+  // fields on the next generate.
+  it('includes a deliverable that has gone live even though its live segment has since ended', () => {
+    const segments = [
+      makeSegment({ id: 'seg-prod', status: 'appstatus-in-production', startDate: '2020-01-01', endDate: '2021-06-30' }),
+      makeSegment({ id: 'seg-sunset', status: 'appstatus-sunset', startDate: '2021-07-01', endDate: '2099-12-31' }),
+    ];
+    const rows = generateLkptiDetails(makeContext({ deliverableSegments: segments }));
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].goLiveDate).toBe('01-01-2020');
+  });
+
+  it('never suggests a future goLiveDate when an earlier live segment has started', () => {
+    const segments = [
+      makeSegment({ id: 'seg-future', status: 'appstatus-in-production', startDate: '2099-01-01', endDate: '2099-12-31' }),
+      makeSegment({ id: 'seg-past', status: 'appstatus-in-production', startDate: '2020-05-20', endDate: '2098-12-31' }),
+    ];
+    const rows = generateLkptiDetails(makeContext({ deliverableSegments: segments }));
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].goLiveDate).toBe('20-05-2020');
+  });
+
   it('auto-suggests goLiveDate (dd-mm-yyyy) from the earliest live segment', () => {
     const segments = [
       makeSegment({ id: 'seg-late', status: 'appstatus-in-production', startDate: '2026-08-15' }),

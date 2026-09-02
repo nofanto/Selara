@@ -9,6 +9,16 @@ export function isLkptiCategoryCode(code: string): code is LkptiCategoryCode {
   return LKPTI_CATEGORY_CODE_SET.has(code);
 }
 
+/**
+ * Today as a local-time ISO date (YYYY-MM-DD). Deliberately not
+ * `new Date().toISOString()`, which converts to UTC first and so reports yesterday
+ * for anyone east of Greenwich — including every user of an Indonesian filing tool.
+ */
+function todayIso(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+}
+
 // Converts Selara's internal ISO date (YYYY-MM-DD) to the LKPTI form's dd-mm-yyyy.
 export function toDdMmYyyy(iso: string): string {
   const [y, m, d] = iso.split('-');
@@ -65,14 +75,24 @@ export function generateLkptiDetails(
 ): LkptiDetail[] {
   const { deliverableSegments, deliverableStatuses, deliverables, assets, assetCategories, existingDetails = [] } = input;
 
+  const today = todayIso();
   const results: LkptiDetail[] = [];
   for (const deliverable of deliverables) {
     if ((deliverable.type ?? 'application') !== 'application') continue;
 
-    const hasLiveSegment = deliverableSegments.some(seg =>
-      seg.deliverableId === deliverable.id && isLiveStatusId(seg.status, deliverableStatuses)
+    // "Has gone live", not merely "has a live segment somewhere on the timeline":
+    // a segment that only starts next year describes a plan, and generating a row for
+    // it produces a future goLiveDate, which OJK validation rule 5.3 rejects outright
+    // (dataHealth.ts raises lkpti-golive-future for exactly this). Comparing ISO
+    // YYYY-MM-DD strings lexicographically is a correct date comparison and keeps this
+    // free of timezone drift. A segment starting today counts as started, matching the
+    // end-of-today boundary dataHealth uses for the same rule.
+    const hasGoneLive = deliverableSegments.some(seg =>
+      seg.deliverableId === deliverable.id
+      && isLiveStatusId(seg.status, deliverableStatuses)
+      && seg.startDate <= today
     );
-    if (!hasLiveSegment) continue;
+    if (!hasGoneLive) continue;
 
     const category = resolveAssetCategory(deliverable, assets, assetCategories);
     const resolvedCategoryCode = deliverable.categoryCode ?? category?.categoryCode;
