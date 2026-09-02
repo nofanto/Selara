@@ -158,6 +158,47 @@ This came out of refining a set of agent use-case placeholders, one of which pro
 | Free-text fields contain no line breaks and no untrimmed whitespace | lkpti-schema §5.9 | `warning` |
 | `applicationName` (from `Deliverable.name`) is unique across the submission | lkpti-schema §5.8 | `warning` |
 
+##### 6a. Which value each check actually reads (decided 2026-09-02)
+
+The rules above are written in terms of LKPTI *export column* names, and two of those
+columns are not stored fields. Resolving that mapping is what makes the check list
+implementable:
+
+| Export column | Where the value comes from | Where the issue lands |
+|---|---|---|
+| `applicationName` | `deliverables.find(d => d.id === detail.targetId).name` — never stored on `LkptiDetail` | Deliverables tab (that is where the name is edited) |
+| `dcLocation` | `[detail.dcCity, detail.dcCountry].filter(Boolean).join(', ')` — composed inside `exportLkptiReportToExcel` | LKPTI tab |
+| `drcLocation` | `[detail.drCity, detail.drCountry].filter(Boolean).join(', ')` — likewise | LKPTI tab |
+| everything else | the field of the same name on `LkptiDetail` | LKPTI tab |
+
+**Decision:** length caps are evaluated against the **composed export value** — what
+actually lands in the spreadsheet cell — not against the stored parts.
+
+**Reasoning:** capping `dcCity` and `dcCountry` at 100 each lets a 60-character city and
+a 60-character country both pass while the composed `"City, Country"` cell is 122
+characters and gets rejected. The cap belongs to the cell, so the check has to see the
+cell. The issue is still reported against the tab where the value is *editable*, so
+click-to-navigate stays actionable.
+
+**Which fields count as free-text** (for the line-break / untrimmed-whitespace check):
+every free-text column that reaches a flat spreadsheet cell — `functionDescription`,
+`platform`, `database`, `dcProvider`, `drcProvider`, `systemOwner`, `developer`,
+`dcCity`, `dcCountry`, `drCity`, `drCountry`, and `Deliverable.name`. The enum-backed
+columns (`categoryCode`, `backupStrategy`, `ownership`) and `goLiveDate` are excluded —
+they are covered by their own checks above.
+
+**Uniqueness comparison:** scoped to deliverables that actually have an `LkptiDetail`
+row — "across the submission" means the rows that export, not every Deliverable in the
+workspace. The comparison key is `name.trim().toLowerCase()`, so `"Core Banking"` and
+`"core banking "` collide. **Every** member of a duplicate group is flagged, not
+all-but-the-first: both records need renaming attention, and "first" would depend on
+array order rather than on anything the user can see.
+
+**Values are read from the stored `LkptiDetail` row**, not recomputed from the
+Deliverable cascade. That row is what `exportLkptiReportToExcel` serialises, and
+regeneration already refreshes the cascade-derived fields (`src/lib/lkpti.ts`), so the
+stored value is the value that files.
+
 **RPTI — workspace validity:**
 
 | Check | Source rule | Severity |
@@ -172,6 +213,24 @@ This came out of refining a set of agent use-case placeholders, one of which pro
 - **PPJTI cross-reference (§5.6)** — requires the IT service provider list from a different LKPTI format, which this app does not model.
 
 Note on the go-live date specifically: both *machine* paths already produce correct `dd-mm-yyyy` — import converts via `toDdMmYyyy` and `suggestGoLiveDate` does the same. The only unvalidated entry path is **manual typing**, since `DataManager.tsx` renders `goLiveDate` as a plain text input labelled "(dd-mm-yyyy)" with no validation. That is a narrower gap than "dates are unchecked," but a real one.
+
+#### 7. Filter controls: two independent groups (decided 2026-09-02)
+
+**Decision:** phase gets its own filter control sitting beside the existing severity
+one — All / Validity / Completeness next to All / Errors / Warnings — and the two
+compose, so all four severity×phase combinations are reachable.
+
+**Implementation note:** the shipped severity filter is a **button group**
+(`aria-pressed`, `data-testid="data-health-filter-*"`) in `DataHealthReportView.tsx`,
+not a dropdown. The phase filter matches that existing pattern rather than introducing
+a second control idiom in the same view.
+
+**Reasoning:** §1 decided severity and phase are independent axes; collapsing them into
+one merged list ("Validity errors / Validity warnings / Completeness gaps") would make
+"show me every error regardless of phase" unexpressible — which is the single most
+likely thing a user filtering this report wants. Keeping the existing control untouched
+also leaves its E2E case (`e2e/data-health-report.spec.ts`) valid as a regression guard.
+
 
 ### No ADR
 
