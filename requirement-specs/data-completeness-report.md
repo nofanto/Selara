@@ -110,7 +110,7 @@ Note also: `DataManagerTab` (the tab-id union) now lives in `src/lib/dataHealth.
 
 Everything `computeDataHealth` checks today asks one of two questions: *does this reference resolve?* or *is this value present?* — the LKPTI field check is literally a `!l[f.key]` falsiness test. **Nothing asks whether a value that is present is actually legal.** A workspace can therefore report "the workspace is clean" while holding a `goLiveDate` of `31-02-2021`, a 900-character `functionDescription`, and two applications with identical names — all three of which OJK would reject at filing time.
 
-This came out of refining `agent-filing-readiness-check.md`, which proposed a separate agent-facing readiness report. That doc is now **superseded by this section** for its rule-engine content: the validation is deterministic and belongs in `src/lib/` with unit tests, not in an agent.
+This came out of refining a set of agent use-case placeholders, one of which proposed a separate agent-facing filing-readiness report. That brainstorm is tracked separately and is not part of this change; its rule-engine content is **superseded by this section**: the validation is deterministic and belongs in `src/lib/` with unit tests, not in an agent.
 
 ### Decided
 
@@ -146,7 +146,7 @@ This came out of refining `agent-filing-readiness-check.md`, which proposed a se
 
 **Rejected:** making the entity fields nullable with a no-op navigate — keeps the list non-uniform and gives the user a dead click.
 
-### 6. The check list
+#### 6. The check list
 
 **LKPTI — value validity (all guarded on the value being present):**
 
@@ -179,4 +179,4 @@ Same reasoning as the phase-1 feature: no new dependency, no IndexedDB schema ch
 
 ### Agent exposure — explicitly out of scope here
 
-The rule engine is a deterministic pure function with unit tests; that is where the regulatory truth lives, and no schema rule should end up encoded only in a prompt. An agent narrating or triaging `computeDataHealth`'s output remains a separate, much smaller idea — see `agent-filing-readiness-check.md`.
+The rule engine is a deterministic pure function with unit tests; that is where the regulatory truth lives, and no schema rule should end up encoded only in a prompt. An agent narrating or triaging `computeDataHealth`'s output remains a separate, much smaller idea, tracked outside this document.
