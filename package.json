@@ -22,7 +22,8 @@
     "lint": "eslint . && tsc --noEmit",
     "format": "prettier --write .",
     "test": "playwright test",
-    "test:unit": "vitest run"
+    "test:unit": "vitest run",
+    "test:backend": "vitest run --config backend/core/vitest.config.ts && tsc --noEmit -p backend/core/tsconfig.json"
   },
   "dependencies": {
     "clsx": "^2.1.1",

@@ -1,0 +1,13 @@
+name = "selara-share-backend"
+main = "src/worker.ts"
+compatibility_date = "2025-01-01"
+
+# Set this to Selara's actual production origin before deploying.
+[vars]
+ALLOWED_ORIGIN = "https://CHANGE-ME.example"
+
+# Create the namespace first: `wrangler kv namespace create SHARE_KV`
+# then paste the returned id below.
+[[kv_namespaces]]
+binding = "SHARE_KV"
+id = "CHANGE-ME"

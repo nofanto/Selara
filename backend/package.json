@@ -1,9 +1,0 @@
-{
-  "name": "selara-share-backend",
-  "version": "1.0.0",
-  "description": "Zero-knowledge storage backend, inherited from Scenia (currently unused — see SHARING_ENABLED in src/components/DataControls.tsx)",
-  "main": "index.js",
-  "dependencies": {
-    "@google-cloud/firestore": "^7.0.0"
-  }
-}
