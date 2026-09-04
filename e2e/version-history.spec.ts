@@ -181,6 +181,9 @@ test.describe('Version History & Snapshotting', () => {
     await page.getByRole('button', { name: 'Run Difference Report' }).click();
 
     await expect(page.getByRole('heading', { name: 'Difference Report' })).toBeVisible();
+    // The "Resources" heading is part of the entity-type breakdown, which sits
+    // behind the All changes tab now that the report opens on the summary.
+    await page.getByTestId('diff-view-all').click();
     await expect(page.getByText('Resources', { exact: true })).toBeVisible();
     await expect(page.getByText(newResourceName)).toBeVisible();
   });

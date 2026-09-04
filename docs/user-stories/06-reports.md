@@ -69,6 +69,7 @@
 - A version selector appears after at least one version has been saved
 - Running the diff shows inline results
 - The inline results cover every entity type the comparison computes — including deliverables, segments, decisions, resources and the RPTI/LKPTI detail rows that feed the OJK filing — and are identical to what the Version Manager's Difference Report shows for the same baseline
+- The results open on the per-asset summary and offer the entity-type breakdown behind a **Summary / All changes** toggle (see [US-VH-06](05-version-history.md))
 - An error message is displayed if versions fail to load
 
 ---

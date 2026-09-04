@@ -126,7 +126,7 @@ Internal reference document. Plain-language master list of everything Selara can
 - **RPTI report** builds the Indonesian OJK IT Development Plan filing (Format 3.1) from deliverable lifecycle segments, and exports it to Excel.
 - **LKPTI report** builds the Indonesian OJK Application List filing (Format 3.2.6), an inventory of currently live applications, and can be seeded by importing an already-filed report.
 - **Data Health report** flags dangling references, report-generation gaps, and values that would be rejected at filing time, each linking straight to the record that needs fixing.
-- **History Differences report** lets you compare the current state against any saved version, showing what was added, removed, or changed across every entity type — initiatives, assets, deliverables, segments, milestones, decisions, resources and the RPTI/LKPTI filing details — with a field-level breakdown of each change. It shares one implementation with the Version Manager's Difference Report, so the two always agree.
+- **History Differences report** lets you compare the current state against any saved version, with a **Summary / All changes** toggle over one comparison. **Summary** — the default — groups changes by the asset they belong to, clusters them by deliverable, ranks RPTI/LKPTI edits and scope changes to the top, and leaves out cosmetic churn like programme colours. **All changes** is the full audit trail by entity type: initiatives, assets, deliverables, segments, milestones, decisions, resources and the RPTI/LKPTI filing details, with a field-level breakdown of each change. It shares one implementation with the Version Manager's Difference Report, so the two always agree.
 
 ---
 

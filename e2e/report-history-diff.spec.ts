@@ -127,6 +127,8 @@ test.describe('History Differences report', () => {
 
     const diffResult = section.getByTestId('diff-result');
     await expect(diffResult).toBeVisible({ timeout: 5000 });
+    // Entity-type headings live in the All changes view; the report opens on Summary.
+    await diffResult.getByTestId('diff-view-all').click();
     await expect(diffResult).toContainText('Assets');
     await expect(diffResult).toContainText('Programmes');
     await expect(diffResult).toContainText('Strategies');
@@ -164,6 +166,9 @@ test.describe('History Differences report — full entity coverage', () => {
     await section.getByRole('button', { name: 'Run Difference Report' }).click();
     const diffResult = section.getByTestId('diff-result');
     await expect(diffResult).toBeVisible({ timeout: 5000 });
+    // The report opens on the per-asset summary (US-VH-06); these tests are about
+    // the entity-type breakdown, so they ask for it.
+    await diffResult.getByTestId('diff-view-all').click();
     return diffResult;
   }
 
@@ -213,5 +218,67 @@ test.describe('History Differences report — full entity coverage', () => {
     const diffResult = await runDiff(page, 'LKPTI Baseline');
     await expect(diffResult).toContainText('LKPTI');
     await expect(diffResult).toContainText(deliverableName);
+  });
+});
+
+/**
+ * The difference report opens on a per-asset summary rather than the entity-type
+ * breakdown (US-VH-06, requirement-specs/diff-summary.md §§2-3, 6-8). The pivot
+ * itself is unit-tested in src/lib/diffSummary.test.ts; what needs cover here is
+ * the interaction — which view a reader lands on, and that the other is one click away.
+ */
+test.describe('History Differences report — summary by asset', () => {
+  test.beforeEach(async ({ page }) => {
+    await loadRptiTemplate(page);
+  });
+
+  async function diffAfterMilestoneChange(page: import('@playwright/test').Page) {
+    await page.getByTestId('nav-history').click();
+    await page.getByRole('button', { name: 'Save Current State' }).click();
+    await page.fill('input[placeholder="e.g., March 2026 Snapshot"]', 'Summary Baseline');
+    await page.getByRole('button', { name: 'Save Version' }).click();
+    await page.getByTestId('close-version-manager').click();
+
+    await page.getByTestId('nav-data-manager').click();
+    await page.getByTestId('data-manager-tab-milestones').click();
+    const dateInput = page.locator('input[data-testid^="real-input-date"]').first();
+    await dateInput.waitFor({ timeout: 10000 });
+    const originalDate = await dateInput.inputValue();
+    await dateInput.fill('2027-11-30');
+    await dateInput.press('Enter');
+
+    await page.getByTestId('nav-reports').click();
+    await page.getByTestId('report-card-version-history').click();
+    const section = page.getByTestId('report-history-diff');
+    await section.getByTestId('version-select').selectOption({ label: 'Summary Baseline' });
+    await section.getByRole('button', { name: 'Run Difference Report' }).click();
+    const diffResult = section.getByTestId('diff-result');
+    await expect(diffResult).toBeVisible({ timeout: 5000 });
+    return { diffResult, originalDate };
+  }
+
+  test('opens on the summary, grouped by asset rather than by entity type', async ({ page }) => {
+    const { diffResult, originalDate } = await diffAfterMilestoneChange(page);
+
+    const group = diffResult.getByTestId('summary-group').first();
+    await expect(group).toBeVisible();
+    // The group is headed by the asset the milestone belongs to...
+    await expect(group.getByTestId('summary-group-title')).not.toBeEmpty();
+    // ...and the change itself is still reported in full.
+    await expect(diffResult).toContainText(`Date: ${originalDate} → 2027-11-30`);
+    // The entity-type heading belongs to the other view.
+    await expect(diffResult).not.toContainText('Milestones');
+  });
+
+  test('All changes restores the entity-type breakdown, and Summary comes back', async ({ page }) => {
+    const { diffResult } = await diffAfterMilestoneChange(page);
+
+    await diffResult.getByTestId('diff-view-all').click();
+    await expect(diffResult).toContainText('Milestones');
+    await expect(diffResult.getByTestId('summary-group')).toHaveCount(0);
+
+    await diffResult.getByTestId('diff-view-summary').click();
+    await expect(diffResult.getByTestId('summary-group').first()).toBeVisible();
+    await expect(diffResult).not.toContainText('Milestones');
   });
 });
