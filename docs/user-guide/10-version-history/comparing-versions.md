@@ -13,19 +13,42 @@ The diff report lets you see exactly what changed between a saved baseline and y
 
 ## Reading the diff report
 
-The report groups changes into three categories:
+Every change falls into one of three categories, in both views:
 
 | Category | Meaning |
 |---|---|
 | **Added** | Items present in the current state but not in the selected baseline |
 | **Removed** | Items present in the baseline but deleted from the current state |
-| **Modified** | Items present in both, where one or more fields have changed |
+| **Changed** | Items present in both, where one or more fields have changed |
 
-Each row identifies the item by name, under a heading for its type. Every type the comparison covers gets a section, and sections with nothing to report are omitted:
+Changed rows show the old and new values for each changed field.
+
+The report offers two views of the same comparison, chosen with the **Summary / All changes** toggle at the top.
+
+### Summary — what happened to each system
+
+The default. Changes are grouped by the **asset** they belong to, so everything that happened to one system reads as a single story instead of being scattered across a dozen type headings. Within a group, changes about the same deliverable are kept together under that deliverable's name; changes that belong to the asset itself — the asset record, its initiatives and its milestones — sit above them.
+
+Groups are ordered by significance rather than alphabetically:
+
+1. **RPTI and LKPTI changes** first. These feed the OJK filing directly, so a one-field edit here outranks a large edit elsewhere.
+2. **Things added or removed** next — a change of scope, not drift.
+3. **Everything else** after that: schedule moves, budget changes, renames, status changes.
+
+Changes with no asset — programmes, strategies, resources, categories, app statuses, decisions, and relationships that span two assets — collect in a **Portfolio-level** group, always last.
+
+Two things the summary does deliberately:
+
+- **Cosmetic changes are left out.** Programme, strategy and app-status colours, and category ordering, are real changes but tell you nothing about the plan. They stay in **All changes**. If a comparison turns out to contain *only* cosmetic changes, the summary says so and reports how many it hid, rather than looking empty.
+- **An added or removed asset is stated once.** If a whole asset was deleted, its group says so with a count of what went with it ("Went with it: 2 initiatives, 3 deliverables, 6 segments") instead of repeating the same fact on every child. The individual rows are still in **All changes**.
+
+### All changes — the full audit trail
+
+The complete breakdown by entity type. Every type the comparison covers gets a section, and sections with nothing to report are omitted:
 
 Assets · Programmes · Strategies · Initiatives · Relationships · Milestones · Deliverables · Deliverable Segments · App Statuses · Resources · Categories · Decisions · RPTI · LKPTI
 
-Modified rows show the old and new values for each changed field.
+Nothing is filtered here — including the cosmetic changes the summary sets aside. Use this view when you need to account for every field that moved.
 
 The **History Differences** report and the **Difference Report** reached from the Version Manager render the same content — they are two entry points to one comparison, so neither shows anything the other hides.
 

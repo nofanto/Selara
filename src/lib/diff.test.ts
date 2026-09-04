@@ -56,7 +56,7 @@ describe('computeDiff', () => {
       {
         id: 'asset-1',
         name: 'Core Platform v2',
-        assetId: 'asset-1',
+        asset: { id: 'asset-1', name: 'Core Platform v2' },
         changes: ['Renamed from "Core Platform" to "Core Platform v2"'],
       },
     ]);
@@ -124,7 +124,8 @@ describe('computeDiff', () => {
       {
         id: 'app-1',
         name: 'Ledger Service',
-        assetId: 'asset-2',
+        asset: { id: 'asset-2', name: 'Edge Gateway' },
+        deliverable: { id: 'app-1', name: 'Ledger Service' },
         changes: [
           'Type: application → infrastructure',
           'Moved from Asset "Core Platform" to "Edge Gateway"',
@@ -158,7 +159,8 @@ describe('computeDiff', () => {
       {
         id: 'seg-1',
         name: 'Ledger Service (2026-01-01 → 2026-04-01)',
-        assetId: 'asset-1',
+        asset: { id: 'asset-1', name: 'Unknown asset' },
+        deliverable: { id: 'app-1', name: 'Ledger Service' },
         changes: [
           'End date: 2026-03-01 → 2026-04-01',
           'Status: Planned → Live',
@@ -273,7 +275,8 @@ describe('computeDiff', () => {
       {
         id: 'rpti-1',
         name: 'Core Banking Upgrade → Ledger Service',
-        assetId: 'asset-1',
+        asset: { id: 'asset-1', name: 'Unknown asset' },
+        deliverable: { id: 'app-1', name: 'Ledger Service' },
         changes: [
           'Development type: new → upgrade',
           'Developer: inhouse → PPJTI',
@@ -318,19 +321,23 @@ describe('computeDiff — entity identity', () => {
 
     const diff = computeDiff(base, current);
 
-    expect(diff.assets.added).toEqual([{ id: 'asset-3', name: 'New Thing', assetId: 'asset-3' }]);
-    expect(diff.assets.removed).toEqual([{ id: 'asset-2', name: 'Retired Thing', assetId: 'asset-2' }]);
+    expect(diff.assets.added).toEqual([
+      { id: 'asset-3', name: 'New Thing', asset: { id: 'asset-3', name: 'New Thing' } },
+    ]);
+    expect(diff.assets.removed).toEqual([
+      { id: 'asset-2', name: 'Retired Thing', asset: { id: 'asset-2', name: 'Retired Thing' } },
+    ]);
     expect(diff.assets.modified).toEqual([
       {
         id: 'asset-1',
         name: 'Core Platform v2',
-        assetId: 'asset-1',
+        asset: { id: 'asset-1', name: 'Core Platform v2' },
         changes: ['Renamed from "Core Platform" to "Core Platform v2"'],
       },
     ]);
   });
 
-  it('resolves assetId directly for initiatives, deliverables and milestones', () => {
+  it('resolves the owning asset, with its name, for initiatives, deliverables and milestones', () => {
     const base = makeVersion({
       assets: [{ id: 'asset-1', name: 'Core Platform', categoryId: 'cat-1' }],
       initiatives: [{ id: 'init-1', assetId: 'asset-1', name: 'Ledger Rewrite', programmeId: 'prog-1', capex: 0, opex: 0, startDate: '2026-01-01', endDate: '2026-06-01' }],
@@ -346,12 +353,13 @@ describe('computeDiff — entity identity', () => {
 
     const diff = computeDiff(base, current);
 
-    expect(diff.initiatives.modified[0]).toMatchObject({ id: 'init-1', assetId: 'asset-1' });
-    expect(diff.deliverables.modified[0]).toMatchObject({ id: 'app-1', assetId: 'asset-1' });
-    expect(diff.milestones.modified[0]).toMatchObject({ id: 'ms-1', assetId: 'asset-1' });
+    const asset = { id: 'asset-1', name: 'Core Platform' };
+    expect(diff.initiatives.modified[0]).toMatchObject({ id: 'init-1', asset });
+    expect(diff.deliverables.modified[0]).toMatchObject({ id: 'app-1', asset });
+    expect(diff.milestones.modified[0]).toMatchObject({ id: 'ms-1', asset });
   });
 
-  it('resolves assetId through the owning deliverable for segments and LKPTI rows', () => {
+  it('resolves both owners through the deliverable for segments and LKPTI rows', () => {
     const base = makeVersion({
       assets: [{ id: 'asset-1', name: 'Core Platform', categoryId: 'cat-1' }],
       deliverables: [{ id: 'app-1', assetId: 'asset-1', name: 'Ledger Service', type: 'application' }],
@@ -371,11 +379,15 @@ describe('computeDiff — entity identity', () => {
 
     const diff = computeDiff(base, current);
 
-    expect(diff.deliverableSegments.modified[0]).toMatchObject({ id: 'seg-1', assetId: 'asset-1' });
-    expect(diff.lkptiDetails.modified[0]).toMatchObject({ id: 'lk-1', assetId: 'asset-1' });
+    const owners = {
+      asset: { id: 'asset-1', name: 'Core Platform' },
+      deliverable: { id: 'app-1', name: 'Ledger Service' },
+    };
+    expect(diff.deliverableSegments.modified[0]).toMatchObject({ id: 'seg-1', ...owners });
+    expect(diff.lkptiDetails.modified[0]).toMatchObject({ id: 'lk-1', ...owners });
   });
 
-  it('resolves assetId for RPTI rows targeting an asset directly and via a deliverable', () => {
+  it('resolves owners for RPTI rows targeting an asset directly and via a deliverable', () => {
     const base = makeVersion({
       assets: [{ id: 'asset-1', name: 'Core Platform', categoryId: 'cat-1' }],
       deliverables: [{ id: 'app-1', assetId: 'asset-1', name: 'Ledger Service', type: 'application' }],
@@ -395,13 +407,21 @@ describe('computeDiff — entity identity', () => {
 
     const diff = computeDiff(base, current);
 
-    expect(diff.rptiDetails.modified).toMatchObject([
-      { id: 'rpti-1', assetId: 'asset-1' },
-      { id: 'rpti-2', assetId: 'asset-1' },
-    ]);
+    // An asset-targeted row has no deliverable to cluster under; it belongs at the
+    // top of the asset's group alongside initiatives and milestones.
+    expect(diff.rptiDetails.modified[0]).toMatchObject({
+      id: 'rpti-1',
+      asset: { id: 'asset-1', name: 'Core Platform' },
+      deliverable: { id: 'app-1', name: 'Ledger Service' },
+    });
+    expect(diff.rptiDetails.modified[1]).toMatchObject({
+      id: 'rpti-2',
+      asset: { id: 'asset-1', name: 'Core Platform' },
+    });
+    expect(diff.rptiDetails.modified[1].deliverable).toBeUndefined();
   });
 
-  it('resolves assetId from the baseline when the owning deliverable has since been deleted', () => {
+  it('names both owners from the baseline when they have since been deleted', () => {
     const base = makeVersion({
       assets: [{ id: 'asset-1', name: 'Core Platform', categoryId: 'cat-1' }],
       deliverables: [{ id: 'app-1', assetId: 'asset-1', name: 'Ledger Service', type: 'application' }],
@@ -409,22 +429,51 @@ describe('computeDiff — entity identity', () => {
       deliverableSegments: [
         { id: 'seg-1', deliverableId: 'app-1', startDate: '2026-01-01', endDate: '2026-03-01', status: 'status-planned' },
       ],
+      lkptiDetails: [{ id: 'lk-1', targetId: 'app-1', categoryCode: '11', developer: 'inhouse', systemOwner: 'Ops' }],
     });
     const current: Version['data'] = {
       ...base.data,
+      assets: [],
       deliverables: [],
       deliverableSegments: [],
+      lkptiDetails: [],
     };
 
     const diff = computeDiff(base, current);
 
-    // The deliverable is gone from the current workspace, so only the baseline
-    // can still say which asset owned it — the removal a summary most needs to place.
-    expect(diff.deliverables.removed).toEqual([{ id: 'app-1', name: 'Ledger Service', assetId: 'asset-1' }]);
-    expect(diff.deliverableSegments.removed[0]).toMatchObject({ id: 'seg-1', assetId: 'asset-1' });
+    // Everything here is gone from the current workspace, so only the baseline can
+    // name the group and the cluster these removals belong to — and removals are
+    // exactly what a catch-up summary must not drop on the floor.
+    const owners = {
+      asset: { id: 'asset-1', name: 'Core Platform' },
+      deliverable: { id: 'app-1', name: 'Ledger Service' },
+    };
+    expect(diff.deliverables.removed).toEqual([
+      { id: 'app-1', name: 'Ledger Service', ...owners },
+    ]);
+    expect(diff.deliverableSegments.removed[0]).toMatchObject({ id: 'seg-1', ...owners });
+    expect(diff.lkptiDetails.removed[0]).toMatchObject({ id: 'lk-1', ...owners });
   });
 
-  it('leaves assetId unset for portfolio-level types and for dependencies', () => {
+  it('falls back to a placeholder name when an asset id resolves to no asset record', () => {
+    const base = makeVersion({
+      // No matching Asset row for 'asset-ghost' in either snapshot.
+      milestones: [{ id: 'ms-1', assetId: 'asset-ghost', name: 'Go Live', date: '2026-06-01', type: 'info' }],
+    });
+    const current: Version['data'] = {
+      ...base.data,
+      milestones: [{ id: 'ms-1', assetId: 'asset-ghost', name: 'Go Live', date: '2026-07-01', type: 'info' }],
+    };
+
+    const diff = computeDiff(base, current);
+
+    // The id still groups correctly; only the heading degrades.
+    expect(diff.milestones.modified[0]).toMatchObject({
+      asset: { id: 'asset-ghost', name: 'Unknown asset' },
+    });
+  });
+
+  it('leaves both owners unset for portfolio-level types and for dependencies', () => {
     const base = makeVersion({
       assets: [
         { id: 'asset-1', name: 'Core Platform', categoryId: 'cat-1' },
@@ -448,11 +497,12 @@ describe('computeDiff — entity identity', () => {
     const diff = computeDiff(base, current);
 
     expect(diff.programmes.modified[0]).toMatchObject({ id: 'prog-1' });
-    expect(diff.programmes.modified[0].assetId).toBeUndefined();
-    expect(diff.resources.modified[0].assetId).toBeUndefined();
+    expect(diff.programmes.modified[0].asset).toBeUndefined();
+    expect(diff.resources.modified[0].asset).toBeUndefined();
     // A dependency joins two initiatives that may sit under different assets,
     // so it has no single owning asset.
     expect(diff.dependencies.modified[0]).toMatchObject({ id: 'dep-1' });
-    expect(diff.dependencies.modified[0].assetId).toBeUndefined();
+    expect(diff.dependencies.modified[0].asset).toBeUndefined();
+    expect(diff.dependencies.modified[0].deliverable).toBeUndefined();
   });
 });
