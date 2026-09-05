@@ -110,3 +110,45 @@ test.describe('Decisions (portfolio decision log)', () => {
     await expect(page.getByTestId('initiative-linked-decisions-section').getByText(title)).toBeVisible();
   });
 });
+
+test.describe('Decision log survives a version restore (ADR-0011)', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await page.evaluate(() => {
+      localStorage.setItem('scenia-e2e', 'true');
+      localStorage.setItem('scenia_has_seen_landing', 'true');
+    });
+    await page.reload();
+    await page.waitForSelector('[data-testid="asset-row-content"]', { timeout: 20000 });
+  });
+
+  test('a decision recorded after a snapshot is not deleted by restoring it', async ({ page }) => {
+    // 1. Snapshot the workspace before the decision exists.
+    const versionName = `Baseline ${Date.now()}`;
+    await page.getByTestId('nav-history').click();
+    await page.getByRole('button', { name: 'Save Current State' }).click();
+    await page.fill('input[placeholder="e.g., March 2026 Snapshot"]', versionName);
+    await page.getByRole('button', { name: 'Save Version' }).click();
+    await expect(page.getByText(versionName)).toBeVisible();
+    await page.getByTestId('close-version-manager').click();
+
+    // 2. Record the decision that explains the rollback we're about to do.
+    const title = `Roll back after the vendor withdrew ${Date.now()}`;
+    await page.getByTestId('nav-decisions').click();
+    await page.getByTestId('add-decision-btn').click();
+    await page.getByTestId('decision-title-input').fill(title);
+    await page.getByTestId('save-decision-btn').click();
+    await expect(page.getByTestId('decisions-list').getByText(title)).toBeVisible();
+
+    // 3. Restore the snapshot taken before that decision existed.
+    await page.getByTestId('nav-history').click();
+    await page.getByText(versionName).click();
+    await page.getByRole('button', { name: 'Restore to Current' }).click();
+    await page.getByTestId('confirm-modal-confirm').click();
+
+    // 4. The decision must still be there. Before ADR-0011 the restore wrote the
+    //    snapshot's empty decisions array over the live log and this vanished.
+    await page.getByTestId('nav-decisions').click();
+    await expect(page.getByTestId('decisions-list').getByText(title)).toBeVisible();
+  });
+});

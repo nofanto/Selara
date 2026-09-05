@@ -22,7 +22,8 @@
 
 **Acceptance Criteria:**
 - Selecting a version and clicking "Restore" shows a confirmation modal
-- Confirming overwrites the current state with the snapshot data
+- Confirming overwrites the current *plan* state with the snapshot data
+- The portfolio decision log is **not** rolled back: decisions recorded since the snapshot survive the restore, because the log records why choices were made rather than forming part of the plan itself (see [ADR-0011](../adr/0011-history-tab-decisions-as-audit-trail.md))
 - The VersionManager closes automatically after a successful restore
 - If the selected version is deleted while the comparison report is open, the app does not crash
 

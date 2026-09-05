@@ -25,7 +25,7 @@ The deliverable is `summarizeDiff`, a tested pure function in `src/lib/` that pi
 
 ### 2. Pivot axis: asset-primary, with a portfolio-level bucket
 
-Group by `Asset`; nest initiatives, deliverables, segments, milestones and RPTI/LKPTI rows underneath. Entities with no asset path (decisions linked to a programme, programme/strategy records themselves) go in a "portfolio-level" bucket.
+Group by `Asset`; nest initiatives, deliverables, segments, milestones and RPTI/LKPTI rows underneath. Entities with no asset path (programme/strategy records themselves) go in a "portfolio-level" bucket. (Decisions were originally listed here too; they are no longer diffed at all — see [ADR-0011](../docs/adr/0011-history-tab-decisions-as-audit-trail.md).)
 
 **Reasoning — this is forced by the entity graph, not a preference.** `Initiative.assetId`, `Deliverable.assetId` and `Milestone.assetId` are all **required**. Asset is the only axis on which every timeline entity has a guaranteed home.
 

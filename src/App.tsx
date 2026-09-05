@@ -36,7 +36,7 @@ import { parseLkptiImportFile, deriveWorkspaceFromLkptiImport } from './lib/lkpt
 import { validateImportSchema } from './lib/importValidation';
 import { importSharedWorkspace } from './lib/share';
 import { getTemplateData, TemplateId } from './lib/workspaceTemplates';
-import { isWorkspaceEmpty } from './lib/workspaceState';
+import { buildRestoredWorkspace, isWorkspaceEmpty } from './lib/workspaceState';
 import { HealthIssueLocation, DataManagerTab } from './lib/dataHealth';
 import { SYNC_CHANNEL_NAME, generateTabId, isRemoteSaveMessage, notifyDataSaved } from './lib/tabSync';
 
@@ -363,6 +363,8 @@ export default function App() {
     setTimelineSettings(sanitizeTimelineSettings(data.timelineSettings));
     setResources(data.resources);
     setDeliverableStatuses(data.deliverableStatuses);
+    // Establishes a new workspace, so resetting the decision log is correct:
+    // its records reference entity IDs that no longer exist (ADR-0011).
     setDecisions(data.decisions || []);
     setRptiDetails(data.rptiDetails || []);
     setLkptiDetails(data.lkptiDetails || []);
@@ -424,6 +426,8 @@ export default function App() {
       setTimelineSettings(sanitizeTimelineSettings(data.timelineSettings));
       setResources(data.resources);
       setDeliverableStatuses(data.deliverableStatuses);
+      // Establishes a new workspace, so resetting the decision log is correct:
+      // its records reference entity IDs that no longer exist (ADR-0011).
       setDecisions(data.decisions || []);
       setRptiDetails(data.rptiDetails || []);
       setLkptiDetails(data.lkptiDetails || []);
@@ -472,6 +476,8 @@ export default function App() {
       setTimelineSettings(sanitizeTimelineSettings(data.timelineSettings));
       setResources(data.resources);
       setDeliverableStatuses(data.deliverableStatuses);
+      // Establishes a new workspace, so resetting the decision log is correct:
+      // its records reference entity IDs that no longer exist (ADR-0011).
       setDecisions(data.decisions || []);
       setRptiDetails(data.rptiDetails || []);
       setLkptiDetails(data.lkptiDetails || []);
@@ -666,8 +672,10 @@ export default function App() {
   }, [assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails, handleUpdate]);
 
   const handleRestoreVersion = useCallback((version: import('./types').Version) => {
-    handleUpdate({ ...version.data, deliverableStatuses: version.data.deliverableStatuses ?? [], decisions: version.data.decisions ?? [], rptiDetails: version.data.rptiDetails ?? [], lkptiDetails: version.data.lkptiDetails ?? [] });
-  }, [handleUpdate]);
+    // Restoring rolls back plan data within the same workspace, so the decision
+    // log survives it — see buildRestoredWorkspace and ADR-0011.
+    handleUpdate(buildRestoredWorkspace(version, decisions));
+  }, [handleUpdate, decisions]);
 
   const handleSaveDeliverableSegment = useCallback((seg: import('./types').DeliverableSegment) => {
     const exists = deliverableSegments.some(s => s.id === seg.id);
@@ -1708,6 +1716,8 @@ export default function App() {
           onRestore={handleRestoreVersion}
           versions={versions}
           onUpdateVersions={setVersions}
+          decisions={decisions}
+          onAddDecision={handleAddDecision}
           currentData={{
             assets,
             deliverables,

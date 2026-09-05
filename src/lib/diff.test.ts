@@ -230,60 +230,27 @@ describe('computeDiff', () => {
     ]);
   });
 
-  it('reports decision status and outcome changes', () => {
+  it('does not diff the decision log at all (ADR-0011)', () => {
+    // The decision log is an audit trail *about* the workspace, not workspace
+    // state: restore deliberately leaves it alone. A diff row saying a decision
+    // was added would therefore describe a change Restore does not undo, which
+    // is worse than silence. The difference report surfaces decisions through
+    // decisionsForSpan() instead — see src/lib/historyStream.ts.
     const base = makeVersion({
       decisions: [{ id: 'dec-1', title: 'Adopt microservices', status: 'proposed', createdAt: '2026-01-01T00:00:00.000Z' }],
     });
     const current: Version['data'] = {
       ...base.data,
-      decisions: [{ id: 'dec-1', title: 'Adopt microservices', status: 'accepted', createdAt: '2026-01-01T00:00:00.000Z', decisionOutcome: 'Proceed with phased rollout' }],
+      decisions: [
+        { id: 'dec-1', title: 'Adopt microservices', status: 'accepted', createdAt: '2026-01-01T00:00:00.000Z', decisionOutcome: 'Proceed with phased rollout' },
+        { id: 'dec-2', title: 'Deferred the mobile programme', status: 'accepted', createdAt: '2026-02-01T00:00:00.000Z' },
+      ],
     };
 
     const diff = computeDiff(base, current);
 
-    expect(diff.hasChanges).toBe(true);
-    expect(diff.decisions.modified).toEqual([
-      {
-        id: 'dec-1',
-        name: 'Adopt microservices',
-        changes: ['Status: proposed → accepted', 'Decision outcome updated'],
-      },
-    ]);
-  });
-
-  it('reports RPTI detail changes, naming the row by initiative and target', () => {
-    const base = makeVersion({
-      initiatives: [{ id: 'init-1', name: 'Core Banking Upgrade', programmeId: 'prog-1', assetId: 'asset-1', startDate: '2026-01-01', endDate: '2026-06-01', capex: 0, opex: 0 }],
-      deliverables: [{ id: 'app-1', assetId: 'asset-1', name: 'Ledger Service' }],
-      rptiDetails: [{
-        id: 'rpti-1', initiativeId: 'init-1', targetType: 'deliverable', targetId: 'app-1',
-        categoryCode: '01', developmentType: 'new', developer: 'inhouse', ppjtiRelatedParty: 'no',
-      }],
-    });
-    const current: Version['data'] = {
-      ...base.data,
-      rptiDetails: [{
-        id: 'rpti-1', initiativeId: 'init-1', targetType: 'deliverable', targetId: 'app-1',
-        categoryCode: '01', developmentType: 'upgrade', developer: 'PPJTI', ppjtiRelatedParty: 'yes',
-      }],
-    };
-
-    const diff = computeDiff(base, current);
-
-    expect(diff.hasChanges).toBe(true);
-    expect(diff.rptiDetails.modified).toEqual([
-      {
-        id: 'rpti-1',
-        name: 'Core Banking Upgrade → Ledger Service',
-        asset: { id: 'asset-1', name: 'Unknown asset' },
-        deliverable: { id: 'app-1', name: 'Ledger Service' },
-        changes: [
-          'Development type: new → upgrade',
-          'Developer: inhouse → PPJTI',
-          'PPJTI related party: no → yes',
-        ],
-      },
-    ]);
+    expect(diff.hasChanges).toBe(false);
+    expect('decisions' in diff).toBe(false);
   });
 
   it('does not report changes for entity types that are identical across versions', () => {
@@ -299,7 +266,6 @@ describe('computeDiff', () => {
     expect(diff.hasChanges).toBe(false);
     expect(diff.resources.modified).toEqual([]);
     expect(diff.rptiDetails.modified).toEqual([]);
-    expect(diff.decisions.modified).toEqual([]);
   });
 });
 

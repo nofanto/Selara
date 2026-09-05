@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Box, ClipboardList, FileText, FolderTree, GitBranch, History, LayoutGrid, Layers, LucideIcon, Scale, Tags, Users } from 'lucide-react';
+import { Box, ClipboardList, FileText, FolderTree, GitBranch, History, LayoutGrid, Layers, LucideIcon, Tags, Users } from 'lucide-react';
 import { DiffResult, DiffSectionKey, EntityDiff } from '../lib/diff';
 import { DiffSummary, SummaryChange, SummaryGroup, summarizeDiff } from '../lib/diffSummary';
 
@@ -20,7 +20,6 @@ const DIFF_SECTIONS: { key: DiffSectionKey; title: string; icon: LucideIcon }[] 
   { key: 'deliverableStatuses', title: 'App Statuses', icon: Tags },
   { key: 'resources', title: 'Resources', icon: Users },
   { key: 'assetCategories', title: 'Categories', icon: FolderTree },
-  { key: 'decisions', title: 'Decisions', icon: Scale },
   { key: 'rptiDetails', title: 'RPTI', icon: ClipboardList },
   { key: 'lkptiDetails', title: 'LKPTI', icon: ClipboardList },
 ];

@@ -125,6 +125,16 @@ export interface Decision {
   consequences?: string;
   linkedEntityType?: 'initiative' | 'programme' | 'asset';
   linkedEntityId?: string;
+  /**
+   * The saved Version that enacted this decision, if one did — lets a reader jump
+   * from "why we did this" to the before/after diff (ADR-0011).
+   *
+   * Lives here rather than as `Version.decisionIds[]` because a decision is
+   * normally linked after the snapshot is taken, and a Version must stay
+   * immutable. Optional: a `proposed` decision has no snapshot yet, and most
+   * decisions will never set one.
+   */
+  versionId?: string;
 }
 
 /**
@@ -301,6 +311,13 @@ export interface Version {
     timelineSettings: TimelineSettings;
     resources: Resource[];
     deliverableStatuses?: DeliverableStatus[];
+    /**
+     * @deprecated Never read. Retained so versions saved before ADR-0011 still
+     * parse, and still written on save so a snapshot stays self-describing.
+     * The decision log is an audit trail about the workspace, not workspace
+     * state, so restore preserves the live log instead of this copy — see
+     * `buildRestoredWorkspace` in `src/lib/workspaceState.ts`.
+     */
     decisions?: Decision[];
     rptiDetails?: RptiDetail[];
     lkptiDetails?: LkptiDetail[];

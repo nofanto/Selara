@@ -46,7 +46,7 @@ Two things the summary does deliberately:
 
 The complete breakdown by entity type. Every type the comparison covers gets a section, and sections with nothing to report are omitted:
 
-Assets · Programmes · Strategies · Initiatives · Relationships · Milestones · Deliverables · Deliverable Segments · App Statuses · Resources · Categories · Decisions · RPTI · LKPTI
+Assets · Programmes · Strategies · Initiatives · Relationships · Milestones · Deliverables · Deliverable Segments · App Statuses · Resources · Categories · RPTI · LKPTI
 
 Nothing is filtered here — including the cosmetic changes the summary sets aside. Use this view when you need to account for every field that moved.
 
@@ -57,6 +57,27 @@ The **History Differences** report and the **Difference Report** reached from th
 The diff compares the selected saved version against the live current state only. Comparing two arbitrary saved versions against each other is not supported; save a version immediately after the state you want as "version A", then compare from there.
 
 If a version fails to load — for example because its IndexedDB record was removed outside the app — an error message is shown in place of the report. Saving a new version and retrying will resolve the issue.
+
+## Decisions in this span
+
+Every difference report opens with **Decisions in this span** — the entries from your
+[decision log](../13-decisions/recording-a-decision.md) that explain the changes being shown.
+
+A decision appears there if either:
+
+- it is **linked to one of the two versions** being compared (for example, recorded from the save dialog), or
+- it was **recorded between the two versions' timestamps**.
+
+Both rules apply, so a decision written weeks later about an earlier change still shows up as long
+as it was linked, and a decision nobody linked still shows up if it falls in the period.
+
+If nothing matches, the report says so explicitly rather than staying silent. That is deliberate:
+a set of changes with no recorded reasoning is worth noticing, not worth hiding.
+
+Note that decisions do **not** also appear as ordinary change rows further down the report. The
+decision log is a record *about* your portfolio rather than part of it, and
+[restoring a version](restoring-a-version.md) deliberately leaves it alone — so listing a decision
+as an added or changed item would describe a change that Restore would not undo.
 
 ---
 

@@ -8,6 +8,8 @@ Restoring replaces your entire current portfolio state with a previously saved v
 
 Restoration is destructive: any changes made since the selected version was saved will be lost. If you want to keep a record of the current state, [save it as a version](saving-a-version.md) before proceeding.
 
+**One deliberate exception: your [decision log](../13-decisions/recording-a-decision.md) is never rolled back.** Decisions recorded since the snapshot was taken survive the restore untouched. The log is a record of *why* choices were made, not part of the plan data itself — rolling it back would delete the very decision explaining why you restored. See [ADR-0011](../../adr/0011-history-tab-decisions-as-audit-trail.md).
+
 ## How to restore a version
 
 1. Open the **Version History** panel.
@@ -20,7 +22,7 @@ The app loads the saved state, the Version History panel closes automatically, a
 
 ## After restoring
 
-The restoration writes the saved snapshot back into IndexedDB as the active state. The version history list itself is unchanged — the version you restored from remains available for future comparisons or restores.
+The restoration writes the saved snapshot back into IndexedDB as the active state. The version history list itself is unchanged — the version you restored from remains available for future comparisons or restores. The decision log is likewise left as it was.
 
 If you realise the restore was a mistake, save the restored state as a new named version immediately so you have a recovery point, then make whatever corrections are needed.
 
