@@ -99,12 +99,24 @@ export function DecisionsView({ decisions, initiatives, programmes, assets, onAd
     setConfirmDelete(null);
   };
 
-  const linkedEntityName = (d: Decision): string | null => {
-    if (!d.linkedEntityType || !d.linkedEntityId) return null;
-    if (d.linkedEntityType === 'initiative') return initiatives.find(i => i.id === d.linkedEntityId)?.name || null;
-    if (d.linkedEntityType === 'programme') return programmes.find(p => p.id === d.linkedEntityId)?.name || null;
-    if (d.linkedEntityType === 'asset') return assets.find(a => a.id === d.linkedEntityId)?.name || null;
-    return null;
+  /**
+   * Resolving the link has three outcomes, not two.
+   *
+   * This used to return `string | null`, which collapsed "never linked" and
+   * "linked to something that has since been deleted" into the same render —
+   * nothing at all. Deleting an entity does not delete decisions about it
+   * (ADR-0011: the log outlives what it describes), so that silence quietly
+   * turned a record with a broken reference into one that looked unlinked.
+   * `linkedEntityId` is still on the record; only the display had given up.
+   */
+  const resolveLink = (d: Decision): { kind: 'none' } | { kind: 'resolved'; name: string } | { kind: 'missing' } => {
+    if (!d.linkedEntityType || !d.linkedEntityId) return { kind: 'none' };
+    const name =
+      d.linkedEntityType === 'initiative' ? initiatives.find(i => i.id === d.linkedEntityId)?.name :
+      d.linkedEntityType === 'programme' ? programmes.find(p => p.id === d.linkedEntityId)?.name :
+      d.linkedEntityType === 'asset' ? assets.find(a => a.id === d.linkedEntityId)?.name :
+      undefined;
+    return name ? { kind: 'resolved', name } : { kind: 'missing' };
   };
 
   const linkedOptions = (type: Decision['linkedEntityType']): { id: string; name: string }[] => {
@@ -152,9 +164,13 @@ export function DecisionsView({ decisions, initiatives, programmes, assets, onAd
                       {d.status}
                     </span>
                   </div>
-                  {linkedEntityName(d) && (
-                    <p className="text-[11px] text-slate-400 truncate">&rarr; {linkedEntityName(d)}</p>
-                  )}
+                  {(() => {
+                    const link = resolveLink(d);
+                    if (link.kind === 'none') return null;
+                    return link.kind === 'resolved'
+                      ? <p className="text-[11px] text-slate-400 truncate">&rarr; {link.name}</p>
+                      : <p data-testid="decision-link-missing" className="text-[11px] text-amber-600 italic truncate">&rarr; linked item no longer exists</p>;
+                  })()}
                 </div>
               ))
             )}
@@ -296,11 +312,22 @@ export function DecisionsView({ decisions, initiatives, programmes, assets, onAd
                 </span>
               </div>
 
-              {linkedEntityName(selected) && (
-                <p className="text-sm text-slate-500">
-                  Linked to <span className="font-medium text-slate-700">{linkedEntityName(selected)}</span> ({selected.linkedEntityType})
-                </p>
-              )}
+              {(() => {
+                const link = resolveLink(selected);
+                if (link.kind === 'none') return null;
+                return link.kind === 'resolved' ? (
+                  <p className="text-sm text-slate-500">
+                    Linked to <span className="font-medium text-slate-700">{link.name}</span> ({selected.linkedEntityType})
+                  </p>
+                ) : (
+                  <p
+                    data-testid="decision-link-missing-detail"
+                    className="text-sm text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2"
+                  >
+                    Linked to a {selected.linkedEntityType} that no longer exists. This record is kept &mdash; only the link is broken.
+                  </p>
+                );
+              })()}
 
               {selected.context && (
                 <div>

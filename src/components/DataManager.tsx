@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { decisionsStrandedBy, LinkedEntityRef } from '../lib/decisionLinks';
 import { Asset, Deliverable, DeliverableSegment, DeliverableStatus, DeliverableType, Decision, RptiDetail, LkptiDetail, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource } from '../types';
 import { EditableTable, Column } from './EditableTable';
 import { cn } from '../lib/utils';
@@ -76,14 +77,28 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery,
     entityName: string,
     cascadeParts: string[],
     updates: Partial<typeof data>,
-    customMsg?: string
+    customMsg?: string,
+    strandedDecisions = 0
   ): boolean => {
-    const msg = customMsg ?? (cascadeParts.length
-      ? `Deleting "${entityName}" will also remove ${cascadeParts.join(', ')}. Continue?`
-      : `Delete "${entityName}"?`);
-    confirm(title, msg, () => onUpdate({ ...data, ...updates }));
+    const buildMsg = () => {
+      const sentences = [cascadeParts.length
+        ? `Deleting "${entityName}" will also remove ${cascadeParts.join(', ')}.`
+        : `Delete "${entityName}"?`];
+      if (strandedDecisions) {
+        // Deliberately phrased apart from cascadeParts: decisions are never removed
+        // by a cascade (ADR-0011) — the log outlives what it describes. What breaks
+        // is the reference, so the warning says the link is lost, not the record.
+        sentences.push(`${strandedDecisions} decision(s) will keep their record but lose their link to it.`);
+      }
+      if (cascadeParts.length) sentences.push('Continue?');
+      return sentences.join(' ');
+    };
+    confirm(title, customMsg ?? buildMsg(), () => onUpdate({ ...data, ...updates }));
     return true;
   };
+
+  /** How many decisions would lose their subject if these entities were deleted. */
+  const strandedBy = (removed: LinkedEntityRef[]) => decisionsStrandedBy(data.decisions, removed).length;
 
   // Cascading delete handlers
   const handleDeleteAsset = (asset: Asset): boolean => {
@@ -99,6 +114,10 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery,
     if (affectedMiles.length) parts.push(`${affectedMiles.length} milestone(s)`);
     if (affectedDeps.length) parts.push(`${affectedDeps.length} dependency(ies)`);
     if (affectedRpti) parts.push(`${affectedRpti} RPTI report row(s)`);
+    const stranded = strandedBy([
+      { type: 'asset', id: asset.id },
+      ...affectedInits.map(i => ({ type: 'initiative' as const, id: i.id })),
+    ]);
     return cascadeDelete('Delete Asset', asset.name, parts, {
       assets: data.assets.filter(a => a.id !== asset.id),
       initiatives: data.initiatives.filter(i => i.assetId !== asset.id),
@@ -108,7 +127,7 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery,
         data.rptiDetails.filter(r => !affectedInitIds.has(r.initiativeId)),
         asset.id
       ),
-    });
+    }, undefined, stranded);
   };
 
   const handleDeleteProgramme = (prog: Programme): boolean => {
@@ -118,11 +137,15 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery,
     const parts = [];
     if (affectedInits.length) parts.push(`${affectedInits.length} initiative(s)`);
     if (affectedDeps.length) parts.push(`${affectedDeps.length} dependency(ies)`);
+    const stranded = strandedBy([
+      { type: 'programme', id: prog.id },
+      ...affectedInits.map(i => ({ type: 'initiative' as const, id: i.id })),
+    ]);
     return cascadeDelete('Delete Programme', prog.name, parts, {
       programmes: data.programmes.filter(p => p.id !== prog.id),
       initiatives: data.initiatives.filter(i => i.programmeId !== prog.id),
       dependencies: data.dependencies.filter(d => !affectedInitIds.has(d.sourceId) && !affectedInitIds.has(d.targetId)),
-    });
+    }, undefined, stranded);
   };
 
   const handleDeleteStrategy = (strat: Strategy): boolean => {
@@ -142,11 +165,12 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery,
     const parts = [];
     if (affectedDeps.length) parts.push(`${affectedDeps.length} dependency(ies)`);
     if (affectedRpti) parts.push(`${affectedRpti} RPTI report row(s)`);
+    const stranded = strandedBy([{ type: 'initiative', id: init.id }]);
     return cascadeDelete('Delete Initiative', init.name, parts, {
       initiatives: data.initiatives.filter(i => i.id !== init.id),
       dependencies: data.dependencies.filter(d => d.sourceId !== init.id && d.targetId !== init.id),
       rptiDetails: rptiCascadeOnInitiativeDelete(data.rptiDetails, init.id),
-    });
+    }, undefined, stranded);
   };
 
   const handleDeleteCategory = (cat: AssetCategory): boolean => {
@@ -161,13 +185,17 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery,
     if (affectedInits.length) parts.push(`${affectedInits.length} initiative(s)`);
     if (affectedMiles.length) parts.push(`${affectedMiles.length} milestone(s)`);
     if (affectedDeps.length) parts.push(`${affectedDeps.length} dependency(ies)`);
+    const stranded = strandedBy([
+      ...affectedAssets.map(a => ({ type: 'asset' as const, id: a.id })),
+      ...affectedInits.map(i => ({ type: 'initiative' as const, id: i.id })),
+    ]);
     return cascadeDelete('Delete Category', cat.name, parts, {
       assetCategories: data.assetCategories.filter(c => c.id !== cat.id),
       assets: data.assets.filter(a => a.categoryId !== cat.id),
       initiatives: data.initiatives.filter(i => !affectedAssetIds.has(i.assetId)),
       milestones: data.milestones.filter(m => !affectedAssetIds.has(m.assetId)),
       dependencies: data.dependencies.filter(d => !affectedInitIds.has(d.sourceId) && !affectedInitIds.has(d.targetId)),
-    });
+    }, undefined, stranded);
   };
 
   const assetOptions = data.assets.map(a => ({ value: a.id, label: a.name }));
