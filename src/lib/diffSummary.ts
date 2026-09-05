@@ -77,7 +77,7 @@ export const PORTFOLIO_GROUP_TITLE = 'Portfolio-level';
 const SECTIONS: DiffSectionKey[] = [
   'assets', 'programmes', 'strategies', 'initiatives', 'dependencies', 'milestones',
   'deliverables', 'deliverableSegments', 'deliverableStatuses', 'resources',
-  'assetCategories', 'decisions', 'rptiDetails', 'lkptiDetails',
+  'assetCategories', 'rptiDetails', 'lkptiDetails',
 ];
 
 const FILING_SECTIONS: DiffSectionKey[] = ['rptiDetails', 'lkptiDetails'];
@@ -94,7 +94,6 @@ const SECTION_NOUNS: Record<DiffSectionKey, [singular: string, plural: string]> 
   deliverableStatuses: ['app status', 'app statuses'],
   resources: ['resource', 'resources'],
   assetCategories: ['category', 'categories'],
-  decisions: ['decision', 'decisions'],
   rptiDetails: ['RPTI row', 'RPTI rows'],
   lkptiDetails: ['LKPTI row', 'LKPTI rows'],
 };

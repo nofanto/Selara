@@ -12,7 +12,6 @@ export type DiffResult = {
   deliverableStatuses: EntityDiff;
   resources: EntityDiff;
   assetCategories: EntityDiff;
-  decisions: EntityDiff;
   rptiDetails: EntityDiff;
   lkptiDetails: EntityDiff;
   hasChanges: boolean;
@@ -324,19 +323,15 @@ export function computeDiff(baseVersion: Version, currentData: Version['data']):
     }
   );
 
-  const decisions = compareEntities(
-    baseVersion.data.decisions ?? [],
-    currentData.decisions ?? [],
-    (d) => d.title,
-    (b, c) => {
-      const changes: string[] = [];
-      if (b.title !== c.title) changes.push(`Renamed from "${b.title}" to "${c.title}"`);
-      if (b.status !== c.status) changes.push(`Status: ${b.status} → ${c.status}`);
-      if ((b.decisionOutcome ?? '') !== (c.decisionOutcome ?? '')) changes.push('Decision outcome updated');
-      if ((b.context ?? '') !== (c.context ?? '')) changes.push('Context updated');
-      return changes;
-    }
-  );
+  /*
+   * The decision log is deliberately NOT diffed (ADR-0011). It is an audit trail
+   * *about* the workspace rather than workspace state, and restore leaves it
+   * alone — so a diff row reporting a decision as added or modified would
+   * describe a change that Restore does not undo. The difference report surfaces
+   * decisions through decisionsForSpan() in src/lib/historyStream.ts instead,
+   * which shows the decisions covering the period rather than only those edited
+   * between two snapshots.
+   */
 
   const getInitiativeName = (initiativeId: string) =>
     currentData.initiatives.find(i => i.id === initiativeId)?.name
@@ -411,13 +406,12 @@ export function computeDiff(baseVersion: Version, currentData: Version['data']):
     deliverableStatuses.added.length > 0 || deliverableStatuses.removed.length > 0 || deliverableStatuses.modified.length > 0 ||
     resources.added.length > 0 || resources.removed.length > 0 || resources.modified.length > 0 ||
     assetCategories.added.length > 0 || assetCategories.removed.length > 0 || assetCategories.modified.length > 0 ||
-    decisions.added.length > 0 || decisions.removed.length > 0 || decisions.modified.length > 0 ||
     rptiDetails.added.length > 0 || rptiDetails.removed.length > 0 || rptiDetails.modified.length > 0 ||
     lkptiDetails.added.length > 0 || lkptiDetails.removed.length > 0 || lkptiDetails.modified.length > 0;
 
   return {
     assets, programmes, strategies, initiatives, dependencies, milestones,
-    deliverables, deliverableSegments, deliverableStatuses, resources, assetCategories, decisions, rptiDetails,
+    deliverables, deliverableSegments, deliverableStatuses, resources, assetCategories, rptiDetails,
     lkptiDetails,
     hasChanges,
   };
