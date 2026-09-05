@@ -58,6 +58,22 @@ The diff compares the selected saved version against the live current state only
 
 If a version fails to load — for example because its IndexedDB record was removed outside the app — an error message is shown in place of the report. Saving a new version and retrying will resolve the issue.
 
+## Decisions in this span
+
+Every difference report opens with **Decisions in this span** — the entries from your
+[decision log](../13-decisions/recording-a-decision.md) that explain the changes being shown.
+
+A decision appears there if either:
+
+- it is **linked to one of the two versions** being compared (for example, recorded from the save dialog), or
+- it was **recorded between the two versions' timestamps**.
+
+Both rules apply, so a decision written weeks later about an earlier change still shows up as long
+as it was linked, and a decision nobody linked still shows up if it falls in the period.
+
+If nothing matches, the report says so explicitly rather than staying silent. That is deliberate:
+a set of changes with no recorded reasoning is worth noticing, not worth hiding.
+
 ---
 
 - Previous: [Saving a Version](saving-a-version.md)

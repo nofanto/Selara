@@ -1716,6 +1716,8 @@ export default function App() {
           onRestore={handleRestoreVersion}
           versions={versions}
           onUpdateVersions={setVersions}
+          decisions={decisions}
+          onAddDecision={handleAddDecision}
           currentData={{
             assets,
             deliverables,

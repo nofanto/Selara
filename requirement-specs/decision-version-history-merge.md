@@ -138,7 +138,9 @@ Three PRs under one issue, so the schema work stays reviewable without UI noise 
 
 **PR 1 — data model (implemented, `feat/decisions-audit-trail`).** Add `Decision.versionId?`. Stop version restore clobbering the log, and comment the three template-shaped paths so their reset reads as deliberate. Vitest for the rule, Playwright for restore-preserves-decisions.
 
-**PR 2 — the History tab and the capture loop.** No longer a refactor: folding `VersionManager` into the tab is the *vehicle* for §6, not the goal. Covers 6a (capture at save), 6b (decisions in the Difference Report), 6c (interleaved stream), 6d (progressive disclosure), and the `versionId` link surfaced in both directions. Needs its own user story with acceptance criteria before implementation. Updates guide pages, `HelpView` nav, and the affected E2E specs.
+**PR 2a — the capture loop (implemented, `feat/history-tab-capture-loop`).** 6a and 6b: capture-at-save, and decisions surfaced in the Difference Report. These are the mechanism — trigger and payoff — and neither depends on the tab migration, so they ship first and start earning immediately.
+
+**PR 2b — the History tab.** No longer a refactor: folding `VersionManager` into the tab is the *vehicle* for §6, not the goal. Covers 6c (interleaved stream, using `buildHistoryStream` which already exists and is tested), 6d (progressive disclosure), and the `versionId` link surfaced in both directions. Needs its own user story with acceptance criteria before implementation. Updates guide pages, `HelpView` nav, and the affected E2E specs.
 
 **PR 3 — backfill.** 6e, split out because it is independent of the tab work and easy to defer.
 

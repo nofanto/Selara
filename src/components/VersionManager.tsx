@@ -4,6 +4,7 @@ import { X, Save, History, Trash2, ArrowRight, FileText, AlertCircle, Check } fr
 import { saveVersion, deleteVersion } from '../lib/db';
 import { ConfirmModal } from './ConfirmModal';
 import { computeDiff } from '../lib/diff';
+import { decisionsForSpan } from '../lib/historyStream';
 import { DiffSections } from './DiffSection';
 import { useFocusTrap } from '../lib/useFocusTrap';
 
@@ -14,6 +15,9 @@ interface VersionManagerProps {
   onRestore: (version: Version) => void;
   versions: Version[];
   onUpdateVersions: (versions: Version[]) => void;
+  /** The live decision log — read for the difference report, appended to on capture. */
+  decisions: Decision[];
+  onAddDecision: (decision: Decision) => void;
   currentData: {
     assets: Asset[];
     deliverables: Deliverable[];
@@ -33,10 +37,12 @@ interface VersionManagerProps {
   };
 }
 
-export function VersionManager({ isOpen, onClose, onRestore, versions, onUpdateVersions, currentData }: VersionManagerProps) {
+export function VersionManager({ isOpen, onClose, onRestore, versions, onUpdateVersions, currentData, decisions, onAddDecision }: VersionManagerProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [newName, setNewName] = useState('');
   const [newDescription, setNewDescription] = useState('');
+  const [captureDecision, setCaptureDecision] = useState(false);
+  const [captureTitle, setCaptureTitle] = useState('');
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   const [comparisonVersionId, setComparisonVersionId] = useState<string | null>(null);
   const [pendingConfirm, setPendingConfirm] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
@@ -66,8 +72,28 @@ export function VersionManager({ isOpen, onClose, onRestore, versions, onUpdateV
 
     await saveVersion(version);
     onUpdateVersions([...versions, version]);
+
+    // Capture-at-save (user story 24 AC2): the trigger the decision log has
+    // always lacked. Only fires on explicit opt-in *and* a non-empty title, so
+    // an abandoned dialog leaves no half-written record — and it never gates
+    // the save itself (AC6). Defaults to 'accepted' rather than 'proposed':
+    // the snapshot exists because a change was made, so the record describes
+    // work already done.
+    if (captureDecision && captureTitle.trim()) {
+      onAddDecision({
+        id: `dec-${Date.now()}`,
+        title: captureTitle.trim(),
+        status: 'accepted',
+        createdAt: version.timestamp,
+        context: newDescription.trim() || undefined,
+        versionId: version.id,
+      });
+    }
+
     setNewName('');
     setNewDescription('');
+    setCaptureDecision(false);
+    setCaptureTitle('');
     setIsSaving(false);
   };
 
@@ -194,6 +220,40 @@ export function VersionManager({ isOpen, onClose, onRestore, versions, onUpdateV
                       rows={3}
                       className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
                     />
+                  </div>
+                  {/*
+                    Capture-at-save (user story 24 AC2). The decision log's problem was
+                    never that people won't record reasoning — it's that nothing ever
+                    asked them at the moment they had it. This is an invitation, never a
+                    gate: unchecked, or checked with an empty title, the save proceeds
+                    untouched (AC6).
+                  */}
+                  <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
+                    <label className="flex items-start gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        data-testid="capture-decision-toggle"
+                        checked={captureDecision}
+                        onChange={(e) => setCaptureDecision(e.target.checked)}
+                        className="mt-0.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                      />
+                      <span>
+                        <span className="block text-sm font-medium text-slate-700">Record why (optional)</span>
+                        <span className="block text-xs text-slate-500">
+                          Adds a decision to the log, linked to this snapshot, so the reasoning outlives the diff.
+                        </span>
+                      </span>
+                    </label>
+                    {captureDecision && (
+                      <input
+                        type="text"
+                        data-testid="capture-decision-title"
+                        value={captureTitle}
+                        onChange={(e) => setCaptureTitle(e.target.value)}
+                        placeholder="e.g., Deferred the mobile programme after the vendor withdrew"
+                        className="mt-3 w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                      />
+                    )}
                   </div>
                   <div className="flex gap-3 pt-2">
                     <button
@@ -328,6 +388,7 @@ export function VersionManager({ isOpen, onClose, onRestore, versions, onUpdateV
           <VersionComparisonReport
             baseVersion={baseVersion}
             comparisonData={currentData}
+            decisions={decisions}
             onClose={() => setComparisonVersionId(null)}
           />
         );
@@ -345,12 +406,19 @@ export function VersionManager({ isOpen, onClose, onRestore, versions, onUpdateV
 }
 
 // Sub-component for the Report
-function VersionComparisonReport({ baseVersion, comparisonData, onClose }: {
+function VersionComparisonReport({ baseVersion, comparisonData, decisions, onClose }: {
   baseVersion: Version,
   comparisonData: Version['data'],
+  decisions: Decision[],
   onClose: () => void
 }) {
   const diff = useMemo(() => computeDiff(baseVersion, comparisonData), [baseVersion, comparisonData]);
+  // The report always compares the baseline against the live workspace, so the
+  // far end of the span is "now" — an endpoint with a timestamp but no version.
+  const spanDecisions = useMemo(
+    () => decisionsForSpan(decisions, baseVersion, { id: '', timestamp: new Date().toISOString() }),
+    [decisions, baseVersion],
+  );
 
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-6">
@@ -378,6 +446,38 @@ function VersionComparisonReport({ baseVersion, comparisonData, onClose }: {
               <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1">Current State</p>
               <p className="font-bold text-indigo-900">Today</p>
             </div>
+          </div>
+
+          {/*
+            AC3 — the payoff. Decisions had zero presence in the surface people
+            actually use, so writing one was unrewarded. Listing them here is what
+            makes the log worth keeping: it turns "I wrote this down" into "my own
+            diffs explain themselves". An empty span says so out loud, so a change
+            nobody documented reads as a visible gap rather than silence.
+          */}
+          <div data-testid="diff-decisions" className="rounded-2xl border border-slate-200 p-4">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">
+              Decisions in this span
+            </p>
+            {spanDecisions.length === 0 ? (
+              <p className="text-sm text-slate-400">
+                No decisions recorded for this period — nothing explains why these changes were made.
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {spanDecisions.map(d => (
+                  <li key={d.id} className="flex items-start gap-2">
+                    <FileText size={14} className="mt-0.5 text-slate-300 shrink-0" />
+                    <div>
+                      <p className="text-sm font-medium text-slate-800">{d.title}</p>
+                      <p className="text-xs text-slate-400">
+                        {new Date(d.createdAt).toLocaleDateString()} &middot; {d.status}
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
           {!diff.hasChanges ? (
