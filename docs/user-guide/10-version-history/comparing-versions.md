@@ -46,7 +46,7 @@ Two things the summary does deliberately:
 
 The complete breakdown by entity type. Every type the comparison covers gets a section, and sections with nothing to report are omitted:
 
-Assets · Programmes · Strategies · Initiatives · Relationships · Milestones · Deliverables · Deliverable Segments · App Statuses · Resources · Categories · Decisions · RPTI · LKPTI
+Assets · Programmes · Strategies · Initiatives · Relationships · Milestones · Deliverables · Deliverable Segments · App Statuses · Resources · Categories · RPTI · LKPTI
 
 Nothing is filtered here — including the cosmetic changes the summary sets aside. Use this view when you need to account for every field that moved.
 
@@ -73,6 +73,11 @@ as it was linked, and a decision nobody linked still shows up if it falls in the
 
 If nothing matches, the report says so explicitly rather than staying silent. That is deliberate:
 a set of changes with no recorded reasoning is worth noticing, not worth hiding.
+
+Note that decisions do **not** also appear as ordinary change rows further down the report. The
+decision log is a record *about* your portfolio rather than part of it, and
+[restoring a version](restoring-a-version.md) deliberately leaves it alone — so listing a decision
+as an added or changed item would describe a change that Restore would not undo.
 
 ---
 
