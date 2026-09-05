@@ -102,3 +102,54 @@ test.describe('Versioned Import/Export', () => {
     await expect(page.locator('h4', { hasText: v2Name })).toBeVisible();
   });
 });
+
+test.describe('Decision log survives export/import (#22)', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await page.evaluate(() => {
+      localStorage.setItem('scenia-e2e', 'true');
+      localStorage.setItem('scenia_has_seen_landing', 'true');
+    });
+    await page.reload();
+    await page.waitForSelector('[data-testid="asset-row-content"]', { timeout: 20000 });
+  });
+
+  test('decisions round-trip through export and Overwrite All Data', async ({ page }) => {
+    const title = `Consolidated identity onto one platform ${Date.now()}`;
+
+    // 1. Record a decision, with the fields most likely to be dropped in transit.
+    await page.getByTestId('nav-decisions').click();
+    await page.getByTestId('add-decision-btn').click();
+    await page.getByTestId('decision-title-input').fill(title);
+    await page.getByTestId('decision-context-input').fill('Two IAM stacks with overlapping scope.');
+    await page.getByTestId('save-decision-btn').click();
+    await expect(page.getByTestId('decisions-list').getByText(title)).toBeVisible();
+
+    // 2. Export.
+    await page.getByTestId('nav-data-manager').click();
+    const downloadPromise = page.waitForEvent('download');
+    await page.getByTestId('export-excel').click();
+    const exportPath = await (await downloadPromise).path();
+    expect(exportPath).not.toBeNull();
+
+    // 3. Reset to an empty workspace, so a surviving decision can only have come
+    //    back from the file rather than from what was already in IndexedDB.
+    await page.getByTestId('clear-and-start-again-btn').click();
+    await page.getByTestId('template-start-blank-btn').click();
+    await page.getByTestId('nav-decisions').click();
+    await expect(page.getByTestId('decisions-list')).toContainText('No decisions recorded yet');
+
+    // 4. Re-import with Overwrite All Data — the exact path #22 reported.
+    await page.getByTestId('nav-data-manager').click();
+    await page.setInputFiles('input[type="file"]', exportPath!);
+    await expect(page.locator('.import-preview-modal')).toBeVisible();
+    await page.getByRole('button', { name: 'Overwrite All Data' }).click();
+    await expect(page.getByTestId('import-success-notification')).toBeVisible();
+
+    // 5. The decision is back, with its context intact.
+    await page.getByTestId('nav-decisions').click();
+    await page.getByTestId('decisions-list').getByText(title).click();
+    await expect(page.getByTestId('decision-detail')).toContainText(title);
+    await expect(page.getByTestId('decision-detail')).toContainText('Two IAM stacks with overlapping scope.');
+  });
+});

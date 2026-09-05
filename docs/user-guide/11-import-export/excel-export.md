@@ -29,6 +29,7 @@ The exported workbook contains one sheet per data type:
 | **DeliverableStatuses** | All named status labels for segments |
 | **Resources** | All people and roles in the resources roster |
 | **RptiDetails** | A raw backup copy of every RPTI report row (see [Recording an RPTI Row](../14-rpti-report/recording-an-rpti-row.md)) — separate from the formatted "Format 3.1" report export |
+| **Decisions** | Every record in your [portfolio decision log](../13-decisions/recording-a-decision.md), including its MADR fields, status, and any links |
 | **Versions** | Metadata for all saved history snapshots |
 | **TimelineSettings** | Configuration settings (zoom, start date, default currency, toggles) for the current state and snapshots |
 
@@ -37,6 +38,12 @@ The exported workbook contains one sheet per data type:
 Unlike simple backups, Selara's Excel export preserves your entire **Version History**. When you export:
 - The **Versions** sheet captures the name, timestamp, and description of every snapshot you've saved.
 - All other data sheets include a **`versionId`** column. Rows where this is blank represent your current "live" data; rows with an ID correspond to data from a specific historical snapshot.
+
+The **Decisions** sheet is the one exception: it has no version envelope. Your decision log is a
+record *about* the portfolio rather than part of its state, so it is exported once, as it stands
+now, and is not snapshotted per version — see [ADR-0011](../../adr/0011-history-tab-decisions-as-audit-trail.md).
+Its own `versionId` column means something different: the snapshot that a decision was recorded
+against, if any.
 
 This allows you to move your entire project history between browsers or share a complete time-travel enabled portfolio with a colleague.
 
