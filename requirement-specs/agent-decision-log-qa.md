@@ -1,5 +1,8 @@
 # AI Agent Use Case: Decision Log Q&A (Design Notes)
 
+> **Closed as a feature direction** (2026-09-02) — see [`agent-exposure-architecture.md`](agent-exposure-architecture.md) for the architectural blocker common to all four of these, the routes considered, and why the family is closed rather than parked. Retained as a discovery record: this idea's audit produced real work, listed below.
+> **Discovery outcome:** the audit found decisions cannot leave the app — `excel.ts` has no Decisions sheet — and that overwrite import silently wipes the log. Filed as [issue #22](https://github.com/nofanto/Selara/issues/22).
+
 > **Status:** Idea — not yet started. No design discussion has happened yet; this is a placeholder capturing the idea so it isn't lost, per the brainstorm in issue-#9's follow-up conversation about read-only AI agent capabilities for Selara.
 > **Context:** Part of a family of read-only agent use cases (alongside [Filing Readiness Check](agent-filing-readiness-check.md), [Version Diff Narrative](agent-version-diff-narrative.md), and [Capacity/Budget Query](agent-capacity-budget-query.md)).
 > **Last refreshed:** 2026-09-02.
