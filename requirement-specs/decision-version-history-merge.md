@@ -1,6 +1,6 @@
 # Merging the Decision Log and Version History — Design Notes
 
-> **Status:** §§1-5 decided and implemented in PR 1; §6 (adoption) drafted, with open questions still to resolve before PR 2. Resolves the design questions raised when reviewing why Selara has two apparent places to "manage changes". Tracked by [issue #29](https://github.com/nofanto/Selara/issues/29) across three PRs — see "Phasing". The data-model rule is recorded as [ADR-0011](../docs/adr/0011-history-tab-decisions-as-audit-trail.md).
+> **Status:** §§1-5 decided and implemented in PR 1; §6 (adoption) decided, implementation in PR 2. Resolves the design questions raised when reviewing why Selara has two apparent places to "manage changes". Tracked by [issue #29](https://github.com/nofanto/Selara/issues/29) across three PRs — see "Phasing". The data-model rule is recorded as [ADR-0011](../docs/adr/0011-history-tab-decisions-as-audit-trail.md).
 
 ## Context and Problem Statement
 
@@ -151,10 +151,10 @@ No IndexedDB `DB_VERSION` bump is required: the `decisions` store already exists
 
 ## Open questions
 
-Items 1-5 are settled and PR 1 is implemented. These concern §6 only, and should be resolved before PR 2 starts:
+None outstanding. §§1-5 are implemented in PR 1; the five §6 questions were resolved as follows and are now binding on PR 2:
 
-1. **Default status for a decision captured at save time (6a).** `DecisionsView` defaults new records to `proposed`, but a decision recorded alongside a snapshot describes work already done, which argues for `accepted`. Defaulting wrong in either direction produces a log whose status field nobody trusts.
-2. **What "covering that span" means for the Difference Report (6b).** Matching `createdAt` between the two version timestamps is the obvious rule, but it misses a decision written *later* about an earlier change. Does an explicit `versionId` link take precedence, and should a decision be able to reference more than one version?
-3. **Does the interleaved stream (6c) replace the two lists, or sit alongside them as a third view?** Replacing is cleaner but removes the ability to scan decisions alone, which is how a filing reviewer would use it.
-4. **Does 6a create the decision immediately, or on the next save?** Creating it inside the save flow means a half-written decision can be abandoned mid-dialog; deferring it means the trigger fires when the context is already gone.
-5. **Agreement on what success looks like** — see "How this will be judged" above.
+1. **A decision captured at save time defaults to `accepted`.** The snapshot exists *because* a change was made, and the dialog's own placeholder ("What changes does this version capture?") is past-tense — the record describes work already done. Rejected `proposed` (would fill the log with proposals for changes that already shipped, making the status field meaningless) and rejected asking in the dialog (adds a field to the exact moment 6a exists to keep frictionless). Accepted carries one known cost: a user who snapshots a baseline *before* acting gets a status they must correct by hand.
+2. **"Covering that span" (6b) is a union, not a choice.** Show decisions explicitly linked by `versionId` to either endpoint, **plus** decisions whose `createdAt` falls between the two version timestamps, deduplicated. The window alone misses a decision written later about an earlier change; the link alone misses everything nobody linked. `versionId` stays singular — multi-version linking is speculative until something needs it.
+3. **The interleaved stream (6c) becomes the tab's default view**, with a filter to show decisions alone. Replacing the separate lists outright would cost the ability to scan decisions on their own, which is how a filing reviewer uses the log; a filter preserves it without keeping two parallel lists.
+4. **The decision is created inside the save transaction (6a)**, but only when the user opts in *and* supplies a non-empty title. An abandoned dialog must leave no half-written record.
+5. **Success is judged on adoption first, then quality.** Initially: what share of saved versions end up with a linked decision. Once the log is non-empty: whether those decisions explain something a diff cannot — rationale, rejected options, constraints. Sequenced because a quality bar is meaningless against an empty log. Neither is measurable by the app (local-first, no telemetry); both are observations the product owner makes in the History tab.
