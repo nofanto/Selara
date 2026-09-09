@@ -12,6 +12,10 @@ const REQUIRED_FIELDS: Record<string, string[]> = {
   milestones: ['id', 'assetId', 'date', 'name', 'type'],
   dependencies: ['id', 'sourceId', 'targetId', 'type'],
   assetCategories: ['id', 'name'],
+  // A decision's only mandatory field is `title` — the same rule DecisionsView
+  // enforces on save. ADR-0002 made every other MADR field optional so small,
+  // routine decisions stay cheap to record, so nothing further belongs here.
+  decisions: ['id', 'title', 'status', 'createdAt'],
 };
 
 function getMissingFieldSeverity(entityType: string, field: string): SchemaIssue['severity'] {
@@ -19,6 +23,12 @@ function getMissingFieldSeverity(entityType: string, field: string): SchemaIssue
     return field === 'id' || field === 'name' || field === 'programmeId' || field === 'assetId'
       ? 'error'
       : 'warning';
+  }
+
+  // Decisions are titled, not named — without this they would fall through to
+  // the default and a title-less decision would import as a mere warning.
+  if (entityType === 'decisions') {
+    return field === 'id' || field === 'title' ? 'error' : 'warning';
   }
 
   return field === 'id' || field === 'name' ? 'error' : 'warning';

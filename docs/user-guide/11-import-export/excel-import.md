@@ -6,7 +6,7 @@ Importing an `.xlsx` file lets you load portfolio data prepared outside Selara â
 
 ## Supported file format
 
-Upload a `.xlsx` file. The importer reads the following sheets by name: **Initiatives**, **Assets**, **AssetCategories**, **Programmes**, **Strategies**, **Milestones**, **Dependencies**, **Deliverables**, **DeliverableSegments**, **DeliverableStatuses**, **Resources**, **RptiDetails**, **TimelineSettings**, **Versions**. Sheets with unrecognised names are ignored. Column headers must match the expected field names; the schema warnings panel reports any mismatches (see below).
+Upload a `.xlsx` file. The importer reads the following sheets by name: **Initiatives**, **Assets**, **AssetCategories**, **Programmes**, **Strategies**, **Milestones**, **Dependencies**, **Deliverables**, **DeliverableSegments**, **DeliverableStatuses**, **Resources**, **RptiDetails**, **Decisions**, **TimelineSettings**, **Versions**. Sheets with unrecognised names are ignored. Column headers must match the expected field names; the schema warnings panel reports any mismatches (see below).
 
 ## Uploading a file
 
@@ -63,6 +63,13 @@ The modal offers two modes:
 - Initiatives and other records with an `id` matching an existing record are updated in place.
 - Records with new `id` values are added.
 - Existing records whose `id` does not appear in the file are left untouched â€” this includes RPTI Detail rows: merging a file with no **RptiDetails** sheet leaves your existing RPTI report data exactly as it was.
+
+### Files exported before the Decisions sheet existed
+
+Older exports carry no **Decisions** sheet at all. Importing one with **Overwrite All Data** leaves
+your decision log exactly as it was, rather than emptying it: a file that cannot speak about
+decisions is not the same as a file saying you have none. A file that *does* carry a Decisions
+sheet replaces the log as you would expect.
 
 Use **Merge Data** when your file contains a partial update or additions to an existing portfolio.
 

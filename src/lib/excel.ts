@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx';
-import { Asset, Deliverable, DeliverableSegment, DeliverableStatus, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource, Version, RptiDetail, LkptiDetail } from '../types';
+import { Decision, Asset, Deliverable, DeliverableSegment, DeliverableStatus, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource, Version, RptiDetail, LkptiDetail } from '../types';
 
 interface AppData {
   assets: Asset[];
@@ -17,6 +17,7 @@ interface AppData {
   versions?: Version[];
   rptiDetails?: RptiDetail[];
   lkptiDetails?: LkptiDetail[];
+  decisions?: Decision[];
 }
 
 
@@ -72,7 +73,12 @@ const normalizeImportedInitiative = (init: any): Initiative => ({
   resourceIds: normalizeResourceIds(init.resourceIds) ?? init.resourceIds,
 });
 
-export const exportToExcel = (data: AppData) => {
+/**
+ * Builds the workbook. Split out from `exportToExcel` so the export/import round
+ * trip can be unit-tested without a browser download and a File — the risk in
+ * this module is the sheet mapping, not the file I/O.
+ */
+export const buildWorkbook = (data: AppData): XLSX.WorkBook => {
   const wb = XLSX.utils.book_new();
 
   // Helper to add versionId to a list of items
@@ -160,19 +166,36 @@ export const exportToExcel = (data: AppData) => {
   }));
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(versionsMetadata), 'Versions');
 
-  // Write file
-  XLSX.writeFile(wb, `it-roadmap-${new Date().toISOString().split('T')[0]}.xlsx`);
+  /*
+   * 15. Decisions — deliberately NOT run through flatten().
+   *
+   * Every other sheet carries a `versionId` column saying which snapshot a row
+   * belongs to ('' meaning current). `Decision.versionId` already means something
+   * else entirely: the snapshot that *enacted* the decision (ADR-0011). Pushing
+   * decisions through flatten()/withVersion() would overwrite that link with ''
+   * on export and strip it on import — a second, quieter data loss hidden inside
+   * the fix for the first.
+   *
+   * There is nothing to version here anyway: ADR-0011 made `Version.data.decisions`
+   * a deprecated field that is never read, because the decision log is an audit
+   * trail about the workspace rather than part of its state. So the log is exported
+   * once, as current data, and `versionId` travels as an ordinary column.
+   */
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data.decisions || []), 'Decisions');
+
+  return wb;
 };
 
-export const importFromExcel = async (file: File): Promise<Partial<AppData>> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    
-    reader.onload = (e) => {
-      try {
-        const data = new Uint8Array(e.target?.result as ArrayBuffer);
-        const wb = XLSX.read(data, { type: 'array' });
-        
+export const exportToExcel = (data: AppData) => {
+  XLSX.writeFile(buildWorkbook(data), `it-roadmap-${new Date().toISOString().split('T')[0]}.xlsx`);
+};
+
+/**
+ * Reads a workbook into workspace data. Split out from `importFromExcel` so the
+ * round trip is unit-testable against `buildWorkbook` without a File or a
+ * FileReader.
+ */
+export const parseWorkbook = (wb: XLSX.WorkBook): Partial<AppData> => {
         const result: Partial<AppData> = {
           versions: []
         };
@@ -290,7 +313,33 @@ export const importFromExcel = async (file: File): Promise<Partial<AppData>> => 
           });
         }
 
-        resolve(result);
+        /*
+         * Decisions are read straight from their sheet — no split(), because the
+         * Decisions sheet carries no version envelope (see buildWorkbook). Running
+         * it through split() would strip `Decision.versionId`, which here means the
+         * snapshot that enacted the decision, not the snapshot the row belongs to.
+         *
+         * Left `undefined` when the sheet is absent rather than defaulted to []:
+         * files exported before this fix carry no Decisions sheet, and the overwrite
+         * import path must be able to tell "this file says there are none" from
+         * "this file cannot speak about decisions at all" — writing [] over a
+         * populated log is exactly the bug this fixes (#22).
+         */
+        if (wb.Sheets['Decisions']) {
+          result.decisions = getSheetData<Decision>('Decisions');
+        }
+
+        return result;
+};
+
+export const importFromExcel = async (file: File): Promise<Partial<AppData>> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        resolve(parseWorkbook(XLSX.read(data, { type: 'array' })));
       } catch (error) {
         reject(error);
       }

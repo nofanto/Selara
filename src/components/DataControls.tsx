@@ -174,7 +174,12 @@ export function DataControls({ data, onImport, onError, timelineId }: DataContro
       timelineSettings: importPreviewData.timelineSettings || data.timelineSettings,
       resources: importPreviewData.resources || [],
       versions: importPreviewData.versions || [],
-      decisions: importPreviewData.decisions || [],
+      // A file exported before the Decisions sheet existed carries no decisions at
+      // all, which arrives here as `undefined` rather than []. Defaulting that to []
+      // is exactly the bug in #22: it silently destroys the workspace's decision log
+      // on an overwrite. `undefined` means "this file cannot speak about decisions",
+      // so the existing log is kept; [] means "this file says there are none".
+      decisions: importPreviewData.decisions ?? data.decisions ?? [],
       rptiDetails: importPreviewData.rptiDetails || [],
       lkptiDetails: importPreviewData.lkptiDetails || [],
     });
