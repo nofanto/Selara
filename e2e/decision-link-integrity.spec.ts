@@ -30,13 +30,15 @@ test.describe('Decision link integrity on delete', () => {
   };
 
   const linkDecisionTo = async (page: Page, assetName: string) => {
-    await page.getByTestId('nav-decisions').click();
-    await page.getByTestId('add-decision-btn').click();
+    await page.getByTestId('nav-history').click();
+    await page.getByTestId('new-decision-btn').click();
     await page.getByTestId('decision-title-input').fill(DECISION);
+    // Context, options, consequences and the entity link sit behind 'Add detail' (AC4).
+    await page.getByTestId('decision-add-detail-toggle').click();
     await page.getByTestId('decision-linked-type-select').selectOption('asset');
     await page.getByTestId('decision-linked-id-select').selectOption({ label: assetName });
     await page.getByTestId('save-decision-btn').click();
-    await expect(page.getByTestId('decisions-list').getByText(DECISION)).toBeVisible();
+    await expect(page.getByTestId('history-stream').getByText(DECISION)).toBeVisible();
   };
 
   /** Link a decision to the asset that is about to be deleted, then delete it. */
@@ -63,23 +65,23 @@ test.describe('Decision link integrity on delete', () => {
     await linkThenDeleteFirstAsset(page);
     await page.getByTestId('confirm-modal-confirm').click();
 
-    await page.getByTestId('nav-decisions').click();
-    await page.getByTestId('decisions-list').getByText(DECISION).click();
+    await page.getByTestId('nav-history').click();
+    await page.getByTestId('history-stream').getByText(DECISION).click();
 
     // The record survives — ADR-0011: the log outlives what it describes.
     await expect(page.getByTestId('decision-detail')).toContainText(DECISION);
     // ...and the fact that a link existed is still visible.
     await expect(page.getByTestId('decision-link-missing-detail')).toBeVisible();
-    await expect(page.getByTestId('decisions-list').getByTestId('decision-link-missing')).toBeVisible();
+    await expect(page.getByTestId('history-stream').getByTestId('decision-link-missing')).toBeVisible();
   });
 
   test('a decision that was never linked shows no tombstone', async ({ page }) => {
     // The whole point of the tombstone is telling these two states apart.
-    await page.getByTestId('nav-decisions').click();
-    await page.getByTestId('add-decision-btn').click();
+    await page.getByTestId('nav-history').click();
+    await page.getByTestId('new-decision-btn').click();
     await page.getByTestId('decision-title-input').fill('Unlinked decision');
     await page.getByTestId('save-decision-btn').click();
-    await page.getByTestId('decisions-list').getByText('Unlinked decision').click();
+    await page.getByTestId('history-stream').getByText('Unlinked decision').click();
 
     await expect(page.getByTestId('decision-detail')).toContainText('Unlinked decision');
     await expect(page.getByTestId('decision-link-missing-detail')).toHaveCount(0);

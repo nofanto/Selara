@@ -12,37 +12,39 @@ test.describe('Decisions (portfolio decision log)', () => {
   });
 
   test('Decisions tab appears in navigation and opens the Decisions view', async ({ page }) => {
-    await expect(page.getByTestId('nav-decisions')).toBeVisible();
-    await page.getByTestId('nav-decisions').click();
+    await expect(page.getByTestId('nav-history')).toBeVisible();
+    await page.getByTestId('nav-history').click();
     await expect(page.getByTestId('decisions-view')).toBeVisible();
   });
 
   test('Can create a new decision with just a title, defaulting to Proposed status', async ({ page }) => {
-    await page.getByTestId('nav-decisions').click();
-    await page.getByTestId('add-decision-btn').click();
+    await page.getByTestId('nav-history').click();
+    await page.getByTestId('new-decision-btn').click();
 
     const title = `Adopt event-driven sync ${Date.now()}`;
     await page.getByTestId('decision-title-input').fill(title);
     await page.getByTestId('save-decision-btn').click();
 
-    await expect(page.getByTestId('decisions-list').getByText(title)).toBeVisible();
+    await expect(page.getByTestId('history-stream').getByText(title)).toBeVisible();
     await expect(page.getByTestId('decision-detail').getByText('Proposed')).toBeVisible();
   });
 
   test('Cannot save a decision without a title', async ({ page }) => {
-    await page.getByTestId('nav-decisions').click();
-    await page.getByTestId('add-decision-btn').click();
+    await page.getByTestId('nav-history').click();
+    await page.getByTestId('new-decision-btn').click();
     await page.getByTestId('save-decision-btn').click();
 
     await expect(page.getByTestId('decision-title-error')).toBeVisible();
   });
 
   test('Can edit a decision, fill in the full MADR fields, and change its status to Accepted', async ({ page }) => {
-    await page.getByTestId('nav-decisions').click();
-    await page.getByTestId('add-decision-btn').click();
+    await page.getByTestId('nav-history').click();
+    await page.getByTestId('new-decision-btn').click();
 
     const title = `Consolidate reporting pipeline ${Date.now()}`;
     await page.getByTestId('decision-title-input').fill(title);
+    // Context, options, consequences and the entity link sit behind 'Add detail' (AC4).
+    await page.getByTestId('decision-add-detail-toggle').click();
     await page.getByTestId('decision-context-input').fill('Two overlapping reporting exports were confusing stakeholders.');
     await page.getByTestId('decision-considered-options-input').fill('Keep both\nMerge into one');
     await page.getByTestId('decision-outcome-input').fill('Merge into a single report.');
@@ -56,8 +58,8 @@ test.describe('Decisions (portfolio decision log)', () => {
   });
 
   test('Can transition a decision from Accepted to Superseded', async ({ page }) => {
-    await page.getByTestId('nav-decisions').click();
-    await page.getByTestId('add-decision-btn').click();
+    await page.getByTestId('nav-history').click();
+    await page.getByTestId('new-decision-btn').click();
     await page.getByTestId('decision-title-input').fill(`Temporary vendor choice ${Date.now()}`);
     await page.getByTestId('decision-status-select').selectOption('accepted');
     await page.getByTestId('save-decision-btn').click();
@@ -70,17 +72,17 @@ test.describe('Decisions (portfolio decision log)', () => {
   });
 
   test('Can delete a decision with confirmation', async ({ page }) => {
-    await page.getByTestId('nav-decisions').click();
-    await page.getByTestId('add-decision-btn').click();
+    await page.getByTestId('nav-history').click();
+    await page.getByTestId('new-decision-btn').click();
     const title = `Decision to delete ${Date.now()}`;
     await page.getByTestId('decision-title-input').fill(title);
     await page.getByTestId('save-decision-btn').click();
-    await expect(page.getByTestId('decisions-list').getByText(title)).toBeVisible();
+    await expect(page.getByTestId('history-stream').getByText(title)).toBeVisible();
 
     await page.getByTestId('delete-decision-btn').click();
     await page.getByTestId('confirm-modal-confirm').click();
 
-    await expect(page.getByTestId('decisions-list').getByText(title)).not.toBeVisible();
+    await expect(page.getByTestId('history-stream').getByText(title)).not.toBeVisible();
   });
 
   test('Can link a decision to an existing initiative and see it surfaced on that initiative\'s panel', async ({ page }) => {
@@ -92,15 +94,17 @@ test.describe('Decisions (portfolio decision log)', () => {
     const initiativeName = await page.getByLabel('Initiative Name').inputValue();
     await page.getByRole('button', { name: 'Close' }).click();
 
-    await page.getByTestId('nav-decisions').click();
-    await page.getByTestId('add-decision-btn').click();
+    await page.getByTestId('nav-history').click();
+    await page.getByTestId('new-decision-btn').click();
     const title = `Link test decision ${Date.now()}`;
     await page.getByTestId('decision-title-input').fill(title);
+    // Context, options, consequences and the entity link sit behind 'Add detail' (AC4).
+    await page.getByTestId('decision-add-detail-toggle').click();
     await page.getByTestId('decision-linked-type-select').selectOption('initiative');
     await page.getByTestId('decision-linked-id-select').selectOption({ label: initiativeName });
     await page.getByTestId('save-decision-btn').click();
 
-    await expect(page.getByTestId('decisions-list').getByText(title)).toBeVisible();
+    await expect(page.getByTestId('history-stream').getByText(title)).toBeVisible();
 
     await page.getByTestId('nav-visualiser').click();
     await bar.click();
@@ -130,15 +134,14 @@ test.describe('Decision log survives a version restore (ADR-0011)', () => {
     await page.fill('input[placeholder="e.g., March 2026 Snapshot"]', versionName);
     await page.getByRole('button', { name: 'Save Version' }).click();
     await expect(page.getByText(versionName)).toBeVisible();
-    await page.getByTestId('close-version-manager').click();
 
     // 2. Record the decision that explains the rollback we're about to do.
     const title = `Roll back after the vendor withdrew ${Date.now()}`;
-    await page.getByTestId('nav-decisions').click();
-    await page.getByTestId('add-decision-btn').click();
+    await page.getByTestId('nav-history').click();
+    await page.getByTestId('new-decision-btn').click();
     await page.getByTestId('decision-title-input').fill(title);
     await page.getByTestId('save-decision-btn').click();
-    await expect(page.getByTestId('decisions-list').getByText(title)).toBeVisible();
+    await expect(page.getByTestId('history-stream').getByText(title)).toBeVisible();
 
     // 3. Restore the snapshot taken before that decision existed.
     await page.getByTestId('nav-history').click();
@@ -148,7 +151,7 @@ test.describe('Decision log survives a version restore (ADR-0011)', () => {
 
     // 4. The decision must still be there. Before ADR-0011 the restore wrote the
     //    snapshot's empty decisions array over the live log and this vanished.
-    await page.getByTestId('nav-decisions').click();
-    await expect(page.getByTestId('decisions-list').getByText(title)).toBeVisible();
+    await page.getByTestId('nav-history').click();
+    await expect(page.getByTestId('history-stream').getByText(title)).toBeVisible();
   });
 });

@@ -8,7 +8,7 @@ test.describe('Version History & Snapshotting', () => {
 
   test('should allow saving a version and viewing it in the list', async ({ page }) => {
     await page.getByTestId('nav-history').click();
-    await expect(page.getByText('Version History')).toBeVisible();
+    await expect(page.getByTestId('history-view')).toBeVisible();
 
     await page.getByRole('button', { name: 'Save Current State' }).click();
     const versionName = `Test Version ${Date.now()}`;
@@ -27,7 +27,6 @@ test.describe('Version History & Snapshotting', () => {
     await page.getByRole('button', { name: 'Save Current State' }).click();
     await page.fill('input[placeholder="e.g., March 2026 Snapshot"]', 'Baseline');
     await page.getByRole('button', { name: 'Save Version' }).click();
-    await page.getByTestId('close-version-manager').click();
 
     await page.getByTestId('nav-data-manager').click();
     const firstInitName = page.locator('input[data-testid^="real-input-name"]').first();
@@ -54,7 +53,6 @@ test.describe('Version History & Snapshotting', () => {
     await page.getByRole('button', { name: 'Save Current State' }).click();
     await page.fill('input[placeholder="e.g., March 2026 Snapshot"]', 'Complex Baseline');
     await page.getByRole('button', { name: 'Save Version' }).click();
-    await page.getByTestId('close-version-manager').click();
 
     await page.getByTestId('nav-data-manager').click();
     const firstInitName = await page.locator('input[data-testid^="real-input-name"]').first().inputValue();
@@ -106,7 +104,7 @@ test.describe('Version History & Snapshotting', () => {
     await expect(page.getByRole('heading', { name: 'Difference Report' })).not.toBeVisible({ timeout: 3000 });
     expect(pageErrors.filter(e => e.includes('Cannot read') || e.includes('undefined'))).toHaveLength(0);
 
-    await page.getByTestId('close-version-manager').click();
+    await page.getByTestId('nav-visualiser').click();
     await expect(page.locator('#timeline-visualiser')).toBeVisible();
   });
 
@@ -115,7 +113,6 @@ test.describe('Version History & Snapshotting', () => {
     await page.getByRole('button', { name: 'Save Current State' }).click();
     await page.fill('input[placeholder="e.g., March 2026 Snapshot"]', 'To Restore');
     await page.getByRole('button', { name: 'Save Version' }).click();
-    await page.getByTestId('close-version-manager').click();
 
     await page.getByTestId('nav-data-manager').click();
     await page.waitForSelector('input[data-testid^="real-input-name"]', { timeout: 10000 });
@@ -131,7 +128,7 @@ test.describe('Version History & Snapshotting', () => {
     await page.getByRole('button', { name: 'Restore to Current' }).click();
     await page.locator('[data-testid="confirm-modal-confirm"]').click();
 
-    await expect(page.getByText('Version History')).not.toBeVisible();
+    await expect(page.getByTestId('confirm-modal')).not.toBeVisible();
     await page.getByTestId('nav-data-manager').click();
     await expect(page.locator('input[data-testid^="real-input-name"]')).toHaveCount(countBefore);
     await expect(page.locator('input[data-testid^="real-input-name"]').first()).toHaveValue(firstInitName);
@@ -143,8 +140,8 @@ test.describe('Version History & Snapshotting', () => {
     await page.getByRole('button', { name: 'Save Current State' }).click();
     await page.fill('input[placeholder="e.g., March 2026 Snapshot"]', 'Integrity Check');
     await page.getByRole('button', { name: 'Save Version' }).click();
-    await page.getByTestId('close-version-manager').click();
 
+    await page.getByTestId('nav-visualiser').click();
     const passkeyBar = page.locator('[data-initiative-id="i-ciam-passkey"]').first();
     await passkeyBar.click();
     await page.getByTestId('initiative-action-edit').click();
@@ -165,7 +162,6 @@ test.describe('Version History & Snapshotting', () => {
     await page.getByRole('button', { name: 'Save Current State' }).click();
     await page.fill('input[placeholder="e.g., March 2026 Snapshot"]', 'Pre-Resource Baseline');
     await page.getByRole('button', { name: 'Save Version' }).click();
-    await page.getByTestId('close-version-manager').click();
 
     await page.getByTestId('nav-data-manager').click();
     await page.getByTestId('data-manager-tab-resources').click();
@@ -194,7 +190,6 @@ test.describe('Version History & Snapshotting', () => {
     await page.getByRole('button', { name: 'Save Current State' }).click();
     await page.fill('input[placeholder="e.g., March 2026 Snapshot"]', 'DB Integrity Check');
     await page.getByRole('button', { name: 'Save Version' }).click();
-    await page.getByTestId('close-version-manager').click();
 
     const savedInitiativeCount = await page.evaluate((): Promise<number> => {
       return new Promise((resolve, reject) => {

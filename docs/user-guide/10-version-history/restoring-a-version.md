@@ -12,13 +12,13 @@ Restoration is destructive: any changes made since the selected version was save
 
 ## How to restore a version
 
-1. Open the **Version History** panel.
+1. Open the **History** tab in the header navigation.
 2. Locate the version you want to restore in the list.
 3. Click **Restore** on that version's row.
 4. Read the confirmation modal, which names the version and warns that the current state will be overwritten.
 5. Click **Confirm Restore**.
 
-The app loads the saved state, the Version History panel closes automatically, and you are returned to the timeline with the restored data.
+The app loads the saved state, the History tab closes automatically, and you are returned to the timeline with the restored data.
 
 ## After restoring
 

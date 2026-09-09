@@ -1,6 +1,6 @@
 # Merging the Decision Log and Version History — Design Notes
 
-> **Status:** §§1-5 decided and implemented in PR 1; §6 (adoption) decided, implementation in PR 2. Resolves the design questions raised when reviewing why Selara has two apparent places to "manage changes". Tracked by [issue #29](https://github.com/nofanto/Selara/issues/29) across three PRs — see "Phasing". The data-model rule is recorded as [ADR-0011](../docs/adr/0011-history-tab-decisions-as-audit-trail.md).
+> **Status:** All decided. §§1-5 implemented in PR 1; §6a/§6b in PR 2a; §6c/§6d in PR 2b. §6e (backfill) remains as PR 3. Resolves the design questions raised when reviewing why Selara has two apparent places to "manage changes". Tracked by [issue #29](https://github.com/nofanto/Selara/issues/29) across three PRs — see "Phasing". The data-model rule is recorded as [ADR-0011](../docs/adr/0011-history-tab-decisions-as-audit-trail.md).
 
 ## Context and Problem Statement
 
@@ -140,9 +140,16 @@ Three PRs under one issue, so the schema work stays reviewable without UI noise 
 
 **PR 2a — the capture loop (implemented, `feat/history-tab-capture-loop`).** 6a and 6b: capture-at-save, and decisions surfaced in the Difference Report. These are the mechanism — trigger and payoff — and neither depends on the tab migration, so they ship first and start earning immediately.
 
-**PR 2b — the History tab.** No longer a refactor: folding `VersionManager` into the tab is the *vehicle* for §6, not the goal. Covers 6c (interleaved stream, using `buildHistoryStream` which already exists and is tested), 6d (progressive disclosure), and the `versionId` link surfaced in both directions. Needs its own user story with acceptance criteria before implementation. Updates guide pages, `HelpView` nav, and the affected E2E specs.
+**PR 2b — the History tab (implemented, `feat/history-tab`).** No longer a refactor: folding `VersionManager` into the tab is the *vehicle* for §6, not the goal. Covers 6c (interleaved stream, using `buildHistoryStream` which already exists and is tested), 6d (progressive disclosure), and the `versionId` link surfaced in both directions. Needs its own user story with acceptance criteria before implementation. Updates guide pages, `HelpView` nav, and the affected E2E specs.
 
-**PR 3 — backfill.** 6e, split out because it is independent of the tab work and easy to defer.
+**PR 3 — backfill.** 6e, split out because it is independent of the tab work and easy to defer. Still outstanding.
+
+### Carried in PR 2b beyond §6
+
+- **[#31](https://github.com/nofanto/Selara/issues/31) defect 3** — deleting a version now warns that decisions linked to it will lose that link, matching the wording rule defects 1 and 2 established. Parked here deliberately: PR 2b relocates the delete handler out of the Version History modal, so fixing it earlier would have meant writing it and then moving it.
+- **Two regressions the refactor surfaced and fixed in place**, rather than by weakening the tests: a decision captured at save time was nested under its version in the stream and could not be selected; and the stream did not carry #31 defect 2's broken-link marker, which would have quietly reintroduced that bug in the new UI.
+- **The toolbar History shortcut was removed.** With the tab labelled History, a second button of the same name was redundant and made `getByRole('button', { name: 'History' })` ambiguous.
+- **Restore now navigates back to the Visualiser.** The modal used to close itself and drop the user on the timeline, and the guide documents that; a tab has to navigate deliberately to keep the same promise.
 
 No IndexedDB `DB_VERSION` bump is required: the `decisions` store already exists (created at version 14, `src/lib/db.ts:165`) and `versionId` is an unindexed optional field.
 

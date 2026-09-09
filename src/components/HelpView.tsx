@@ -101,11 +101,13 @@ const SECTIONS: GuideSection[] = [
     ],
   },
   {
-    title: 'Version History',
+    title: 'History',
     pages: [
-      { title: 'Saving a Version',    path: '10-version-history/saving-a-version' },
-      { title: 'Comparing Versions',  path: '10-version-history/comparing-versions' },
-      { title: 'Restoring a Version', path: '10-version-history/restoring-a-version' },
+      { title: 'Saving a Version',     path: '10-version-history/saving-a-version' },
+      { title: 'Comparing Versions',   path: '10-version-history/comparing-versions' },
+      { title: 'Restoring a Version',  path: '10-version-history/restoring-a-version' },
+      { title: 'Recording a Decision', path: '13-decisions/recording-a-decision' },
+      { title: 'Linking Decisions',    path: '13-decisions/linking-decisions' },
     ],
   },
   {
@@ -123,13 +125,6 @@ const SECTIONS: GuideSection[] = [
     pages: [
       { title: 'Card View',       path: '12-mobile/card-view' },
       { title: 'Mobile Settings', path: '12-mobile/mobile-settings' },
-    ],
-  },
-  {
-    title: 'Decisions',
-    pages: [
-      { title: 'Recording a Decision', path: '13-decisions/recording-a-decision' },
-      { title: 'Linking Decisions',    path: '13-decisions/linking-decisions' },
     ],
   },
   {

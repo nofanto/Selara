@@ -109,14 +109,16 @@ test.describe('In-app ConfirmModal — no browser dialogs', () => {
     await page.getByRole('button', { name: 'Save Current State' }).click();
     await page.getByPlaceholder('e.g., March 2026 Snapshot').fill('Test Version');
     await page.getByRole('button', { name: 'Save Version' }).click();
-    await expect(page.getByText('Test Version')).toBeVisible();
+    await expect(page.getByTestId('history-stream')).toContainText('Test Version');
 
-    // Delete it via the trash icon
+    // Delete lives on the selected version's detail pane now that History is a
+    // tab rather than a modal, so select it first.
+    await page.getByText('Test Version').click();
     await page.locator('[data-testid="delete-version-btn"]').first().click();
     await expect(page.locator(CONFIRM_MODAL)).toBeVisible();
     await page.locator(CONFIRM_BTN).click();
     await expect(page.locator(CONFIRM_MODAL)).not.toBeVisible();
-    await expect(page.getByText('Test Version')).not.toBeVisible();
+    await expect(page.getByTestId('history-stream')).not.toContainText('Test Version');
   });
 
   test('VersionManager restore version shows confirm modal', async ({ page }) => {
@@ -125,9 +127,9 @@ test.describe('In-app ConfirmModal — no browser dialogs', () => {
     await page.getByRole('button', { name: 'Save Current State' }).click();
     await page.getByPlaceholder('e.g., March 2026 Snapshot').fill('Restore Test');
     await page.getByRole('button', { name: 'Save Version' }).click();
-    await expect(page.getByText('Restore Test')).toBeVisible();
+    await expect(page.getByTestId('history-stream')).toContainText('Restore Test');
 
-    await page.getByText('Restore Test').click();
+    await page.getByTestId('history-stream').getByText('Restore Test').click();
     await page.getByRole('button', { name: 'Restore to Current' }).click();
     await expect(page.locator(CONFIRM_MODAL)).toBeVisible();
     await page.locator(CANCEL_BTN).click();

@@ -50,7 +50,6 @@ test.describe('History Differences report', () => {
     await page.getByRole('button', { name: 'Save Current State' }).click();
     await page.fill('input[placeholder="e.g., March 2026 Snapshot"]', 'Test Snapshot');
     await page.getByRole('button', { name: 'Save Version' }).click();
-    await page.getByTestId('close-version-manager').click();
 
     await page.getByTestId('nav-reports').click();
     await page.getByTestId('report-card-version-history').click();
@@ -65,7 +64,6 @@ test.describe('History Differences report', () => {
     await page.getByRole('button', { name: 'Save Current State' }).click();
     await page.fill('input[placeholder="e.g., March 2026 Snapshot"]', 'Baseline Snapshot');
     await page.getByRole('button', { name: 'Save Version' }).click();
-    await page.getByTestId('close-version-manager').click();
 
     await page.getByTestId('nav-data-manager').click();
     await page.waitForSelector('input[data-testid^="real-input-name"]', { timeout: 10000 });
@@ -91,7 +89,6 @@ test.describe('History Differences report', () => {
     await page.getByRole('button', { name: 'Save Current State' }).click();
     await page.fill('input[placeholder="e.g., March 2026 Snapshot"]', 'Category Baseline');
     await page.getByRole('button', { name: 'Save Version' }).click();
-    await page.getByTestId('close-version-manager').click();
 
     await page.getByTestId('nav-data-manager').click();
 
@@ -155,7 +152,6 @@ test.describe('History Differences report — full entity coverage', () => {
     await page.getByRole('button', { name: 'Save Current State' }).click();
     await page.fill('input[placeholder="e.g., March 2026 Snapshot"]', name);
     await page.getByRole('button', { name: 'Save Version' }).click();
-    await page.getByTestId('close-version-manager').click();
   }
 
   async function runDiff(page: import('@playwright/test').Page, versionName: string) {
@@ -237,7 +233,6 @@ test.describe('History Differences report — summary by asset', () => {
     await page.getByRole('button', { name: 'Save Current State' }).click();
     await page.fill('input[placeholder="e.g., March 2026 Snapshot"]', 'Summary Baseline');
     await page.getByRole('button', { name: 'Save Version' }).click();
-    await page.getByTestId('close-version-manager').click();
 
     await page.getByTestId('nav-data-manager').click();
     await page.getByTestId('data-manager-tab-milestones').click();

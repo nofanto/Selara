@@ -14,7 +14,7 @@ Save a version before:
 
 ## How to save a version
 
-1. Open the **Version History** panel from the toolbar or the main menu.
+1. Open the **History** tab from the toolbar or the main menu.
 2. Click **Save Current State**.
 3. Enter a name (required). Names should be short and descriptive, for example `Q2 Baseline` or `Pre-board 2026-03`.
 4. Optionally add a description to record the context or reason for the snapshot.

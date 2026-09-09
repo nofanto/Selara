@@ -15,7 +15,7 @@ export type DataManagerTab =
 
 export type HealthIssueLocation =
   | { view: 'data'; tab: DataManagerTab }
-  | { view: 'decisions' };
+  | { view: 'history' };
 
 export type HealthSeverity = 'error' | 'warning';
 
@@ -61,7 +61,7 @@ export interface DataHealthInput {
 
 const DATA_TAB: HealthIssueLocation = { view: 'data', tab: 'deliverables' };
 const tab = (t: DataManagerTab): HealthIssueLocation => ({ view: 'data', tab: t });
-const DECISIONS: HealthIssueLocation = { view: 'decisions' };
+const DECISIONS: HealthIssueLocation = { view: 'history' };
 
 /**
  * Computes the full set of workspace data-health issues — dangling references

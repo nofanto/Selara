@@ -115,7 +115,7 @@ describe('computeDataHealth — hard checks (dangling references)', () => {
   it('flags a Decision with a dangling linkedEntityId or supersededBy', () => {
     const dec = { id: 'dec-1', title: 'Decision One', status: 'accepted' as const, createdAt: '2026-01-01T00:00:00Z', linkedEntityType: 'initiative' as const, linkedEntityId: 'ghost', supersededBy: 'ghost' };
     const issues = computeDataHealth(baseInput({ decisions: [dec] }));
-    expect(findIssue(issues, `decision-linked:${dec.id}`)).toMatchObject({ severity: 'error', location: { view: 'decisions' } });
+    expect(findIssue(issues, `decision-linked:${dec.id}`)).toMatchObject({ severity: 'error', location: { view: 'history' } });
     expect(findIssue(issues, `decision-superseded-by:${dec.id}`)?.severity).toBe('error');
   });
 

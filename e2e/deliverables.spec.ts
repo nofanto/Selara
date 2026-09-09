@@ -229,7 +229,6 @@ test.describe('Deliverables — Version snapshots', () => {
 
     // The snapshot should have been saved without error
     await expect(page.getByText('App Test Snapshot')).toBeVisible();
-    await page.getByTestId('close-version-manager').click();
 
     // Add a new deliverable
     await page.getByTestId('nav-data-manager').click();
