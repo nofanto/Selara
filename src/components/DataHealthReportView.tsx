@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { computeDataHealth, DataHealthInput, HealthIssue, HealthIssueLocation, HealthPhase, HealthSeverity } from '../lib/dataHealth';
+import { computeDataHealth, DataHealthInput, HealthIssueLocation, HealthPhase, HealthSeverity } from '../lib/dataHealth';
 import { AlertTriangle, AlertCircle } from 'lucide-react';
 
 interface DataHealthReportViewProps extends DataHealthInput {

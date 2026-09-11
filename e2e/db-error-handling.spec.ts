@@ -13,7 +13,6 @@ test.describe('DB save error handling', () => {
 
     // Intercept IDBObjectStore.put to simulate a DB failure
     await page.evaluate(() => {
-      const originalOpen = window.indexedDB.open.bind(window.indexedDB);
       // Force the next saveAppData call to throw by patching the global
       // We'll use a localStorage flag that the app checks to simulate the failure
       localStorage.setItem('scenia-test-db-save-fail', 'true');

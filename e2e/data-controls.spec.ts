@@ -1,5 +1,4 @@
 import { test, expect } from '@playwright/test';
-import * as path from 'path';
 
 test.describe('Data Controls (Export/Import)', () => {
   test.beforeEach(async ({ page }) => {

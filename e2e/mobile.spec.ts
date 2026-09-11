@@ -59,7 +59,7 @@ test.describe('Mobile layout — foundation', () => {
     expect(paddingLeft).toBeLessThanOrEqual(16);
   });
 
-  test('desktop shows timeline and not card view', async ({ page, browser }) => {
+  test('desktop shows timeline and not card view', async ({ browser }) => {
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
     const p = await ctx.newPage();
     await p.goto('/');

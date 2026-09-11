@@ -95,8 +95,18 @@ function depSentence(dep: Dependency, src: Initiative, tgt: Initiative, perspect
 
 export function ReportsView({ assets, initiatives, milestones, dependencies, currentData, programmes, strategies, assetCategories, resources = [], deliverables = [], deliverableSegments = [], deliverableStatuses = [], rptiDetails = [], lkptiDetails = [], onSaveAsset, onNavigate }: ReportsViewProps) {
   const [selectedReport, setSelectedReport] = useState<ReportSlug | null>(null);
-  const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
-  const [assetPanelOpen, setAssetPanelOpen] = useState(false);
+  /*
+   * One piece of state, not two. The panel is open precisely when its asset still
+   * exists, so deriving that from `assets` rather than mirroring it into a second
+   * useState makes the dangling case impossible by construction — an asset deleted
+   * here, or by another tab via cross-tab sync (requirement-specs/cross-tab-sync.md),
+   * closes the panel on the same render. This previously took an effect that called
+   * setState synchronously, costing a second cascading render to fix up state that
+   * should never have diverged.
+   */
+  const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
+  const selectedAsset = selectedAssetId ? assets.find(a => a.id === selectedAssetId) ?? null : null;
+  const assetPanelOpen = selectedAsset !== null;
   const [versions, setVersions] = useState<Version[]>([]);
   const [selectedVersionId, setSelectedVersionId] = useState<string>('');
   const [diffResult, setDiffResult] = useState<DiffResult | null>(null);
@@ -105,17 +115,6 @@ export function ReportsView({ assets, initiatives, milestones, dependencies, cur
       ? 'Failed to load saved versions. Please try reloading.'
       : null
   );
-
-  // If the Asset panel is open on an asset that disappears from underneath it —
-  // deleted in this tab, or (see requirement-specs/cross-tab-sync.md) by another
-  // tab's save reflected here via cross-tab sync — close the panel rather than
-  // leave it showing a dangling record.
-  useEffect(() => {
-    if (assetPanelOpen && selectedAsset && !assets.some(a => a.id === selectedAsset.id)) {
-      setAssetPanelOpen(false);
-      setSelectedAsset(null);
-    }
-  }, [assets, selectedAsset, assetPanelOpen]);
 
   useEffect(() => {
     if (versionsError) return;
@@ -398,19 +397,12 @@ export function ReportsView({ assets, initiatives, milestones, dependencies, cur
 
   // ── Maturity Heatmap ─────────────────────────────────────────────────────────
   if (selectedReport === 'maturity-heatmap') {
-    const handleTileClick = (asset: Asset) => {
-      setSelectedAsset(asset);
-      setAssetPanelOpen(true);
-    };
+    const handleTileClick = (asset: Asset) => setSelectedAssetId(asset.id);
     const handleAssetSave = (updatedAsset: Asset) => {
       onSaveAsset?.(updatedAsset);
-      setAssetPanelOpen(false);
-      setSelectedAsset(null);
+      setSelectedAssetId(null);
     };
-    const handleAssetPanelClose = () => {
-      setAssetPanelOpen(false);
-      setSelectedAsset(null);
-    };
+    const handleAssetPanelClose = () => setSelectedAssetId(null);
     return (
       <div className="h-full overflow-y-auto p-6 bg-slate-50">
         <div className="max-w-5xl mx-auto">

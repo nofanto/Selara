@@ -36,8 +36,6 @@ describe('layoutSegments', () => {
   });
 
   it('rechecks moved conflicts so tall explicit rows do not end up overlapping', () => {
-    const startDate = new Date('2024-01-01T00:00:00.000Z');
-
     const segments: DeliverableSegment[] = [
       {
         id: 'seg-0',

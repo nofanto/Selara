@@ -1,6 +1,4 @@
 import { test, expect } from '@playwright/test';
-import * as fs from 'fs';
-import * as XLSX from 'xlsx';
 
 test.describe('Resource Assignment Sync', () => {
   test.beforeEach(async ({ page }) => {
