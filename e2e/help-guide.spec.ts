@@ -82,7 +82,8 @@ test.describe('In-app User Guide', () => {
     // in-app guide, leaving the fork's regulatory features undocumented in-product.
     await expect(sidebar.getByRole('button', { name: 'RPTI Report', exact: true })).toBeVisible();
     await expect(sidebar.getByRole('button', { name: 'LKPTI Report', exact: true })).toBeVisible();
-    await expect(sidebar.getByRole('button', { name: 'Decisions', exact: true })).toBeVisible();
+    // The guide's Decisions section merged into History alongside the tab it documents.
+    await expect(sidebar.getByRole('button', { name: 'History', exact: true })).toBeVisible();
   });
 
   test('reports section lists every report page that exists on disk', async ({ page }) => {

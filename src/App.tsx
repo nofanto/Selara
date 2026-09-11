@@ -11,8 +11,7 @@ import { DataControls } from './components/DataControls';
 import { ModalErrorBoundary, TestErrorThrower } from './components/ErrorBoundary';
 import { TutorialModal } from './components/TutorialModal';
 import { LandingPage } from './components/LandingPage';
-import { VersionManager } from './components/VersionManager';
-import { LayoutGrid, Table, Loader2, Search, Undo2, Redo2, HelpCircle, BookOpen, History, AlertTriangle, GitBranch, AlignLeft, DollarSign, MoreHorizontal, BarChart2, ZoomIn, ZoomOut, SlidersHorizontal, X, Keyboard, GitCommit, GitCommitHorizontal, Palette, Box, Boxes, Target, Users, Layers, AppWindow, ClipboardList } from 'lucide-react';
+import { LayoutGrid, Table, Loader2, Search, Undo2, Redo2, HelpCircle, BookOpen, AlertTriangle, GitBranch, AlignLeft, DollarSign, MoreHorizontal, BarChart2, ZoomIn, ZoomOut, SlidersHorizontal, X, Keyboard, GitCommit, GitCommitHorizontal, Palette, Box, Boxes, Target, Users, Layers, AppWindow, ClipboardList } from 'lucide-react';
 
 import {
   demoAssets as initialAssets,
@@ -45,7 +44,7 @@ const FeaturesModal = lazy(() => import('./components/FeaturesModal').then(m => 
 const KeyboardShortcutsModal = lazy(() => import('./components/KeyboardShortcutsModal').then(m => ({ default: m.KeyboardShortcutsModal })));
 const TemplatePickerModal = lazy(() => import('./components/TemplatePickerModal').then(m => ({ default: m.TemplatePickerModal })));
 const DataManager = lazy(() => import('./components/DataManager').then(m => ({ default: m.DataManager })));
-const DecisionsView = lazy(() => import('./components/DecisionsView').then(m => ({ default: m.DecisionsView })));
+const HistoryView = lazy(() => import('./components/HistoryView').then(m => ({ default: m.HistoryView })));
 const ReportsView = lazy(() => import('./components/ReportsView').then(m => ({ default: m.ReportsView })));
 const HelpView = lazy(() => import('./components/HelpView').then(m => ({ default: m.HelpView })));
 
@@ -115,7 +114,7 @@ function LoadingFallback() {
 
 export default function App() {
   const isMobile = useMediaQuery('(max-width: 767px)');
-  const [view, setView] = useState<'visualiser' | 'data' | 'reports' | 'decisions' | 'guide'>('visualiser');
+  const [view, setView] = useState<'visualiser' | 'data' | 'reports' | 'history' | 'guide'>('visualiser');
   const [dataManagerInitialTab, setDataManagerInitialTab] = useState<DataManagerTab | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
   const [isImportingShare, setIsImportingShare] = useState(false);
@@ -161,7 +160,6 @@ export default function App() {
   const syncToastTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [isVersionManagerOpen, setIsVersionManagerOpen] = useState(false);
   const [showMoreSettingsPanel, setShowMoreSettingsPanel] = useState(false);
   const [showViewOptionsPanel, setShowViewOptionsPanel] = useState(false);
   const [showMobileSheet, setShowMobileSheet] = useState(false);
@@ -647,8 +645,8 @@ export default function App() {
 
   const handleNavigateFromHealthIssue = useCallback((location: HealthIssueLocation, entityName: string) => {
     setSearchQuery(entityName);
-    if (location.view === 'decisions') {
-      setView('decisions');
+    if (location.view === 'history') {
+      setView('history');
     } else {
       setDataManagerInitialTab(location.tab);
       setView('data');
@@ -753,7 +751,7 @@ export default function App() {
 
   const handleOpenDecision = useCallback((decisionId: string) => {
     setSelectedDecisionId(decisionId);
-    setView('decisions');
+    setView('history');
   }, []);
 
   useEffect(() => {
@@ -917,18 +915,18 @@ export default function App() {
             Reports
           </button>
           <button
-            onClick={() => setView('decisions')}
-            data-testid="nav-decisions"
-            aria-pressed={view === 'decisions'}
+            onClick={() => setView('history')}
+            data-testid="nav-history"
+            aria-pressed={view === 'history'}
             className={cn(
               "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all cursor-pointer",
-              view === 'decisions'
+              view === 'history'
                 ? "bg-white text-blue-700 shadow-sm ring-1 ring-blue-200"
                 : "text-slate-600 hover:text-slate-800"
             )}
           >
             <ClipboardList size={14} />
-            Decisions
+            History
           </button>
           <button
             onClick={() => setView('guide')}
@@ -1346,19 +1344,6 @@ export default function App() {
         {/* Spacer */}
         <div className="flex-1" />
 
-        {/* History */}
-        <button
-          onClick={() => setIsVersionManagerOpen(true)}
-          data-testid="nav-history"
-          className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 transition-colors shrink-0"
-          title="Version History"
-        >
-          <History size={14} />
-          History
-        </button>
-
-        <div className="w-px h-6 bg-slate-200 shrink-0" />
-
         {/* Data Controls (PDF, Export, Import) */}
         <DataControls
           data={{ assets, deliverables, deliverableSegments, deliverableStatuses, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, versions, decisions, rptiDetails, lkptiDetails }}
@@ -1620,18 +1605,44 @@ export default function App() {
               onNavigate={handleNavigateFromHealthIssue}
             />
           </Suspense>
-        ) : view === 'decisions' ? (
+        ) : view === 'history' ? (
           <Suspense fallback={<LoadingFallback />}>
-            <DecisionsView
+            <HistoryView
+              versions={versions}
+              onUpdateVersions={setVersions}
+              onRestore={(v) => {
+                handleRestoreVersion(v);
+                // The old modal closed itself and dropped you back on the timeline
+                // so you could see the restored state; the guide documents that.
+                // A tab has to navigate deliberately to keep the same promise.
+                setView('visualiser');
+              }}
               decisions={decisions}
               initiatives={initiatives}
               programmes={programmes}
               assets={assets}
-              onAdd={handleAddDecision}
-              onUpdate={handleUpdateDecision}
-              onDelete={handleDeleteDecision}
-              selectedId={selectedDecisionId}
-              onSelectId={setSelectedDecisionId}
+              onAddDecision={handleAddDecision}
+              onUpdateDecision={handleUpdateDecision}
+              onDeleteDecision={handleDeleteDecision}
+              selectedDecisionId={selectedDecisionId}
+              onSelectDecisionId={setSelectedDecisionId}
+              currentData={{
+                assets,
+                deliverables,
+                deliverableSegments,
+                initiatives,
+                milestones,
+                programmes,
+                strategies,
+                dependencies,
+                assetCategories,
+                timelineSettings,
+                resources,
+                deliverableStatuses,
+                decisions,
+                rptiDetails,
+                lkptiDetails,
+              }}
             />
           </Suspense>
         ) : (
@@ -1709,34 +1720,6 @@ export default function App() {
         </ModalErrorBoundary>
       )}
 
-      <ModalErrorBoundary onDismiss={() => setIsVersionManagerOpen(false)}>
-        <VersionManager
-          isOpen={isVersionManagerOpen}
-          onClose={() => setIsVersionManagerOpen(false)}
-          onRestore={handleRestoreVersion}
-          versions={versions}
-          onUpdateVersions={setVersions}
-          decisions={decisions}
-          onAddDecision={handleAddDecision}
-          currentData={{
-            assets,
-            deliverables,
-            deliverableSegments,
-            initiatives,
-            milestones,
-            programmes,
-            strategies,
-            dependencies,
-            assetCategories,
-            timelineSettings,
-            resources,
-            deliverableStatuses,
-            decisions,
-            rptiDetails,
-            lkptiDetails,
-          }}
-        />
-      </ModalErrorBoundary>
     </div>
   );
 }

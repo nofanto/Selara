@@ -1,6 +1,6 @@
 # Recording a Decision
 
-The Decisions view is a portfolio decision log — a running record of *why* a call was made about an initiative, programme, or asset. It's separate from Version History (which snapshots the whole portfolio) and from Notes on an initiative — Decisions is specifically for capturing the reasoning and alternatives behind a choice, in a structured format.
+The **History** tab holds a portfolio decision log — a running record of *why* a call was made about an initiative, programme, or asset. It sits alongside version snapshots in the same tab, interleaved into one chronological stream, but stays a separate kind of record: a snapshot captures *what* the portfolio looked like, a decision captures *why* it changed and from Notes on an initiative — the decision log is specifically for capturing the reasoning and alternatives behind a choice, in a structured format.
 
 ## Opening the Decisions View
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Decision, DecisionStatus, Initiative, Programme, Asset } from '../types';
-import { ClipboardList, Plus, Save, Trash2, Pencil } from 'lucide-react';
+import { Decision, DecisionStatus, Initiative, Programme, Asset, Version } from '../types';
+import { ClipboardList, Plus, Save, Trash2, Pencil, History } from 'lucide-react';
 import { ConfirmModal } from './ConfirmModal';
 
 interface DecisionsViewProps {
@@ -13,6 +13,20 @@ interface DecisionsViewProps {
   onDelete: (decision: Decision) => void;
   selectedId: string | null;
   onSelectId: (id: string | null) => void;
+  /**
+   * 'full' keeps the component's own list (its standalone layout). 'detail' hides
+   * it, for when an outer view — the History tab — supplies the list instead.
+   */
+  variant?: 'full' | 'detail';
+  /**
+   * Bump to open a blank decision form. A signal rather than lifted state: the
+   * create/edit logic here is already covered by its own tests, and hoisting it
+   * into the History tab would be a far larger change than that tab warrants.
+   */
+  createRequestId?: number;
+  /** Supplied by the History tab so a decision can link back to its snapshot (AC5). */
+  versions?: Version[];
+  onSelectVersionId?: (id: string) => void;
 }
 
 const STATUS_OPTIONS: DecisionStatus[] = ['proposed', 'accepted', 'deprecated', 'superseded'];
@@ -37,11 +51,20 @@ function blankDecision(): Decision {
   };
 }
 
-export function DecisionsView({ decisions, initiatives, programmes, assets, onAdd, onUpdate, onDelete, selectedId, onSelectId }: DecisionsViewProps) {
+export function DecisionsView({ decisions, initiatives, programmes, assets, onAdd, onUpdate, onDelete, selectedId, onSelectId, variant = 'full', createRequestId = 0, versions = [], onSelectVersionId }: DecisionsViewProps) {
   const [formData, setFormData] = useState<Decision | null>(null);
   const [isNew, setIsNew] = useState(false);
   const [titleError, setTitleError] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<Decision | null>(null);
+  /**
+   * AC4: Title and Decision Outcome lead; the rest is collapsed. ADR-0002's driver
+   * was "minimize overhead for small, routine decisions" — the data model honoured
+   * that (everything past `title` is optional) but the form showed all seven fields
+   * at once, which reads as an obligation and is part of why the log stayed empty.
+   * Opened by default when editing a record that already has detail, so nothing a
+   * user wrote is hidden from them.
+   */
+  const [showDetail, setShowDetail] = useState(false);
 
   // Whenever the selection changes (row click, or navigated to from a linked
   // entity panel), drop out of any in-progress create/edit form.
@@ -54,17 +77,31 @@ export function DecisionsView({ decisions, initiatives, programmes, assets, onAd
   }, [selectedId]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
+  // Opening a blank form when the History tab asks for one (see createRequestId).
+  useEffect(() => {
+    if (createRequestId > 0) {
+      setFormData(blankDecision());
+      setIsNew(true);
+      setTitleError(false);
+      setShowDetail(false);
+    }
+  }, [createRequestId]);
+
   const sorted = [...decisions].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const selected = decisions.find(d => d.id === selectedId) || null;
   const isEditing = formData !== null;
 
   const startCreate = () => {
+    setShowDetail(false);
     setFormData(blankDecision());
     setIsNew(true);
     setTitleError(false);
   };
 
   const startEdit = (decision: Decision) => {
+    setShowDetail(Boolean(
+      decision.context || decision.consideredOptions || decision.consequences || decision.linkedEntityType,
+    ));
     setFormData({ ...decision });
     setIsNew(false);
     setTitleError(false);
@@ -129,7 +166,8 @@ export function DecisionsView({ decisions, initiatives, programmes, assets, onAd
   return (
     <div data-testid="decisions-view" className="flex flex-col h-full bg-slate-50 overflow-hidden">
       <div className="flex-1 overflow-hidden flex">
-        {/* Sidebar: list of decisions */}
+        {/* Sidebar: list of decisions — hidden when the History tab supplies its own. */}
+        {variant === 'full' && (
         <div className="w-80 shrink-0 border-r border-slate-200 flex flex-col bg-white">
           <div className="p-4 border-b border-slate-200">
             <button
@@ -176,6 +214,7 @@ export function DecisionsView({ decisions, initiatives, programmes, assets, onAd
             )}
           </div>
         </div>
+        )}
 
         {/* Detail / form pane */}
         <div className="flex-1 overflow-y-auto p-6 bg-white">
@@ -206,6 +245,26 @@ export function DecisionsView({ decisions, initiatives, programmes, assets, onAd
                 </select>
               </div>
               <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Decision Outcome</label>
+                <textarea
+                  data-testid="decision-outcome-input"
+                  rows={2}
+                  value={formData.decisionOutcome || ''}
+                  onChange={(e) => setFormData({ ...formData, decisionOutcome: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <button
+                type="button"
+                data-testid="decision-add-detail-toggle"
+                onClick={() => setShowDetail(v => !v)}
+                className="text-sm font-medium text-blue-600 hover:text-blue-800"
+              >
+                {showDetail ? 'Hide detail' : 'Add detail'}
+              </button>
+              {showDetail && (
+                <div data-testid="decision-detail-fields" className="space-y-4">
+              <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Context</label>
                 <textarea
                   data-testid="decision-context-input"
@@ -225,16 +284,6 @@ export function DecisionsView({ decisions, initiatives, programmes, assets, onAd
                   onChange={(e) => setFormData({ ...formData, consideredOptions: e.target.value })}
                   className="w-full px-3 py-2 border border-slate-200 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="One option per line"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Decision Outcome</label>
-                <textarea
-                  data-testid="decision-outcome-input"
-                  rows={2}
-                  value={formData.decisionOutcome || ''}
-                  onChange={(e) => setFormData({ ...formData, decisionOutcome: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
               <div>
@@ -281,6 +330,8 @@ export function DecisionsView({ decisions, initiatives, programmes, assets, onAd
                   </select>
                 </div>
               </div>
+                </div>
+              )}
               <div className="flex gap-3 pt-2">
                 <button
                   type="button"
@@ -325,6 +376,30 @@ export function DecisionsView({ decisions, initiatives, programmes, assets, onAd
                     className="text-sm text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2"
                   >
                     Linked to a {selected.linkedEntityType} that no longer exists. This record is kept &mdash; only the link is broken.
+                  </p>
+                );
+              })()}
+
+              {/* AC5: jump from "why we did this" to the snapshot that captured it. */}
+              {selected.versionId && (() => {
+                const version = versions.find(v => v.id === selected.versionId);
+                return version ? (
+                  <button
+                    data-testid="decision-version-link"
+                    onClick={() => onSelectVersionId?.(version.id)}
+                    className="text-sm text-indigo-600 hover:text-indigo-800 flex items-center gap-1.5 font-medium"
+                  >
+                    <History size={14} />
+                    Recorded against &ldquo;{version.name}&rdquo;
+                  </button>
+                ) : (
+                  // Same convention as a dead entity link (#31): a reference that
+                  // stopped resolving must stay visible, not silently vanish.
+                  <p
+                    data-testid="decision-version-missing"
+                    className="text-sm text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2"
+                  >
+                    Recorded against a snapshot that has since been deleted. This record is kept &mdash; only the link is broken.
                   </p>
                 );
               })()}

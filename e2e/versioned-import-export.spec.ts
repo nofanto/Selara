@@ -14,7 +14,6 @@ test.describe('Versioned Import/Export', () => {
     await page.fill('input[placeholder="e.g., March 2026 Snapshot"]', versionName);
     await page.getByRole('button', { name: 'Save Version' }).click();
     await expect(page.locator('h4', { hasText: versionName })).toBeVisible();
-    await page.getByTestId('close-version-manager').click();
 
     // 2. Trigger the export
     await page.getByTestId('nav-data-manager').click();
@@ -31,8 +30,7 @@ test.describe('Versioned Import/Export', () => {
     // Verify it's empty
     await page.getByTestId('nav-history').click();
     await expect(page.locator('h4', { hasText: versionName })).not.toBeVisible();
-    await expect(page.getByText('No versions saved yet')).toBeVisible();
-    await page.getByTestId('close-version-manager').click();
+    await expect(page.getByText('Nothing recorded yet')).toBeVisible();
 
     // 4. Import the file we just exported
     await page.getByTestId('nav-data-manager').click();
@@ -57,7 +55,7 @@ test.describe('Versioned Import/Export', () => {
     await page.locator('[data-testid="confirm-modal-confirm"]').click();
     
     // If the modal closed, we restored successfully
-    await expect(page.getByText('Version History')).not.toBeVisible();
+    await expect(page.getByTestId('confirm-modal')).not.toBeVisible();
   });
 
   test('should correctly merge versions during a merge import', async ({ page }) => {
@@ -67,7 +65,6 @@ test.describe('Versioned Import/Export', () => {
     const v1Name = `Merge-V1-${Date.now()}`;
     await page.fill('input[placeholder="e.g., March 2026 Snapshot"]', v1Name);
     await page.getByRole('button', { name: 'Save Version' }).click();
-    await page.getByTestId('close-version-manager').click();
 
     // 2. Export
     await page.getByTestId('nav-data-manager').click();
@@ -83,13 +80,12 @@ test.describe('Versioned Import/Export', () => {
     await page.fill('input[placeholder="e.g., March 2026 Snapshot"]', v2Name);
     await page.getByRole('button', { name: 'Save Version' }).click();
     
-    // Delete V1 locally before merging
-    // Scope the delete button to the V1 item
-    const v1Item = page.locator('div.rounded-xl', { has: page.locator('h4', { hasText: v1Name }) });
-    await v1Item.getByTestId('delete-version-btn').click();
+    // Delete V1 locally before merging. Delete now lives on the selected version's
+    // detail pane rather than on every stream row, so select it first.
+    await page.getByTestId('history-stream').getByText(v1Name).click();
+    await page.getByTestId('delete-version-btn').click();
     await page.locator('[data-testid="confirm-modal-confirm"]').click();
     await expect(page.locator('h4', { hasText: v1Name })).not.toBeVisible();
-    await page.getByTestId('close-version-manager').click();
 
     // 4. Merge import back in (it contains V1)
     await page.getByTestId('nav-data-manager').click();
@@ -118,12 +114,14 @@ test.describe('Decision log survives export/import (#22)', () => {
     const title = `Consolidated identity onto one platform ${Date.now()}`;
 
     // 1. Record a decision, with the fields most likely to be dropped in transit.
-    await page.getByTestId('nav-decisions').click();
-    await page.getByTestId('add-decision-btn').click();
+    await page.getByTestId('nav-history').click();
+    await page.getByTestId('new-decision-btn').click();
     await page.getByTestId('decision-title-input').fill(title);
+    // Context, options, consequences and the entity link sit behind 'Add detail' (AC4).
+    await page.getByTestId('decision-add-detail-toggle').click();
     await page.getByTestId('decision-context-input').fill('Two IAM stacks with overlapping scope.');
     await page.getByTestId('save-decision-btn').click();
-    await expect(page.getByTestId('decisions-list').getByText(title)).toBeVisible();
+    await expect(page.getByTestId('history-stream').getByText(title)).toBeVisible();
 
     // 2. Export.
     await page.getByTestId('nav-data-manager').click();
@@ -136,8 +134,8 @@ test.describe('Decision log survives export/import (#22)', () => {
     //    back from the file rather than from what was already in IndexedDB.
     await page.getByTestId('clear-and-start-again-btn').click();
     await page.getByTestId('template-start-blank-btn').click();
-    await page.getByTestId('nav-decisions').click();
-    await expect(page.getByTestId('decisions-list')).toContainText('No decisions recorded yet');
+    await page.getByTestId('nav-history').click();
+    await expect(page.getByTestId('history-stream')).toContainText('Nothing recorded yet');
 
     // 4. Re-import with Overwrite All Data — the exact path #22 reported.
     await page.getByTestId('nav-data-manager').click();
@@ -147,8 +145,8 @@ test.describe('Decision log survives export/import (#22)', () => {
     await expect(page.getByTestId('import-success-notification')).toBeVisible();
 
     // 5. The decision is back, with its context intact.
-    await page.getByTestId('nav-decisions').click();
-    await page.getByTestId('decisions-list').getByText(title).click();
+    await page.getByTestId('nav-history').click();
+    await page.getByTestId('history-stream').getByText(title).click();
     await expect(page.getByTestId('decision-detail')).toContainText(title);
     await expect(page.getByTestId('decision-detail')).toContainText('Two IAM stacks with overlapping scope.');
   });

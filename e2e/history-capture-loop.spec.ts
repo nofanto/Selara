@@ -30,11 +30,10 @@ test.describe('History capture loop', () => {
     await page.getByRole('button', { name: 'Save Version' }).click();
 
     await expect(page.getByText(versionName)).toBeVisible();
-    await page.getByTestId('close-version-manager').click();
 
     // The decision exists, and defaults to Accepted — it describes work already done.
-    await page.getByTestId('nav-decisions').click();
-    await page.getByTestId('decisions-list').getByText(why).click();
+    await page.getByTestId('nav-history').click();
+    await page.getByTestId('history-stream').getByText(why).click();
     await expect(page.getByTestId('decision-status-badge')).toHaveText('Accepted');
   });
 
@@ -46,10 +45,12 @@ test.describe('History capture loop', () => {
     await page.getByRole('button', { name: 'Save Version' }).click();
 
     await expect(page.getByText(versionName)).toBeVisible();
-    await page.getByTestId('close-version-manager').click();
 
-    await page.getByTestId('nav-decisions').click();
-    await expect(page.getByTestId('decisions-list')).toContainText('No decisions recorded yet');
+    await page.getByTestId('nav-history').click();
+    // The stream now holds the saved version, so "empty" has to be asked of the
+    // decisions filter specifically: no decision was created.
+    await page.getByTestId('history-filter-decisions').click();
+    await expect(page.getByTestId('history-stream')).toContainText('Nothing recorded yet');
   });
 
   test('AC2: opting in but leaving the title empty creates no half-written record', async ({ page }) => {
@@ -62,10 +63,12 @@ test.describe('History capture loop', () => {
 
     // The save still succeeds — AC6, nothing gates a save.
     await expect(page.getByText(versionName)).toBeVisible();
-    await page.getByTestId('close-version-manager').click();
 
-    await page.getByTestId('nav-decisions').click();
-    await expect(page.getByTestId('decisions-list')).toContainText('No decisions recorded yet');
+    await page.getByTestId('nav-history').click();
+    // The stream now holds the saved version, so "empty" has to be asked of the
+    // decisions filter specifically: no decision was created.
+    await page.getByTestId('history-filter-decisions').click();
+    await expect(page.getByTestId('history-stream')).toContainText('Nothing recorded yet');
   });
 
   test('AC3: the difference report lists decisions covering the span', async ({ page }) => {
