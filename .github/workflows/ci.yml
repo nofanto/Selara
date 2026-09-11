@@ -1,30 +1,74 @@
-name: Playwright Tests
+name: CI
+
 on:
   push:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  # Lets a run be triggered by hand — useful for re-running a flaky suite, and for
+  # proving CI works without having to push a commit to find out.
+  workflow_dispatch:
+
 permissions:
   contents: read
 
 jobs:
-  test:
-    timeout-minutes: 60
+  # Fast feedback: the unit tests cover the domain rules CLAUDE.md calls the primary
+  # risk (RPTI/LKPTI generation, the decision-log rules, the Excel round trip), so
+  # they should fail in under a minute rather than behind a 10-minute browser suite.
+  verify:
+    name: Unit tests, build, static checks
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-node@v4
-      with:
-        node-version: lts/*
-    - name: Install dependencies
-      run: npm install
-    - name: Install Playwright Browsers
-      run: npx playwright install --with-deps
-    - name: Run Playwright tests
-      run: npx playwright test
-    - uses: actions/upload-artifact@v4
-      if: ${{ !cancelled() }}
-      with:
-        name: playwright-report
-        path: playwright-report/
-        retention-days: 30
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Unit tests
+        run: npm run test:unit
+      - name: Production build
+        run: npm run build
+
+      # Enforced: the eslint baseline was cleared on this branch, so a new error here
+      # is genuinely new and should stop the build.
+      - name: Lint
+        run: npx eslint .
+
+      # Still reported rather than enforced. One pre-existing error remains:
+      # src/lib/excel.ts does `sanitizeTimelineSettings(...) || {}` while
+      # Version['data'].timelineSettings is required, so a snapshot whose settings row
+      # is missing gets `{}` typed as TimelineSettings. Fixing that needs a decision
+      # about what such a snapshot should inherit — not a cast — so it is left for its
+      # own change. Drop continue-on-error once it lands and this becomes a real gate.
+      - name: Typecheck (non-blocking — one known baseline error, see note)
+        run: npx tsc --noEmit
+        continue-on-error: true
+
+  e2e:
+    name: Playwright end-to-end
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      # Only chromium is configured in playwright.config.ts — installing the other
+      # browsers would add minutes per run for projects that never execute.
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+      - name: Run Playwright tests
+        run: npx playwright test
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 30
