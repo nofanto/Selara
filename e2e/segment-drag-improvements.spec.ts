@@ -72,7 +72,7 @@ test.describe('Deliverable Segment Drag Improvements', () => {
     const bar = page.locator('[data-testid^="segment-bar-"]').first();
 
     // First drag it down so there's room to drag up
-    let box = await bar.boundingBox();
+    const box = await bar.boundingBox();
     expect(box).not.toBeNull();
     await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
     await page.mouse.down();

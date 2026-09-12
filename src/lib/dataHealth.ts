@@ -91,7 +91,6 @@ export function computeDataHealth(input: DataHealthInput): HealthIssue[] {
   const decisionIds = new Set(decisions.map(d => d.id));
 
   const deliverableById = new Map(deliverables.map(d => [d.id, d]));
-  const assetById = new Map(assets.map(a => [a.id, a]));
   const initiativeById = new Map(initiatives.map(i => [i.id, i]));
 
   // Checks push without a `phase` — it is stamped on at the end from which array the

@@ -84,7 +84,6 @@ test.describe('Deliverable segment visual distinction & status management', () =
 
     // Find the "In Production" name input and change it — cells are always inputs in EditableTable
     const nameInputs = page.locator('tbody tr td input[type="text"]');
-    const inProdInput = nameInputs.filter({ hasText: '' }).nth(0); // fallback
     // More reliable: find by current value
     const allInputs = await nameInputs.all();
     let targetInput = null;
