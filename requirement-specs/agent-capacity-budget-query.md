@@ -1,5 +1,8 @@
 # AI Agent Use Case: Capacity / Budget Query (Design Notes)
 
+> **Closed as a feature direction** (2026-09-02) — see [`agent-exposure-architecture.md`](agent-exposure-architecture.md) for the architectural blocker common to all four of these, the routes considered, and why the family is closed rather than parked. Retained as a discovery record: this idea's audit produced real work, listed below.
+> **Discovery outcome:** the audit found the Capacity Report does not compute capacity (no date-overlap analysis) and the data model has no capacity attribute at all — no FTE, effort or allocation on `Resource` or `Initiative`. What "capacity" should mean is now the one open domain question, recorded in [`agent-exposure-architecture.md`](agent-exposure-architecture.md).
+
 > **Status:** Idea — not yet started, and the furthest from ready of the four (see "What the codebase already provides" below). No design discussion has happened yet; this is a placeholder capturing the idea so it isn't lost, per the brainstorm in issue-#9's follow-up conversation about read-only AI agent capabilities for Selara.
 > **Context:** Part of a family of read-only agent use cases (alongside [Filing Readiness Check](agent-filing-readiness-check.md), [Decision Log Q&A](agent-decision-log-qa.md), and [Version Diff Narrative](agent-version-diff-narrative.md)).
 > **Last refreshed:** 2026-09-02.
