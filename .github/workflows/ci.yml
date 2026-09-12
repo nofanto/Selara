@@ -38,15 +38,43 @@ jobs:
       - name: Lint
         run: npx eslint .
 
-      # Still reported rather than enforced. One pre-existing error remains:
-      # src/lib/excel.ts does `sanitizeTimelineSettings(...) || {}` while
-      # Version['data'].timelineSettings is required, so a snapshot whose settings row
-      # is missing gets `{}` typed as TimelineSettings. Fixing that needs a decision
+      # Ratcheted, not merely non-blocking. `continue-on-error` renders a green tick,
+      # so a failing typecheck looked identical to a passing one at a glance — and a
+      # check nobody can see fail is not a check. This compares the error count against
+      # a known baseline instead: the one pre-existing error passes, a second one fails
+      # the build, and clearing it prompts you to drop the baseline to zero.
+      #
+      # The baseline error: src/lib/excel.ts does `sanitizeTimelineSettings(...) || {}`
+      # while Version['data'].timelineSettings is required, so a snapshot whose settings
+      # row is missing gets `{}` typed as TimelineSettings. Fixing that needs a decision
       # about what such a snapshot should inherit — not a cast — so it is left for its
-      # own change. Drop continue-on-error once it lands and this becomes a real gate.
-      - name: Typecheck (non-blocking — one known baseline error, see note)
-        run: npx tsc --noEmit
-        continue-on-error: true
+      # own change.
+      - name: Typecheck
+        env:
+          BASELINE: 1
+        run: |
+          LOG="$RUNNER_TEMP/tsc.log"
+          npx tsc --noEmit > "$LOG" 2>&1 || true
+          COUNT=$(grep -c 'error TS' "$LOG" || true)
+          {
+            echo "### Typecheck"
+            echo
+            echo "tsc --noEmit reported **$COUNT** error(s). Accepted baseline: **$BASELINE**."
+            if [ -s "$LOG" ]; then
+              echo
+              echo '```'
+              cat "$LOG"
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$COUNT" -gt "$BASELINE" ]; then
+            echo "::error::Typecheck regressed — $COUNT errors against a baseline of $BASELINE. See the run summary."
+            exit 1
+          fi
+          if [ "$COUNT" -lt "$BASELINE" ]; then
+            echo "::notice::Typecheck improved — $COUNT errors against a baseline of $BASELINE. Lower BASELINE in .github/workflows/ci.yml."
+          fi
+          echo "Typecheck at baseline ($COUNT error(s), baseline $BASELINE)."
 
   e2e:
     name: Playwright end-to-end
