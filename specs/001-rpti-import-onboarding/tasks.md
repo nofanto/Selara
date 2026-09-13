@@ -22,8 +22,8 @@ Single-project SPA. Domain logic in `src/lib/` with adjacent Vitest; components 
 
 ## Phase 1: Setup (Shared Infrastructure)
 
-- [ ] T001 Export a Format 3.1 and a Format 3.2.6 fixture pair from a demo workspace and commit them to `e2e/fixtures/` per quickstart.md — the importer inverts Selara's own exports, so the app generates its own fixtures
-- [ ] T002 [P] Produce ~300-row fixture returns for scale validation in `e2e/fixtures/`, seeded the way issue #36 was measured
+- [X] T001 Export a Format 3.1 and a Format 3.2.6 fixture pair from a demo workspace and commit them to `e2e/fixtures/` per quickstart.md — the importer inverts Selara's own exports, so the app generates its own fixtures
+- [X] T002 [P] Produce ~300-row fixture returns for scale validation in `e2e/fixtures/`, seeded the way issue #36 was measured
 
 ---
 
@@ -31,9 +31,9 @@ Single-project SPA. Domain logic in `src/lib/` with adjacent Vitest; components 
 
 **Blocks all user stories. T003 in particular must land before the picker is touched.**
 
-- [ ] T003 Audit the nine e2e specs that reference onboarding (research.md §6) and record, in `specs/001-rpti-import-onboarding/e2e-audit.md`, what each one protects and whether the picker is incidental setup or the thing under test
-- [ ] T004 [P] Write failing Vitest for `periodForQuarter(quarter, year)` in `src/lib/rpti.test.ts`, including the round-trip property `deriveQuarterFromDate(periodForQuarter(q, y).startDate) === q`
-- [ ] T005 Implement `periodForQuarter` in `src/lib/rpti.ts` alongside the existing `deriveQuarterFromDate`
+- [X] T003 Audit the nine e2e specs that reference onboarding (research.md §6) and record, in `specs/001-rpti-import-onboarding/e2e-audit.md`, what each one protects and whether the picker is incidental setup or the thing under test
+- [X] T004 [P] Write failing Vitest for `periodForQuarter(quarter, year)` in `src/lib/rpti.test.ts`, including the round-trip property `deriveQuarterFromDate(periodForQuarter(q, y).startDate) === q`
+- [X] T005 Implement `periodForQuarter` in `src/lib/rpti.ts` alongside the existing `deriveQuarterFromDate`
 
 ---
 
@@ -46,17 +46,17 @@ both inventory and plan, and that the data-health review is what appears at the 
 
 ### Tests for User Story 1 (Red first)
 
-- [ ] T006 [P] [US1] Failing Vitest in `src/lib/rptiImport.test.ts` for `parseRptiImportWorkbook`: a non-Format-3.1 workbook is rejected by name; every input row appears in exactly one of `rows` or `skipped`; a bad value inside a well-formed sheet skips the row rather than throwing
-- [ ] T007 [P] [US1] Failing Vitest in `src/lib/rptiImport.test.ts` for category→type mapping, asserted **per code** rather than per range — `01`-`12`/`49` → `application`, `51`-`54`/`99` → `infrastructure`, anything else skipped
-- [ ] T008 [P] [US1] Failing Vitest in `src/lib/rptiImport.test.ts` for segment placement: `new` yields pre-launch-then-live around the close of its quarter; `upgrade` yields the same **plus** a preceding live segment; every derived segment carries an `initiativeId`
-- [ ] T009 [P] [US1] Failing Vitest in `src/lib/rptiImport.test.ts` for upgrade matching: attaches on exact name **and** category; yields an unresolved reference and creates nothing on zero or multiple matches
-- [ ] T010 [P] [US1] Failing Vitest in `src/lib/rptiImport.test.ts` asserting derivation is pure — same inputs produce identical output, ids derive from row position rather than `Date.now()`
+- [X] T006 [P] [US1] Failing Vitest in `src/lib/rptiImport.test.ts` for `parseRptiImportWorkbook`: a non-Format-3.1 workbook is rejected by name; every input row appears in exactly one of `rows` or `skipped`; a bad value inside a well-formed sheet skips the row rather than throwing
+- [X] T007 [P] [US1] Failing Vitest in `src/lib/rptiImport.test.ts` for category→type mapping, asserted **per code** rather than per range — `01`-`12`/`49` → `application`, `51`-`54`/`99` → `infrastructure`, anything else skipped
+- [X] T008 [P] [US1] Failing Vitest in `src/lib/rptiImport.test.ts` for segment placement: `new` yields pre-launch-then-live around the close of its quarter; `upgrade` yields the same **plus** a preceding live segment; every derived segment carries an `initiativeId`
+- [X] T009 [P] [US1] Failing Vitest in `src/lib/rptiImport.test.ts` for upgrade matching: attaches on exact name **and** category; yields an unresolved reference and creates nothing on zero or multiple matches
+- [X] T010 [P] [US1] Failing Vitest in `src/lib/rptiImport.test.ts` asserting derivation is pure — same inputs produce identical output, ids derive from row position rather than `Date.now()`
 - [ ] T011 [US1] Failing Playwright in `e2e/rpti-import-onboarding.spec.ts` for the journey: two slots with LKPTI required and RPTI optional; a year asked per return with 2026/2027 differing; LKPTI processed first; infrastructure present; matched upgrade attached not duplicated; unmatched upgrade appearing in data health; **skipped rows listed with position and reason**; ends on data health; LKPTI-alone also completes
 
 ### Implementation for User Story 1
 
-- [ ] T012 [US1] Define `RptiImportRow`, `RptiImportSkippedRow`, `ParseRptiImportResult` and implement `parseRptiImportWorkbook` + `parseRptiImportFile` in `src/lib/rptiImport.ts`, mirroring `lkptiImport.ts`'s two-stage split
-- [ ] T013 [US1] Implement `deriveWorkspaceFromRptiImport(rows, reportYear, existing)` in `src/lib/rptiImport.ts` per data-model.md, returning `unresolved` alongside the entities
+- [X] T012 [US1] Define `RptiImportRow`, `RptiImportSkippedRow`, `ParseRptiImportResult` and implement `parseRptiImportWorkbook` + `parseRptiImportFile` in `src/lib/rptiImport.ts`, mirroring `lkptiImport.ts`'s two-stage split
+- [X] T013 [US1] Implement `deriveWorkspaceFromRptiImport(rows, reportYear, existing)` in `src/lib/rptiImport.ts` per data-model.md, returning `unresolved` alongside the entities
 - [ ] T014 [US1] Add the "start from your filed returns" path to `src/components/TemplatePickerModal.tsx`: an LKPTI slot (required) and an RPTI slot (optional), each with its own reporting-year input
 - [ ] T015 [US1] Add an optional `initialReport?: ReportSlug` prop to `src/components/ReportsView.tsx` so a report can be opened from outside (`selectedReport` is currently local state with no way in)
 - [ ] T016 [US1] Orchestrate onboarding in `src/App.tsx`: import LKPTI first, then RPTI against it, persist once, then navigate to the data-health report
