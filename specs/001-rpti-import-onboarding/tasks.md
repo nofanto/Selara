@@ -51,17 +51,17 @@ both inventory and plan, and that the data-health review is what appears at the 
 - [X] T008 [P] [US1] Failing Vitest in `src/lib/rptiImport.test.ts` for segment placement: `new` yields pre-launch-then-live around the close of its quarter; `upgrade` yields the same **plus** a preceding live segment; every derived segment carries an `initiativeId`
 - [X] T009 [P] [US1] Failing Vitest in `src/lib/rptiImport.test.ts` for upgrade matching: attaches on exact name **and** category; yields an unresolved reference and creates nothing on zero or multiple matches
 - [X] T010 [P] [US1] Failing Vitest in `src/lib/rptiImport.test.ts` asserting derivation is pure — same inputs produce identical output, ids derive from row position rather than `Date.now()`
-- [ ] T011 [US1] Failing Playwright in `e2e/rpti-import-onboarding.spec.ts` for the journey: two slots with LKPTI required and RPTI optional; a year asked per return with 2026/2027 differing; LKPTI processed first; infrastructure present; matched upgrade attached not duplicated; unmatched upgrade appearing in data health; **skipped rows listed with position and reason**; ends on data health; LKPTI-alone also completes
+- [X] T011 [US1] Failing Playwright in `e2e/rpti-import-onboarding.spec.ts` for the journey: two slots with LKPTI required and RPTI optional; a year asked per return with 2026/2027 differing; LKPTI processed first; infrastructure present; matched upgrade attached not duplicated; unmatched upgrade appearing in data health; **skipped rows listed with position and reason**; ends on data health; LKPTI-alone also completes
 
 ### Implementation for User Story 1
 
 - [X] T012 [US1] Define `RptiImportRow`, `RptiImportSkippedRow`, `ParseRptiImportResult` and implement `parseRptiImportWorkbook` + `parseRptiImportFile` in `src/lib/rptiImport.ts`, mirroring `lkptiImport.ts`'s two-stage split
 - [X] T013 [US1] Implement `deriveWorkspaceFromRptiImport(rows, reportYear, existing)` in `src/lib/rptiImport.ts` per data-model.md, returning `unresolved` alongside the entities
-- [ ] T014 [US1] Add the "start from your filed returns" path to `src/components/TemplatePickerModal.tsx`: an LKPTI slot (required) and an RPTI slot (optional), each with its own reporting-year input
-- [ ] T015 [US1] Add an optional `initialReport?: ReportSlug` prop to `src/components/ReportsView.tsx` so a report can be opened from outside (`selectedReport` is currently local state with no way in)
-- [ ] T016 [US1] Orchestrate onboarding in `src/App.tsx`: import LKPTI first, then RPTI against it, persist once, then navigate to the data-health report
-- [ ] T017 [US1] Present an import summary of **skipped rows** — position and reason — before the user reaches the workspace. Unresolved upgrade references are **not** listed here: they persist as unresolved `RptiDetail` targets and surface through data health's existing `rpti-target` check
-- [ ] T017a [P] [US1] Failing Vitest in `src/lib/dataHealth.test.ts` confirming an imported `RptiDetail` whose target does not resolve raises `rpti-target`, so the existing rule genuinely covers the import case rather than being assumed to
+- [X] T014 [US1] Add the "start from your filed returns" path to `src/components/TemplatePickerModal.tsx`: an LKPTI slot (required) and an RPTI slot (optional), each with its own reporting-year input
+- [X] T015 [US1] Add an optional `initialReport?: ReportSlug` prop to `src/components/ReportsView.tsx` so a report can be opened from outside (`selectedReport` is currently local state with no way in)
+- [X] T016 [US1] Orchestrate onboarding in `src/App.tsx`: import LKPTI first, then RPTI against it, persist once, then navigate to the data-health report
+- [X] T017 [US1] Present an import summary of **skipped rows** — position and reason — before the user reaches the workspace. Unresolved upgrade references are **not** listed here: they persist as unresolved `RptiDetail` targets and surface through data health's existing `rpti-target` check
+- [X] T017a [P] [US1] Failing Vitest in `src/lib/dataHealth.test.ts` confirming an imported `RptiDetail` whose target does not resolve raises `rpti-target`, so the existing rule genuinely covers the import case rather than being assumed to
 
 **Checkpoint**: US1 alone is a shippable MVP. The starting screen still shows the old cards
 alongside the new path; Phase 4 removes them.
@@ -74,10 +74,10 @@ alongside the new path; Phase 4 removes them.
 
 **Independent test**: Open a fresh workspace and confirm the choices, without uploading anything.
 
-- [ ] T018 [P] [US2] Failing Playwright in `e2e/workspace-templates.spec.ts` for exactly two starting paths, OJK purpose stated in the copy, demo data reachable from the start-empty path, and the catalogue still addable from the Visualiser
-- [ ] T019 [US2] Remove the `rpti` catalogue template from `src/lib/workspaceTemplates.ts`
-- [ ] T020 [US2] Move the demo-data option onto the start-empty path in `src/components/TemplatePickerModal.tsx` — it is currently reachable **only** through the catalogue card being removed (`TemplatePickerModal.tsx:95-110`), so without this SC-006 breaks
-- [ ] T021 [US2] Rewrite the screen's heading and copy so preparing OJK returns is the stated purpose
+- [X] T018 [P] [US2] Failing Playwright in `e2e/workspace-templates.spec.ts` for exactly two starting paths, OJK purpose stated in the copy, demo data reachable from the start-empty path, and the catalogue still addable from the Visualiser
+- [X] T019 [US2] Remove the `rpti` catalogue template from `src/lib/workspaceTemplates.ts`
+- [X] T020 [US2] Move the demo-data option onto the start-empty path in `src/components/TemplatePickerModal.tsx` — it is currently reachable **only** through the catalogue card being removed (`TemplatePickerModal.tsx:95-110`), so without this SC-006 breaks
+- [X] T021 [US2] Rewrite the screen's heading and copy so preparing OJK returns is the stated purpose
 
 ---
 
@@ -88,19 +88,24 @@ alongside the new path; Phase 4 removes them.
 **Independent test**: With the simplified screen showing two paths, open a shared export from the
 import/sharing surface.
 
-- [ ] T022 [P] [US3] Failing Playwright asserting the viewer upload is absent from onboarding and present on the import/share surface
-- [ ] T023 [US3] Remove the `viewer` template from `src/lib/workspaceTemplates.ts` and its card from `src/components/TemplatePickerModal.tsx`
-- [ ] T024 [US3] Surface "open a shared file" from the import/export controls in `src/components/DataControls.tsx`, wired to the existing `handleViewerImport` in `src/App.tsx`
+- [X] T022 [P] [US3] Failing Playwright asserting the viewer upload is absent from onboarding and present on the import/share surface
+- [X] T023 [US3] Remove the `viewer` template from `src/lib/workspaceTemplates.ts` and its card from `src/components/TemplatePickerModal.tsx`
+- [X] T024 [US3] Surface "open a shared file" from the import/export controls in `src/components/DataControls.tsx`, wired to the existing `handleViewerImport` in `src/App.tsx`
 
 ---
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T025 Update the nine affected e2e specs using the T003 audit — read what each protects before changing selectors; do not repoint mechanically
-- [ ] T026 [P] Update `docs/user-guide/01-getting-started/` and any onboarding references to describe the two paths and the per-return year
-- [ ] T027 [P] Update `requirement-specs/it-planning-flow.md` to record that step 1 of the onboarding sequencing has shipped
-- [ ] T028 Verify scale per quickstart.md level 4: import ~300-row returns, confirm under 60s, and confirm `document.querySelectorAll('table option').length` on the RPTI and LKPTI tabs has **not** increased above issue #36's recorded 141,470 / 78,566
-- [ ] T029 Full verification: `npm run test:unit`, `npx playwright test`, `npx eslint .` at 0 errors, `npx tsc --noEmit` at no more than the 1 known baseline error
+- [X] T025 Update the nine affected e2e specs using the T003 audit — read what each protects before changing selectors; do not repoint mechanically
+- [X] T026 [P] Update `docs/user-guide/01-getting-started/` and any onboarding references to describe the two paths and the per-return year
+- [X] T027 [P] Update `requirement-specs/it-planning-flow.md` to record that step 1 of the onboarding sequencing has shipped
+- [X] T028 Verify scale per quickstart.md level 4 — **SC-003 passes; the option-count threshold as written does not, and should not have been written that way.** Measured on the dev server with the 300-row fixtures (390 deliverables / 390 assets / 300 initiatives / 300 RPTI / 240 LKPTI rows):
+  - Import + persist **0.1s**, data-health render **0.5s** — against a 60s budget. SC-003 met with room to spare.
+  - LKPTI tab 3,908 ms / **100,256** `<option>`; RPTI tab 5,534 ms / **337,120** — both above #36's recorded 78,566 / 141,470.
+  - That is **not a rendering regression**. `DataManager.tsx` is untouched by this feature, and the per-row select structure is provably unchanged: the option-count histogram shows LKPTI with exactly one n-sized select per row (391 = 390 deliverables + blank) and RPTI with exactly two (301 initiatives, 781 deliverables + assets) — the three sites #36 named, and no fourth. `241 rows × 416 = 100,256` and `301 × 1120 = 337,120` account for every node.
+  - The counts are higher because the workspace is larger, not because a row got heavier. #36's synthetic workspace had no imported initiatives; this one has 300, one per filed RPTI row, which is the feature working as specified. Comparing raw totals across differently-shaped workspaces was the wrong guard — the per-row select count is the invariant, and it held.
+  - **Real consequence worth recording on #36**: onboarding now makes a workspace that opens the RPTI tab in ~5.5s reachable in one click from first run, where previously it took deliberate effort to construct. #36 moves from theoretical to routine. (Dev-server figures; #36's production-build numbers ran ~30% faster.)
+- [X] T029 Full verification (all green: 278 unit tests, 650 e2e passed / 4 skipped / 0 failed, eslint 0 errors, tsc at the 1 known baseline error): `npm run test:unit`, `npx playwright test`, `npx eslint .` at 0 errors, `npx tsc --noEmit` at no more than the 1 known baseline error
 
 ---
 

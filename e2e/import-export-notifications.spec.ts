@@ -33,7 +33,7 @@ test.describe('Import/Export inline notifications — no browser alert()', () =>
     let alertFired = false;
     page.on('dialog', dialog => { alertFired = true; dialog.dismiss(); });
 
-    const fileInput = page.locator('input[type="file"]');
+    const fileInput = page.getByTestId('import-file-input');
     await fileInput.setInputFiles(mockFilePath);
     await page.waitForSelector('.import-preview-modal', { timeout: 5000 });
     await page.getByRole('button', { name: 'Merge Data' }).click();
@@ -49,7 +49,7 @@ test.describe('Import/Export inline notifications — no browser alert()', () =>
     let alertFired = false;
     page.on('dialog', dialog => { alertFired = true; dialog.dismiss(); });
 
-    const fileInput = page.locator('input[type="file"]');
+    const fileInput = page.getByTestId('import-file-input');
     await fileInput.setInputFiles(mockFilePath);
     await page.waitForSelector('.import-preview-modal', { timeout: 5000 });
     await page.getByRole('button', { name: 'Overwrite All Data' }).click();
@@ -69,7 +69,7 @@ test.describe('Import/Export inline notifications — no browser alert()', () =>
     XLSX.utils.book_append_sheet(wb, ws, 'UnknownSheet');
     fs.writeFileSync(emptyFilePath, XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }));
 
-    const fileInput = page.locator('input[type="file"]');
+    const fileInput = page.getByTestId('import-file-input');
     await fileInput.setInputFiles(emptyFilePath);
 
     expect(alertFired).toBe(false);

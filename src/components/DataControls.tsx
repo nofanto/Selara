@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Upload, FileSpreadsheet, FileText, AlertCircle, Check, TriangleAlert, ImageDown, Share } from 'lucide-react';
+import { Upload, FileSpreadsheet, FileText, AlertCircle, Check, TriangleAlert, ImageDown, Share, FolderOpen } from 'lucide-react';
 import { exportToExcel, importFromExcel } from '../lib/excel';
 import { SchemaIssue, validateImportSchema } from '../lib/importValidation';
 import { exportToPDF, exportToPNG } from '../lib/pdf';
@@ -49,11 +49,18 @@ interface DataControlsProps {
     lkptiDetails?: LkptiDetail[];
   }) => void;
   onError?: (message: string | null) => void;
+  /**
+   * Open a colleague's exported file read-only. Lives here rather than on the
+   * onboarding screen: viewing someone else's portfolio is a mode, not a way of
+   * starting your own workspace.
+   */
+  onViewerImport?: (file: File) => void;
   timelineId?: string; // ID of the element to capture for PDF
 }
 
-export function DataControls({ data, onImport, onError, timelineId }: DataControlsProps) {
+export function DataControls({ data, onImport, onError, onViewerImport, timelineId }: DataControlsProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const viewerInputRef = useRef<HTMLInputElement>(null);
   const [importPreviewData, setImportPreviewData] = useState<Partial<typeof data> | null>(null);
   const [showImportModal, setShowImportModal] = useState(false);
   const [importSchemaIssues, setImportSchemaIssues] = useState<SchemaIssue[]>([]);
@@ -266,6 +273,32 @@ export function DataControls({ data, onImport, onError, timelineId }: DataContro
         PNG
       </button>
 
+      {onViewerImport && (
+        <>
+          <input
+            ref={viewerInputRef}
+            type="file"
+            accept=".xlsx,.xls"
+            data-testid="viewer-file-input"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) onViewerImport(file);
+              e.currentTarget.value = '';
+            }}
+          />
+          <button
+            data-testid="open-shared-file"
+            onClick={() => viewerInputRef.current?.click()}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-100 transition-colors"
+            title="Open a portfolio file shared by a colleague"
+          >
+            <FolderOpen size={14} />
+            Open shared
+          </button>
+        </>
+      )}
+
       <button
         data-testid="export-excel"
         onClick={handleExportExcel}
@@ -288,6 +321,7 @@ export function DataControls({ data, onImport, onError, timelineId }: DataContro
       <input
         type="file"
         ref={fileInputRef}
+        data-testid="import-file-input"
         onChange={handleFileChange}
         accept=".xlsx, .xls"
         className="hidden"

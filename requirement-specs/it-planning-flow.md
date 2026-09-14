@@ -166,6 +166,12 @@ to escape, and no workspace that is half fabricated with nothing marking which h
 exists; RPTI is then matched *against a known inventory* rather than two unknown lists being
 merged into each other.
 
+> **Step 1 shipped** (2026-09-14, [issue #38](https://github.com/nofanto/Selara/issues/38)). The
+> RPTI importer and the two-path onboarding landed together, specified through Spec Kit in
+> `specs/001-rpti-import-onboarding/`. Step 2 — importing an RPTI into an *existing* workspace, where
+> judgement-based matching arrives — remains outstanding. Onboarding does exact-match only, and
+> reports anything it cannot resolve rather than guessing.
+
 ### Why this ships in three steps
 
 Consolidating onto "import both" puts the hardest unbuilt feature in the product — matching —

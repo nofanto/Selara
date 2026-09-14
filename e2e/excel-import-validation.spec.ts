@@ -41,7 +41,7 @@ test.describe('Excel Import Data Validation', () => {
     fs.writeFileSync(invalidFilePath, XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }));
 
     try {
-      const fileInput = page.locator('input[type="file"]');
+      const fileInput = page.getByTestId('import-file-input');
       await fileInput.setInputFiles(invalidFilePath);
 
       // Should show validation error notification
@@ -71,7 +71,7 @@ test.describe('Excel Import Data Validation', () => {
     fs.writeFileSync(invalidFilePath, XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }));
 
     try {
-      const fileInput = page.locator('input[type="file"]');
+      const fileInput = page.getByTestId('import-file-input');
       await fileInput.setInputFiles(invalidFilePath);
 
       await expect(page.getByTestId('import-error-notification')).toBeVisible({ timeout: 5000 });
@@ -100,7 +100,7 @@ test.describe('Excel Import Data Validation', () => {
     fs.writeFileSync(invalidFilePath, XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }));
 
     try {
-      const fileInput = page.locator('input[type="file"]');
+      const fileInput = page.getByTestId('import-file-input');
       await fileInput.setInputFiles(invalidFilePath);
 
       // Should show validation error notification
@@ -132,7 +132,7 @@ test.describe('Excel Import Data Validation', () => {
     fs.writeFileSync(invalidFilePath, XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }));
 
     try {
-      const fileInput = page.locator('input[type="file"]');
+      const fileInput = page.getByTestId('import-file-input');
       await fileInput.setInputFiles(invalidFilePath);
 
       // Should show validation warning or error
@@ -162,7 +162,7 @@ test.describe('Excel Import Data Validation', () => {
     fs.writeFileSync(validFilePath, XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }));
 
     try {
-      const fileInput = page.locator('input[type="file"]');
+      const fileInput = page.getByTestId('import-file-input');
       await fileInput.setInputFiles(validFilePath);
 
       // Wait for import preview modal

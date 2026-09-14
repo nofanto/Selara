@@ -88,11 +88,26 @@ function parseRow(cells: unknown[]): { row: LkptiImportRow } | { reason: string 
   const name = cellText(cells[2]);
   if (!name) return { reason: 'Application name (Nama Aplikasi) is blank' };
 
-  const categoryCode = parseCategoryCode(cells[1]);
-  if (!categoryCode) return { reason: `Unrecognized category code in "${cellText(cells[1])}"` };
+  // Blank is accepted for the same reason blank developer is: generateLkptiDetails
+  // writes an empty category cell whenever the deliverable has no resolvable code
+  // (lkpti.ts:180), so rejecting blank meant the app could not read back its own
+  // export. A *wrong* code is still rejected — that is a malformed cell we cannot
+  // guess our way out of, whereas blank simply says nothing, and
+  // computeDataHealth already reports it as `deliverable-no-category`.
+  const rawCategory = cellText(cells[1]);
+  const categoryCode = parseCategoryCode(cells[1]) ?? '';
+  if (!categoryCode && rawCategory) return { reason: `Unrecognized category code in "${rawCategory}"` };
 
+  // Blank is accepted. Selara's own LKPTI export writes this cell empty for
+  // anything not marked in-house — generateLkptiDetails only ever sets
+  // `developer` to 'inhouse' — so rejecting blank meant the app could not read
+  // back files it had just written. Importing a real bank's inventory dropped
+  // 12 of 13 rows for a field the exporter had left empty itself.
+  //
+  // A blank developer is a *completeness* problem, not a malformed row, and
+  // computeDataHealth already reports it as one. Dropping the row instead loses
+  // the application entirely and says nothing about why.
   const developerRaw = cellText(cells[12]);
-  if (!developerRaw) return { reason: 'Developer (Pengembang Aplikasi) is blank' };
 
   const goLiveDateIso = parseGoLiveDate(cells[13]);
   if (!goLiveDateIso) return { reason: `Go-live date "${cellText(cells[13])}" is neither dd-mm-yyyy text nor a date cell` };
@@ -231,11 +246,13 @@ export function deriveWorkspaceFromLkptiImport(rows: LkptiImportRow[]): DerivedL
 
     let categoryId = categoryIdByCode.get(row.categoryCode);
     if (!categoryId) {
-      categoryId = `lkpti-import-cat-${row.categoryCode}`;
+      // Rows that stated no category collect in one visible bucket rather than in a
+      // nameless category, so the user can find them and assign a code.
+      categoryId = row.categoryCode ? `lkpti-import-cat-${row.categoryCode}` : 'lkpti-import-cat-uncategorised';
       categoryIdByCode.set(row.categoryCode, categoryId);
       assetCategories.push({
         id: categoryId,
-        name: isLkptiCategoryCode(row.categoryCode) ? RPTI_CATEGORY_LABELS[row.categoryCode] : row.categoryCode,
+        name: isLkptiCategoryCode(row.categoryCode) ? RPTI_CATEGORY_LABELS[row.categoryCode] : (row.categoryCode || 'Uncategorised'),
         categoryCode: isLkptiCategoryCode(row.categoryCode) ? row.categoryCode : undefined,
       });
     }
@@ -247,13 +264,17 @@ export function deriveWorkspaceFromLkptiImport(rows: LkptiImportRow[]): DerivedL
 
     const deliverableId = `lkpti-import-deliv-${n}`;
     const isInhouse = row.developerRaw.toLowerCase() === 'inhouse';
+    // Blank stays unknown rather than becoming 'PPJTI'. Defaulting would assert
+    // third-party sourcing the filed return never stated — inventing regulatory
+    // data is worse than leaving a gap that data health can report.
+    const developer = row.developerRaw === '' ? undefined : (isInhouse ? 'inhouse' : 'PPJTI');
     deliverables.push({
       id: deliverableId,
       assetId,
       name: row.name,
       description: row.description,
       categoryCode: isLkptiCategoryCode(row.categoryCode) ? row.categoryCode : undefined,
-      developer: isInhouse ? 'inhouse' : 'PPJTI',
+      developer,
       dcCity: row.dcCity,
       dcCountry: row.dcCountry,
       drCity: row.drCity,
@@ -274,7 +295,7 @@ export function deriveWorkspaceFromLkptiImport(rows: LkptiImportRow[]): DerivedL
       categoryCode: isLkptiCategoryCode(row.categoryCode) ? row.categoryCode : undefined,
       // Preserved verbatim, unlike generateLkptiDetails' cascade rule — the raw provider
       // name from the source report is worth keeping even for non-inhouse developers.
-      developer: isInhouse ? 'inhouse' : row.developerRaw,
+      developer: row.developerRaw === '' ? undefined : (isInhouse ? 'inhouse' : row.developerRaw),
       dcCity: row.dcCity,
       dcCountry: row.dcCountry,
       drCity: row.drCity,

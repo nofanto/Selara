@@ -5,7 +5,6 @@ import {
   RPTI_IMPORT_SHEET_NAME,
   parseRptiImportWorkbook,
   deriveWorkspaceFromRptiImport,
-  type RptiImportRow,
 } from './rptiImport';
 import { RPTI_CATEGORY_LABELS } from './rpti';
 import type { Asset, AssetCategory, Deliverable } from '../types';
@@ -232,5 +231,40 @@ describe('round trip against the real exporter', () => {
     const { rows, skipped } = parseRptiImportWorkbook(load('rpti-format-3.1-scale-300.xlsx'));
     expect(skipped).toEqual([]);
     expect(rows).toHaveLength(300);
+  });
+});
+
+describe('imported entities must not dangle', () => {
+  // A 7-row import produced 14 data-health errors before this was fixed: every
+  // initiative had an empty programmeId and assetId, and computeDataHealth
+  // reports both. Caught by looking at the screen, not by the suite.
+  const parse = (over = {}) => parseRptiImportWorkbook(wb([row(over)])).rows;
+
+  it('gives every imported initiative a programme that exists in the result', () => {
+    const out = deriveWorkspaceFromRptiImport(parse(), 2027, EMPTY);
+    const programmeIds = new Set(out.programmes.map(p => p.id));
+    expect(out.initiatives.length).toBeGreaterThan(0);
+    expect(out.initiatives.every(i => programmeIds.has(i.programmeId))).toBe(true);
+  });
+
+  it('gives every imported initiative an asset that exists in the result', () => {
+    const out = deriveWorkspaceFromRptiImport(parse(), 2027, EMPTY);
+    const assetIds = new Set(out.assets.map(a => a.id));
+    expect(out.initiatives.every(i => assetIds.has(i.assetId))).toBe(true);
+  });
+
+  it('attaches an upgrade initiative to the existing asset it targets', () => {
+    const inventory = {
+      deliverables: [{ id: 'd-1', assetId: 'a-1', name: 'Core Banking GL', type: 'application', categoryCode: '04' } as Deliverable],
+      assets: [{ id: 'a-1', name: 'Core Banking GL', categoryId: 'c-1' } as Asset],
+      assetCategories: [{ id: 'c-1', name: 'Area', categoryCode: '04' } as AssetCategory],
+    };
+    const out = deriveWorkspaceFromRptiImport(parse({ jenis: 'upgrade' }), 2027, inventory);
+    expect(out.initiatives[0].assetId).toBe('a-1');
+  });
+
+  it('creates no programme when there is nothing to import', () => {
+    const out = deriveWorkspaceFromRptiImport([], 2027, EMPTY);
+    expect(out.programmes).toEqual([]);
   });
 });

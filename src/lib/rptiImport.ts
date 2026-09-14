@@ -1,7 +1,7 @@
 import * as XLSX from 'xlsx';
 import {
   Asset, AssetCategory, Deliverable, DeliverableSegment, DeliverableStatus,
-  Initiative, RptiCategoryCode, RptiDetail, RptiDeveloper, RptiDevelopmentType,
+  Initiative, Programme, RptiCategoryCode, RptiDetail, RptiDeveloper, RptiDevelopmentType,
   RptiQuarter, RptiRelatedParty,
 } from '../types';
 import { RPTI_CATEGORY_LABELS, periodForQuarter } from './rpti';
@@ -67,6 +67,7 @@ export interface UnresolvedRptiReference {
 }
 
 export interface DerivedRptiWorkspace {
+  programmes: Programme[];
   assetCategories: AssetCategory[];
   assets: Asset[];
   deliverables: Deliverable[];
@@ -194,6 +195,7 @@ export function parseRptiImportFile(file: File): Promise<ParseRptiImportResult> 
   });
 }
 
+export const RPTI_IMPORT_PROGRAMME_ID = 'rpti-import-programme';
 export const RPTI_IMPORT_PRELAUNCH_STATUS_ID = 'rpti-import-status-planned';
 export const RPTI_IMPORT_LIVE_STATUS_ID = 'rpti-import-status-live';
 
@@ -209,6 +211,7 @@ export function deriveWorkspaceFromRptiImport(
   reportYear: number,
   existing: { deliverables: Deliverable[]; assets: Asset[]; assetCategories: AssetCategory[] },
 ): DerivedRptiWorkspace {
+  const programmes: Programme[] = [];
   const assetCategories: AssetCategory[] = [];
   const assets: Asset[] = [];
   const deliverables: Deliverable[] = [];
@@ -240,22 +243,11 @@ export function deriveWorkspaceFromRptiImport(
     const initiativeId = `rpti-import-init-${n}`;
     const { startDate: qStart, endDate: qEnd } = period(row.plannedQuarter);
 
-    initiatives.push({
-      id: initiativeId,
-      name: row.name,
-      programmeId: '',
-      assetId: '',
-      startDate: `${reportYear}-01-01`,
-      endDate: qEnd,
-      capex: row.capexAmount ?? 0,
-      opex: row.opexAmount ?? 0,
-      description: row.description,
-    });
-
     // An upgrade targets something the bank already runs, so it should find an
     // existing entry. Matching is exact on name AND category: anything looser is
     // judgement, and judgement is surfaced rather than automated (FR-018/019).
     let targetId: string | undefined;
+    let initiativeAssetId = '';
     if (row.developmentType === 'upgrade') {
       const matches = existing.deliverables.filter(
         d => d.name.trim().toLowerCase() === row.name.trim().toLowerCase()
@@ -263,12 +255,17 @@ export function deriveWorkspaceFromRptiImport(
       );
       if (matches.length === 1) {
         targetId = matches[0].id;
+        initiativeAssetId = matches[0].assetId;
       } else {
         // Zero or several. Create nothing, and leave the report row pointing at
         // an id that will not resolve — computeDataHealth's existing rpti-target
         // check reports it, so no new rule and no import-results store is needed.
         unresolved.push({ rowNumber: row.rowNumber, name: row.name, categoryCode: row.categoryCode });
         targetId = `rpti-import-unresolved-${n}`;
+        // The report row's target is deliberately left unresolvable (that is what
+        // data health reports), but the initiative must not also dangle — one
+        // finding per problem, not three.
+        initiativeAssetId = existing.assets[0]?.id ?? '';
       }
     }
 
@@ -276,6 +273,7 @@ export function deriveWorkspaceFromRptiImport(
       const assetId = `rpti-import-asset-${n}`;
       const deliverableId = `rpti-import-deliv-${n}`;
       assets.push({ id: assetId, name: row.name, categoryId, maturity: 1 });
+      initiativeAssetId = assetId;
       deliverables.push({
         id: deliverableId,
         assetId,
@@ -314,6 +312,22 @@ export function deriveWorkspaceFromRptiImport(
       });
     }
 
+    // Created after the target is known, so it can carry a real assetId. Leaving
+    // programmeId/assetId empty would dangle: computeDataHealth reports every
+    // initiative whose programme or asset does not resolve, so a 7-row import
+    // arrived with 14 errors before this was fixed.
+    initiatives.push({
+      id: initiativeId,
+      name: row.name,
+      programmeId: RPTI_IMPORT_PROGRAMME_ID,
+      assetId: initiativeAssetId,
+      startDate: `${reportYear}-01-01`,
+      endDate: qEnd,
+      capex: row.capexAmount ?? 0,
+      opex: row.opexAmount ?? 0,
+      description: row.description,
+    });
+
     rptiDetails.push({
       id: `rpti-import-row-${n}`,
       initiativeId,
@@ -333,10 +347,14 @@ export function deriveWorkspaceFromRptiImport(
     });
   });
 
+  if (initiatives.length > 0) {
+    programmes.push({ id: RPTI_IMPORT_PROGRAMME_ID, name: `RPTI ${reportYear} plan`, color: '#4f46e5' });
+  }
+
   const deliverableStatuses: DeliverableStatus[] = deliverableSegments.length === 0 ? [] : [
     { id: RPTI_IMPORT_PRELAUNCH_STATUS_ID, name: 'Planned', color: '#2563eb', isPreLaunchStatus: true },
     { id: RPTI_IMPORT_LIVE_STATUS_ID, name: 'In Production', color: '#16a34a', isLiveStatus: true },
   ];
 
-  return { assetCategories, assets, deliverables, deliverableSegments, deliverableStatuses, initiatives, rptiDetails, unresolved };
+  return { assetCategories, assets, deliverables, deliverableSegments, deliverableStatuses, initiatives, programmes, rptiDetails, unresolved };
 }

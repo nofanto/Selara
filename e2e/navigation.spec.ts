@@ -53,7 +53,7 @@ test.describe('Navigation & State Management', () => {
     // clear-all-stores-then-add-all-records path in db.ts
     await page.getByTestId('nav-data-manager').click();
     await page.getByTestId('clear-and-start-again-btn').click();
-    await page.getByTestId('template-select-with-demo-btn-rpti').click();
+    await page.getByTestId('template-start-demo-btn').click();
     // Brief pause to let the DB write begin before reloading (intentional — tests write atomicity)
     await page.waitForTimeout(500);
 
