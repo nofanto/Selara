@@ -332,3 +332,16 @@ describe('colours are Tailwind classes, not hex or bare colour names', () => {
     for (const s of out.deliverableStatuses) expect(s.color).toMatch(/^bg-[a-z]+-\d{2,3}$/);
   });
 });
+
+describe('imported applications state their type', () => {
+  // LKPTI is Daftar Aplikasi, and the parser already rejects the infrastructure
+  // codes, so every surviving row is an application. Reading code defaults an unset
+  // type to 'application' anyway, but the Deliverables tab showed a blank Type
+  // select on all 13 imported rows, which reads as missing data.
+  it('sets type to application rather than leaving it to a fallback', () => {
+    const { rows } = parseLkptiImportWorkbook(makeWorkbook([VALID_ROW]));
+    const out = deriveWorkspaceFromLkptiImport(rows);
+    expect(out.deliverables).toHaveLength(1);
+    expect(out.deliverables[0].type).toBe('application');
+  });
+});

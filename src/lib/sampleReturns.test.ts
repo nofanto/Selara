@@ -184,3 +184,24 @@ describe('the sample plan upgrades infrastructure the LKPTI cannot hold', () => 
     expect(regen.find(r => r.targetId === dc!.id)?.developmentType).toBe('upgrade');
   });
 });
+
+describe('every imported deliverable states its type', () => {
+  // Nothing in the lib layer would have caught this: every read uses
+  // `d.type ?? 'application'`. The gap was only visible in the Deliverables tab,
+  // as an empty Type select on all 13 LKPTI rows.
+  it('LKPTI gives every row an explicit application type', () => {
+    const inv = deriveWorkspaceFromLkptiImport(parseLkptiImportWorkbook(load('sample-lkpti-2026.xlsx')).rows);
+    expect(inv.deliverables).toHaveLength(13);
+    expect(inv.deliverables.every(d => d.type === 'application')).toBe(true);
+  });
+
+  it('no deliverable from either importer is left without a type', () => {
+    const inv = deriveWorkspaceFromLkptiImport(parseLkptiImportWorkbook(load('sample-lkpti-2026.xlsx')).rows);
+    const out = deriveWorkspaceFromRptiImport(parseRptiImportWorkbook(load('sample-rpti-2027.xlsx')).rows, 2027, {
+      deliverables: inv.deliverables, assets: inv.assets, assetCategories: inv.assetCategories,
+    });
+    const all = [...inv.deliverables, ...out.deliverables];
+    expect(all.length).toBeGreaterThan(13);
+    expect(all.filter(d => d.type === undefined)).toEqual([]);
+  });
+});

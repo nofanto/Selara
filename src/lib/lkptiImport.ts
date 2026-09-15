@@ -271,6 +271,14 @@ export function deriveWorkspaceFromLkptiImport(rows: LkptiImportRow[]): DerivedL
       id: deliverableId,
       assetId,
       name: row.name,
+      // Stated, not left to the `?? 'application'` fallback the reading code uses.
+      // LKPTI is Daftar Aplikasi and the parser enforces it — only codes 01-12/49
+      // are accepted, and the infrastructure codes are rejected outright — so every
+      // row that gets this far is an application. Leaving it unset showed an empty
+      // "Select..." in the Deliverables tab, which reads as missing data rather
+      // than as the known fact it is, and it differed from the RPTI importer, which
+      // sets the type explicitly.
+      type: 'application',
       description: row.description,
       categoryCode: isLkptiCategoryCode(row.categoryCode) ? row.categoryCode : undefined,
       developer,
