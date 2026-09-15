@@ -40,6 +40,7 @@ import { rptiCatalogueAssetCategories } from './lib/rptiCatalogue';
 import { buildRestoredWorkspace, isWorkspaceEmpty } from './lib/workspaceState';
 import { HealthIssueLocation, DataManagerTab } from './lib/dataHealth';
 import { SYNC_CHANNEL_NAME, generateTabId, isRemoteSaveMessage, notifyDataSaved } from './lib/tabSync';
+import { mergeDeliverableStatuses } from './lib/deliverableStatusDefaults';
 
 // Lazy load modals and heavy components for code splitting
 const FeaturesModal = lazy(() => import('./components/FeaturesModal').then(m => ({ default: m.FeaturesModal })));
@@ -492,7 +493,7 @@ export default function App() {
       assets: [...lkDerived.assets, ...(rpDerived?.assets ?? [])],
       deliverables: [...lkDerived.deliverables, ...(rpDerived?.deliverables ?? [])],
       deliverableSegments: [...lkDerived.deliverableSegments, ...(rpDerived?.deliverableSegments ?? [])],
-      deliverableStatuses: [...lkDerived.deliverableStatuses, ...(rpDerived?.deliverableStatuses ?? [])],
+      deliverableStatuses: mergeDeliverableStatuses(lkDerived.deliverableStatuses, rpDerived?.deliverableStatuses),
       initiatives: rpDerived?.initiatives ?? [],
       programmes: rpDerived?.programmes ?? [],
       rptiDetails: rpDerived?.rptiDetails ?? [],

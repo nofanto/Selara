@@ -9,6 +9,7 @@ import {
   toDdMmYyyy,
 } from './lkpti';
 import { RPTI_CATEGORY_LABELS } from './rpti';
+import { IN_PRODUCTION_STATUS } from './deliverableStatusDefaults';
 
 /**
  * Strict-format parser for an existing LKPTI Format 3.2.6 report — the inverse of
@@ -234,15 +235,10 @@ export function deriveWorkspaceFromLkptiImport(rows: LkptiImportRow[]): DerivedL
   const deliverableSegments: DeliverableSegment[] = [];
   const lkptiDetails: LkptiDetail[] = [];
 
-  const liveStatus: DeliverableStatus = {
-    id: 'lkpti-import-status-live',
-    name: 'Live',
-    // A Tailwind class, not a colour name: Timeline renders this value directly as
-    // a className (SEGMENT_COLORS, Timeline.tsx:84). 'green' matched no class, so
-    // imported segments drew with no fill at all.
-    color: 'bg-emerald-500',
-    isLiveStatus: true,
-  };
+  // The shared definition, not a private one. This importer used to mint its own
+  // "Live" while the RPTI importer minted "In Production" — the same concept under
+  // two names, both landing in the same workspace. See deliverableStatusDefaults.ts.
+  const liveStatus = IN_PRODUCTION_STATUS;
 
   rows.forEach((row, i) => {
     const n = i + 1;

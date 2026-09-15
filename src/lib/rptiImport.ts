@@ -5,6 +5,7 @@ import {
   RptiQuarter, RptiRelatedParty,
 } from '../types';
 import { RPTI_CATEGORY_LABELS, periodForQuarter } from './rpti';
+import { PLANNED_STATUS, IN_PRODUCTION_STATUS, SEEDED_DELIVERABLE_STATUSES } from './deliverableStatusDefaults';
 
 /**
  * Strict-format parser for a filed RPTI Format 3.1 return — the inverse of
@@ -196,8 +197,10 @@ export function parseRptiImportFile(file: File): Promise<ParseRptiImportResult> 
 }
 
 export const RPTI_IMPORT_PROGRAMME_ID = 'rpti-import-programme';
-export const RPTI_IMPORT_PRELAUNCH_STATUS_ID = 'rpti-import-status-planned';
-export const RPTI_IMPORT_LIVE_STATUS_ID = 'rpti-import-status-live';
+// Shared with the LKPTI importer and demo data rather than importer-specific: one
+// vocabulary per workspace, whichever path seeded it. See deliverableStatusDefaults.ts.
+export const RPTI_IMPORT_PRELAUNCH_STATUS_ID = PLANNED_STATUS.id;
+export const RPTI_IMPORT_LIVE_STATUS_ID = IN_PRODUCTION_STATUS.id;
 
 /**
  * Turns parsed rows into workspace entities.
@@ -354,10 +357,8 @@ export function deriveWorkspaceFromRptiImport(
     programmes.push({ id: RPTI_IMPORT_PROGRAMME_ID, name: `RPTI ${reportYear} plan`, color: 'bg-indigo-500' });
   }
 
-  const deliverableStatuses: DeliverableStatus[] = deliverableSegments.length === 0 ? [] : [
-    { id: RPTI_IMPORT_PRELAUNCH_STATUS_ID, name: 'Planned', color: 'bg-slate-400', isPreLaunchStatus: true },
-    { id: RPTI_IMPORT_LIVE_STATUS_ID, name: 'In Production', color: 'bg-emerald-500', isLiveStatus: true },
-  ];
+  const deliverableStatuses: DeliverableStatus[] =
+    deliverableSegments.length === 0 ? [] : [...SEEDED_DELIVERABLE_STATUSES];
 
   return { assetCategories, assets, deliverables, deliverableSegments, deliverableStatuses, initiatives, programmes, rptiDetails, unresolved };
 }

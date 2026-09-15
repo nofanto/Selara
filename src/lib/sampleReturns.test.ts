@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { parseLkptiImportWorkbook, deriveWorkspaceFromLkptiImport } from './lkptiImport';
 import { parseRptiImportWorkbook, deriveWorkspaceFromRptiImport } from './rptiImport';
 import { generateRptiDetails } from './rpti';
+import { mergeDeliverableStatuses } from './deliverableStatusDefaults';
 
 const load = (n: string) => XLSX.read(readFileSync(new URL(`../../docs/sample-data/${n}`, import.meta.url)), { type: 'buffer' });
 
@@ -115,5 +116,45 @@ describe('a planned enhancement to an application the bank already runs', () => 
     for (const n of ['Open API Banking Platform', 'Digital Onboarding (eKYC)', 'Syariah Financing Module']) {
       expect(byName(n)?.developmentType, n).toBe('new');
     }
+  });
+});
+
+describe('an imported workspace has one vocabulary, not two', () => {
+  /**
+   * The LKPTI importer used to mint "Live" and the RPTI importer "In Production" —
+   * the same concept under two names, both landing in the same workspace with half
+   * the segments each. Nothing said which to use, renaming one left the other
+   * behind, and clearing isLiveStatus on one silently dropped half the workspace out
+   * of LKPTI generation. The flags are what the rules read, so generation stayed
+   * correct and only the user ever saw the problem.
+   */
+  const statuses = () => {
+    const inv = deriveWorkspaceFromLkptiImport(parseLkptiImportWorkbook(load('sample-lkpti-2026.xlsx')).rows);
+    const out = deriveWorkspaceFromRptiImport(parseRptiImportWorkbook(load('sample-rpti-2027.xlsx')).rows, 2027, {
+      deliverables: inv.deliverables, assets: inv.assets, assetCategories: inv.assetCategories,
+    });
+    return {
+      merged: mergeDeliverableStatuses(inv.deliverableStatuses, out.deliverableStatuses),
+      segments: [...inv.deliverableSegments, ...out.deliverableSegments],
+    };
+  };
+
+  it('defines exactly one live status and one pre-launch status', () => {
+    const { merged } = statuses();
+    expect(merged.filter(s => s.isLiveStatus)).toHaveLength(1);
+    expect(merged.filter(s => s.isPreLaunchStatus)).toHaveLength(1);
+  });
+
+  it('gives each status a distinct id, with both importers naming the same ones', () => {
+    const { merged } = statuses();
+    expect(new Set(merged.map(s => s.id)).size).toBe(merged.length);
+    expect(merged.map(s => s.name).sort()).toEqual(['In Production', 'Planned']);
+  });
+
+  it('leaves no segment pointing at a status the workspace does not define', () => {
+    const { merged, segments } = statuses();
+    const ids = new Set(merged.map(s => s.id));
+    expect(segments.length).toBeGreaterThan(0);
+    for (const seg of segments) expect(ids.has(seg.status), `${seg.id} → ${seg.status}`).toBe(true);
   });
 });

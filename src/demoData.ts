@@ -1,5 +1,6 @@
 import { Asset, Deliverable, DeliverableSegment, DeliverableStatus, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource } from './types';
 import { rptiCatalogueAssetCategories } from './lib/rptiCatalogue';
+import { PLANNED_STATUS, IN_PRODUCTION_STATUS } from './lib/deliverableStatusDefaults';
 
 /**
  * Returns a date string (YYYY-MM-DD) relative to the current calendar year.
@@ -597,9 +598,11 @@ export const demoResources: Resource[] = [
 ];
 
 export const demoDeliverableStatuses: DeliverableStatus[] = [
-    { id: 'appstatus-planned',        name: 'Planned',          color: 'bg-slate-400', isPreLaunchStatus: true },
+    // Planned and In Production come from the shared defaults rather than being
+    // restated here, so demo and imported workspaces cannot drift apart.
+    PLANNED_STATUS,
     { id: 'appstatus-funded',         name: 'Funded',           color: 'bg-blue-400', isPreLaunchStatus: true },
-    { id: 'appstatus-in-production',  name: 'In Production',    color: 'bg-emerald-500', isLiveStatus: true },
+    IN_PRODUCTION_STATUS,
     { id: 'appstatus-sunset',         name: 'Sunset',           color: 'bg-amber-500' },
     { id: 'appstatus-out-of-support', name: 'Out of Support',   color: 'bg-orange-500' },
     { id: 'appstatus-retired',        name: 'Retired',          color: 'bg-slate-300' },
