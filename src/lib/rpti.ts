@@ -96,6 +96,12 @@ export interface GenerateRptiDetailsInput {
   deliverables: Deliverable[];
   assets: Asset[];
   assetCategories: AssetCategory[];
+  /**
+   * Rows already in the workspace. Supplying them makes generation merge-preserving
+   * instead of wipe-and-rebuild; omitting them keeps the old behaviour of returning
+   * only what could be generated.
+   */
+  existingDetails?: RptiDetail[];
 }
 
 // Resolves the AssetCategory backing a Deliverable's auto-fill defaults, via
@@ -121,7 +127,7 @@ export function generateRptiDetails(
   input: GenerateRptiDetailsInput,
   reportYear: number,
 ): RptiDetail[] {
-  const { deliverableSegments, deliverableStatuses, initiatives, deliverables, assets, assetCategories } = input;
+  const { deliverableSegments, deliverableStatuses, initiatives, deliverables, assets, assetCategories, existingDetails = [] } = input;
 
   // Overlap, not "starts in": a segment qualifies if any part of its
   // [startDate, endDate] range falls within the report year, even if it
@@ -207,7 +213,63 @@ export function generateRptiDetails(
     });
   }
 
-  return results;
+  return mergeWithExisting(results, existingDetails);
+}
+
+/**
+ * Folds freshly generated rows into the rows already present, rather than replacing
+ * them wholesale.
+ *
+ * Wipe-and-rebuild was the shipped v1 (see requirement-specs/rpti-auto-generation.md,
+ * "Regeneration behavior"), on the grounds that losing manual edits could be revisited
+ * if it hurt. It does. A row that generation cannot reproduce is not necessarily stale:
+ * an imported upgrade whose target was not found in the inventory has no segment to
+ * regenerate from, so a wipe silently deleted the filed CapEx, OpEx, quarter and
+ * remarks of the very row most needing attention — and took its data-health warning
+ * with it, so the problem looked solved. Generation is also year-scoped, so rebuilding
+ * one year used to destroy every other year's rows.
+ *
+ * A row is matched to its regenerated counterpart by (initiative, target) rather than
+ * by id, because an imported row and a generated one for the same work carry different
+ * ids. On a match the derived fields refresh and the row keeps its id and the fields
+ * generation has no source for. With no existing rows supplied this returns the
+ * generated list unchanged.
+ */
+function mergeWithExisting(generated: RptiDetail[], existing: RptiDetail[]): RptiDetail[] {
+  if (existing.length === 0) return generated;
+
+  const key = (r: RptiDetail) => `${r.initiativeId}::${r.targetId}`;
+  const freshByKey = new Map(generated.map(r => [key(r), r]));
+  const merged: RptiDetail[] = [];
+  const refreshed = new Set<string>();
+
+  // Existing order first, so regenerating does not reshuffle the table under the user.
+  for (const row of existing) {
+    const k = key(row);
+    const fresh = freshByKey.get(k);
+    if (!fresh || refreshed.has(k)) {
+      // Not reproduced, or a second row for the same pair — keep it exactly as it is.
+      // Preserving a duplicate beats silently dropping filed data.
+      merged.push(row);
+      continue;
+    }
+    refreshed.add(k);
+    merged.push({
+      ...fresh,
+      id: row.id,
+      // Generation has no source for these: CapEx/OpEx are overrides on top of the
+      // initiative's figures, and remarks is free text. Rebuilding them from segments
+      // is impossible, so they survive the refresh.
+      capexAmount: row.capexAmount,
+      opexAmount: row.opexAmount,
+      remarks: row.remarks,
+    });
+  }
+
+  for (const [k, fresh] of freshByKey) {
+    if (!refreshed.has(k)) merged.push(fresh);
+  }
+  return merged;
 }
 
 /**

@@ -272,8 +272,8 @@ export function deriveWorkspaceFromRptiImport(
         // Leaving it unresolved created a dead end: a data-health error the user
         // could never clear by importing, because no LKPTI could ever supply the
         // target. The bank does run this infrastructure; the plan says so. Creating
-        // it records that, and the prior-live segment below keeps it classified as
-        // an upgrade on regeneration.
+        // it records that, and the live segment below — live precisely because this
+        // is an upgrade — keeps it classified as one on regeneration.
         //
         // Still only when nothing matched. A later import that does find the entry
         // this one created attaches to it rather than making a second copy.

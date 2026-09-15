@@ -110,9 +110,45 @@ direction is still open.
 - Every deliverable is expected to pass through at least a `planned` segment and an `in-production` segment at some point in its life (not enforced in code today, just a shared mental model).
 - **A deliverable is assumed to have at most one `in-production` segment, ever.** This is what keeps the collapsing rule in step 4 simple — there's no need to handle "which of several in-production events does this row represent," since repeat upgrades to something already live aren't expected to be modeled as additional `in-production` segments on the same deliverable.
 
-## Regeneration behavior (v1)
+## Regeneration behavior
 
-Pressing "Generate" wipes all existing generated rows for the current report-year and rebuilds them from scratch — no reconciliation with prior manual edits. Simplest possible behavior to ship first; revisit if losing edits on regenerate turns out to be painful in practice.
+**v1 (superseded).** Pressing "Generate" wiped all existing rows and rebuilt them from
+scratch — no reconciliation with prior manual edits. Shipped as the simplest thing that
+could work, with an explicit note to revisit "if losing edits on regenerate turns out to
+be painful in practice."
+
+**v2 (current): merge-preserving.** It did turn out to be painful, and worse than losing
+edits. Generation only produces a row for work it can see in the segments, so a row with
+no segment regenerates to nothing — and under wipe-and-rebuild it was deleted. The row
+that fits that description is an imported `upgrade` whose target was never found in the
+inventory: the one row that most needs a person to look at it. One click removed its
+filed CapEx, OpEx, quarter and remarks, *and* its data-health warning went with it, so
+the problem appeared to have been solved rather than destroyed. Generation is also
+year-scoped, so rebuilding one year wiped every other year's rows: on the sample
+workspace, a 13-row 2027 import became 4 rows after pressing the button, which is
+hardcoded to the current calendar year.
+
+`generateRptiDetails` now takes `existingDetails` and folds the generated rows into
+them:
+
+- A row is paired with its regenerated counterpart by **(initiative, target)**, not by
+  id — an imported row and a generated one for the same work carry different ids.
+- On a match, derived fields refresh; the row keeps its **id**, and the fields generation
+  has no source for: `capexAmount`, `opexAmount` (overrides on the initiative's figures)
+  and `remarks` (free text).
+- A row with no counterpart is **kept unchanged**, whatever the reason — unresolved
+  target, another report year, or manual creation.
+- A second row for the same pair is kept rather than deduplicated. Preserving a duplicate
+  beats silently dropping filed data.
+- Omitting `existingDetails` returns the generated list unchanged, so every other caller
+  is unaffected.
+
+Verified on the sample: 13 imported rows stay 13 through a regenerate for either 2026 or
+2027, the unresolved row keeps its filed figures, and regenerating twice is idempotent.
+
+**Still open:** the Generate button's report year is `new Date().getFullYear()`, so it
+still acts on the wrong year for a plan filed for a different one. Merging means that no
+longer destroys anything, but it does mean the button can silently refresh nothing.
 
 ## Coupling worth knowing before changing rule 4's third bullet
 

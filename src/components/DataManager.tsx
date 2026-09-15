@@ -232,10 +232,11 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery,
       deliverables: data.deliverables || [],
       assets: data.assets,
       assetCategories: data.assetCategories,
+      existingDetails: data.rptiDetails || [],
     }, reportYear);
     const existingCount = (data.rptiDetails || []).length;
     const message = existingCount
-      ? `This replaces all ${existingCount} existing RPTI row(s) with ${generated.length} row(s) generated from ${reportYear} deliverable segment data. Any manual edits will be lost. Continue?`
+      ? `This refreshes RPTI rows from ${reportYear} deliverable segment data, leaving ${generated.length} row(s) in total. Rows that cannot be regenerated — such as an imported row whose target was never found — are kept as they are. Continue?`
       : `Generate ${generated.length} RPTI row(s) from ${reportYear} deliverable segment data?`;
     confirm('Generate RPTI Rows', message, () => updateData('rptiDetails', generated));
   };
@@ -720,7 +721,8 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery,
                 Generate {new Date().getFullYear()} RPTI Rows
               </button>
               <p className="text-xs text-slate-500">
-                Rebuilds rows from this year's deliverable segments — replaces all rows below.
+                Refreshes rows from this year's deliverable segments. Rows that cannot be
+                regenerated are kept.
               </p>
               <div className="flex items-center gap-2 ml-auto">
                 <label htmlFor="rpti-default-currency" className="text-xs text-slate-500 whitespace-nowrap">

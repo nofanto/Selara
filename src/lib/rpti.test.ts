@@ -420,3 +420,80 @@ describe('an application that is continuously live counts as pre-existing', () =
     expect(rows[0].developmentType).toBe('new');
   });
 });
+
+describe('regenerating merges instead of wiping', () => {
+  /**
+   * Wipe-and-rebuild was the shipped v1. It meant a row generation cannot reproduce
+   * was deleted — and the row that most needs a person, an imported upgrade whose
+   * target was never found, is exactly that kind of row: it has no segment, so it
+   * regenerates to nothing. One click destroyed its filed CapEx, OpEx, quarter and
+   * remarks, and removed its data-health warning, so the problem looked solved.
+   */
+  const liveSegment = () => makeSegment({
+    id: 'seg-live', status: 'appstatus-in-production',
+    startDate: '2021-01-01', endDate: '2031-12-31', initiativeId: undefined,
+  });
+  const plannedSegment = () => makeSegment({
+    id: 'seg-plan', status: 'appstatus-planned', startDate: '2027-01-01', endDate: '2027-03-31',
+  });
+  const ctx = (existingDetails: any[]) => makeContext({
+    deliverableSegments: [liveSegment(), plannedSegment()],
+    initiatives: [makeInitiative({ startDate: '2027-01-01', endDate: '2027-03-31' })],
+    existingDetails,
+  });
+
+  const orphan = {
+    id: 'rpti-import-row-9', initiativeId: 'init-orphan', targetType: 'deliverable',
+    targetId: 'rpti-import-unresolved-9', developmentType: 'upgrade',
+    capexAmount: 4200, opexAmount: 900, plannedImplementationQuarter: 'Q4',
+    remarks: 'Filed against an application not in the inventory.',
+  } as any;
+
+  it('keeps a row it cannot reproduce, with its filed figures intact', () => {
+    const rows = generateRptiDetails(ctx([orphan]), 2027);
+    const kept = rows.find(r => r.id === 'rpti-import-row-9');
+    expect(kept).toBeDefined();
+    expect(kept).toMatchObject({
+      capexAmount: 4200, opexAmount: 900, plannedImplementationQuarter: 'Q4',
+      developmentType: 'upgrade', remarks: 'Filed against an application not in the inventory.',
+    });
+  });
+
+  it('refreshes a row it can reproduce, keeping its id and the fields it has no source for', () => {
+    const existing = {
+      id: 'rpti-import-row-1', initiativeId: 'init-1', targetType: 'deliverable', targetId: 'deliv-1',
+      developmentType: 'new', capexAmount: 5000, opexAmount: 750,
+      remarks: 'Board approved.', plannedImplementationQuarter: 'Q4',
+    } as any;
+    const rows = generateRptiDetails(ctx([existing]), 2027);
+    const row = rows.find(r => r.initiativeId === 'init-1');
+    expect(rows).toHaveLength(1);
+    expect(row!.id).toBe('rpti-import-row-1');          // id survives
+    expect(row!.capexAmount).toBe(5000);                 // no generation source
+    expect(row!.remarks).toBe('Board approved.');        // no generation source
+    expect(row!.developmentType).toBe('upgrade');        // derived — refreshed
+    expect(row!.plannedImplementationQuarter).toBe('Q1'); // derived from the segment
+  });
+
+  it('does not destroy rows belonging to another report year', () => {
+    const otherYear = { ...orphan, id: 'row-2028', initiativeId: 'init-2028', targetId: 'deliv-2028' };
+    const rows = generateRptiDetails(ctx([otherYear]), 2027);
+    expect(rows.map(r => r.id)).toContain('row-2028');
+  });
+
+  it('behaves exactly as before when no existing rows are supplied', () => {
+    const without = generateRptiDetails(makeContext({
+      deliverableSegments: [liveSegment(), plannedSegment()],
+      initiatives: [makeInitiative({ startDate: '2027-01-01', endDate: '2027-03-31' })],
+    }), 2027);
+    expect(without).toHaveLength(1);
+    expect(without[0].id).toMatch(/^rpti-gen-/);
+  });
+
+  it('keeps a duplicate pair rather than silently dropping one', () => {
+    const a = { id: 'dup-a', initiativeId: 'init-1', targetType: 'deliverable', targetId: 'deliv-1', developmentType: 'new' } as any;
+    const b = { ...a, id: 'dup-b', remarks: 'second row for the same work' };
+    const rows = generateRptiDetails(ctx([a, b]), 2027);
+    expect(rows.map(r => r.id).sort()).toEqual(['dup-a', 'dup-b']);
+  });
+});
