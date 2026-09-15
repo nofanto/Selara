@@ -89,7 +89,12 @@ const RPTI_ROWS = [
   ['SD-WAN Branch Network', 'Replace MPLS branch links with SD-WAN across 214 branches.', 'Data communication network', 'new', 'PPJTI', 'yes', JKT, SBY, 'Q1', 15200000000, 4800000000, 'Related party: network services subsidiary.'],
   ['Next-Gen Firewall & SIEM Upgrade', 'Perimeter firewall replacement and SIEM correlation rebuild.', 'Security systems', 'new', 'PPJTI', 'no', JKT, SBY, 'Q4', 11300000000, 2700000000, ''],
 
-  // Upgrade to something the 2026 inventory does not contain. Imported and
+  // An upgrade to infrastructure the bank already runs. LKPTI is Daftar Aplikasi
+  // and carries no infrastructure, so this can never match the inventory — it is
+  // created rather than stranded, and stays an 'upgrade' when regenerated.
+  ['Primary Data Center Jakarta', 'Add two floors of rack capacity to the existing facility.', 'Data Center / Disaster Recovery Center', 'upgrade', 'PPJTI', 'no', JKT, SBY, 'Q3', 7400000000, 1900000000, 'Existing DC; not an LKPTI item.'],
+
+  // Upgrade to an *application* the 2026 inventory does not contain. Imported and
   // flagged in the data-health review, not silently dropped or duplicated.
   ['Legacy Teller Application', 'Branch teller front-end modernisation.', 'Internal management', 'upgrade', 'inhouse', 'n/a', JKT, SBY, 'Q3', 2900000000, 640000000, 'Not present in the 2026 LKPTI — needs a target.'],
 ];

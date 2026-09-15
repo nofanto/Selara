@@ -259,8 +259,27 @@ export function deriveWorkspaceFromRptiImport(
       if (matches.length === 1) {
         targetId = matches[0].id;
         initiativeAssetId = matches[0].assetId;
+      } else if (matches.length === 0 && INFRASTRUCTURE_CODES.has(row.categoryCode)) {
+        // Falls through to creation below, deliberately (FR-019a).
+        //
+        // FR-019 holds an unmatched upgrade back because the two returns are known
+        // to disagree on naming, so a non-match is a judgement call for a person.
+        // That reasoning is about applications, which both returns list. LKPTI is
+        // Daftar Aplikasi: it never contains infrastructure at all, so an
+        // infrastructure upgrade finding no match is not a naming disagreement —
+        // it is a certainty, and there is no judgement to defer.
+        //
+        // Leaving it unresolved created a dead end: a data-health error the user
+        // could never clear by importing, because no LKPTI could ever supply the
+        // target. The bank does run this infrastructure; the plan says so. Creating
+        // it records that, and the prior-live segment below keeps it classified as
+        // an upgrade on regeneration.
+        //
+        // Still only when nothing matched. A later import that does find the entry
+        // this one created attaches to it rather than making a second copy.
       } else {
-        // Zero or several. Create nothing, and leave the report row pointing at
+        // An application that matched nothing, or several matches of either kind —
+        // genuine ambiguity. Create nothing, and leave the report row pointing at
         // an id that will not resolve — computeDataHealth's existing rpti-target
         // check reports it, so no new rule and no import-results store is needed.
         unresolved.push({ rowNumber: row.rowNumber, name: row.name, categoryCode: row.categoryCode });

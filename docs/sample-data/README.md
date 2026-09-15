@@ -6,7 +6,7 @@ filing from a real bank.
 | File | Format | Rows |
 |---|---|---|
 | `sample-lkpti-2026.xlsx` | LKPTI Format 3.2.6 (*Daftar Aplikasi*) | 13 applications |
-| `sample-rpti-2027.xlsx` | RPTI Format 3.1 (*Rencana*) | 12 planned items |
+| `sample-rpti-2027.xlsx` | RPTI Format 3.1 (*Rencana*) | 13 planned items |
 
 **Bank Nusantara Sejahtera is fictional**, as is every application name, vendor,
 owner and rupiah figure in these files. They are not derived from any real bank's
@@ -27,10 +27,10 @@ asks for each one rather than guessing.
 
 ## What you should see
 
-> **Import complete** — LKPTI 2026: 13 row(s) · RPTI 2027: 12 row(s). No rows were
+> **Import complete** — LKPTI 2026: 13 row(s) · RPTI 2027: 13 row(s). No rows were
 > skipped. 1 planned upgrade(s) reference an application not in your inventory.
 
-Then the data-health review, with **1 error and 21 warnings**.
+Then the data-health review, with **1 error and 22 warnings**.
 
 ## Why these rows
 
@@ -43,12 +43,18 @@ something different:
   creating a second copy of it.
 - **3 wholly new applications** — Open API Banking Platform, Digital Onboarding
   (eKYC), Syariah Financing Module. No 2026 counterpart, so they are created fresh.
-- **4 infrastructure items** — DRC relocation, server refresh, SD-WAN, firewall/SIEM.
-  These carry RPTI codes `51`–`54`, which LKPTI does not have at all. An
-  LKPTI-only workspace structurally cannot reach them, and that is the reason the
+- **4 new infrastructure items** — DRC relocation, server refresh, SD-WAN,
+  firewall/SIEM. These carry RPTI codes `51`–`54`, which LKPTI does not have at all.
+  An LKPTI-only workspace structurally cannot reach them, and that is the reason the
   RPTI import exists.
-- **1 upgrade that matches nothing** — *Legacy Teller Application*. It is imported
-  and flagged, not dropped and not guessed at. This is the single error in the
+- **1 infrastructure *upgrade*** — *Primary Data Center Jakarta*. Filed as an
+  upgrade, but no LKPTI can contain it, because LKPTI is applications only. It is
+  **created** rather than flagged: unlike a mismatched application name, this is not
+  a disagreement between the two returns for someone to resolve — it is a certainty.
+  It keeps its `upgrade` classification when the return is regenerated.
+- **1 *application* upgrade that matches nothing** — *Legacy Teller Application*. It
+  is imported and flagged, not dropped and not guessed at. Both returns list
+  applications, so a non-match here really is a naming disagreement to resolve. This is the single error in the
   review: *"An RPTI row for 'Legacy Teller Application' points at a deliverable that
   no longer exists."* Give it a target in the RPTI tab of Data Manager to clear it.
 

@@ -25,7 +25,7 @@ describe('the published sample returns', () => {
   it('RPTI parses with nothing skipped', () => {
     const { rows, skipped } = parseRptiImportWorkbook(load('sample-rpti-2027.xlsx'));
     expect(skipped).toEqual([]);
-    expect(rows).toHaveLength(12);
+    expect(rows).toHaveLength(13);
   });
 
   it('RPTI carries both applications and infrastructure', () => {
@@ -35,7 +35,7 @@ describe('the published sample returns', () => {
       deliverables: inv.deliverables, assets: inv.assets, assetCategories: inv.assetCategories,
     });
     const types = out.deliverables.map(d => d.type);
-    expect(types.filter(t => t === 'infrastructure').length).toBe(4);
+    expect(types.filter(t => t === 'infrastructure').length).toBe(5);
     expect(types.filter(t => t === 'application').length).toBeGreaterThan(0);
   });
 
@@ -156,5 +156,31 @@ describe('an imported workspace has one vocabulary, not two', () => {
     const ids = new Set(merged.map(s => s.id));
     expect(segments.length).toBeGreaterThan(0);
     for (const seg of segments) expect(ids.has(seg.status), `${seg.id} → ${seg.status}`).toBe(true);
+  });
+});
+
+describe('the sample plan upgrades infrastructure the LKPTI cannot hold', () => {
+  // Primary Data Center Jakarta is filed as an upgrade but appears in no LKPTI,
+  // because LKPTI is applications only. It must be created rather than stranded.
+  it('creates it, and leaves only the application mismatch unresolved', () => {
+    const inv = deriveWorkspaceFromLkptiImport(parseLkptiImportWorkbook(load('sample-lkpti-2026.xlsx')).rows);
+    const out = deriveWorkspaceFromRptiImport(parseRptiImportWorkbook(load('sample-rpti-2027.xlsx')).rows, 2027, {
+      deliverables: inv.deliverables, assets: inv.assets, assetCategories: inv.assetCategories,
+    });
+
+    expect(out.unresolved.map(u => u.name)).toEqual(['Legacy Teller Application']);
+
+    const dc = out.deliverables.find(d => d.name === 'Primary Data Center Jakarta');
+    expect(dc?.type).toBe('infrastructure');
+
+    const regen = generateRptiDetails({
+      deliverableSegments: [...inv.deliverableSegments, ...out.deliverableSegments],
+      deliverableStatuses: mergeDeliverableStatuses(inv.deliverableStatuses, out.deliverableStatuses),
+      initiatives: out.initiatives,
+      deliverables: [...inv.deliverables, ...out.deliverables],
+      assets: [...inv.assets, ...out.assets],
+      assetCategories: [...inv.assetCategories, ...out.assetCategories],
+    }, 2027);
+    expect(regen.find(r => r.targetId === dc!.id)?.developmentType).toBe('upgrade');
   });
 });

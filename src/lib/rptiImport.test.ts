@@ -6,7 +6,7 @@ import {
   parseRptiImportWorkbook,
   deriveWorkspaceFromRptiImport,
 } from './rptiImport';
-import { RPTI_CATEGORY_LABELS } from './rpti';
+import { RPTI_CATEGORY_LABELS, generateRptiDetails } from './rpti';
 import type { Asset, AssetCategory, Deliverable } from '../types';
 
 const HEADERS = [
@@ -284,5 +284,77 @@ describe('colours are Tailwind classes, not hex', () => {
     const out = deriveWorkspaceFromRptiImport(parseRptiImportWorkbook(wb([row()])).rows, 2027, EMPTY);
     expect(out.deliverableStatuses.length).toBeGreaterThan(0);
     for (const s of out.deliverableStatuses) expect(s.color).toMatch(TAILWIND_BG);
+  });
+});
+
+describe('an upgrade to infrastructure the LKPTI cannot contain', () => {
+  /**
+   * LKPTI is Daftar Aplikasi — applications only. So an RPTI row upgrading
+   * infrastructure the bank already runs (expand a data centre, refresh a network)
+   * can never match anything in the inventory, no matter how well named.
+   *
+   * Holding it back as "unresolved" made that a dead end: a data-health error no
+   * import could ever clear, with the row's initiative parked on an unrelated
+   * application. FR-019's reasoning — that a non-match is a naming disagreement for
+   * a person to judge — is about applications, which both returns list. For
+   * infrastructure there is nothing to judge, so the entry is created (FR-019a).
+   */
+  const infraUpgrade = (over = {}) => parseRptiImportWorkbook(wb([row({
+    name: 'Primary Data Center Jakarta',
+    kategori: RPTI_CATEGORY_LABELS['51'],
+    jenis: 'upgrade',
+    ...over,
+  })])).rows;
+
+  it('creates the entry instead of stranding the row', () => {
+    const out = deriveWorkspaceFromRptiImport(infraUpgrade(), 2027, EMPTY);
+    expect(out.unresolved).toEqual([]);
+    expect(out.deliverables).toHaveLength(1);
+    expect(out.deliverables[0].type).toBe('infrastructure');
+    expect(out.assets).toHaveLength(1);
+    expect(out.rptiDetails[0].targetId).toBe(out.deliverables[0].id);
+  });
+
+  it('gives it the prior-live segment, so it stays an upgrade when regenerated', () => {
+    const out = deriveWorkspaceFromRptiImport(infraUpgrade(), 2027, EMPTY);
+    const regen = generateRptiDetails({
+      deliverableSegments: out.deliverableSegments, deliverableStatuses: out.deliverableStatuses,
+      initiatives: out.initiatives, deliverables: out.deliverables,
+      assets: out.assets, assetCategories: out.assetCategories,
+    }, 2027);
+    expect(regen).toHaveLength(1);
+    expect(regen[0].developmentType).toBe('upgrade');
+  });
+
+  it('attaches to the entry a previous import created rather than making a second', () => {
+    const first = deriveWorkspaceFromRptiImport(infraUpgrade(), 2027, EMPTY);
+    const second = deriveWorkspaceFromRptiImport(infraUpgrade(), 2028, {
+      deliverables: first.deliverables, assets: first.assets, assetCategories: first.assetCategories,
+    });
+    expect(second.assets).toEqual([]);
+    expect(second.deliverables).toEqual([]);
+    expect(second.rptiDetails[0].targetId).toBe(first.deliverables[0].id);
+  });
+
+  it('leaves an unmatched application upgrade unresolved, as before', () => {
+    const rows = parseRptiImportWorkbook(wb([row({ name: 'Nothing Like This', jenis: 'upgrade' })])).rows;
+    const out = deriveWorkspaceFromRptiImport(rows, 2027, EMPTY);
+    expect(out.unresolved).toHaveLength(1);
+    expect(out.deliverables).toEqual([]);
+    expect(out.assets).toEqual([]);
+  });
+
+  it('still defers to a person when several infrastructure entries share the name', () => {
+    const twins = ['d-1', 'd-2'].map(id => ({
+      id, assetId: `a-${id}`, name: 'Primary Data Center Jakarta',
+      type: 'infrastructure', categoryCode: '51',
+    } as Deliverable));
+    const out = deriveWorkspaceFromRptiImport(infraUpgrade(), 2027, {
+      deliverables: twins,
+      assets: twins.map(d => ({ id: d.assetId, name: d.name, categoryId: 'c-1' } as Asset)),
+      assetCategories: [{ id: 'c-1', name: 'DC/DRC', categoryCode: '51' } as AssetCategory],
+    });
+    expect(out.unresolved).toHaveLength(1);
+    expect(out.deliverables).toEqual([]);
   });
 });

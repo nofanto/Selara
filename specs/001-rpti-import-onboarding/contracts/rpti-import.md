@@ -68,8 +68,13 @@ These are the assertions the unit tests exist to hold:
 6. **`upgrade` rows produce a preceding live segment; `new` rows do not.**
 7. **An `upgrade` row matching an existing Deliverable on name *and* category attaches to it** and
    adds no new Deliverable.
-8. **An `upgrade` row matching zero or more than one existing Deliverable creates nothing** and
-   yields an `UnresolvedRptiReference`. It is never guessed at and never silently created as new.
+8. **An `upgrade` *application* row matching zero or more than one existing Deliverable creates
+   nothing** and yields an `UnresolvedRptiReference`. It is never guessed at and never silently
+   created as new.
+8a. **An `upgrade` *infrastructure* row (`51`-`54`, `99`) matching nothing is created**, with its
+   prior-live segment, and yields no `UnresolvedRptiReference`. LKPTI carries no infrastructure, so
+   such a row can never match and holding it back stranded it permanently. More than one match is
+   still ambiguous and still unresolved.
 9. **Derivation is pure**: same inputs, same outputs; no clock, no randomness, no IndexedDB. Ids are
    derived from row position, not `Date.now()`, so results are reproducible and testable.
 10. **Nothing is written on rejection.** Persistence happens only after derivation returns.
