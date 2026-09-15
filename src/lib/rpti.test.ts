@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { generateRptiDetails, GenerateRptiDetailsInput } from './rpti';
+import { generateRptiDetails, GenerateRptiDetailsInput, periodForQuarter, deriveQuarterFromDate } from './rpti';
 import type { AssetCategory, Asset, Deliverable, DeliverableSegment, DeliverableStatus, Initiative } from '../types';
 
 const statuses: DeliverableStatus[] = [
@@ -345,5 +345,36 @@ describe('generateRptiDetails — DC/DR location auto-fill', () => {
     expect(rows[0].dcCountry).toBeUndefined();
     expect(rows[0].drCity).toBeUndefined();
     expect(rows[0].drCountry).toBeUndefined();
+  });
+});
+
+describe('periodForQuarter', () => {
+  // The inverse of deriveQuarterFromDate. Needed because a filed RPTI return
+  // states a planned implementation quarter with no year and no dates, so
+  // imported work has to be given a period (spec FR-016).
+  it('maps each quarter to its calendar span within the given year', () => {
+    expect(periodForQuarter('Q1', 2027)).toEqual({ startDate: '2027-01-01', endDate: '2027-03-31' });
+    expect(periodForQuarter('Q2', 2027)).toEqual({ startDate: '2027-04-01', endDate: '2027-06-30' });
+    expect(periodForQuarter('Q3', 2027)).toEqual({ startDate: '2027-07-01', endDate: '2027-09-30' });
+    expect(periodForQuarter('Q4', 2027)).toEqual({ startDate: '2027-10-01', endDate: '2027-12-31' });
+  });
+
+  it('round-trips through deriveQuarterFromDate for both boundaries', () => {
+    // If this ever fails, an imported row would regenerate into a different
+    // quarter than the one the bank filed.
+    for (const q of ['Q1', 'Q2', 'Q3', 'Q4'] as const) {
+      const { startDate, endDate } = periodForQuarter(q, 2027);
+      expect(deriveQuarterFromDate(startDate)).toBe(q);
+      expect(deriveQuarterFromDate(endDate)).toBe(q);
+    }
+  });
+
+  it('handles a leap year without shifting Q1', () => {
+    expect(periodForQuarter('Q1', 2028)).toEqual({ startDate: '2028-01-01', endDate: '2028-03-31' });
+  });
+
+  it('is year-agnostic in shape', () => {
+    expect(periodForQuarter('Q3', 2026).startDate).toBe('2026-07-01');
+    expect(periodForQuarter('Q3', 2030).endDate).toBe('2030-09-30');
   });
 });

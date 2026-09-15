@@ -1,33 +1,46 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, Page } from '@playwright/test';
 
 /**
- * User Story 20: Import an Existing LKPTI Report as a Workspace Template
+ * User Story 20: Import an Existing LKPTI Report as a Workspace Template.
  * See requirement-specs/lkpti-import-onboarding.md.
  *
- * AC1: 4th template card with its own upload control
- * AC5: imported rows survive a subsequent "Generate LKPTI Rows" click
- * AC6: an unrecognized file shows an error and leaves the picker open
+ * Most of this story's acceptance criteria moved to rpti-import-onboarding.spec.ts
+ * when #38 replaced the four-card picker with the two-path onboarding: the card and
+ * its upload button (AC1), building a workspace from a valid file (AC2-AC4), and
+ * rejecting an unusable one while leaving the picker open (AC6) are all covered
+ * there against the new LKPTI slot.
+ *
+ * AC5 is not, and it is the one that guards a silent data loss, so it stays here
+ * re-pointed at the new flow: the importer writes manual-only fields that no
+ * cascade can reconstruct, and "Generate LKPTI Rows" must not overwrite them.
  */
-
 const LKPTI_HEADERS = [
-  'No.',
-  'Kategori Aplikasi',
-  'Nama Aplikasi',
-  'Deskripsi Fungsi Aplikasi',
-  'Platform',
-  'Pangkalan Data',
-  'Lokasi DC',
-  'Penyelenggara DC',
-  'Lokasi DRC',
-  'Penyelenggara DRC',
-  'Strategi Backup',
-  'System Owner',
-  'Pengembang Aplikasi',
-  'Tanggal Implementasi (Go Live)',
-  'Kepemilikan',
+  'No.', 'Kategori Aplikasi', 'Nama Aplikasi', 'Deskripsi Fungsi Aplikasi', 'Platform',
+  'Pangkalan Data', 'Lokasi DC', 'Penyelenggara DC', 'Lokasi DRC', 'Penyelenggara DRC',
+  'Strategi Backup', 'System Owner', 'Pengembang Aplikasi',
+  'Tanggal Implementasi (Go Live)', 'Kepemilikan',
 ];
 
-async function simulateFirstRun(page: import('@playwright/test').Page) {
+/**
+ * Built here rather than read from e2e/fixtures: that fixture is a real Selara
+ * export, and Platform is a manual-only field the demo workspace never sets, so
+ * every one of its rows carries a blank platform. This test needs a value that
+ * a regenerate could destroy.
+ */
+async function lkptiWorkbookWithPlatform() {
+  const { utils, write } = await import('xlsx');
+  const wb = utils.book_new();
+  const row = [
+    1, '01 — Customer management', 'Core Banking App', 'Handles customer onboarding.',
+    'Java/Spring', 'PostgreSQL', 'Jakarta, Indonesia', 'Self', 'Surabaya, Indonesia', 'Self',
+    'High Availability Active - Active', 'Jane Doe', 'inhouse', '15-03-2021', 'Beli Putus',
+  ];
+  utils.book_append_sheet(wb, utils.aoa_to_sheet([LKPTI_HEADERS, row]), 'LKPTI Format 3.2.6');
+  return write(wb, { type: 'buffer', bookType: 'xlsx' }) as Buffer;
+}
+
+async function freshWorkspace(page: Page) {
+  await page.goto('/');
   await page.evaluate(async () => {
     await new Promise<void>((resolve) => {
       const req = indexedDB.deleteDatabase('it-initiative-visualiser');
@@ -39,115 +52,35 @@ async function simulateFirstRun(page: import('@playwright/test').Page) {
     localStorage.setItem('scenia_has_seen_landing', 'true');
   });
   await page.reload();
-}
-
-async function buildValidLkptiWorkbook(): Promise<Buffer> {
-  const { utils, write } = await import('xlsx');
-  const wb = utils.book_new();
-  const row = [
-    1,
-    '01 — Customer management',
-    'Core Banking App',
-    'Handles customer onboarding.',
-    'Java/Spring',
-    'PostgreSQL',
-    'Jakarta, Indonesia',
-    'Self',
-    'Surabaya, Indonesia',
-    'Self',
-    'High Availability Active - Active',
-    'Jane Doe',
-    'inhouse',
-    '15-03-2021',
-    'Beli Putus',
-  ];
-  utils.book_append_sheet(wb, utils.aoa_to_sheet([LKPTI_HEADERS, row]), 'LKPTI Format 3.2.6');
-  return write(wb, { type: 'buffer', bookType: 'xlsx' });
+  await expect(page.getByTestId('template-picker-modal')).toBeVisible({ timeout: 20000 });
 }
 
 test.describe('LKPTI Import Onboarding', () => {
-  test('AC1: template picker shows a 4th "Import LKPTI Report" card with its own upload button', async ({ page }) => {
-    await page.goto('/');
-    await simulateFirstRun(page);
-    await page.waitForSelector('[data-testid="template-picker-modal"]', { timeout: 20000 });
-
-    const card = page.getByTestId('template-card-lkpti-import');
-    await expect(card).toBeVisible();
-    await expect(card.getByTestId('template-lkpti-import-upload-btn')).toBeVisible();
-  });
-
-  test('AC1/AC2/AC3/AC4: uploading a valid LKPTI file builds a workspace and closes the picker', async ({ page }) => {
-    const buf = await buildValidLkptiWorkbook();
-
-    await page.goto('/');
-    await simulateFirstRun(page);
-    await page.waitForSelector('[data-testid="template-picker-modal"]', { timeout: 20000 });
-
-    const [fileChooser] = await Promise.all([
-      page.waitForEvent('filechooser'),
-      page.getByTestId('template-lkpti-import-upload-btn').click(),
-    ]);
-    await fileChooser.setFiles({
+  test('AC5: regenerating LKPTI rows preserves the manual-only fields the import wrote', async ({ page }) => {
+    const buffer = await lkptiWorkbookWithPlatform();
+    await freshWorkspace(page);
+    await page.getByTestId('onboarding-lkpti-file-input').setInputFiles({
       name: 'lkpti-report.xlsx',
       mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      buffer: buf,
+      buffer,
     });
-
-    await expect(page.getByTestId('template-picker-modal')).not.toBeVisible({ timeout: 10000 });
-    await expect(page.getByTestId('nav-visualiser')).toBeVisible();
-    await expect(page.getByText('Core Banking App').first()).toBeVisible({ timeout: 10000 });
-  });
-
-  test('AC5: a subsequent "Generate LKPTI Rows" click preserves the manual-only fields the import wrote', async ({ page }) => {
-    const buf = await buildValidLkptiWorkbook();
-
-    await page.goto('/');
-    await simulateFirstRun(page);
-    await page.waitForSelector('[data-testid="template-picker-modal"]', { timeout: 20000 });
-
-    const [fileChooser] = await Promise.all([
-      page.waitForEvent('filechooser'),
-      page.getByTestId('template-lkpti-import-upload-btn').click(),
-    ]);
-    await fileChooser.setFiles({
-      name: 'lkpti-report.xlsx',
-      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      buffer: buf,
-    });
-    await expect(page.getByTestId('template-picker-modal')).not.toBeVisible({ timeout: 10000 });
+    await page.getByTestId('onboarding-lkpti-year').fill('2026');
+    await page.getByTestId('onboarding-import-btn').click();
+    await expect(page.getByTestId('data-health-report-view')).toBeVisible({ timeout: 30000 });
 
     await page.getByTestId('nav-data-manager').click();
     await page.getByTestId('data-manager-tab-lkpti').click();
-    const platformInput = page.locator('[data-testid="data-manager"] tbody tr[data-real="true"] td[data-key="platform"] input').first();
+
+    // platform has no cascade source — generateLkptiDetails cannot reconstruct it,
+    // so if a regenerate clobbers it the value is gone for good.
+    const platformInput = page
+      .locator('[data-testid="data-manager"] tbody tr[data-real="true"] td[data-key="platform"] input')
+      .first();
     await expect(platformInput).toHaveValue('Java/Spring', { timeout: 10000 });
 
     await page.getByTestId('lkpti-generate-btn').click();
     await page.getByTestId('confirm-modal-confirm').click();
 
-    // platform ("Java/Spring") has no cascade source — it must survive a regenerate
     await expect(platformInput).toHaveValue('Java/Spring', { timeout: 10000 });
-  });
-
-  test('AC6: an unrecognized file shows an error and leaves the picker open', async ({ page }) => {
-    const { utils, write } = await import('xlsx');
-    const wb = utils.book_new();
-    utils.book_append_sheet(wb, utils.aoa_to_sheet([['Not', 'An', 'LKPTI', 'File']]), 'Sheet1');
-    const buf: Buffer = write(wb, { type: 'buffer', bookType: 'xlsx' });
-
-    await page.goto('/');
-    await simulateFirstRun(page);
-    await page.waitForSelector('[data-testid="template-picker-modal"]', { timeout: 20000 });
-
-    const [fileChooser] = await Promise.all([
-      page.waitForEvent('filechooser'),
-      page.getByTestId('template-lkpti-import-upload-btn').click(),
-    ]);
-    await fileChooser.setFiles({
-      name: 'not-lkpti.xlsx',
-      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      buffer: buf,
-    });
-
-    await expect(page.getByTestId('template-picker-modal')).toBeVisible({ timeout: 10000 });
   });
 });

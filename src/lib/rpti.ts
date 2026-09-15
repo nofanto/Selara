@@ -33,6 +33,30 @@ export function deriveQuarterFromDate(iso: string): RptiQuarter {
   return 'Q4';
 }
 
+/**
+ * The calendar span of a quarter within a given year — the inverse of
+ * `deriveQuarterFromDate`.
+ *
+ * A filed RPTI return states `Waktu Rencana Implementasi` as a quarter with no
+ * year and no dates (see `exportRptiReportToExcel`'s columns), so importing one
+ * has to turn that back into a period before the planned work can be placed on
+ * a timeline. Kept as a named function rather than inline arithmetic so the
+ * boundary dates are testable, and so the round trip
+ * `deriveQuarterFromDate(periodForQuarter(q, y).startDate) === q` can be
+ * asserted — if that ever broke, an imported row would regenerate into a
+ * different quarter than the bank filed.
+ */
+export function periodForQuarter(quarter: RptiQuarter, year: number): { startDate: string; endDate: string } {
+  const spans: Record<RptiQuarter, [string, string]> = {
+    Q1: ['01-01', '03-31'],
+    Q2: ['04-01', '06-30'],
+    Q3: ['07-01', '09-30'],
+    Q4: ['10-01', '12-31'],
+  };
+  const [start, end] = spans[quarter];
+  return { startDate: `${year}-${start}`, endDate: `${year}-${end}` };
+}
+
 export function isLiveStatusId(statusId: string, deliverableStatuses: DeliverableStatus[]): boolean {
   const status = deliverableStatuses.find(s => s.id === statusId);
   if (status) return !!status.isLiveStatus || (!deliverableStatuses.some(s => s.isLiveStatus) && (statusId === LIVE_STATUS_FALLBACK_ID || LIVE_STATUS_FALLBACK_PATTERN.test(status.name)));

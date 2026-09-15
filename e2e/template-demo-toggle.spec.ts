@@ -59,15 +59,18 @@ test.describe('US-18: Template Demo Data Toggle', () => {
   });
 
   // ── AC3 ──────────────────────────────────────────────────────────────────
-  test('AC3: non-blank template cards show "With demo data" and "Without demo data" buttons', async ({ page }) => {
+  // AC3 (revised for #38): the per-card with/without pair is gone. Demo data now
+  // lives on the start-empty path — it was previously reachable only through the
+  // catalogue card, which this feature removed.
+  test('AC3: the start-empty path offers both a blank workspace and demo data', async ({ page }) => {
     await page.goto('/');
     await simulateFirstRun(page);
     await page.waitForSelector('[data-testid="template-picker-modal"]', { timeout: 20000 });
-
-    for (const templateId of ['rpti']) {
-      await expect(page.getByTestId(`template-select-with-demo-btn-${templateId}`)).toBeVisible();
-      await expect(page.getByTestId(`template-select-no-demo-btn-${templateId}`)).toBeVisible();
-    }
+    const empty = page.getByTestId('onboarding-path-empty');
+    await expect(empty.getByTestId('template-start-blank-btn')).toBeVisible();
+    await expect(empty.getByTestId('template-start-demo-btn')).toBeVisible();
+    // The per-template pair no longer exists.
+    await expect(page.getByTestId('template-select-with-demo-btn-rpti')).toHaveCount(0);
   });
 
   // ── AC4 ──────────────────────────────────────────────────────────────────
@@ -86,7 +89,7 @@ test.describe('US-18: Template Demo Data Toggle', () => {
     await page.goto('/');
     await simulateFirstRun(page);
     await page.waitForSelector('[data-testid="template-picker-modal"]', { timeout: 20000 });
-    await page.getByTestId('template-select-with-demo-btn-rpti').click();
+    await page.getByTestId('template-start-demo-btn').click();
 
     await page.waitForSelector('[data-testid="asset-row-content"]', { timeout: 20000 });
 
@@ -100,33 +103,45 @@ test.describe('US-18: Template Demo Data Toggle', () => {
   });
 
   // ── AC6 ──────────────────────────────────────────────────────────────────
-  test('AC6: RPTI catalogue "Without demo data" loads only categories and assets — no initiatives or segments', async ({ page }) => {
+  // AC6 (revised for #38): "catalogue structure without demo data" was one click
+  // on the removed card. The capability survives but costs more: start blank —
+  // which now surfaces the catalogue, since nothing else does — then prepopulate
+  // an area. Asserted end to end rather than assumed.
+  test('AC6: the OJK catalogue is reachable from a blank workspace without demo data', async ({ page }) => {
     await page.goto('/');
     await simulateFirstRun(page);
     await page.waitForSelector('[data-testid="template-picker-modal"]', { timeout: 20000 });
-    await page.getByTestId('template-select-no-demo-btn-rpti').click();
+    await page.getByTestId('template-start-blank-btn').click();
 
-    await page.waitForSelector('[data-testid="asset-row-content"]', { timeout: 20000 });
+    // First run shows the tutorial over everything (AC8). It must be dismissed,
+    // or it covers the catalogue — a forced click would silently land on the
+    // overlay instead of the button, and add nothing.
+    await page.getByRole('button', { name: 'Skip' }).click();
+    await expect(page.getByTestId('tutorial-modal')).toHaveCount(0);
 
-    await expect(page.locator('[data-testid="asset-row-content"]').first()).toBeVisible();
+    await expect(page.getByTestId('rpti-catalogue-section')).toBeVisible({ timeout: 20000 });
+    // Any area will do — pinning a code would couple this to catalogue ordering.
+    const prepopulate = page.locator('[data-testid^="rpti-catalogue-prepopulate-btn-"]').first();
+    await expect(prepopulate).toBeVisible({ timeout: 10000 });
+    await prepopulate.click();
 
-    // No initiative bars
+    await expect(page.locator('[data-testid="asset-row-content"]').first()).toBeVisible({ timeout: 10000 });
+    // Structure only — no fabricated work.
     await expect(page.locator('[data-testid^="initiative-bar"]')).toHaveCount(0);
-
-    // No deliverable segments
     await expect(page.locator('[data-testid^="segment-"]')).toHaveCount(0);
   });
 
   // ── AC7 ──────────────────────────────────────────────────────────────────
-  test('AC7: first-time onboarding flow shows updated template picker with demo data buttons', async ({ page }) => {
+  test('AC7: first-time onboarding shows the two paths', async ({ page }) => {
     await page.goto('/');
     await simulateFirstRun(page);
     await page.waitForSelector('[data-testid="template-picker-modal"]', { timeout: 20000 });
 
     // The updated dual-button structure must appear in the first-run context too
-    await expect(page.getByTestId('template-select-with-demo-btn-rpti')).toBeVisible();
-    await expect(page.getByTestId('template-select-no-demo-btn-rpti')).toBeVisible();
+    await expect(page.getByTestId('onboarding-path-returns')).toBeVisible();
+    await expect(page.getByTestId('onboarding-path-empty')).toBeVisible();
     await expect(page.getByTestId('template-start-blank-btn')).toBeVisible();
+    await expect(page.getByTestId('template-start-demo-btn')).toBeVisible();
   });
 
   // ── AC8 ──────────────────────────────────────────────────────────────────
@@ -135,7 +150,7 @@ test.describe('US-18: Template Demo Data Toggle', () => {
     // Fresh DB means hasSeenTutorial = false, so tutorial auto-opens after template selection
     await simulateFirstRun(page);
     await page.waitForSelector('[data-testid="template-picker-modal"]', { timeout: 20000 });
-    await page.getByTestId('template-select-with-demo-btn-rpti').click();
+    await page.getByTestId('template-start-demo-btn').click();
 
     // Tutorial modal must appear (identified by its data-testid added in implementation)
     await expect(page.getByTestId('tutorial-modal')).toBeVisible({ timeout: 10000 });

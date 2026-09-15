@@ -1,0 +1,92 @@
+# Sample OJK returns
+
+Two spreadsheets for trying the onboarding importer by hand, without needing a real
+filing from a real bank.
+
+| File | Format | Rows |
+|---|---|---|
+| `sample-lkpti-2026.xlsx` | LKPTI Format 3.2.6 (*Daftar Aplikasi*) | 13 applications |
+| `sample-rpti-2027.xlsx` | RPTI Format 3.1 (*Rencana*) | 12 planned items |
+
+**Bank Nusantara Sejahtera is fictional**, as is every application name, vendor,
+owner and rupiah figure in these files. They are not derived from any real bank's
+return.
+
+## How to use them
+
+1. Open Selara with an empty workspace (first run, or **Data Manager → Clear data and
+   start again**).
+2. On the onboarding screen, choose **Start from your filed returns**.
+3. LKPTI slot → `sample-lkpti-2026.xlsx`, reporting year **2026**.
+4. RPTI slot → `sample-rpti-2027.xlsx`, reporting year **2027**.
+5. **Import**.
+
+The years differ on purpose. A bank filing in late 2026 files an inventory *as at*
+2026 beside a plan *for* 2027; neither spreadsheet layout carries a year, so Selara
+asks for each one rather than guessing.
+
+## What you should see
+
+> **Import complete** — LKPTI 2026: 13 row(s) · RPTI 2027: 12 row(s). No rows were
+> skipped. 1 planned upgrade(s) reference an application not in your inventory.
+
+Then the data-health review, with **1 error and 21 warnings**.
+
+## Why these rows
+
+The plan is shaped to exercise every branch of the importer, so each group shows you
+something different:
+
+- **4 upgrades that match the inventory exactly** — Mobile Banking Nusantara, Payment
+  Gateway, Core Banking General Ledger, AML Transaction Monitoring. Matching is exact
+  on name *and* category code, so these attach to the 2026 application rather than
+  creating a second copy of it.
+- **3 wholly new applications** — Open API Banking Platform, Digital Onboarding
+  (eKYC), Syariah Financing Module. No 2026 counterpart, so they are created fresh.
+- **4 infrastructure items** — DRC relocation, server refresh, SD-WAN, firewall/SIEM.
+  These carry RPTI codes `51`–`54`, which LKPTI does not have at all. An
+  LKPTI-only workspace structurally cannot reach them, and that is the reason the
+  RPTI import exists.
+- **1 upgrade that matches nothing** — *Legacy Teller Application*. It is imported
+  and flagged, not dropped and not guessed at. This is the single error in the
+  review: *"An RPTI row for 'Legacy Teller Application' points at a deliverable that
+  no longer exists."* Give it a target in the RPTI tab of Data Manager to clear it.
+
+Two things that look odd but are intended:
+
+- Most of the 21 warnings read *"has lifecycle segments, but none linked to an
+  Initiative — it can never generate an RPTI row."* That is correct: 9 of the 13
+  applications have no planned work in 2027, so they belong in the LKPTI and not in
+  the RPTI.
+- The unmatched *Legacy Teller Application* initiative is parked on an arbitrary
+  existing asset. Its report row is deliberately left unresolvable — that is the
+  finding — but the initiative itself is given a real asset so it does not dangle
+  as a second, duplicate error for the same problem.
+
+## Trying the failure paths
+
+- Put the RPTI file in the LKPTI slot: the import is refused and the workspace is
+  left untouched.
+- In the **LKPTI** file, clear a row's **Kategori Aplikasi** cell, or its **Pengembang
+  Aplikasi** cell: the row is still imported and the missing value shows up in the
+  review as a completeness gap. A blank cell states nothing, and dropping the row
+  would lose the whole application while saying nothing about why.
+- In the **LKPTI** file, change a **Kategori Aplikasi** cell to something invalid like
+  `77 — Nonsense`: *that* row is rejected and reported by its position, because a
+  wrong code cannot be guessed at.
+- In the **RPTI** file, clear a **Kategori** cell and the row *is* rejected — unlike
+  LKPTI. The two differ on purpose: LKPTI is applications only, so a blank category
+  costs just the regulatory code, whereas in RPTI the category is what decides whether
+  a row becomes an application or infrastructure (codes `51`–`54`, `99`). With it
+  blank there is no way to know which kind of thing to create.
+
+## Regenerating
+
+```sh
+node scripts/generate-sample-returns.mjs
+```
+
+The header rows must match the exporters byte-for-byte
+(`LKPTI_EXPORT_HEADERS` in `src/lib/lkpti.ts`, and the headers in
+`exportRptiReportToExcel` in `src/lib/rpti.ts`). `src/lib/sampleReturns.test.ts`
+fails if these files stop parsing, so drift is caught by the suite.

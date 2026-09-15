@@ -14,7 +14,7 @@ async function loadRptiTemplate(page: import('@playwright/test').Page) {
   });
   await page.reload();
   await page.waitForSelector('[data-testid="template-picker-modal"]', { timeout: 20000 });
-  await page.getByTestId('template-select-with-demo-btn-rpti').click();
+  await page.getByTestId('template-start-demo-btn').click();
   await page.waitForSelector('[data-testid="asset-row-content"]', { timeout: 20000 });
   const tutorialModal = page.getByTestId('tutorial-modal');
   if (await tutorialModal.isVisible()) {

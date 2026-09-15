@@ -451,3 +451,47 @@ describe('computeDataHealth — validity: RPTI workspace currency', () => {
     expect(findIssue(issues, 'workspace-currency-not-idr')).toBeUndefined();
   });
 });
+
+describe('computeDataHealth — unresolved RPTI import references (#38)', () => {
+  // An RPTI upgrade row that matched nothing in the inventory is imported with a
+  // target that does not resolve, on the basis that the existing rpti-target
+  // check reports it. That claim is only worth making if it is tested: without
+  // this, the import would rely on a rule nobody had exercised for this case.
+  const unresolvedRow = {
+    id: 'rpti-import-row-1',
+    initiativeId: 'rpti-import-init-1',
+    targetType: 'deliverable' as const,
+    targetId: 'rpti-import-unresolved-1',
+    developmentType: 'upgrade' as const,
+    categoryCode: '04' as const,
+  };
+  const initiative = {
+    id: 'rpti-import-init-1', name: 'Core Banking GL', programmeId: '', assetId: '',
+    startDate: '2027-01-01', endDate: '2027-09-30', capex: 0, opex: 0,
+  };
+
+  it('reports an imported row whose upgrade target was never resolved', () => {
+    const issues = computeDataHealth(baseInput({ initiatives: [initiative], rptiDetails: [unresolvedRow] }));
+    expect(findIssue(issues, `rpti-target:${unresolvedRow.id}`)).toMatchObject({
+      severity: 'error',
+      location: { view: 'data', tab: 'rpti' },
+    });
+  });
+
+  it('names the row so the user can find it, rather than reporting an opaque id', () => {
+    const issues = computeDataHealth(baseInput({ initiatives: [initiative], rptiDetails: [unresolvedRow] }));
+    expect(findIssue(issues, `rpti-target:${unresolvedRow.id}`)?.entityName).toBe('Core Banking GL');
+  });
+
+  it('does not report a row whose target resolves', () => {
+    const resolved = { ...unresolvedRow, targetId: 'deliv-1' };
+    const issues = computeDataHealth(baseInput({
+      initiatives: [initiative],
+      assetCategories: [{ id: 'c-1', name: 'Area', categoryCode: '04' }],
+      assets: [{ id: 'a-1', name: 'Core Banking GL', categoryId: 'c-1' }],
+      deliverables: [{ id: 'deliv-1', assetId: 'a-1', name: 'Core Banking GL', type: 'application' }],
+      rptiDetails: [resolved],
+    }));
+    expect(findIssue(issues, `rpti-target:${resolved.id}`)).toBeUndefined();
+  });
+});
