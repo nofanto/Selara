@@ -378,3 +378,45 @@ describe('periodForQuarter', () => {
     expect(periodForQuarter('Q3', 2030).endDate).toBe('2030-09-30');
   });
 });
+
+describe('an application that is continuously live counts as pre-existing', () => {
+  /**
+   * The case every earlier test missed. Each of them gave the deliverable a live
+   * segment that had already *ended* before the report year, so "ended before" and
+   * "started before" were indistinguishable. A real bank application is not like
+   * that: an LKPTI entry means "live as at 31 December", so its segment straddles
+   * the report year and never ends before it. Under the old rule, planning an
+   * enhancement to an application the bank actually runs filed it as a brand-new
+   * build.
+   */
+  const stillLive = () => makeSegment({
+    id: 'seg-live-since-2021', status: 'appstatus-in-production',
+    startDate: '2021-08-17', endDate: '2031-12-31', initiativeId: undefined,
+  });
+
+  it('classifies planned work on a continuously live application as "upgrade"', () => {
+    const rows = generateRptiDetails(makeContext({
+      deliverableSegments: [
+        stillLive(),
+        makeSegment({ id: 'seg-plan-2027', status: 'appstatus-planned', startDate: '2027-01-01', endDate: '2027-03-31' }),
+      ],
+      initiatives: [makeInitiative({ startDate: '2027-01-01', endDate: '2027-03-31' })],
+    }), 2027);
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].developmentType).toBe('upgrade');
+  });
+
+  it('still calls a first-ever build "new" — nothing of it was live before the year', () => {
+    const rows = generateRptiDetails(makeContext({
+      deliverableSegments: [
+        makeSegment({ id: 'seg-plan-2027', status: 'appstatus-planned', startDate: '2027-01-01', endDate: '2027-06-30' }),
+        makeSegment({ id: 'seg-live-2027', status: 'appstatus-in-production', startDate: '2027-06-30', endDate: '2030-12-31' }),
+      ],
+      initiatives: [makeInitiative({ startDate: '2027-01-01', endDate: '2027-06-30' })],
+    }), 2027);
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].developmentType).toBe('new');
+  });
+});

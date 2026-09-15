@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx';
 import { readFileSync } from 'node:fs';
 import { parseLkptiImportWorkbook, deriveWorkspaceFromLkptiImport } from './lkptiImport';
 import { parseRptiImportWorkbook, deriveWorkspaceFromRptiImport } from './rptiImport';
+import { generateRptiDetails } from './rpti';
 
 const load = (n: string) => XLSX.read(readFileSync(new URL(`../../docs/sample-data/${n}`, import.meta.url)), { type: 'buffer' });
 
@@ -51,5 +52,68 @@ describe('the published sample returns', () => {
     const attached = out.rptiDetails.filter(r => inventoryIds.has(r.targetId));
     expect(attached).toHaveLength(4);
     expect(out.rptiDetails.filter(r => r.targetId.startsWith('rpti-import-unresolved-'))).toHaveLength(1);
+  });
+});
+
+describe('a planned enhancement to an application the bank already runs', () => {
+  /**
+   * Payment Gateway is in the 2026 LKPTI as a live application and in the 2027
+   * RPTI as an upgrade. That pairing is the normal case, and it must survive the
+   * round trip: filed as `upgrade`, imported as `upgrade`, and — critically —
+   * still `upgrade` after the user clicks "Generate RPTI Rows", which is what
+   * actually produces the return. It regenerated as `new` before the prior-live
+   * rule was corrected: a brand-new payment gateway declared to OJK.
+   */
+  const merged = () => {
+    const inv = deriveWorkspaceFromLkptiImport(parseLkptiImportWorkbook(load('sample-lkpti-2026.xlsx')).rows);
+    const { rows } = parseRptiImportWorkbook(load('sample-rpti-2027.xlsx'));
+    const out = deriveWorkspaceFromRptiImport(rows, 2027, {
+      deliverables: inv.deliverables, assets: inv.assets, assetCategories: inv.assetCategories,
+    });
+    return {
+      out,
+      deliverables: [...inv.deliverables, ...out.deliverables],
+      assets: [...inv.assets, ...out.assets],
+      assetCategories: [...inv.assetCategories, ...out.assetCategories],
+      deliverableSegments: [...inv.deliverableSegments, ...out.deliverableSegments],
+      deliverableStatuses: [...inv.deliverableStatuses, ...out.deliverableStatuses],
+    };
+  };
+
+  it('does not duplicate the application it enhances', () => {
+    const w = merged();
+    expect(w.deliverables.filter(d => d.name === 'Payment Gateway')).toHaveLength(1);
+    expect(w.assets.filter(a => a.name === 'Payment Gateway')).toHaveLength(1);
+  });
+
+  it('stays an upgrade after regeneration, and yields exactly one row', () => {
+    const w = merged();
+    const pg = w.deliverables.find(d => d.name === 'Payment Gateway')!;
+
+    expect(w.out.rptiDetails.find(r => r.targetId === pg.id)?.developmentType).toBe('upgrade');
+
+    const regen = generateRptiDetails({
+      deliverableSegments: w.deliverableSegments, deliverableStatuses: w.deliverableStatuses,
+      initiatives: w.out.initiatives, deliverables: w.deliverables,
+      assets: w.assets, assetCategories: w.assetCategories,
+    }, 2027);
+
+    const forPg = regen.filter(r => r.targetId === pg.id);
+    expect(forPg).toHaveLength(1);
+    expect(forPg[0].developmentType).toBe('upgrade');
+    expect(forPg[0].plannedImplementationQuarter).toBe('Q1');
+  });
+
+  it('keeps the three new applications classified as new', () => {
+    const w = merged();
+    const regen = generateRptiDetails({
+      deliverableSegments: w.deliverableSegments, deliverableStatuses: w.deliverableStatuses,
+      initiatives: w.out.initiatives, deliverables: w.deliverables,
+      assets: w.assets, assetCategories: w.assetCategories,
+    }, 2027);
+    const byName = (n: string) => regen.find(r => w.deliverables.find(d => d.id === r.targetId)?.name === n);
+    for (const n of ['Open API Banking Platform', 'Digital Onboarding (eKYC)', 'Syariah Financing Module']) {
+      expect(byName(n)?.developmentType, n).toBe('new');
+    }
   });
 });

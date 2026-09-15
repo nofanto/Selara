@@ -26,7 +26,7 @@
 
 1. **Rows are never manually added or removed.** Existence is entirely derived from `DeliverableSegment` data — auto-generated and auto-filled, with fields remaining user-editable afterward.
 
-2. **RPTI rows are generated one report-year at a time — but `developmentType` also checks a deliverable's full history.** Generating the report for year Y produces rows only from `DeliverableSegment`s whose `[startDate, endDate]` range **overlaps** Y — i.e. `startDate <= Y-12-31 AND endDate >= Y-01-01` — regardless of which year they started or end in; a segment with no overlap into Y never generates a row of its own. The one exception is the new/upgrade signal itself (see step 4): before classifying a pair `'new'`, generation checks whether the deliverable has **any** live segment, in any year, that ended before Y started — if so, the deliverable already exists and this year's activity is an `'upgrade'`, not a first-ever build. This is a narrow, deliberate exception to "no lookback": it only ever answers "has this deliverable gone live before," never pulls in an extra row from another year.
+2. **RPTI rows are generated one report-year at a time — but `developmentType` also checks a deliverable's full history.** Generating the report for year Y produces rows only from `DeliverableSegment`s whose `[startDate, endDate]` range **overlaps** Y — i.e. `startDate <= Y-12-31 AND endDate >= Y-01-01` — regardless of which year they started or end in; a segment with no overlap into Y never generates a row of its own. The one exception is the new/upgrade signal itself (see step 4): before classifying a pair `'new'`, generation checks whether the deliverable has **any** live segment, in any year, that **started** before Y started — if so, the deliverable already exists and this year's activity is an `'upgrade'`, not a first-ever build. This is a narrow, deliberate exception to "no lookback": it only ever answers "has this deliverable gone live before," never pulls in an extra row from another year.
 
 3. **Within a report-year's window, a segment "qualifies" only if:**
    - its `status` is `planned`, `funded`, or `in-production`, **and**
@@ -35,7 +35,7 @@
    - `sunset` / `out-of-support` / `retired` are explicitly **out of scope for now** — no row.
 
 4. **Rows are grouped and collapsed by `(initiativeId, deliverableId)`, within the report-year's window:**
-   - If the pair has one or more qualifying `planned`/`funded` segments **and no qualifying `in-production` segment** in that window → **one row**, anchored on the **latest** of those segments (`funded` over `planned`) for `deliverableSegmentId` and quarter derivation. `developmentType` is `'new'` — **unless** the deliverable already has a live segment (anywhere, any initiative) that ended before this report year started, in which case it's `'upgrade'` instead (see rule 2's history check).
+   - If the pair has one or more qualifying `planned`/`funded` segments **and no qualifying `in-production` segment** in that window → **one row**, anchored on the **latest** of those segments (`funded` over `planned`) for `deliverableSegmentId` and quarter derivation. `developmentType` is `'new'` — **unless** the deliverable already has a live segment (anywhere, any initiative) that **started** before this report year started, in which case it's `'upgrade'` instead (see rule 2's history check).
    - If the pair has one or more qualifying `planned`/`funded` segments **and** a qualifying `in-production` segment, all in the same report-year → these **collapse into one row**, `developmentType: 'new'` (it's still the deliverable's first go-live — the same prior-history check applies here too, though in practice it's expected never to trigger given the "at most one `in-production` segment ever" assumption below), and `plannedImplementationQuarter` is derived from the **`in-production` segment's** `startDate`, not the planning segment's — that's the more meaningful "when did it actually land" answer.
    - If the pair has **only** a qualifying `in-production` segment in that window (no planned/funded segment this year) → **one row**, `developmentType: 'upgrade'`, unconditionally — still a documented simplification: it doesn't distinguish "this is genuinely a subsequent upgrade" from "this is actually the first-ever go-live, tracked without a formal planning segment." Fixing that direction (flipping to `'new'` when there's no prior live history at all) was considered but deferred — see "Related, discussed separately."
    - Distinct `(initiativeId, deliverableId)` pairs always produce separate rows — no merging across different initiatives or different deliverables.
@@ -62,6 +62,44 @@ A review of this generation logic (issue #3) found two gaps between this spec an
 - `qualifying` in `generateRptiDetails` now excludes segments whose `initiativeId` resolves to an `isPlaceholder: true` Initiative — folded into the same existence-check `Set` already used to guard against dangling `initiativeId` references, so a placeholder-linked segment is treated exactly like an orphaned one (correctly excluded).
 
 See [ADR-0009](../docs/adr/0009-rpti-status-allow-list.md) for the full record.
+
+## Correction (2026-09-15): prior-live history is tested on `startDate`, not `endDate`
+
+The history check in rules 2 and 4 originally asked whether the deliverable had a live
+segment that **ended** before the report year. That is wrong for the case the product
+exists to serve.
+
+An application a bank actually runs is *continuously* live. That is precisely what an
+LKPTI entry asserts — "live as at 31 December of the report year" — so its live segment
+straddles the report year and, for anything still in service, never ends before it. Under
+the old test, such a deliverable never had "prior live history", so planning an
+enhancement to an application the bank has run since 2021 classified the work as
+`'new'`: a declaration to OJK that the bank is building a brand-new system where it is
+in fact upgrading an existing one. That is the single misclassification this project's
+philosophy names as its primary risk.
+
+Testing `startDate < Y-01-01` instead answers the question the rule was always asking —
+*had this deliverable gone live before the report year?* — for both a run that has since
+ended and one still in progress.
+
+**Why it survived so long.** Every test covering the rule gave the deliverable a live
+segment that both started *and* ended before the report year (e.g. `2025-01-01 →
+2025-06-01`), making the two readings indistinguishable. No test described a
+continuously-live application until `rpti.test.ts`'s "an application that is
+continuously live counts as pre-existing", added with this correction.
+
+**Rejected: leaving generation alone and fixing only the importer.** The RPTI importer
+writes a synthetic prior-live segment for upgrade rows, and it ended on 1 January of the
+report year — one day short of the strict `<` comparison. Ending it on 31 December of the
+prior year makes an imported plan classify correctly without touching the generation
+rule. That was rejected as a fix on its own: it repairs only workspaces built by the
+importer and leaves the hand-built path — import an LKPTI, then plan work on an
+application yourself, which is the flow onboarding steers users into — still filing
+upgrades as new builds. The off-by-one was corrected too, but as a separate, smaller bug.
+
+**Not changed:** the deliberate simplification in rule 4's third bullet (in-production
+only, this year → always `'upgrade'`). See "Related, discussed separately" below; that
+direction is still open.
 
 ## Considered and rejected
 

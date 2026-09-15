@@ -295,7 +295,10 @@ export function deriveWorkspaceFromRptiImport(
       if (row.developmentType === 'upgrade') {
         deliverableSegments.push({
           id: `rpti-import-seg-prior-${n}`, deliverableId: targetId,
-          startDate: `${reportYear - 1}-01-01`, endDate: `${reportYear}-01-01`,
+          // Ends in the prior year, not on 1 January of this one: it records that
+          // the thing already ran before the plan, so it must not also count as
+          // part of the plan's own report-year activity.
+          startDate: `${reportYear - 1}-01-01`, endDate: `${reportYear - 1}-12-31`,
           status: RPTI_IMPORT_LIVE_STATUS_ID, initiativeId,
         });
       }

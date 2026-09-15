@@ -134,15 +134,23 @@ export function generateRptiDetails(
   // Placeholder initiatives (empty markers, not real work) are excluded the same way.
   const initiativeIds = new Set(initiatives.filter(i => i.isPlaceholder !== true).map(i => i.id));
 
-  // A deliverable that already went live in a prior, non-overlapping year already
-  // exists — a planned/funded segment this year is an upgrade to it, not a
-  // first-ever "new" build, regardless of which initiative is now touching it.
+  // A deliverable that was already live before the report year already exists — a
+  // planned/funded segment this year is an upgrade to it, not a first-ever "new"
+  // build, regardless of which initiative is now touching it.
   // Deliberately deliverable-wide (not filtered by initiativeId): "has this ever
   // gone live" is a fact about the deliverable, not about who's working on it now.
+  //
+  // Tested on startDate, not endDate. An application the bank actually runs is
+  // *continuously* live — that is what an LKPTI entry means, "live as at 31
+  // December" — so its segment straddles the report year and would never satisfy
+  // "ended before it". Requiring the live run to have finished first classified
+  // every ongoing application's enhancement as a brand-new build, which is
+  // precisely the misclassification this product exists to avoid. A genuine new
+  // build is still 'new': none of its live segments start before the year.
   const hasPriorLiveSegment = (deliverableId: string): boolean =>
     deliverableSegments.some(seg =>
       seg.deliverableId === deliverableId &&
-      seg.endDate < yearStart &&
+      seg.startDate < yearStart &&
       classifySegmentKind(seg.status, deliverableStatuses) === 'live'
     );
 
