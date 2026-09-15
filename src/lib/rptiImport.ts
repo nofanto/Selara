@@ -291,7 +291,12 @@ export function deriveWorkspaceFromRptiImport(
       }
     }
 
+    // A Deliverable is only ever created alongside its own Asset — the two are made
+    // together here or not at all, so an imported deliverable never hangs off an
+    // asset belonging to something else.
+    let createdEntry = false;
     if (!targetId) {
+      createdEntry = true;
       const assetId = `rpti-import-asset-${n}`;
       const deliverableId = `rpti-import-deliv-${n}`;
       assets.push({ id: assetId, name: row.name, categoryId, maturity: 1 });
@@ -312,18 +317,43 @@ export function deriveWorkspaceFromRptiImport(
 
     const hasEntry = !unresolved.some(u => u.rowNumber === row.rowNumber);
     let anchorSegmentId: string | undefined;
-    if (hasEntry) {
-      // An upgrade already ran before this plan; a new build did not.
-      if (row.developmentType === 'upgrade') {
-        deliverableSegments.push({
-          id: `rpti-import-seg-prior-${n}`, deliverableId: targetId,
-          // Ends in the prior year, not on 1 January of this one: it records that
-          // the thing already ran before the plan, so it must not also count as
-          // part of the plan's own report-year activity.
-          startDate: `${reportYear - 1}-01-01`, endDate: `${reportYear - 1}-12-31`,
-          status: RPTI_IMPORT_LIVE_STATUS_ID, initiativeId,
-        });
-      }
+    if (hasEntry && createdEntry) {
+      // One segment for an entry this import created, and its status says whether
+      // the thing exists yet — which is exactly what `Jenis Pengembangan` states.
+      //
+      // `upgrade` means the bank already runs it (the only way to reach this branch
+      // is infrastructure, which no LKPTI can carry), so the segment is live. `new`
+      // means it does not exist yet, so the segment is planned and nothing asserts
+      // it ever goes live: the return files an intention, not an outcome.
+      //
+      // Both regenerate to the development type that was filed. A lone planned
+      // segment with no prior live history reads as 'new'; a lone live segment
+      // reads as 'upgrade'. The span is the filed quarter either way, so
+      // deriveQuarterFromDate recovers the quarter the bank filed.
+      anchorSegmentId = `rpti-import-seg-${n}`;
+      deliverableSegments.push({
+        id: anchorSegmentId, deliverableId: targetId,
+        startDate: qStart, endDate: qEnd,
+        status: row.developmentType === 'upgrade' ? RPTI_IMPORT_LIVE_STATUS_ID : RPTI_IMPORT_PRELAUNCH_STATUS_ID,
+        initiativeId,
+      });
+    } else if (hasEntry) {
+      // Attached to an entry that already existed, so this import only adds the
+      // planned enhancement — plus a preceding live period.
+      //
+      // That prior segment is not merely belt-and-braces. Where the target came
+      // from an LKPTI import it is redundant, because that live segment already
+      // starts before the report year. But a target built by hand may carry no
+      // live segment at all, and then nothing else would tell regeneration that
+      // the thing pre-existed: the filed `upgrade` would come back as `new`.
+      deliverableSegments.push({
+        id: `rpti-import-seg-prior-${n}`, deliverableId: targetId,
+        // Ends in the prior year, not on 1 January of this one: it records that
+        // the thing already ran before the plan, so it must not also count as
+        // part of the plan's own report-year activity.
+        startDate: `${reportYear - 1}-01-01`, endDate: `${reportYear - 1}-12-31`,
+        status: RPTI_IMPORT_LIVE_STATUS_ID, initiativeId,
+      });
       anchorSegmentId = `rpti-import-seg-plan-${n}`;
       deliverableSegments.push({
         id: anchorSegmentId, deliverableId: targetId,

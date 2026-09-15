@@ -30,7 +30,7 @@ asks for each one rather than guessing.
 > **Import complete** — LKPTI 2026: 13 row(s) · RPTI 2027: 13 row(s). No rows were
 > skipped. 1 planned upgrade(s) reference an application not in your inventory.
 
-Then the data-health review, with **1 error and 22 warnings**.
+Then the data-health review, with **1 error and 25 warnings**.
 
 ## Why these rows
 
@@ -58,7 +58,12 @@ something different:
   review: *"An RPTI row for 'Legacy Teller Application' points at a deliverable that
   no longer exists."* Give it a target in the RPTI tab of Data Manager to clear it.
 
-Two things that look odd but are intended:
+Three things that look odd but are intended:
+
+- Each of the three new *applications* warns *"has no live-status segment — silently
+  excluded from LKPTI generation"*. That is correct: a 2027 build is not live, so it
+  does not belong in an LKPTI yet. Mark its segment **In Production** once it really
+  ships and it joins the inventory.
 
 - Most of the 21 warnings read *"has lifecycle segments, but none linked to an
   Initiative — it can never generate an RPTI row."* That is correct: 9 of the 13

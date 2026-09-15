@@ -5,6 +5,8 @@ import {
   RPTI_IMPORT_SHEET_NAME,
   parseRptiImportWorkbook,
   deriveWorkspaceFromRptiImport,
+  RPTI_IMPORT_PRELAUNCH_STATUS_ID,
+  RPTI_IMPORT_LIVE_STATUS_ID,
 } from './rptiImport';
 import { RPTI_CATEGORY_LABELS, generateRptiDetails } from './rpti';
 import type { Asset, AssetCategory, Deliverable } from '../types';
@@ -114,15 +116,30 @@ describe('deriveWorkspaceFromRptiImport — placement', () => {
     assetCategories: [{ id: 'c-1', name: 'Area', categoryCode: '04' } as AssetCategory],
   };
 
-  it('places a new build as pre-launch up to the quarter close, then live', () => {
+  it('gives a newly created build one planned segment spanning the filed quarter', () => {
+    // Planned, not live: a `new` row states an intention to build, and the return
+    // never asserts the thing reaches production. Inventing a live period would put
+    // a go-live on the timeline that nobody filed.
     const out = deriveWorkspaceFromRptiImport(parse({ jenis: 'new', quarter: 'Q3' }), 2027, EMPTY);
-    const segs = out.deliverableSegments.sort((a, b) => a.startDate.localeCompare(b.startDate));
-    expect(segs).toHaveLength(2);
-    expect(segs[0].endDate).toBe('2027-09-30');
-    expect(segs[1].startDate).toBe('2027-09-30');
+    expect(out.deliverableSegments).toHaveLength(1);
+    expect(out.deliverableSegments[0]).toMatchObject({
+      startDate: '2027-07-01', endDate: '2027-09-30', status: RPTI_IMPORT_PRELAUNCH_STATUS_ID,
+    });
   });
 
-  it('gives an upgrade a preceding live period, because it targets something already running', () => {
+  it('gives a newly created upgrade one live segment, because it already runs', () => {
+    // Reachable only for infrastructure, which no LKPTI can carry. `upgrade` says
+    // the bank already operates it, so the segment is live rather than planned.
+    const out = deriveWorkspaceFromRptiImport(
+      parse({ jenis: 'upgrade', quarter: 'Q3', kategori: RPTI_CATEGORY_LABELS['52'] }), 2027, EMPTY);
+    expect(out.deliverables).toHaveLength(1); // guard: otherwise this was unresolved
+    expect(out.deliverableSegments).toHaveLength(1);
+    expect(out.deliverableSegments[0]).toMatchObject({
+      startDate: '2027-07-01', endDate: '2027-09-30', status: RPTI_IMPORT_LIVE_STATUS_ID,
+    });
+  });
+
+  it('gives an upgrade attached to an existing entry a preceding live period', () => {
     const out = deriveWorkspaceFromRptiImport(parse({ jenis: 'upgrade', quarter: 'Q3' }), 2027, inventory);
     expect(out.unresolved).toHaveLength(0); // guard: otherwise the next assertion is vacuous
     expect(out.deliverableSegments).toHaveLength(3);

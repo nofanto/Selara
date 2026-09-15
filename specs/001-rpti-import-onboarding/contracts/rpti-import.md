@@ -65,7 +65,16 @@ These are the assertions the unit tests exist to hold:
    `51`-`54`/`99` → `infrastructure`; anything else → skipped. Never inferred from the name.
 5. **Every derived `DeliverableSegment` carries an `initiativeId`**, or a regenerated return would
    silently omit the imported work.
-6. **`upgrade` rows produce a preceding live segment; `new` rows do not.**
+6. **A row that creates its own entry produces exactly one segment, spanning the filed quarter**,
+   and its status states whether the thing exists yet: `upgrade` → live (the bank already runs it),
+   `new` → planned. Nothing asserts that a `new` build reaches production — the return files an
+   intention, not an outcome — so no live period is invented for it.
+6a. **A row attaching to an existing entry produces a preceding live segment, a planned segment,
+   and a following live segment.** The preceding one matters even when the target came from an
+   LKPTI: a target built by hand may have no live history, and without it the filed `upgrade`
+   would regenerate as `new`.
+6b. **A Deliverable is only ever created together with its own Asset**, never attached to an
+   existing one.
 7. **An `upgrade` row matching an existing Deliverable on name *and* category attaches to it** and
    adds no new Deliverable.
 8. **An `upgrade` *application* row matching zero or more than one existing Deliverable creates

@@ -114,6 +114,22 @@ direction is still open.
 
 Pressing "Generate" wipes all existing generated rows for the current report-year and rebuilds them from scratch — no reconciliation with prior manual edits. Simplest possible behavior to ship first; revisit if losing edits on regenerate turns out to be painful in practice.
 
+## Coupling worth knowing before changing rule 4's third bullet
+
+Rule 4's third bullet — *only an in-production segment this year → `'upgrade'`, unconditionally* —
+is listed below as a deferred simplification. It is no longer only a simplification: the RPTI
+importer now depends on it.
+
+A row that creates its own entry gets exactly one segment, and for an `upgrade` that segment is
+live (see `specs/001-rpti-import-onboarding/spec.md` FR-021). Such a deliverable has no prior-live
+history at all — it did not exist before this import — so the *only* thing classifying its
+regenerated row as `'upgrade'` is this bullet. Implementing the deferred change in the obvious way,
+flipping to `'new'` when there is no prior live history, would silently refile every imported
+infrastructure upgrade as a new build.
+
+Anyone taking that on should decide the importer's segment shape at the same time — most likely by
+giving the created entry a prior-live segment as well — rather than changing the rule alone.
+
 ## Related, discussed separately
 
 - **Version History** as the mechanism for archiving/auditing RPTI data year over year (see conversation; not yet written up as a spec). Key finding: restoring a version never touches the saved-versions list itself — it's a flat, independent store, so archival snapshots are safe to keep alongside live data. Gaps: no scheduled/automatic snapshotting, and no read-only view of a past version's RPTI table without a full workspace restore.
