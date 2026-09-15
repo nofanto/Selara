@@ -321,3 +321,14 @@ describe('a blank category cell is accepted, but a wrong one is not', () => {
     expect(skipped[0].reason).toMatch(/Unrecognized category code/);
   });
 });
+
+describe('colours are Tailwind classes, not hex or bare colour names', () => {
+  // See the note on the status in lkptiImport.ts: 'green' matched no Tailwind
+  // class, so every imported lifecycle segment drew with no fill.
+  it('gives every imported deliverable status a class the visualiser can render', () => {
+    const { rows } = parseLkptiImportWorkbook(makeWorkbook([VALID_ROW]));
+    const out = deriveWorkspaceFromLkptiImport(rows);
+    expect(out.deliverableStatuses.length).toBeGreaterThan(0);
+    for (const s of out.deliverableStatuses) expect(s.color).toMatch(/^bg-[a-z]+-\d{2,3}$/);
+  });
+});

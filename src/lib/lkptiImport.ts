@@ -237,7 +237,10 @@ export function deriveWorkspaceFromLkptiImport(rows: LkptiImportRow[]): DerivedL
   const liveStatus: DeliverableStatus = {
     id: 'lkpti-import-status-live',
     name: 'Live',
-    color: 'green',
+    // A Tailwind class, not a colour name: Timeline renders this value directly as
+    // a className (SEGMENT_COLORS, Timeline.tsx:84). 'green' matched no class, so
+    // imported segments drew with no fill at all.
+    color: 'bg-emerald-500',
     isLiveStatus: true,
   };
 

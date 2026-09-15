@@ -348,12 +348,12 @@ export function deriveWorkspaceFromRptiImport(
   });
 
   if (initiatives.length > 0) {
-    programmes.push({ id: RPTI_IMPORT_PROGRAMME_ID, name: `RPTI ${reportYear} plan`, color: '#4f46e5' });
+    programmes.push({ id: RPTI_IMPORT_PROGRAMME_ID, name: `RPTI ${reportYear} plan`, color: 'bg-indigo-500' });
   }
 
   const deliverableStatuses: DeliverableStatus[] = deliverableSegments.length === 0 ? [] : [
-    { id: RPTI_IMPORT_PRELAUNCH_STATUS_ID, name: 'Planned', color: '#2563eb', isPreLaunchStatus: true },
-    { id: RPTI_IMPORT_LIVE_STATUS_ID, name: 'In Production', color: '#16a34a', isLiveStatus: true },
+    { id: RPTI_IMPORT_PRELAUNCH_STATUS_ID, name: 'Planned', color: 'bg-slate-400', isPreLaunchStatus: true },
+    { id: RPTI_IMPORT_LIVE_STATUS_ID, name: 'In Production', color: 'bg-emerald-500', isLiveStatus: true },
   ];
 
   return { assetCategories, assets, deliverables, deliverableSegments, deliverableStatuses, initiatives, programmes, rptiDetails, unresolved };

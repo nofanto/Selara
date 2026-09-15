@@ -268,3 +268,21 @@ describe('imported entities must not dangle', () => {
     expect(out.programmes).toEqual([]);
   });
 });
+
+describe('colours are Tailwind classes, not hex', () => {
+  // Timeline renders Programme.color and DeliverableStatus.color directly as a
+  // className (Timeline.tsx:120 and :84). A hex string is not a class, so it
+  // produced an invisible white bar on the white visualiser background.
+  const TAILWIND_BG = /^bg-[a-z]+-\d{2,3}$/;
+
+  it('gives the imported programme a class the visualiser can render', () => {
+    const out = deriveWorkspaceFromRptiImport(parseRptiImportWorkbook(wb([row()])).rows, 2027, EMPTY);
+    expect(out.programmes[0].color).toMatch(TAILWIND_BG);
+  });
+
+  it('gives every imported deliverable status a class the visualiser can render', () => {
+    const out = deriveWorkspaceFromRptiImport(parseRptiImportWorkbook(wb([row()])).rows, 2027, EMPTY);
+    expect(out.deliverableStatuses.length).toBeGreaterThan(0);
+    for (const s of out.deliverableStatuses) expect(s.color).toMatch(TAILWIND_BG);
+  });
+});
