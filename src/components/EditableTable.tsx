@@ -507,7 +507,15 @@ export function EditableTable<T extends { [key: string]: any }>({
           data-testid={`${tableId}-table-scroll-wrapper`}
           className="h-full overflow-auto border border-slate-200 rounded-lg bg-white shadow-sm"
         >
-        <table ref={tableRef} className="min-w-full text-sm text-left border-collapse table-fixed">
+        {/*
+          w-max alongside min-w-full: with table-layout fixed and an auto width, the
+          table shrink-to-fits its container and then distributes the declared column
+          widths *proportionally*, so every column rendered at a fraction of what it
+          asked for. Sizing to max-content makes the declared widths literal and lets
+          the wrapper scroll instead of squeezing. min-w-full keeps a narrow table
+          filling the panel. See issue #44.
+        */}
+        <table ref={tableRef} className="min-w-full w-max text-sm text-left border-collapse table-fixed">
           <thead className="text-xs text-slate-500 uppercase bg-slate-50 sticky top-0 z-10 shadow-sm">
             <tr>
               {columns.map(col => (
@@ -519,11 +527,15 @@ export function EditableTable<T extends { [key: string]: any }>({
                     if ((e.target as HTMLElement).classList.contains('resize-handle')) return;
                     handleSort(col.key);
                   }}
-                  className="px-4 py-3 font-medium border-b border-r border-slate-200 last:border-r-0 whitespace-nowrap cursor-pointer hover:bg-slate-100 transition-colors group/header relative"
+                  // No whitespace-nowrap: it made the header's intrinsic width a floor
+                  // the column could not go below, so under table-fixed every column
+                  // rendered at exactly its label's width and the `width` below was
+                  // ignored entirely. Long labels now wrap instead. See issue #44.
+                  className="px-4 py-3 font-medium border-b border-r border-slate-200 last:border-r-0 cursor-pointer hover:bg-slate-100 transition-colors group/header relative align-bottom"
                   style={{ width: col.width }}
                 >
                   <div className="flex items-center gap-2 pr-2">
-                    {col.label}
+                    <span className="min-w-0">{col.label}</span>
                     {sortConfig?.key === col.key ? (
                       sortConfig.direction === 'asc' ? <ArrowUp size={14} className="text-blue-500" /> : <ArrowDown size={14} className="text-blue-500" />
                     ) : (

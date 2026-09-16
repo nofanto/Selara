@@ -264,20 +264,20 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery,
   };
 
   const initiativeColumns: Column<Initiative>[] = [
-    { key: 'name', label: 'Initiative Name', type: 'text', width: '180px' },
-    { key: 'assetId', label: 'Asset', type: 'select', options: assetOptions, width: '120px' },
-    { key: 'programmeId', label: 'Programme', type: 'select', options: programmeOptions, width: '110px' },
-    { key: 'strategyId', label: 'Strategy', type: 'select', options: strategyOptions, width: '110px' },
-    { key: 'startDate', label: 'Start Date', type: 'date', width: '120px' },
-    { key: 'endDate', label: 'End Date', type: 'date', width: '120px' },
-    { key: 'capex', label: `CapEx (${data.timelineSettings.defaultCurrency || 'USD'})`, type: 'number', width: '100px' },
-    { key: 'opex', label: `OpEx (${data.timelineSettings.defaultCurrency || 'USD'})`, type: 'number', width: '100px' },
+    { key: 'name', label: 'Initiative Name', type: 'text', width: '280px' },
+    { key: 'assetId', label: 'Asset', type: 'select', options: assetOptions, width: '230px' },
+    { key: 'programmeId', label: 'Programme', type: 'select', options: programmeOptions, width: '150px' },
+    { key: 'strategyId', label: 'Strategy', type: 'select', options: strategyOptions, width: '150px' },
+    { key: 'startDate', label: 'Start Date', type: 'date', width: '130px' },
+    { key: 'endDate', label: 'End Date', type: 'date', width: '130px' },
+    { key: 'capex', label: `CapEx (${data.timelineSettings.defaultCurrency || 'USD'})`, type: 'number', width: '120px' },
+    { key: 'opex', label: `OpEx (${data.timelineSettings.defaultCurrency || 'USD'})`, type: 'number', width: '120px' },
     { key: 'status', label: 'Status', type: 'select', options: [
       { value: 'planned', label: 'Planned' },
       { value: 'active', label: 'Active' },
       { value: 'done', label: 'Done' },
       { value: 'cancelled', label: 'Cancelled' },
-    ], width: '100px' },
+    ], width: '140px' },
     { key: 'ragStatus', label: 'RAG Status', type: 'select', options: [
       { value: '', label: '— None —' },
       { value: 'green', label: 'Green' },
@@ -285,14 +285,14 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery,
       { value: 'red', label: 'Red' },
     ], width: '100px' },
     { key: 'progress', label: 'Progress (%)', type: 'number', width: '90px' },
-    { key: 'owner', label: 'Owner', type: 'text', width: '110px' },
+    { key: 'owner', label: 'Owner', type: 'text', width: '150px' },
     { key: 'isPlaceholder', label: 'Placeholder?', type: 'boolean', width: '80px' },
-    { key: 'description', label: 'Description', type: 'textarea', width: '220px', placeholder: 'Add a description...' },
+    { key: 'description', label: 'Description', type: 'textarea', width: '260px', placeholder: 'Add a description...' },
   ];
 
   const assetColumns: Column<Asset>[] = [
-    { key: 'name', label: 'Asset Name', type: 'text', width: '40%' },
-    { key: 'categoryId', label: 'Category', type: 'select', options: categoryOptions, width: '40%' },
+    { key: 'name', label: 'Asset Name', type: 'text', width: '220px' },
+    { key: 'categoryId', label: 'Category', type: 'select', options: categoryOptions, width: '160px' },
     { key: 'maturity', label: 'Maturity', type: 'select', options: [
       { value: '', label: '— Unrated —' },
       { value: '1', label: '1 – Emergent' },
@@ -300,14 +300,14 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery,
       { value: '3', label: '3 – Defined' },
       { value: '4', label: '4 – Managed' },
       { value: '5', label: '5 – Optimised' },
-    ], width: '20%' },
+    ], width: '110px' },
   ];
 
   const categoryColumns: Column<AssetCategory>[] = [
-    { key: 'name', label: 'Category Name', type: 'text', width: '200px' },
+    { key: 'name', label: 'Category Name', type: 'text', width: '340px' },
     { key: 'order', label: 'Sort Order', type: 'number', width: '100px' },
     {
-      key: 'categoryCode', label: 'Default RPTI Category', type: 'select', width: '220px',
+      key: 'categoryCode', label: 'Default RPTI Category', type: 'select', width: '200px',
       options: [
         { value: '', label: '— Not set —' },
         ...(Object.keys(RPTI_CATEGORY_LABELS) as (keyof typeof RPTI_CATEGORY_LABELS)[])
@@ -321,37 +321,37 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery,
   ];
 
   const programmeColumns: Column<Programme>[] = [
-    { key: 'name', label: 'Programme Name', type: 'text', width: '60%' },
-    { key: 'color', label: 'Color', type: 'color', width: '40%' },
+    { key: 'name', label: 'Programme Name', type: 'text', width: '220px' },
+    { key: 'color', label: 'Color', type: 'color', width: '120px' },
   ];
 
   const strategyColumns: Column<Strategy>[] = [
-    { key: 'name', label: 'Strategy Name', type: 'text', width: '60%' },
-    { key: 'color', label: 'Color', type: 'color', width: '40%' },
+    { key: 'name', label: 'Strategy Name', type: 'text', width: '220px' },
+    { key: 'color', label: 'Color', type: 'color', width: '120px' },
   ];
 
   const milestoneColumns: Column<Milestone>[] = [
-    { key: 'name', label: 'Milestone Name', type: 'text', width: '30%' },
-    { key: 'assetId', label: 'Asset', type: 'select', options: assetOptions, width: '20%' },
-    { key: 'date', label: 'Date', type: 'date', width: '20%' },
+    { key: 'name', label: 'Milestone Name', type: 'text', width: '220px' },
+    { key: 'assetId', label: 'Asset', type: 'select', options: assetOptions, width: '230px' },
+    { key: 'date', label: 'Date', type: 'date', width: '130px' },
     {
       key: 'type', label: 'Type', type: 'select', options: [
         { value: 'info', label: 'Info' },
         { value: 'warning', label: 'Warning' },
         { value: 'critical', label: 'Critical' }
-      ], width: '20%'
+      ], width: '130px'
     },
   ];
 
   const dependencyColumns: Column<Dependency>[] = [
     { key: 'sourceId', label: 'Dependent Initiative', type: 'select', options: initiativeOptions, width: '35%' },
-    { key: 'targetId', label: 'Depends On', type: 'select', options: initiativeOptions, width: '35%' },
+    { key: 'targetId', label: 'Depends On', type: 'select', options: initiativeOptions, width: '230px' },
     {
       key: 'type', label: 'Dependency Type', type: 'select', options: [
         { value: 'blocks', label: 'Blocks' },
         { value: 'requires', label: 'Requires' },
         { value: 'related', label: 'Related' }
-      ], width: '20%'
+      ], width: '130px'
     },
   ];
 
@@ -382,24 +382,24 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery,
   };
 
   const resourceColumns: Column<Resource>[] = [
-    { key: 'name', label: 'Name', type: 'text', width: '50%' },
-    { key: 'role', label: 'Role', type: 'text', width: '50%' },
+    { key: 'name', label: 'Name', type: 'text', width: '220px' },
+    { key: 'role', label: 'Role', type: 'text', width: '150px' },
   ];
 
   const deliverableColumns: Column<Deliverable>[] = [
-    { key: 'name', label: 'Name', type: 'text', width: '180px' },
+    { key: 'name', label: 'Name', type: 'text', width: '280px' },
     {
       key: 'type', label: 'Type', type: 'select', width: '130px',
       options: (['application', 'infrastructure', 'document', 'procedure', 'other'] as DeliverableType[])
         .map(t => ({ value: t, label: t.charAt(0).toUpperCase() + t.slice(1) })),
     },
     {
-      key: 'assetId', label: 'Asset', type: 'select', width: '160px',
+      key: 'assetId', label: 'Asset', type: 'select', width: '230px',
       options: data.assets.map(a => ({ value: a.id, label: a.name })),
     },
-    { key: 'description', label: 'Description', type: 'textarea', width: '220px' },
+    { key: 'description', label: 'Description', type: 'textarea', width: '260px' },
     {
-      key: 'categoryCode', label: 'RPTI Category Override', type: 'select', width: '220px',
+      key: 'categoryCode', label: 'RPTI Category Override', type: 'select', width: '200px',
       options: [
         { value: '', label: '— Use category default —' },
         ...(Object.keys(RPTI_CATEGORY_LABELS) as (keyof typeof RPTI_CATEGORY_LABELS)[])
@@ -407,7 +407,7 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery,
       ],
     },
     {
-      key: 'developer', label: 'Developer', type: 'select', width: '110px',
+      key: 'developer', label: 'Developer', type: 'select', width: '140px',
       options: [
         { value: '', label: '— Not set —' },
         { value: 'inhouse', label: 'In-house' }, { value: 'PPJTI', label: 'PPJTI' },
@@ -459,17 +459,17 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery,
   };
 
   const deliverableStatusColumns: Column<DeliverableStatus>[] = [
-    { key: 'name', label: 'Status Name', type: 'text', width: '40%' },
-    { key: 'color', label: 'Color', type: 'color', width: '20%' },
+    { key: 'name', label: 'Status Name', type: 'text', width: '220px' },
+    { key: 'color', label: 'Color', type: 'color', width: '120px' },
     { key: 'isLiveStatus', label: 'Live?', type: 'boolean', width: '20%' },
     { key: 'isPreLaunchStatus', label: 'Pre-Launch?', type: 'boolean', width: '20%' },
   ];
 
   const rptiColumns: Column<RptiDetail>[] = [
-    { key: 'initiativeId', label: 'Initiative', type: 'select', options: initiativeOptions, width: '150px' },
-    { key: 'targetId', label: 'Target', type: 'select', options: rptiTargetOptions, width: '160px' },
+    { key: 'initiativeId', label: 'Initiative', type: 'select', options: initiativeOptions, width: '230px' },
+    { key: 'targetId', label: 'Target', type: 'select', options: rptiTargetOptions, width: '230px' },
     {
-      key: 'categoryCode', label: 'Category', type: 'select', width: '220px',
+      key: 'categoryCode', label: 'Category', type: 'select', width: '200px',
       options: [
         { value: '', label: '— Not set —' },
         ...(Object.keys(RPTI_CATEGORY_LABELS) as (keyof typeof RPTI_CATEGORY_LABELS)[])
@@ -477,11 +477,11 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery,
       ],
     },
     {
-      key: 'developmentType', label: 'Dev Type', type: 'select', width: '110px',
+      key: 'developmentType', label: 'Dev Type', type: 'select', width: '130px',
       options: [{ value: 'new', label: 'New' }, { value: 'upgrade', label: 'Upgrade' }],
     },
     {
-      key: 'developer', label: 'Developer', type: 'select', width: '110px',
+      key: 'developer', label: 'Developer', type: 'select', width: '140px',
       options: [
         { value: '', label: '— Not set —' },
         { value: 'inhouse', label: 'In-house' }, { value: 'PPJTI', label: 'PPJTI' },
@@ -495,7 +495,7 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery,
       ],
     },
     {
-      key: 'plannedImplementationQuarter', label: 'Quarter', type: 'select', width: '100px',
+      key: 'plannedImplementationQuarter', label: 'Quarter', type: 'select', width: '120px',
       options: [
         { value: '', label: '— Not set —' },
         { value: 'Q1', label: 'Q1' }, { value: 'Q2', label: 'Q2' }, { value: 'Q3', label: 'Q3' }, { value: 'Q4', label: 'Q4' },
@@ -503,33 +503,33 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery,
     },
     { key: 'capexAmount', label: 'CapEx Override', type: 'number', width: '140px' },
     { key: 'opexAmount', label: 'OpEx Override', type: 'number', width: '140px' },
-    { key: 'dcCity', label: 'DC City', type: 'text', width: '110px' },
-    { key: 'dcCountry', label: 'DC Country', type: 'text', width: '110px' },
-    { key: 'drCity', label: 'DR City', type: 'text', width: '110px' },
-    { key: 'drCountry', label: 'DR Country', type: 'text', width: '110px' },
-    { key: 'remarks', label: 'Remarks', type: 'textarea', width: '200px' },
+    { key: 'dcCity', label: 'DC City Override', type: 'text', width: '130px' },
+    { key: 'dcCountry', label: 'DC Country Override', type: 'text', width: '130px' },
+    { key: 'drCity', label: 'DR City Override', type: 'text', width: '130px' },
+    { key: 'drCountry', label: 'DR Country Override', type: 'text', width: '130px' },
+    { key: 'remarks', label: 'Remarks', type: 'textarea', width: '220px' },
   ];
 
   const lkptiColumns: Column<LkptiDetail>[] = [
-    { key: 'targetId', label: 'Deliverable', type: 'select', options: deliverableOptions, width: '160px' },
+    { key: 'targetId', label: 'Deliverable', type: 'select', options: deliverableOptions, width: '230px' },
     {
-      key: 'categoryCode', label: 'Category', type: 'select', width: '220px',
+      key: 'categoryCode', label: 'Category', type: 'select', width: '200px',
       options: [
         { value: '', label: '— Not set —' },
         ...LKPTI_CATEGORY_CODES.map(code => ({ value: code, label: `${code} — ${RPTI_CATEGORY_LABELS[code]}` })),
       ],
     },
-    { key: 'functionDescription', label: 'Function Description', type: 'textarea', width: '220px' },
-    { key: 'platform', label: 'Platform', type: 'text', width: '150px' },
+    { key: 'functionDescription', label: 'Function Description', type: 'textarea', width: '260px' },
+    { key: 'platform', label: 'Platform', type: 'text', width: '180px' },
     { key: 'database', label: 'Database', type: 'text', width: '150px' },
-    { key: 'dcCity', label: 'DC City', type: 'text', width: '110px' },
-    { key: 'dcCountry', label: 'DC Country', type: 'text', width: '110px' },
-    { key: 'dcProvider', label: 'DC Provider', type: 'text', width: '140px', placeholder: "'self' or company name" },
-    { key: 'drCity', label: 'DR City', type: 'text', width: '110px' },
-    { key: 'drCountry', label: 'DR Country', type: 'text', width: '110px' },
-    { key: 'drcProvider', label: 'DRC Provider', type: 'text', width: '140px', placeholder: "'self' or company name" },
+    { key: 'dcCity', label: 'DC City Override', type: 'text', width: '130px' },
+    { key: 'dcCountry', label: 'DC Country Override', type: 'text', width: '130px' },
+    { key: 'dcProvider', label: 'DC Provider', type: 'text', width: '150px', placeholder: "'self' or company name" },
+    { key: 'drCity', label: 'DR City Override', type: 'text', width: '130px' },
+    { key: 'drCountry', label: 'DR Country Override', type: 'text', width: '130px' },
+    { key: 'drcProvider', label: 'DRC Provider', type: 'text', width: '150px', placeholder: "'self' or company name" },
     {
-      key: 'backupStrategy', label: 'Backup Strategy', type: 'select', width: '180px',
+      key: 'backupStrategy', label: 'Backup Strategy', type: 'select', width: '190px',
       options: [
         { value: '', label: '— Not set —' },
         { value: 'HA_ACTIVE_ACTIVE', label: 'HA Active-Active' },
@@ -538,11 +538,11 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery,
         { value: 'BACKUP_PERIODIC', label: 'Backup Periodic' },
       ],
     },
-    { key: 'systemOwner', label: 'System Owner', type: 'text', width: '150px' },
-    { key: 'developer', label: 'Developer', type: 'text', width: '150px', placeholder: "'inhouse' or provider name" },
+    { key: 'systemOwner', label: 'System Owner', type: 'text', width: '230px' },
+    { key: 'developer', label: 'Developer', type: 'text', width: '200px', placeholder: "'inhouse' or provider name" },
     { key: 'goLiveDate', label: 'Go-Live Date (dd-mm-yyyy)', type: 'text', width: '150px' },
     {
-      key: 'ownership', label: 'Ownership', type: 'select', width: '130px',
+      key: 'ownership', label: 'Ownership', type: 'select', width: '140px',
       options: [
         { value: '', label: '— Not set —' },
         { value: 'LEASE', label: 'Lease' },
