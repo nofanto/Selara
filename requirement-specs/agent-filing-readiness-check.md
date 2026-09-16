@@ -1,5 +1,8 @@
 # AI Agent Use Case: Filing Readiness Check (Design Notes)
 
+> **Closed as a feature direction** (2026-09-02) — see [`agent-exposure-architecture.md`](agent-exposure-architecture.md) for the architectural blocker common to all four of these, the routes considered, and why the family is closed rather than parked. Retained as a discovery record: this idea's audit produced real work, listed below.
+> **Discovery outcome:** the rule engine became Data Health phase 2 — [issue #16](https://github.com/nofanto/Selara/issues/16), **shipped**.
+
 > **Status:** **Superseded for its rule-engine content** by [issue #16](https://github.com/nofanto/Selara/issues/16) — Data Health phase 2 (decided 2026-09-02), whose design record is the "Phase 2 — Validity checks" section of [`data-completeness-report.md`](data-completeness-report.md). What remains here is only the agent-facing narration layer, which is still an idea with no design discussion behind it.
 > **Context:** Part of a family of read-only agent use cases (alongside [Decision Log Q&A](agent-decision-log-qa.md), [Version Diff Narrative](agent-version-diff-narrative.md), and [Capacity/Budget Query](agent-capacity-budget-query.md)).
 

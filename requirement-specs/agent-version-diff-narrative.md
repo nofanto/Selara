@@ -1,5 +1,8 @@
 # AI Agent Use Case: Version Diff Narrative (Design Notes)
 
+> **Closed as a feature direction** (2026-09-02) — see [`agent-exposure-architecture.md`](agent-exposure-architecture.md) for the architectural blocker common to all four of these, the routes considered, and why the family is closed rather than parked. Retained as a discovery record: this idea's audit produced real work, listed below.
+> **Discovery outcome:** the regrouping became [issue #18](https://github.com/nofanto/Selara/issues/18); the consolidation phase is **shipped**, and the audit found `ReportsView` was silently dropping 8 of 14 entity types including RPTI/LKPTI.
+
 > **Status:** **Superseded for its deterministic content** by [`diff-summary.md`](diff-summary.md) (decided 2026-09-02), which takes the regrouping, noise-filtering and significance-ranking work. What remains here is only the language layer on top, still an idea with no design discussion behind it and no exposure mechanism chosen.
 > **Context:** Part of a family of read-only agent use cases (alongside [Filing Readiness Check](agent-filing-readiness-check.md), [Decision Log Q&A](agent-decision-log-qa.md), and [Capacity/Budget Query](agent-capacity-budget-query.md)).
 > **Last refreshed:** 2026-09-02.
