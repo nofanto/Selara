@@ -29,7 +29,7 @@ test.describe('Import Error Paths', () => {
       page.on('dialog', dialog => { alertFired = true; dialog.dismiss(); });
 
       // Use setInputFiles to bypass the browser's accept filter
-      const fileInput = page.locator('input[type="file"]');
+      const fileInput = page.getByTestId('import-file-input');
       await fileInput.setInputFiles(txtPath);
 
       // Should show an error notification
@@ -55,7 +55,7 @@ test.describe('Import Error Paths', () => {
       let alertFired = false;
       page.on('dialog', dialog => { alertFired = true; dialog.dismiss(); });
 
-      const fileInput = page.locator('input[type="file"]');
+      const fileInput = page.getByTestId('import-file-input');
       await fileInput.setInputFiles(corruptPath);
 
       // Should show an error notification

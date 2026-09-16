@@ -7,7 +7,7 @@ import { test, expect } from '@playwright/test';
  * AC2: Modal shows 3 template cards: rpti, viewer, blank
  * AC4: RPTI catalogue template loads RPTI demo portfolio; catalogue section visible
  * AC5: Viewer card has single "Upload file" button; triggers file chooser; closes picker after import
- * AC6: Blank template loads empty workspace; catalogue section hidden
+ * AC6: Blank template loads empty workspace; catalogue section available
  * AC7: Template picker NOT shown in E2E mode (scenia-e2e flag)
  * AC8: Template picker NOT shown on subsequent loads (non-empty DB)
  */
@@ -46,16 +46,17 @@ test.describe('Workspace Templates', () => {
     await expect(page.getByTestId('template-picker-modal')).toBeVisible({ timeout: 20000 });
   });
 
-  // AC2: all 3 template cards are present
-  test('AC2: all 3 template cards are visible', async ({ page }) => {
+  // AC2 (revised for #38): the picker offers two ways to begin, not a template
+  // gallery — start from your filed OJK returns, or start empty.
+  test('AC2: exactly two ways to begin are offered', async ({ page }) => {
     await page.goto('/');
     await simulateFirstRun(page);
     await page.waitForSelector('[data-testid="template-picker-modal"]', { timeout: 20000 });
-    await expect(page.getByTestId('template-card-rpti')).toBeVisible();
-    await expect(page.getByTestId('template-card-viewer')).toBeVisible();
-    await expect(page.getByTestId('template-card-blank')).toBeVisible();
-    // Mixed card must no longer exist
-    await expect(page.getByTestId('template-card-mixed')).not.toBeVisible();
+    await expect(page.getByTestId('onboarding-path-returns')).toBeVisible();
+    await expect(page.getByTestId('onboarding-path-empty')).toBeVisible();
+    // The template gallery is gone; the catalogue is now added from the Visualiser.
+    await expect(page.getByTestId('template-card-rpti')).toHaveCount(0);
+    await expect(page.getByTestId('template-card-viewer')).toHaveCount(0);
   });
 
   // AC4: RPTI catalogue template
@@ -63,71 +64,31 @@ test.describe('Workspace Templates', () => {
     await page.goto('/');
     await simulateFirstRun(page);
     await page.waitForSelector('[data-testid="template-picker-modal"]', { timeout: 20000 });
-    await page.getByTestId('template-select-with-demo-btn-rpti').click();
+    // Demo data moved to the start-empty path when the catalogue card was
+    // removed — it was previously reachable only through that card.
+    await page.getByTestId('template-start-demo-btn').click();
     await page.waitForSelector('[data-testid="asset-row-content"]', { timeout: 20000 });
     // Catalogue section must be visible
     await expect(page.getByTestId('rpti-catalogue-section')).toBeVisible();
   });
 
-  // AC5: Viewer mode
-  test('AC5a: Viewer card has a single "Upload file" button and no demo-data buttons', async ({ page }) => {
+  // AC5 (revised for #38): opening a colleague's shared file is no longer a way
+  // to *start* a workspace — it is a mode, and it lives on the import/share
+  // surface. The capability must survive the move (SC-006).
+  test('AC5: opening a shared file is available from the import/share controls', async ({ page }) => {
     await page.goto('/');
-    await simulateFirstRun(page);
-    await page.waitForSelector('[data-testid="template-picker-modal"]', { timeout: 20000 });
-    const card = page.getByTestId('template-card-viewer');
-    await expect(card).toBeVisible();
-    await expect(card.getByTestId('template-viewer-upload-btn')).toBeVisible();
-    await expect(card.getByTestId('template-select-with-demo-btn-viewer')).not.toBeVisible();
-    await expect(card.getByTestId('template-select-no-demo-btn-viewer')).not.toBeVisible();
-  });
+    await page.waitForSelector('[data-testid="asset-row-content"]', { timeout: 20000 });
+    await expect(page.getByTestId('open-shared-file')).toBeVisible();
 
-  test('AC5b: clicking Upload file on Viewer card opens a file chooser', async ({ page }) => {
-    await page.goto('/');
-    await simulateFirstRun(page);
-    await page.waitForSelector('[data-testid="template-picker-modal"]', { timeout: 20000 });
     const [fileChooser] = await Promise.all([
       page.waitForEvent('filechooser'),
-      page.getByTestId('template-viewer-upload-btn').click(),
+      page.getByTestId('open-shared-file').click(),
     ]);
     expect(fileChooser).toBeTruthy();
   });
 
-  test('AC5c: uploading an Excel file via Viewer mode loads data and closes the picker', async ({ page }) => {
-    // Create a minimal valid XLSX buffer with an Assets sheet
-    const { utils, write } = await import('xlsx');
-    const wb = utils.book_new();
-    utils.book_append_sheet(
-      wb,
-      utils.aoa_to_sheet([
-        ['id', 'name', 'categoryId'],
-        ['asset-1', 'Imported Asset', 'cat-1'],
-      ]),
-      'Assets'
-    );
-    const buf: Buffer = write(wb, { type: 'buffer', bookType: 'xlsx' });
-
-    await page.goto('/');
-    await simulateFirstRun(page);
-    await page.waitForSelector('[data-testid="template-picker-modal"]', { timeout: 20000 });
-
-    const [fileChooser] = await Promise.all([
-      page.waitForEvent('filechooser'),
-      page.getByTestId('template-viewer-upload-btn').click(),
-    ]);
-    await fileChooser.setFiles({
-      name: 'test-portfolio.xlsx',
-      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      buffer: buf,
-    });
-
-    // Template picker should close after import
-    await expect(page.getByTestId('template-picker-modal')).not.toBeVisible({ timeout: 10000 });
-    // App nav is visible
-    await expect(page.getByTestId('nav-visualiser')).toBeVisible();
-  });
-
   // AC6: Blank template
-  test('AC6: Blank template loads empty workspace; catalogue section hidden', async ({ page }) => {
+  test('AC6: Blank template loads empty workspace; catalogue section available', async ({ page }) => {
     await page.goto('/');
     await simulateFirstRun(page);
     await page.waitForSelector('[data-testid="template-picker-modal"]', { timeout: 20000 });
@@ -138,8 +99,11 @@ test.describe('Workspace Templates', () => {
     await expect(page.getByTestId('nav-visualiser')).toBeVisible();
     // No asset swimlanes
     await expect(page.locator('[data-testid="asset-row-content"]')).toHaveCount(0);
-    // Catalogue section hidden
-    await expect(page.getByTestId('rpti-catalogue-section')).not.toBeVisible();
+    // The catalogue IS shown on a blank workspace now. It previously had its own
+    // onboarding card; with that gone, this is the only route to the OJK areas,
+    // and showRptiCatalogue has no UI toggle — so hiding it here would make them
+    // unreachable (SC-006).
+    await expect(page.getByTestId('rpti-catalogue-section')).toBeVisible();
   });
 
   // AC8: picker not shown on subsequent loads

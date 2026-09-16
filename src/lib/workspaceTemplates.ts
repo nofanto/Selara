@@ -141,7 +141,11 @@ export function getTemplateData(templateId: TemplateId | string, withDemoData = 
         decisions: [],
         rptiDetails: [],
         lkptiDetails: [],
-        timelineSettings: { ...baseSettings, showRptiCatalogue: false },
+        timelineSettings: { ...baseSettings, // Shown, not hidden. The OJK technology catalogue used to have its own card on
+        // the onboarding screen; with that card removed (#38) a blank workspace is the
+        // only route to it, and `showRptiCatalogue` has no UI toggle anywhere — so
+        // hiding it here would make the catalogue unreachable and break SC-006.
+        showRptiCatalogue: true },
       };
 
     case 'rpti':

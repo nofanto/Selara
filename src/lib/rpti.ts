@@ -33,6 +33,30 @@ export function deriveQuarterFromDate(iso: string): RptiQuarter {
   return 'Q4';
 }
 
+/**
+ * The calendar span of a quarter within a given year — the inverse of
+ * `deriveQuarterFromDate`.
+ *
+ * A filed RPTI return states `Waktu Rencana Implementasi` as a quarter with no
+ * year and no dates (see `exportRptiReportToExcel`'s columns), so importing one
+ * has to turn that back into a period before the planned work can be placed on
+ * a timeline. Kept as a named function rather than inline arithmetic so the
+ * boundary dates are testable, and so the round trip
+ * `deriveQuarterFromDate(periodForQuarter(q, y).startDate) === q` can be
+ * asserted — if that ever broke, an imported row would regenerate into a
+ * different quarter than the bank filed.
+ */
+export function periodForQuarter(quarter: RptiQuarter, year: number): { startDate: string; endDate: string } {
+  const spans: Record<RptiQuarter, [string, string]> = {
+    Q1: ['01-01', '03-31'],
+    Q2: ['04-01', '06-30'],
+    Q3: ['07-01', '09-30'],
+    Q4: ['10-01', '12-31'],
+  };
+  const [start, end] = spans[quarter];
+  return { startDate: `${year}-${start}`, endDate: `${year}-${end}` };
+}
+
 export function isLiveStatusId(statusId: string, deliverableStatuses: DeliverableStatus[]): boolean {
   const status = deliverableStatuses.find(s => s.id === statusId);
   if (status) return !!status.isLiveStatus || (!deliverableStatuses.some(s => s.isLiveStatus) && (statusId === LIVE_STATUS_FALLBACK_ID || LIVE_STATUS_FALLBACK_PATTERN.test(status.name)));
@@ -72,6 +96,12 @@ export interface GenerateRptiDetailsInput {
   deliverables: Deliverable[];
   assets: Asset[];
   assetCategories: AssetCategory[];
+  /**
+   * Rows already in the workspace. Supplying them makes generation merge-preserving
+   * instead of wipe-and-rebuild; omitting them keeps the old behaviour of returning
+   * only what could be generated.
+   */
+  existingDetails?: RptiDetail[];
 }
 
 // Resolves the AssetCategory backing a Deliverable's auto-fill defaults, via
@@ -97,7 +127,7 @@ export function generateRptiDetails(
   input: GenerateRptiDetailsInput,
   reportYear: number,
 ): RptiDetail[] {
-  const { deliverableSegments, deliverableStatuses, initiatives, deliverables, assets, assetCategories } = input;
+  const { deliverableSegments, deliverableStatuses, initiatives, deliverables, assets, assetCategories, existingDetails = [] } = input;
 
   // Overlap, not "starts in": a segment qualifies if any part of its
   // [startDate, endDate] range falls within the report year, even if it
@@ -110,15 +140,23 @@ export function generateRptiDetails(
   // Placeholder initiatives (empty markers, not real work) are excluded the same way.
   const initiativeIds = new Set(initiatives.filter(i => i.isPlaceholder !== true).map(i => i.id));
 
-  // A deliverable that already went live in a prior, non-overlapping year already
-  // exists — a planned/funded segment this year is an upgrade to it, not a
-  // first-ever "new" build, regardless of which initiative is now touching it.
+  // A deliverable that was already live before the report year already exists — a
+  // planned/funded segment this year is an upgrade to it, not a first-ever "new"
+  // build, regardless of which initiative is now touching it.
   // Deliberately deliverable-wide (not filtered by initiativeId): "has this ever
   // gone live" is a fact about the deliverable, not about who's working on it now.
+  //
+  // Tested on startDate, not endDate. An application the bank actually runs is
+  // *continuously* live — that is what an LKPTI entry means, "live as at 31
+  // December" — so its segment straddles the report year and would never satisfy
+  // "ended before it". Requiring the live run to have finished first classified
+  // every ongoing application's enhancement as a brand-new build, which is
+  // precisely the misclassification this product exists to avoid. A genuine new
+  // build is still 'new': none of its live segments start before the year.
   const hasPriorLiveSegment = (deliverableId: string): boolean =>
     deliverableSegments.some(seg =>
       seg.deliverableId === deliverableId &&
-      seg.endDate < yearStart &&
+      seg.startDate < yearStart &&
       classifySegmentKind(seg.status, deliverableStatuses) === 'live'
     );
 
@@ -175,7 +213,63 @@ export function generateRptiDetails(
     });
   }
 
-  return results;
+  return mergeWithExisting(results, existingDetails);
+}
+
+/**
+ * Folds freshly generated rows into the rows already present, rather than replacing
+ * them wholesale.
+ *
+ * Wipe-and-rebuild was the shipped v1 (see requirement-specs/rpti-auto-generation.md,
+ * "Regeneration behavior"), on the grounds that losing manual edits could be revisited
+ * if it hurt. It does. A row that generation cannot reproduce is not necessarily stale:
+ * an imported upgrade whose target was not found in the inventory has no segment to
+ * regenerate from, so a wipe silently deleted the filed CapEx, OpEx, quarter and
+ * remarks of the very row most needing attention — and took its data-health warning
+ * with it, so the problem looked solved. Generation is also year-scoped, so rebuilding
+ * one year used to destroy every other year's rows.
+ *
+ * A row is matched to its regenerated counterpart by (initiative, target) rather than
+ * by id, because an imported row and a generated one for the same work carry different
+ * ids. On a match the derived fields refresh and the row keeps its id and the fields
+ * generation has no source for. With no existing rows supplied this returns the
+ * generated list unchanged.
+ */
+function mergeWithExisting(generated: RptiDetail[], existing: RptiDetail[]): RptiDetail[] {
+  if (existing.length === 0) return generated;
+
+  const key = (r: RptiDetail) => `${r.initiativeId}::${r.targetId}`;
+  const freshByKey = new Map(generated.map(r => [key(r), r]));
+  const merged: RptiDetail[] = [];
+  const refreshed = new Set<string>();
+
+  // Existing order first, so regenerating does not reshuffle the table under the user.
+  for (const row of existing) {
+    const k = key(row);
+    const fresh = freshByKey.get(k);
+    if (!fresh || refreshed.has(k)) {
+      // Not reproduced, or a second row for the same pair — keep it exactly as it is.
+      // Preserving a duplicate beats silently dropping filed data.
+      merged.push(row);
+      continue;
+    }
+    refreshed.add(k);
+    merged.push({
+      ...fresh,
+      id: row.id,
+      // Generation has no source for these: CapEx/OpEx are overrides on top of the
+      // initiative's figures, and remarks is free text. Rebuilding them from segments
+      // is impossible, so they survive the refresh.
+      capexAmount: row.capexAmount,
+      opexAmount: row.opexAmount,
+      remarks: row.remarks,
+    });
+  }
+
+  for (const [k, fresh] of freshByKey) {
+    if (!refreshed.has(k)) merged.push(fresh);
+  }
+  return merged;
 }
 
 /**

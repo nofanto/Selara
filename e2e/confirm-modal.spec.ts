@@ -65,7 +65,7 @@ test.describe('In-app ConfirmModal — no browser dialogs', () => {
     await openDataManager(page);
     await page.getByTestId('clear-and-start-again-btn').click();
     await expect(page.getByTestId('template-picker-modal')).toBeVisible();
-    await page.getByTestId('template-select-with-demo-btn-rpti').click();
+    await page.getByTestId('template-start-demo-btn').click();
     await expect(page.getByTestId('template-picker-modal')).not.toBeVisible();
 
     const rows = page.locator('table tbody tr');

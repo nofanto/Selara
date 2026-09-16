@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import * as XLSX from 'xlsx';
 import { parseLkptiImportWorkbook, deriveWorkspaceFromLkptiImport, LkptiImportRow } from './lkptiImport';
 import { LKPTI_EXPORT_HEADERS, LKPTI_SHEET_NAME } from './lkpti';
@@ -230,5 +231,117 @@ describe('deriveWorkspaceFromLkptiImport', () => {
   it('preserves the raw developer text on LkptiDetail.developer even for third-party developers', () => {
     const result = deriveWorkspaceFromLkptiImport(rows);
     expect(result.lkptiDetails[1].developer).toBe('PT Third Party Dev');
+  });
+});
+
+describe('a blank developer cell is accepted, not a reason to drop the row', () => {
+  // Selara's own LKPTI export leaves this cell empty for anything not marked
+  // in-house (generateLkptiDetails only ever sets 'inhouse'), so rejecting blank
+  // meant the app could not read back a file it had just written — a real import
+  // of 13 rows kept 1. A missing developer is a completeness gap, which
+  // computeDataHealth already reports; dropping the row loses the application.
+  const blankDeveloperRow = () => {
+    const row = [...VALID_ROW];
+    row[12] = '';
+    return row;
+  };
+
+  it('keeps a row whose developer is blank', () => {
+    const result = parseLkptiImportWorkbook(makeWorkbook([blankDeveloperRow()]));
+    expect(result.skipped).toEqual([]);
+    expect(result.rows).toHaveLength(1);
+    expect(result.rows[0].developerRaw).toBe('');
+  });
+
+  it('leaves the developer unknown rather than defaulting it to PPJTI', () => {
+    const { rows } = parseLkptiImportWorkbook(makeWorkbook([blankDeveloperRow()]));
+    const derived = deriveWorkspaceFromLkptiImport(rows);
+    expect(derived.deliverables[0].developer).toBeUndefined();
+    expect(derived.lkptiDetails[0].developer).toBeUndefined();
+  });
+
+  it('still reads an explicit developer', () => {
+    const { rows } = parseLkptiImportWorkbook(makeWorkbook([VALID_ROW]));
+    const derived = deriveWorkspaceFromLkptiImport(rows);
+    expect(derived.deliverables[0].developer).toBe('inhouse');
+    expect(derived.lkptiDetails[0].developer).toBe('inhouse');
+  });
+});
+
+describe('round trip against the real exporter', () => {
+  // The bug this guards: generateLkptiDetails only ever writes 'inhouse' into the
+  // developer column, so a return Selara exported itself came back with 12 of its
+  // 13 rows rejected as malformed. What the app writes, it must read back.
+  const load = (name: string) => {
+    const buf = readFileSync(new URL(`../../e2e/fixtures/${name}`, import.meta.url));
+    return XLSX.read(buf, { type: 'buffer' });
+  };
+
+  it('reads back every row of a return this app exported', () => {
+    const { rows, skipped } = parseLkptiImportWorkbook(load('lkpti-format-3.2.6.xlsx'));
+    expect(skipped).toEqual([]);
+    expect(rows.length).toBeGreaterThan(0);
+  });
+
+  // 240, not 300: the scale workspace holds 300 deliverables, of which 240 are
+  // LKPTI-eligible applications. The number to hold onto is that none are skipped.
+  it('handles a full-scale return without skipping anything', () => {
+    const { rows, skipped } = parseLkptiImportWorkbook(load('lkpti-format-3.2.6-scale-300.xlsx'));
+    expect(skipped).toEqual([]);
+    expect(rows).toHaveLength(240);
+  });
+
+  it('turns that return into one application per filed row', () => {
+    const { rows } = parseLkptiImportWorkbook(load('lkpti-format-3.2.6.xlsx'));
+    const out = deriveWorkspaceFromLkptiImport(rows);
+    expect(out.deliverables).toHaveLength(rows.length);
+    expect(out.lkptiDetails).toHaveLength(rows.length);
+  });
+});
+
+describe('a blank category cell is accepted, but a wrong one is not', () => {
+  const withCategory = (value: string) => {
+    const row = [...VALID_ROW];
+    row[1] = value;
+    return makeWorkbook([row]);
+  };
+
+  it('keeps a row that states no category, and buckets it visibly', () => {
+    const { rows, skipped } = parseLkptiImportWorkbook(withCategory(''));
+    expect(skipped).toEqual([]);
+    const out = deriveWorkspaceFromLkptiImport(rows);
+    expect(out.deliverables[0].categoryCode).toBeUndefined();
+    expect(out.assetCategories[0].name).toBe('Uncategorised');
+    expect(out.assetCategories[0].categoryCode).toBeUndefined();
+  });
+
+  it('still rejects a category code that is present but not an LKPTI code', () => {
+    const { rows, skipped } = parseLkptiImportWorkbook(withCategory('77 — Not a thing'));
+    expect(rows).toEqual([]);
+    expect(skipped[0].reason).toMatch(/Unrecognized category code/);
+  });
+});
+
+describe('colours are Tailwind classes, not hex or bare colour names', () => {
+  // See the note on the status in lkptiImport.ts: 'green' matched no Tailwind
+  // class, so every imported lifecycle segment drew with no fill.
+  it('gives every imported deliverable status a class the visualiser can render', () => {
+    const { rows } = parseLkptiImportWorkbook(makeWorkbook([VALID_ROW]));
+    const out = deriveWorkspaceFromLkptiImport(rows);
+    expect(out.deliverableStatuses.length).toBeGreaterThan(0);
+    for (const s of out.deliverableStatuses) expect(s.color).toMatch(/^bg-[a-z]+-\d{2,3}$/);
+  });
+});
+
+describe('imported applications state their type', () => {
+  // LKPTI is Daftar Aplikasi, and the parser already rejects the infrastructure
+  // codes, so every surviving row is an application. Reading code defaults an unset
+  // type to 'application' anyway, but the Deliverables tab showed a blank Type
+  // select on all 13 imported rows, which reads as missing data.
+  it('sets type to application rather than leaving it to a fallback', () => {
+    const { rows } = parseLkptiImportWorkbook(makeWorkbook([VALID_ROW]));
+    const out = deriveWorkspaceFromLkptiImport(rows);
+    expect(out.deliverables).toHaveLength(1);
+    expect(out.deliverables[0].type).toBe('application');
   });
 });

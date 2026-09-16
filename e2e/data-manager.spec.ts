@@ -172,7 +172,7 @@ test.describe('Data Manager — reset buttons', () => {
   test('"Clear data and start again" with RPTI catalogue demo data repopulates', async ({ page }) => {
     await page.getByTestId('clear-and-start-again-btn').click();
     await expect(page.getByTestId('template-picker-modal')).toBeVisible();
-    await page.getByTestId('template-select-with-demo-btn-rpti').click();
+    await page.getByTestId('template-start-demo-btn').click();
 
     const count = await page.locator('table tbody tr').count();
     expect(count).toBe(49); // 22 original + 26 RPTI catalogue + 1 ghost

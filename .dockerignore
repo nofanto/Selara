@@ -1,0 +1,31 @@
+# The Dockerfile runs `npm ci` and then `COPY . .`, so without this the host's
+# node_modules is copied over the container's freshly installed one — including
+# platform-specific binaries built for the developer's machine rather than the
+# image.
+#
+# Deliberately NOT excluded: docs/ and *.md. HelpView globs
+# `/docs/user-guide/**/*.md` at build time (HelpView.tsx:147) and compiles the
+# guide into the bundle, so excluding either would produce an image whose in-app
+# user guide is silently empty.
+node_modules/
+dist/
+build/
+coverage/
+
+# Test and CI output — rebuilt or irrelevant to the image
+test-results/
+playwright-report/
+e2e/
+*.log
+
+# Repository and process metadata — not read by the build
+.git/
+.github/
+.specify/
+.claude/
+specs/
+requirement-specs/
+Dockerfile*
+.dockerignore
+.env*
+.DS_Store

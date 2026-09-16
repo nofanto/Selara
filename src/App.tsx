@@ -31,18 +31,22 @@ import { Asset, Deliverable, DeliverableSegment, DeliverableStatus, Decision, Rp
 import { cn } from './lib/utils';
 import { getAppData, saveAppData, getAllVersions } from './lib/db';
 import { importFromExcel } from './lib/excel';
+import { parseRptiImportFile, deriveWorkspaceFromRptiImport } from './lib/rptiImport';
 import { parseLkptiImportFile, deriveWorkspaceFromLkptiImport } from './lib/lkptiImport';
 import { validateImportSchema } from './lib/importValidation';
 import { importSharedWorkspace } from './lib/share';
 import { getTemplateData, TemplateId } from './lib/workspaceTemplates';
+import { rptiCatalogueAssetCategories } from './lib/rptiCatalogue';
 import { buildRestoredWorkspace, isWorkspaceEmpty } from './lib/workspaceState';
 import { HealthIssueLocation, DataManagerTab } from './lib/dataHealth';
 import { SYNC_CHANNEL_NAME, generateTabId, isRemoteSaveMessage, notifyDataSaved } from './lib/tabSync';
+import { mergeDeliverableStatuses } from './lib/deliverableStatusDefaults';
 
 // Lazy load modals and heavy components for code splitting
 const FeaturesModal = lazy(() => import('./components/FeaturesModal').then(m => ({ default: m.FeaturesModal })));
 const KeyboardShortcutsModal = lazy(() => import('./components/KeyboardShortcutsModal').then(m => ({ default: m.KeyboardShortcutsModal })));
 const TemplatePickerModal = lazy(() => import('./components/TemplatePickerModal').then(m => ({ default: m.TemplatePickerModal })));
+type OnboardingImportRequest = import('./components/TemplatePickerModal').OnboardingImportRequest;
 const DataManager = lazy(() => import('./components/DataManager').then(m => ({ default: m.DataManager })));
 const HistoryView = lazy(() => import('./components/HistoryView').then(m => ({ default: m.HistoryView })));
 const ReportsView = lazy(() => import('./components/ReportsView').then(m => ({ default: m.ReportsView })));
@@ -150,6 +154,11 @@ export default function App() {
   const [versions, setVersions] = useState<Version[]>([]);
 
   const [undoStack, setUndoStack] = useState<AppState[]>([]);
+  const [initialReport, setInitialReport] = useState<'data-health' | undefined>(undefined);
+  const [importSummary, setImportSummary] = useState<{
+    lkptiYear: number; rptiYear?: number; lkptiRows: number; rptiRows: number;
+    skipped: { rowNumber: number; reason: string }[]; unresolved: number;
+  } | null>(null);
   const [redoStack, setRedoStack] = useState<AppState[]>([]);
   const [dbSaveError, setDbSaveError] = useState<string | null>(null);
 
@@ -438,57 +447,98 @@ export default function App() {
     }
   }, []);
 
-  // See requirement-specs/lkpti-import-onboarding.md and docs/user-stories/20-lkpti-import-onboarding.md.
-  const handleLkptiImport = useCallback(async (file: File) => {
-    try {
-      const { rows, skipped } = await parseLkptiImportFile(file);
-      if (rows.length === 0) {
-        setDbSaveError(skipped.length > 0
-          ? `No rows could be imported — every row had a problem (e.g. row ${skipped[0].rowNumber}: ${skipped[0].reason}).`
-          : 'No data rows found in this file.');
-        return;
-      }
-
-      const derived = deriveWorkspaceFromLkptiImport(rows);
-      const blank = getTemplateData('lkpti-import', false);
-      const data: AppState = {
-        ...blank,
-        assetCategories: derived.assetCategories,
-        assets: derived.assets,
-        deliverables: derived.deliverables,
-        deliverableSegments: derived.deliverableSegments,
-        deliverableStatuses: derived.deliverableStatuses,
-        lkptiDetails: derived.lkptiDetails,
-        versions: [],
-      };
-      await saveAppData(data);
-      setAssets(data.assets);
-      setDeliverables(data.deliverables);
-      setDeliverableSegments(data.deliverableSegments);
-      setInitiatives(data.initiatives);
-      setMilestones(data.milestones);
-      setProgrammes(data.programmes);
-      setStrategies(data.strategies);
-      setDependencies(data.dependencies);
-      setAssetCategories(data.assetCategories);
-      setTimelineSettings(sanitizeTimelineSettings(data.timelineSettings));
-      setResources(data.resources);
-      setDeliverableStatuses(data.deliverableStatuses);
-      // Establishes a new workspace, so resetting the decision log is correct:
-      // its records reference entity IDs that no longer exist (ADR-0011).
-      setDecisions(data.decisions || []);
-      setRptiDetails(data.rptiDetails || []);
-      setLkptiDetails(data.lkptiDetails || []);
-      setVersions([]);
-      setShowTemplatePicker(false);
-      setTemplatePickerIsReset(false);
-      if (skipped.length > 0) {
-        setDbSaveError(`Imported ${rows.length} row(s). Skipped ${skipped.length} row(s) with problems (e.g. row ${skipped[0].rowNumber}: ${skipped[0].reason}).`);
-      }
-    } catch (error) {
-      console.error('LKPTI import failed:', error instanceof Error ? `${error.name}: ${error.message}` : error);
-      setDbSaveError(error instanceof Error ? error.message : 'Failed to import this file as an LKPTI Format 3.2.6 report.');
+  /**
+   * Onboarding from filed returns (specs/001-rpti-import-onboarding).
+   *
+   * LKPTI first, always: it establishes what the bank actually runs, so the plan
+   * can be read against a known inventory rather than two unknown lists being
+   * merged into each other. The RPTI is optional — a bank may only have last
+   * year's inventory to hand.
+   *
+   * Each return carries its own reporting year. An inventory *as at* 2026 beside
+   * a plan *for* 2027 is the normal pairing, and neither layout carries a year,
+   * so neither can be inferred.
+   *
+   * Everything is persisted in one write. There is no staging area: an import
+   * that is refused leaves the workspace untouched, and recovery from an unwanted
+   * result is the existing start-over mechanism.
+   */
+  const handleImportReturns = useCallback(async (request: OnboardingImportRequest) => {
+    const lk = await parseLkptiImportFile(request.lkptiFile);
+    if (lk.rows.length === 0) {
+      throw new Error(lk.skipped.length > 0
+        ? `No rows could be imported — every row had a problem (e.g. row ${lk.skipped[0].rowNumber}: ${lk.skipped[0].reason}).`
+        : 'No data rows found in this LKPTI file.');
     }
+    const lkDerived = deriveWorkspaceFromLkptiImport(lk.rows);
+
+    let rpDerived: ReturnType<typeof deriveWorkspaceFromRptiImport> | null = null;
+    let rpSkipped: { rowNumber: number; reason: string }[] = [];
+    let rpRowCount = 0;
+    if (request.rptiFile && request.rptiYear) {
+      const rp = await parseRptiImportFile(request.rptiFile);
+      rpSkipped = rp.skipped;
+      rpRowCount = rp.rows.length;
+      rpDerived = deriveWorkspaceFromRptiImport(rp.rows, request.rptiYear, {
+        deliverables: lkDerived.deliverables,
+        assets: lkDerived.assets,
+        assetCategories: lkDerived.assetCategories,
+        // So an upgrade attaching to an application the LKPTI already supplied does
+        // not get a second, redundant live period drawn inside the first.
+        deliverableSegments: lkDerived.deliverableSegments,
+        deliverableStatuses: lkDerived.deliverableStatuses,
+      });
+    }
+
+    const blank = getTemplateData('lkpti-import', false);
+    const data: AppState = {
+      ...blank,
+      assetCategories: [...lkDerived.assetCategories, ...(rpDerived?.assetCategories ?? [])],
+      assets: [...lkDerived.assets, ...(rpDerived?.assets ?? [])],
+      deliverables: [...lkDerived.deliverables, ...(rpDerived?.deliverables ?? [])],
+      deliverableSegments: [...lkDerived.deliverableSegments, ...(rpDerived?.deliverableSegments ?? [])],
+      deliverableStatuses: mergeDeliverableStatuses(lkDerived.deliverableStatuses, rpDerived?.deliverableStatuses),
+      initiatives: rpDerived?.initiatives ?? [],
+      programmes: rpDerived?.programmes ?? [],
+      rptiDetails: rpDerived?.rptiDetails ?? [],
+      lkptiDetails: lkDerived.lkptiDetails,
+      versions: [],
+    };
+
+    await saveAppData(data);
+    setAssets(data.assets);
+    setDeliverables(data.deliverables);
+    setDeliverableSegments(data.deliverableSegments);
+    setInitiatives(data.initiatives);
+    setMilestones(data.milestones);
+    setProgrammes(data.programmes);
+    setStrategies(data.strategies);
+    setDependencies(data.dependencies);
+    setAssetCategories(data.assetCategories);
+    setTimelineSettings(sanitizeTimelineSettings(data.timelineSettings));
+    setResources(data.resources);
+    setDeliverableStatuses(data.deliverableStatuses);
+    // Establishes a new workspace, so resetting the decision log is correct:
+    // its records reference entity IDs that no longer exist (ADR-0011).
+    setDecisions(data.decisions || []);
+    setRptiDetails(data.rptiDetails || []);
+    setLkptiDetails(data.lkptiDetails || []);
+    setVersions([]);
+
+    setImportSummary({
+      lkptiYear: request.lkptiYear,
+      rptiYear: request.rptiYear,
+      lkptiRows: lk.rows.length,
+      rptiRows: rpRowCount,
+      skipped: [...lk.skipped, ...rpSkipped],
+      unresolved: rpDerived?.unresolved.length ?? 0,
+    });
+    setShowTemplatePicker(false);
+    setTemplatePickerIsReset(false);
+    // FR-022: land on the data-health review, so the first thing seen after an
+    // import is what needs attention.
+    setInitialReport('data-health');
+    setView('reports');
   }, []);
 
   const handleUpdate = useCallback(async (data: AppState, skipHistory = false) => {
@@ -734,7 +784,19 @@ export default function App() {
     const existingExternalIds = new Set(assets.map(a => a.externalId).filter(Boolean));
     const toAdd = newAssets.filter(a => !a.externalId || !existingExternalIds.has(a.externalId));
     if (toAdd.length === 0) return;
-    handleUpdate({ assets: [...assets, ...toAdd], deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails });
+
+    // Bring the catalogue's own category along if the workspace hasn't got it.
+    // These assets carry a `cat-rpti-NN` categoryId, which previously only existed
+    // because the catalogue was reachable solely from the RPTI template — that
+    // template seeds them. Now that a blank workspace surfaces the catalogue too
+    // (#38), adding an area without its category would create orphaned assets
+    // that render nowhere and trip dataHealth's dangling-category check.
+    const existingCategoryIds = new Set(assetCategories.map(c => c.id));
+    const missingCategories = rptiCatalogueAssetCategories.filter(
+      c => !existingCategoryIds.has(c.id) && toAdd.some(a => a.categoryId === c.id),
+    );
+
+    handleUpdate({ assets: [...assets, ...toAdd], deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories: [...assetCategories, ...missingCategories], timelineSettings, resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails });
   }, [assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails, handleUpdate]);
 
   const handleAddDecision = useCallback((newDecision: Decision) => {
@@ -1348,6 +1410,7 @@ export default function App() {
         <DataControls
           data={{ assets, deliverables, deliverableSegments, deliverableStatuses, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, versions, decisions, rptiDetails, lkptiDetails }}
           onImport={handleUpdate}
+          onViewerImport={handleViewerImport}
           onError={setDbSaveError}
           timelineId={view === 'visualiser' ? 'timeline-visualiser' : undefined}
         />
@@ -1587,6 +1650,7 @@ export default function App() {
         ) : view === 'reports' ? (
           <Suspense fallback={<LoadingFallback />}>
             <ReportsView
+              initialReport={initialReport}
               assets={assets}
               initiatives={initiatives}
               milestones={milestones}
@@ -1680,10 +1744,45 @@ export default function App() {
         </Suspense>
       </ModalErrorBoundary>
 
+      {importSummary && (
+        <div
+          data-testid="import-summary"
+          className="fixed bottom-4 right-4 z-[150] max-w-md bg-white border border-slate-200 rounded-xl shadow-lg p-4 text-sm"
+        >
+          <div className="flex items-start justify-between gap-3 mb-2">
+            <h4 className="font-bold text-slate-800">Import complete</h4>
+            <button
+              onClick={() => setImportSummary(null)}
+              data-testid="import-summary-dismiss"
+              aria-label="Dismiss import summary"
+              className="text-slate-400 hover:text-slate-600"
+            >
+              <X size={16} />
+            </button>
+          </div>
+          <p className="text-slate-600">
+            LKPTI {importSummary.lkptiYear}: {importSummary.lkptiRows} row(s)
+            {importSummary.rptiYear ? ` \u00b7 RPTI ${importSummary.rptiYear}: ${importSummary.rptiRows} row(s)` : ' \u00b7 no RPTI supplied'}
+          </p>
+          {/* Stated even when zero: silence and success must not look identical. */}
+          <p className="text-slate-500 mt-1">
+            {importSummary.skipped.length === 0
+              ? 'No rows were skipped.'
+              : `${importSummary.skipped.length} row(s) skipped \u2014 e.g. row ${importSummary.skipped[0].rowNumber}: ${importSummary.skipped[0].reason}`}
+          </p>
+          {importSummary.unresolved > 0 && (
+            <p className="text-amber-700 mt-1">
+              {importSummary.unresolved} planned upgrade(s) reference an application not in your
+              inventory. They are listed in the data-health review.
+            </p>
+          )}
+        </div>
+      )}
+
       {showTemplatePicker && !showLandingPage && (
         <ModalErrorBoundary onDismiss={() => { setShowTemplatePicker(false); setTemplatePickerIsReset(false); }}>
           <Suspense fallback={null}>
-            <TemplatePickerModal onSelect={handleSelectTemplate} onViewerImport={handleViewerImport} onLkptiImport={handleLkptiImport} isReset={templatePickerIsReset} />
+            <TemplatePickerModal onSelect={handleSelectTemplate} onImportReturns={handleImportReturns} isReset={templatePickerIsReset} />
           </Suspense>
         </ModalErrorBoundary>
       )}

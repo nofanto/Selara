@@ -28,6 +28,13 @@ interface ReportsViewProps {
   lkptiDetails?: LkptiDetail[];
   onSaveAsset?: (asset: Asset) => void;
   onNavigate?: (location: HealthIssueLocation, entityName: string) => void;
+  /**
+   * Open directly on a given report instead of the card grid. Needed because
+   * `selectedReport` is local state with no other way in, and onboarding has to
+   * land the user on the data-health review once an import completes.
+   * Applied at mount only, so navigating away and back still returns to the grid.
+   */
+  initialReport?: ReportSlug;
 }
 
 type ReportSlug = 'version-history' | 'budget' | 'initiatives-dependencies' | 'capacity' | 'maturity-heatmap' | 'rpti' | 'lkpti' | 'data-health';
@@ -93,8 +100,8 @@ function depSentence(dep: Dependency, src: Initiative, tgt: Initiative, perspect
   return `${src.name} and ${tgt.name} are related.`;
 }
 
-export function ReportsView({ assets, initiatives, milestones, dependencies, currentData, programmes, strategies, assetCategories, resources = [], deliverables = [], deliverableSegments = [], deliverableStatuses = [], rptiDetails = [], lkptiDetails = [], onSaveAsset, onNavigate }: ReportsViewProps) {
-  const [selectedReport, setSelectedReport] = useState<ReportSlug | null>(null);
+export function ReportsView({ assets, initiatives, milestones, dependencies, currentData, programmes, strategies, assetCategories, resources = [], deliverables = [], deliverableSegments = [], deliverableStatuses = [], rptiDetails = [], lkptiDetails = [], onSaveAsset, onNavigate, initialReport }: ReportsViewProps) {
+  const [selectedReport, setSelectedReport] = useState<ReportSlug | null>(initialReport ?? null);
   /*
    * One piece of state, not two. The panel is open precisely when its asset still
    * exists, so deriving that from `assets` rather than mirroring it into a second

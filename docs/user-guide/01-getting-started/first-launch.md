@@ -1,24 +1,46 @@
 # First Launch
 
-## Choosing a template
+## Two ways to begin
 
-When you open Selara for the first time, a **template picker** appears. Choose the starting point that best matches your agency's needs:
-
-| Template | Best for |
-|----------|----------|
-| **Indonesian Bank Technology Catalogue** | Banks building an application portfolio aligned to OJK's RPTI category codes. Loads a representative demo portfolio across 11 of 18 RPTI areas, with the full catalogue browsable in the catalogue section. |
-| **Viewer** | Uploading an Excel file shared by a colleague to view their portfolio. |
-| **Blank** | Banks with their own internal taxonomy. Starts completely empty. |
-| **Import LKPTI Report** | Banks that have already filed an LKPTI Format 3.2.6 report. Builds a starting workspace directly from that file — see [Importing an Existing LKPTI Report](../15-lkpti-report/importing-an-lkpti-report.md). |
+When you open Selara for the first time you are asked how to start. There are two paths, because
+Selara exists to prepare your OJK regulatory returns — **RPTI** (Format 3.1, the development plan)
+and **LKPTI** (Format 3.2.6, *Daftar Aplikasi*, the application inventory).
 
 ![Template picker modal](../../public/features/template-picker-modal.png)
 
-## With or without demo data
+### Start from your filed returns
 
-For the Indonesian Bank Technology Catalogue template you can choose how to start:
+Upload what you last filed with OJK. Nothing is retyped.
 
-- **With demo data** — loads the template's asset categories and assets, plus a set of example initiatives, milestones, and deliverable lifecycle segments. Use this to explore how Selara works before adding your own data.
-- **Without demo data** — loads only the template's structural elements (asset categories and assets) with no initiatives, milestones, or segments. Use this when you are ready to start building your real portfolio from day one.
+| Slot | |
+|---|---|
+| **LKPTI — Daftar Aplikasi** | **Required.** The applications you run, as at 31 December of the reporting year. |
+| **RPTI — Rencana** | **Optional.** Your development plan for the reporting year — applications *and* infrastructure. |
+
+**Each return is asked for its own reporting year, and they are usually different.** A bank filing
+in late 2026 files an LKPTI *as at* 2026 alongside an RPTI *for* 2027. Neither spreadsheet layout
+contains a year, so Selara cannot work it out and will not guess.
+
+The LKPTI is imported first, so your plan can be read against the inventory it refers to. Where a
+planned **upgrade** matches an application you already run, the plan is attached to it rather than
+creating a duplicate. Where it matches nothing — the two returns often name things differently —
+the row is still imported and flagged for you in the data-health review, rather than being guessed
+at or silently duplicated.
+
+When the import finishes you land on the **data-health review**, so the first thing you see is what
+needs your attention.
+
+Importing only the LKPTI is perfectly valid; you will have an inventory and no plan.
+
+### Start empty
+
+| | |
+|---|---|
+| **Start blank** | Build your portfolio from scratch. The standard OJK technology areas can be added at any time from the catalogue section in the Visualiser. |
+| **Explore with demo data** | Loads a representative bank portfolio across 11 of 18 RPTI areas, with initiatives, deliverables, lifecycle segments, resources and budget figures. Use this to see how Selara works before committing your own data. |
+
+> **Opening a colleague's file.** Viewing a portfolio someone else exported is not a way of starting
+> your own workspace, so it is not offered here. Use **Open shared** in the import/export controls.
 
 ## After choosing a template
 
@@ -26,7 +48,7 @@ A tutorial modal appears automatically. It walks through the key features in fiv
 
 ## The demo data
 
-The Indonesian Bank Technology Catalogue template loads a representative bank portfolio across 11 of 18 RPTI areas, with initiatives, deliverables, lifecycle segments, resources, and budget figures.
+Choosing **Explore with demo data** loads a representative bank portfolio across 11 of 18 RPTI areas, with initiatives, deliverables, lifecycle segments, resources, and budget figures.
 
 The demo data is safe to experiment with. You can:
 

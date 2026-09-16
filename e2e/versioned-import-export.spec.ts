@@ -34,7 +34,7 @@ test.describe('Versioned Import/Export', () => {
 
     // 4. Import the file we just exported
     await page.getByTestId('nav-data-manager').click();
-    await page.setInputFiles('input[type="file"]', exportPath!);
+    await page.getByTestId('import-file-input').setInputFiles(exportPath!);
     
     // Verify the preview shows the version count
     const previewModal = page.locator('.import-preview-modal');
@@ -89,7 +89,7 @@ test.describe('Versioned Import/Export', () => {
 
     // 4. Merge import back in (it contains V1)
     await page.getByTestId('nav-data-manager').click();
-    await page.setInputFiles('input[type="file"]', exportPath!);
+    await page.getByTestId('import-file-input').setInputFiles(exportPath!);
     await page.getByRole('button', { name: 'Merge Data' }).click();
 
     // 5. Verify both versions now exist
@@ -139,7 +139,7 @@ test.describe('Decision log survives export/import (#22)', () => {
 
     // 4. Re-import with Overwrite All Data — the exact path #22 reported.
     await page.getByTestId('nav-data-manager').click();
-    await page.setInputFiles('input[type="file"]', exportPath!);
+    await page.getByTestId('import-file-input').setInputFiles(exportPath!);
     await expect(page.locator('.import-preview-modal')).toBeVisible();
     await page.getByRole('button', { name: 'Overwrite All Data' }).click();
     await expect(page.getByTestId('import-success-notification')).toBeVisible();

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { generateRptiDetails, GenerateRptiDetailsInput } from './rpti';
+import { generateRptiDetails, GenerateRptiDetailsInput, periodForQuarter, deriveQuarterFromDate } from './rpti';
 import type { AssetCategory, Asset, Deliverable, DeliverableSegment, DeliverableStatus, Initiative } from '../types';
 
 const statuses: DeliverableStatus[] = [
@@ -345,5 +345,155 @@ describe('generateRptiDetails — DC/DR location auto-fill', () => {
     expect(rows[0].dcCountry).toBeUndefined();
     expect(rows[0].drCity).toBeUndefined();
     expect(rows[0].drCountry).toBeUndefined();
+  });
+});
+
+describe('periodForQuarter', () => {
+  // The inverse of deriveQuarterFromDate. Needed because a filed RPTI return
+  // states a planned implementation quarter with no year and no dates, so
+  // imported work has to be given a period (spec FR-016).
+  it('maps each quarter to its calendar span within the given year', () => {
+    expect(periodForQuarter('Q1', 2027)).toEqual({ startDate: '2027-01-01', endDate: '2027-03-31' });
+    expect(periodForQuarter('Q2', 2027)).toEqual({ startDate: '2027-04-01', endDate: '2027-06-30' });
+    expect(periodForQuarter('Q3', 2027)).toEqual({ startDate: '2027-07-01', endDate: '2027-09-30' });
+    expect(periodForQuarter('Q4', 2027)).toEqual({ startDate: '2027-10-01', endDate: '2027-12-31' });
+  });
+
+  it('round-trips through deriveQuarterFromDate for both boundaries', () => {
+    // If this ever fails, an imported row would regenerate into a different
+    // quarter than the one the bank filed.
+    for (const q of ['Q1', 'Q2', 'Q3', 'Q4'] as const) {
+      const { startDate, endDate } = periodForQuarter(q, 2027);
+      expect(deriveQuarterFromDate(startDate)).toBe(q);
+      expect(deriveQuarterFromDate(endDate)).toBe(q);
+    }
+  });
+
+  it('handles a leap year without shifting Q1', () => {
+    expect(periodForQuarter('Q1', 2028)).toEqual({ startDate: '2028-01-01', endDate: '2028-03-31' });
+  });
+
+  it('is year-agnostic in shape', () => {
+    expect(periodForQuarter('Q3', 2026).startDate).toBe('2026-07-01');
+    expect(periodForQuarter('Q3', 2030).endDate).toBe('2030-09-30');
+  });
+});
+
+describe('an application that is continuously live counts as pre-existing', () => {
+  /**
+   * The case every earlier test missed. Each of them gave the deliverable a live
+   * segment that had already *ended* before the report year, so "ended before" and
+   * "started before" were indistinguishable. A real bank application is not like
+   * that: an LKPTI entry means "live as at 31 December", so its segment straddles
+   * the report year and never ends before it. Under the old rule, planning an
+   * enhancement to an application the bank actually runs filed it as a brand-new
+   * build.
+   */
+  const stillLive = () => makeSegment({
+    id: 'seg-live-since-2021', status: 'appstatus-in-production',
+    startDate: '2021-08-17', endDate: '2031-12-31', initiativeId: undefined,
+  });
+
+  it('classifies planned work on a continuously live application as "upgrade"', () => {
+    const rows = generateRptiDetails(makeContext({
+      deliverableSegments: [
+        stillLive(),
+        makeSegment({ id: 'seg-plan-2027', status: 'appstatus-planned', startDate: '2027-01-01', endDate: '2027-03-31' }),
+      ],
+      initiatives: [makeInitiative({ startDate: '2027-01-01', endDate: '2027-03-31' })],
+    }), 2027);
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].developmentType).toBe('upgrade');
+  });
+
+  it('still calls a first-ever build "new" — nothing of it was live before the year', () => {
+    const rows = generateRptiDetails(makeContext({
+      deliverableSegments: [
+        makeSegment({ id: 'seg-plan-2027', status: 'appstatus-planned', startDate: '2027-01-01', endDate: '2027-06-30' }),
+        makeSegment({ id: 'seg-live-2027', status: 'appstatus-in-production', startDate: '2027-06-30', endDate: '2030-12-31' }),
+      ],
+      initiatives: [makeInitiative({ startDate: '2027-01-01', endDate: '2027-06-30' })],
+    }), 2027);
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].developmentType).toBe('new');
+  });
+});
+
+describe('regenerating merges instead of wiping', () => {
+  /**
+   * Wipe-and-rebuild was the shipped v1. It meant a row generation cannot reproduce
+   * was deleted — and the row that most needs a person, an imported upgrade whose
+   * target was never found, is exactly that kind of row: it has no segment, so it
+   * regenerates to nothing. One click destroyed its filed CapEx, OpEx, quarter and
+   * remarks, and removed its data-health warning, so the problem looked solved.
+   */
+  const liveSegment = () => makeSegment({
+    id: 'seg-live', status: 'appstatus-in-production',
+    startDate: '2021-01-01', endDate: '2031-12-31', initiativeId: undefined,
+  });
+  const plannedSegment = () => makeSegment({
+    id: 'seg-plan', status: 'appstatus-planned', startDate: '2027-01-01', endDate: '2027-03-31',
+  });
+  const ctx = (existingDetails: any[]) => makeContext({
+    deliverableSegments: [liveSegment(), plannedSegment()],
+    initiatives: [makeInitiative({ startDate: '2027-01-01', endDate: '2027-03-31' })],
+    existingDetails,
+  });
+
+  const orphan = {
+    id: 'rpti-import-row-9', initiativeId: 'init-orphan', targetType: 'deliverable',
+    targetId: 'rpti-import-unresolved-9', developmentType: 'upgrade',
+    capexAmount: 4200, opexAmount: 900, plannedImplementationQuarter: 'Q4',
+    remarks: 'Filed against an application not in the inventory.',
+  } as any;
+
+  it('keeps a row it cannot reproduce, with its filed figures intact', () => {
+    const rows = generateRptiDetails(ctx([orphan]), 2027);
+    const kept = rows.find(r => r.id === 'rpti-import-row-9');
+    expect(kept).toBeDefined();
+    expect(kept).toMatchObject({
+      capexAmount: 4200, opexAmount: 900, plannedImplementationQuarter: 'Q4',
+      developmentType: 'upgrade', remarks: 'Filed against an application not in the inventory.',
+    });
+  });
+
+  it('refreshes a row it can reproduce, keeping its id and the fields it has no source for', () => {
+    const existing = {
+      id: 'rpti-import-row-1', initiativeId: 'init-1', targetType: 'deliverable', targetId: 'deliv-1',
+      developmentType: 'new', capexAmount: 5000, opexAmount: 750,
+      remarks: 'Board approved.', plannedImplementationQuarter: 'Q4',
+    } as any;
+    const rows = generateRptiDetails(ctx([existing]), 2027);
+    const row = rows.find(r => r.initiativeId === 'init-1');
+    expect(rows).toHaveLength(1);
+    expect(row!.id).toBe('rpti-import-row-1');          // id survives
+    expect(row!.capexAmount).toBe(5000);                 // no generation source
+    expect(row!.remarks).toBe('Board approved.');        // no generation source
+    expect(row!.developmentType).toBe('upgrade');        // derived — refreshed
+    expect(row!.plannedImplementationQuarter).toBe('Q1'); // derived from the segment
+  });
+
+  it('does not destroy rows belonging to another report year', () => {
+    const otherYear = { ...orphan, id: 'row-2028', initiativeId: 'init-2028', targetId: 'deliv-2028' };
+    const rows = generateRptiDetails(ctx([otherYear]), 2027);
+    expect(rows.map(r => r.id)).toContain('row-2028');
+  });
+
+  it('behaves exactly as before when no existing rows are supplied', () => {
+    const without = generateRptiDetails(makeContext({
+      deliverableSegments: [liveSegment(), plannedSegment()],
+      initiatives: [makeInitiative({ startDate: '2027-01-01', endDate: '2027-03-31' })],
+    }), 2027);
+    expect(without).toHaveLength(1);
+    expect(without[0].id).toMatch(/^rpti-gen-/);
+  });
+
+  it('keeps a duplicate pair rather than silently dropping one', () => {
+    const a = { id: 'dup-a', initiativeId: 'init-1', targetType: 'deliverable', targetId: 'deliv-1', developmentType: 'new' } as any;
+    const b = { ...a, id: 'dup-b', remarks: 'second row for the same work' };
+    const rows = generateRptiDetails(ctx([a, b]), 2027);
+    expect(rows.map(r => r.id).sort()).toEqual(['dup-a', 'dup-b']);
   });
 });
