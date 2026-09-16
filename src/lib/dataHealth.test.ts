@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeDataHealth, DataHealthInput } from './dataHealth';
+import { computeDataHealth, DataHealthInput, checkOf } from './dataHealth';
 
 const statuses = [
   { id: 'appstatus-planned', name: 'Planned', color: 'slate', isPreLaunchStatus: true },
@@ -493,5 +493,76 @@ describe('computeDataHealth — unresolved RPTI import references (#38)', () => 
       rptiDetails: [resolved],
     }));
     expect(findIssue(issues, `rpti-target:${resolved.id}`)).toBeUndefined();
+  });
+});
+
+describe('every check declares which return it bears on', () => {
+  /**
+   * REPORTS_BY_CHECK defaults to [] — affects no filing — so a check added without
+   * an entry disappears from the RPTI and LKPTI filters silently, with no error and
+   * a green suite. This asserts the classification keeps up with the checks.
+   *
+   * It works by driving a workspace deliberately broken in every way the checks
+   * look for, then requiring every issue that fires to carry a non-accidental
+   * classification.
+   */
+  const brokenEverything = () => {
+    const base = baseInput();
+    return {
+      ...base,
+      // Dangling references of every shape.
+      deliverables: [
+        { id: 'd-1', assetId: 'missing-asset', name: 'Orphan', type: 'application' },
+        { id: 'd-2', assetId: 'a-1', name: 'No segments', type: 'application' },
+      ],
+      assets: [{ id: 'a-1', name: 'A', categoryId: 'missing-category' }],
+      assetCategories: [],
+      deliverableSegments: [
+        { id: 's-1', deliverableId: 'missing-deliverable', startDate: '2027-01-01', endDate: '2027-02-01', status: 'missing-status', initiativeId: 'missing-initiative' },
+      ],
+      deliverableStatuses: [],
+      initiatives: [
+        { id: 'i-1', name: 'I', programmeId: 'missing-programme', strategyId: 'missing-strategy',
+          assetId: 'missing-asset', deliverableId: 'missing-deliverable', ownerId: 'missing-resource',
+          resourceIds: ['missing-resource'], startDate: '2027-01-01', endDate: '2027-12-31', capex: 0, opex: 0 },
+      ],
+      milestones: [{ id: 'm-1', assetId: 'missing-asset', date: '2027-01-01', name: 'M', type: 'info' }],
+      dependencies: [{ id: 'dep-1', sourceId: 'missing', targetId: 'missing', type: 'blocks' }],
+      decisions: [
+        { id: 'dec-1', title: 'D', status: 'superseded', supersededBy: 'missing', createdAt: '2027-01-01T00:00:00Z',
+          linkedEntityType: 'asset', linkedEntityId: 'missing' },
+      ],
+      rptiDetails: [{ id: 'r-1', initiativeId: 'missing', targetType: 'deliverable', targetId: 'missing', developmentType: 'new', deliverableSegmentId: 'missing' }],
+      lkptiDetails: [{ id: 'l-1', targetId: 'missing', goLiveDate: 'not-a-date' }],
+      timelineSettings: { defaultCurrency: 'USD' },
+    } as never;
+  };
+
+  it('classifies every check that can fire, rather than defaulting it to "affects nothing"', () => {
+    const issues = computeDataHealth(brokenEverything());
+    expect(issues.length).toBeGreaterThan(10); // guard: otherwise this passes vacuously
+
+    // A check is unclassified if it fires yet reports nothing AND is not one of the
+    // workspace-hygiene checks that genuinely affect no filing.
+    const NON_FILING = new Set([
+      'asset-category', 'deliverable-asset', 'segment-deliverable', 'segment-initiative',
+      'segment-status', 'initiative-asset', 'initiative-deliverable', 'initiative-programme',
+      'initiative-strategy', 'initiative-owner', 'initiative-resource', 'initiative-no-owner',
+      'dependency-source', 'dependency-target', 'milestone-asset',
+      'decision-linked', 'decision-superseded-by',
+    ]);
+    const unclassified = [...new Set(
+      issues.filter(i => i.reports.length === 0).map(i => checkOf(i.id)),
+    )].filter(k => !NON_FILING.has(k));
+
+    expect(unclassified, `unclassified checks — add them to REPORTS_BY_CHECK: ${unclassified.join(', ')}`).toEqual([]);
+  });
+
+  it('gives a filing-relevant check a report, and a hygiene check none', () => {
+    const issues = computeDataHealth(brokenEverything());
+    const byCheck = (k: string) => issues.find(i => checkOf(i.id) === k);
+    expect(byCheck('rpti-target')?.reports).toEqual(['rpti']);
+    expect(byCheck('deliverable-no-segments')?.reports).toEqual(['rpti', 'lkpti']);
+    expect(byCheck('initiative-programme')?.reports).toEqual([]);
   });
 });

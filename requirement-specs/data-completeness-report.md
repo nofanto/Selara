@@ -258,3 +258,90 @@ The rule engine is a deterministic pure function with unit tests; that is where 
 One consequence for the UI worth noting: with two composable filters, a combination can now match
 zero issues while the workspace is not clean, so the empty state distinguishes "no issues match
 the current filters" from "the workspace is clean."
+
+## Phase 3 — Report filter and issue-kind grouping (decided 2026-09-16)
+
+### The problem, measured
+
+Data Health scales as a computation and collapses as a workflow. On a workspace built by
+importing 300-row returns it produces **1,990 issues** — rendered as 1,990 rows in a flat
+list, immediately after onboarding, as the user's first sight of the product.
+
+The volume is not the interesting part. Those 1,990 issues carry only **nine distinct kinds**
+between them:
+
+| | |
+|---|---|
+| 410 | Deliverables with no developer set |
+| 410 | Deliverables missing a DC or DR location |
+| 300 | RPTI rows missing a manual-only field |
+| 300 | Initiatives with no owner assigned |
+| 240 | LKPTI rows missing a manual-only field |
+| 140 | Deliverables whose segments have no Initiative |
+| 120 | Deliverables with no live segment |
+| 40 | Deliverables with no resolvable category |
+| 30 | RPTI rows pointing at a missing target *(error)* |
+
+The information content is nine lines. The presentation was 1,990.
+
+### Decided
+
+**1. `HealthIssue` gains `reports: HealthReport[]`** — which filed returns the issue bears on.
+A list rather than a four-value enum, so "affects both" is `['rpti', 'lkpti']` and filtering to
+one return is `reports.includes(r)` with no special case. Empty means the issue affects neither
+filing: a real problem with the workspace that changes nothing about what is submitted.
+
+The classification lives in **one table**, `REPORTS_BY_CHECK`, rather than at the forty-odd
+push sites. It is a domain judgement and is only reviewable if it can be read in one sitting.
+It is also not invented: nine of the checks already stated their answer in their own message
+text — *"invisible to both RPTI and LKPTI generation"*, *"can never generate an RPTI row"*,
+*"silently excluded from LKPTI generation"*. This makes that queryable instead of prose.
+
+The default is deliberately `[]`. A check that forgets to declare itself should under-claim
+rather than pad a filing-readiness count with something irrelevant — and `dataHealth.test.ts`
+drives a workspace broken in every way the checks look for, then asserts every check that
+fires carries a classification, so the default never silently applies to a new one.
+
+**2. The report filter is the primary axis, above severity and phase.** Which return you are
+preparing is the *task*; severity and phase are properties of an individual finding. All three
+compose.
+
+An issue affecting both returns appears under **each** of them. Someone preparing the RPTI
+needs to see a missing developer even though it also shows under LKPTI — so `RPTI (1,330)` and
+`LKPTI (1,220)` overlap by the 860 issues that hit both, and that is correct rather than
+double-counting.
+
+**3. The list groups by check, one row per kind, expandable to the records.** Ordered by
+severity then by how many records each covers — the two things that decide what to look at
+first. At 300 applications the list renders **9 rows and 39 DOM buttons** in place of 1,990.
+
+**4. Error groups open by default, warning groups closed.** An error blocks filing and there
+are few — one in a sample workspace, thirty in a 300-application one — so putting them behind
+a click buries the only thing that must be dealt with. Implemented as per-group overrides over
+a severity-derived default, rather than a set of open groups, so the default can differ by
+group.
+
+This rule was arrived at from the other direction: every pre-existing E2E case in
+`data-health-report.spec.ts` asserts on an error-severity issue, and all four that broke under
+grouping passed again once errors defaulted open, with no change to the tests. The existing
+tests had encoded what a user needs to see first.
+
+### Rejected
+
+- **Report as a third row of chips, list left flat.** Smallest change and consistent with the
+  two rows already there. But selecting RPTI still leaves ~1,330 individual rows, so it helps a
+  26-issue workspace and not a real one — and three rows of chips is a lot of chrome above the
+  content. The filter and the grouping only solve the problem together.
+- **A two-pane layout**, reports in a left rail. Makes the filing-centric structure most
+  explicit, but the rail is largely empty at four entries and it costs the most layout change.
+- **Splitting "gaps the returns cannot supply" from "problems"** — owner and platform are
+  absent from a filed return by design, so flagging them after onboarding is arguably noise of a
+  different kind. Deferred: it needs a judgement per check about which side it falls on, and the
+  grouping already collapses the noise to one line.
+
+### Not addressed
+
+Grouping makes the volume legible; it does not reduce it. 1,990 gaps still have to be filled by
+someone. Triage-by-exception — dismissing, acknowledging, or bulk-filling a whole kind at once —
+remains unbuilt, and `requirement-specs/it-planning-flow.md` notes the same pattern is wanted
+for the match review queue and the Data Manager tables.

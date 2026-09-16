@@ -152,3 +152,80 @@ test.describe('Data Health report', () => {
     await expect(view).toContainText('No issues match the current filters.');
   });
 });
+
+/**
+ * Issue-kind grouping and the report filter.
+ *
+ * A flat list is legible at the 26 issues a sample workspace produces and unusable
+ * at the 1,990 a 300-application one does — where those 1,990 carry only nine
+ * distinct kinds between them. Grouping is what makes the volume readable; the
+ * report filter alone does not, since selecting RPTI still leaves roughly 1,330.
+ */
+test.describe('Data Health — grouping and the report filter', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector('[data-testid="asset-row-content"]', { timeout: 20000 });
+    await page.getByTestId('nav-reports').click();
+    await page.getByTestId('report-card-data-health').click();
+    await expect(page.getByTestId('data-health-report-view')).toBeVisible();
+  });
+
+  test('shows one row per kind of problem, not one per affected record', async ({ page }) => {
+    const groups = page.locator('[data-testid^="data-health-group-"]:not([data-testid*="count"]):not([data-testid*="items"])');
+    const groupCount = await groups.count();
+    expect(groupCount).toBeGreaterThan(0);
+
+    // Every group states how many records it covers, and at least one covers several —
+    // otherwise grouping is doing nothing and this passes vacuously.
+    const counts = await page.locator('[data-testid^="data-health-group-count-"]').allInnerTexts();
+    expect(counts).toHaveLength(groupCount);
+    expect(counts.some(c => Number(c) > 1)).toBe(true);
+  });
+
+  test('an error group is open by default; a warning group is not', async ({ page }) => {
+    const groups = page.locator('[data-testid^="data-health-group-"]:not([data-testid*="count"]):not([data-testid*="items"])');
+    for (let i = 0; i < await groups.count(); i++) {
+      const g = groups.nth(i);
+      const isError = (await g.innerText()).includes('ERROR');
+      await expect(g, `group ${i}`).toHaveAttribute('aria-expanded', isError ? 'true' : 'false');
+    }
+  });
+
+  test('expanding a group reveals its records, each still navigating on click', async ({ page }) => {
+    const warning = page.locator('[data-testid^="data-health-group-"]:not([data-testid*="count"]):not([data-testid*="items"])')
+      .filter({ hasText: 'WARNING' }).first();
+    const testId = await warning.getAttribute('data-testid');
+    const check = testId!.replace('data-health-group-', '');
+
+    await expect(page.getByTestId(`data-health-group-items-${check}`)).toHaveCount(0);
+    await warning.click();
+    const items = page.getByTestId(`data-health-group-items-${check}`);
+    await expect(items).toBeVisible();
+    expect(await items.locator('button').count()).toBeGreaterThan(0);
+
+    await items.locator('button').first().click();
+    await expect(page.getByTestId('data-manager')).toBeVisible();
+  });
+
+  test('the report filter narrows to what affects one return, and composes with severity', async ({ page }) => {
+    const groups = page.locator('[data-testid^="data-health-group-"]:not([data-testid*="count"]):not([data-testid*="items"])');
+    const all = await groups.count();
+
+    await page.getByTestId('data-health-report-filter-rpti').click();
+    const rptiGroups = await groups.allInnerTexts();
+    expect(rptiGroups.length).toBeGreaterThan(0);
+    // Nothing badged LKPTI-only or Neither survives an RPTI filter.
+    for (const g of rptiGroups) expect(g).not.toContain('NEITHER');
+
+    await page.getByTestId('data-health-report-filter-none').click();
+    for (const g of await groups.allInnerTexts()) expect(g).toContain('NEITHER');
+
+    await page.getByTestId('data-health-report-filter-all').click();
+    await expect(groups).toHaveCount(all);
+  });
+
+  test('a badge says which returns a kind affects', async ({ page }) => {
+    const text = await page.getByTestId('data-health-issue-list').innerText();
+    expect(/RPTI|LKPTI|BOTH|NEITHER/.test(text)).toBe(true);
+  });
+});
