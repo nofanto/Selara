@@ -28,6 +28,9 @@ export type HealthSeverity = 'error' | 'warning';
  */
 export type HealthPhase = 'completeness' | 'validity';
 
+/** A filed OJK return that a check can bear on. */
+export type HealthReport = 'rpti' | 'lkpti';
+
 export interface HealthIssue {
   id: string; // stable, unique per (check, record) — used for React keys and dedup in tests
   severity: HealthSeverity;
@@ -37,6 +40,15 @@ export interface HealthIssue {
   entityName: string; // best-effort human label; also used to pre-fill the Data Manager search box on navigate
   message: string;
   location: HealthIssueLocation;
+  /**
+   * Which filed returns this issue affects. Empty means neither — a real problem
+   * with the workspace that changes nothing about what is submitted.
+   *
+   * A list rather than a four-value enum so that "affects both" is simply
+   * `['rpti', 'lkpti']`, and filtering to one return is `reports.includes(r)`
+   * with no special case for issues that hit both.
+   */
+  reports: HealthReport[];
 }
 
 export interface DataHealthInput {
@@ -93,9 +105,10 @@ export function computeDataHealth(input: DataHealthInput): HealthIssue[] {
   const deliverableById = new Map(deliverables.map(d => [d.id, d]));
   const initiativeById = new Map(initiatives.map(i => [i.id, i]));
 
-  // Checks push without a `phase` — it is stamped on at the end from which array the
-  // issue landed in, rather than repeated at every one of the ~30 push sites.
-  type PendingIssue = Omit<HealthIssue, 'phase'>;
+  // Checks push without `phase` or `reports` — both are stamped on at the end, phase
+  // from which array the issue landed in and reports from REPORTS_BY_CHECK, rather
+  // than repeated at every one of the ~40 push sites.
+  type PendingIssue = Omit<HealthIssue, 'phase' | 'reports'>;
   const issues: PendingIssue[] = [];
   const validityIssues: PendingIssue[] = [];
 
@@ -545,8 +558,75 @@ export function computeDataHealth(input: DataHealthInput): HealthIssue[] {
     });
   }
 
+  const withReports = <T extends { id: string }>(i: T) => ({ ...i, reports: reportsFor(i.id) });
   return [
-    ...issues.map(i => ({ ...i, phase: 'completeness' as const })),
-    ...validityIssues.map(i => ({ ...i, phase: 'validity' as const })),
+    ...issues.map(i => ({ ...withReports(i), phase: 'completeness' as const })),
+    ...validityIssues.map(i => ({ ...withReports(i), phase: 'validity' as const })),
   ];
 }
+
+/**
+ * Which return each check bears on, in one table rather than spread across the
+ * forty-odd places issues are pushed — the classification is a domain judgement
+ * and only reviewable if it can be read in one sitting.
+ *
+ * Several checks already state their answer in their own message text ("invisible
+ * to both RPTI and LKPTI generation", "can never generate an RPTI row", "silently
+ * excluded from LKPTI generation"); this makes that queryable instead of prose.
+ *
+ * The default is deliberately `[]` — affects no filing — because a check that
+ * forgot to declare itself should under-claim rather than pad a filing-readiness
+ * count with something irrelevant. `dataHealth.test.ts` asserts every check that
+ * can actually fire has an entry here, so the default never silently applies to a
+ * new one.
+ */
+const REPORTS_BY_CHECK: Record<string, HealthReport[]> = {
+  // Rows of a return, and the things that stop one being generated at all.
+  'rpti-incomplete': ['rpti'],
+  'rpti-initiative': ['rpti'],
+  'rpti-segment': ['rpti'],
+  'rpti-target': ['rpti'],
+  'deliverable-no-initiative-segment': ['rpti'],
+  'workspace-currency-not-idr': ['rpti'],
+
+  'lkpti-incomplete': ['lkpti'],
+  'lkpti-target': ['lkpti'],
+  'lkpti-golive-future': ['lkpti'],
+  'lkpti-golive-invalid': ['lkpti'],
+  'lkpti-too-long': ['lkpti'],
+  'lkpti-untidy-text': ['lkpti'],
+  'lkpti-duplicate-name': ['lkpti'],
+  'deliverable-no-live-segment': ['lkpti'],
+  'deliverable-no-description': ['lkpti'],
+
+  // Fields both returns carry, so a gap shows up in whichever is filed next.
+  'deliverable-no-segments': ['rpti', 'lkpti'],
+  'deliverable-no-category': ['rpti', 'lkpti'],
+  'deliverable-no-developer': ['rpti', 'lkpti'],
+  'deliverable-no-location': ['rpti', 'lkpti'],
+
+  // Broken references and workspace hygiene. Worth fixing, but nothing here
+  // changes a cell in a filed return, so they must not inflate a readiness count.
+  'asset-category': [],
+  'deliverable-asset': [],
+  'segment-deliverable': [],
+  'segment-initiative': [],
+  'segment-status': [],
+  'initiative-asset': [],
+  'initiative-deliverable': [],
+  'initiative-programme': [],
+  'initiative-strategy': [],
+  'initiative-owner': [],
+  'initiative-resource': [],
+  'initiative-no-owner': [],
+  'dependency-source': [],
+  'dependency-target': [],
+  'milestone-asset': [],
+  'decision-linked': [],
+  'decision-superseded-by': [],
+};
+
+/** The check an issue id belongs to: ids are `check:entityId`, or bare for workspace-wide ones. */
+export const checkOf = (issueId: string): string => issueId.split(':')[0];
+
+const reportsFor = (issueId: string): HealthReport[] => REPORTS_BY_CHECK[checkOf(issueId)] ?? [];
