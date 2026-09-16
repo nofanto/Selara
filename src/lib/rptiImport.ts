@@ -392,6 +392,16 @@ export function deriveWorkspaceFromRptiImport(
       name: row.name,
       programmeId: RPTI_IMPORT_PROGRAMME_ID,
       assetId: initiativeAssetId,
+      // The importer knows exactly which deliverable this row is about — it either
+      // matched it or just created it — so the initiative records it rather than
+      // naming only the asset. It matters most for a matched upgrade, where the
+      // asset can hold several deliverables and the initiative works on one.
+      //
+      // Only when the row resolved. An unresolved row's targetId points at nothing,
+      // and computeDataHealth raises `initiative-deliverable` as an error for a
+      // deliverableId that does not resolve (dataHealth.ts:164) — that row already
+      // has its one finding, and this must not add a second for the same problem.
+      deliverableId: hasEntry ? targetId : undefined,
       startDate: `${reportYear}-01-01`,
       endDate: qEnd,
       capex: row.capexAmount ?? 0,

@@ -422,3 +422,51 @@ describe('an upgrade to infrastructure the LKPTI cannot contain', () => {
     expect(out.deliverables).toEqual([]);
   });
 });
+
+describe('an imported initiative names the deliverable it works on', () => {
+  /**
+   * The initiative used to carry only an assetId, so opening it showed no
+   * deliverable even though the importer knew precisely which one the row matched
+   * or created. An asset can hold several deliverables, so naming the asset alone
+   * loses which one the plan is about.
+   */
+  const parse = (over = {}) => parseRptiImportWorkbook(wb([row(over)])).rows;
+
+  it('links a matched upgrade to the deliverable it attached to', () => {
+    const inventory = {
+      deliverables: [{ id: 'd-1', assetId: 'a-1', name: 'Core Banking GL', type: 'application', categoryCode: '04' } as Deliverable],
+      assets: [{ id: 'a-1', name: 'Core Banking GL', categoryId: 'c-1' } as Asset],
+      assetCategories: [{ id: 'c-1', name: 'Area', categoryCode: '04' } as AssetCategory],
+    };
+    const out = deriveWorkspaceFromRptiImport(parse({ jenis: 'upgrade' }), 2027, inventory);
+    expect(out.unresolved).toEqual([]); // guard
+    expect(out.initiatives[0].deliverableId).toBe('d-1');
+    expect(out.initiatives[0].assetId).toBe('a-1');
+  });
+
+  it('links a created row to the deliverable it created', () => {
+    const out = deriveWorkspaceFromRptiImport(parse({ jenis: 'new' }), 2027, EMPTY);
+    expect(out.initiatives[0].deliverableId).toBe(out.deliverables[0].id);
+  });
+
+  it('leaves it unset for an unresolved row, which has no deliverable to name', () => {
+    // Setting it would point at rpti-import-unresolved-N, which resolves to nothing,
+    // and computeDataHealth reports that as a second error for one problem.
+    const out = deriveWorkspaceFromRptiImport(parse({ jenis: 'upgrade' }), 2027, EMPTY);
+    expect(out.unresolved).toHaveLength(1); // guard
+    expect(out.initiatives[0].deliverableId).toBeUndefined();
+  });
+
+  it('never points an initiative at a deliverable the result does not contain', () => {
+    const { rows } = parseRptiImportWorkbook(wb([
+      row({ name: 'A', jenis: 'new' }),
+      row({ no: 2, name: 'B', jenis: 'upgrade' }),
+      row({ no: 3, name: 'C', jenis: 'new', kategori: RPTI_CATEGORY_LABELS['52'] }),
+    ]));
+    const out = deriveWorkspaceFromRptiImport(rows, 2027, EMPTY);
+    const ids = new Set(out.deliverables.map(d => d.id));
+    for (const i of out.initiatives) {
+      if (i.deliverableId) expect(ids.has(i.deliverableId), i.name).toBe(true);
+    }
+  });
+});
