@@ -69,10 +69,14 @@ These are the assertions the unit tests exist to hold:
    and its status states whether the thing exists yet: `upgrade` → live (the bank already runs it),
    `new` → planned. Nothing asserts that a `new` build reaches production — the return files an
    intention, not an outcome — so no live period is invented for it.
-6a. **A row attaching to an existing entry produces a preceding live segment, a planned segment,
-   and a following live segment.** The preceding one matters even when the target came from an
-   LKPTI: a target built by hand may have no live history, and without it the filed `upgrade`
-   would regenerate as `new`.
+6a. **A row attaching to an existing entry produces the planned segment, and a preceding live
+   segment only when the target has no live history of its own.** The preceding one exists solely
+   to stop the filed `upgrade` regenerating as `new`, which `hasPriorLiveSegment` decides from a
+   live segment starting before the report year. A target from an LKPTI import already has one, so
+   adding another drew a second bar wholly inside the first — and the planned period then claimed
+   pre-launch across years the inventory says the application was live, contradicting it. A target
+   built by hand may have no live segment at all, and still needs it. No trailing live segment is
+   produced, for the same reason a `new` build gets none.
 6b. **A Deliverable is only ever created together with its own Asset**, never attached to an
    existing one.
 7. **An `upgrade` row matching an existing Deliverable on name *and* category attaches to it** and

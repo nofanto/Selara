@@ -9,7 +9,8 @@ import {
   RPTI_IMPORT_LIVE_STATUS_ID,
 } from './rptiImport';
 import { RPTI_CATEGORY_LABELS, generateRptiDetails } from './rpti';
-import type { Asset, AssetCategory, Deliverable } from '../types';
+import type { Asset, AssetCategory, Deliverable, DeliverableSegment } from '../types';
+import { SEEDED_DELIVERABLE_STATUSES } from './deliverableStatusDefaults';
 
 const HEADERS = [
   'No.', 'Nama Aplikasi/Infrastruktur Bank', 'Deskripsi', 'Kategori', 'Jenis Pengembangan',
@@ -139,12 +140,58 @@ describe('deriveWorkspaceFromRptiImport — placement', () => {
     });
   });
 
-  it('gives an upgrade attached to an existing entry a preceding live period', () => {
+  it('adds a preceding live period when the target has no live history of its own', () => {
+    // `inventory` is a bare deliverable with no segments — the shape a hand-built
+    // workspace can have. Without the synthetic prior segment, nothing would tell
+    // regeneration the thing pre-existed and the filed upgrade would come back as new.
     const out = deriveWorkspaceFromRptiImport(parse({ jenis: 'upgrade', quarter: 'Q3' }), 2027, inventory);
-    expect(out.unresolved).toHaveLength(0); // guard: otherwise the next assertion is vacuous
-    expect(out.deliverableSegments).toHaveLength(3);
+    expect(out.unresolved).toHaveLength(0); // guard: otherwise the rest is vacuous
+    expect(out.deliverableSegments).toHaveLength(2);
     const earliest = out.deliverableSegments.map(s => s.startDate).sort()[0];
     expect(earliest < '2027-01-01').toBe(true);
+  });
+
+  it('adds only the planned enhancement when the target is already live', () => {
+    // The LKPTI-backed case: the target carries a live segment from its go-live date,
+    // so a second one drew a shorter bar wholly inside the first, and the planned
+    // period contradicted the inventory by claiming pre-launch while it was live.
+    const out = deriveWorkspaceFromRptiImport(parse({ jenis: 'upgrade', quarter: 'Q3' }), 2027, {
+      ...inventory,
+      deliverableSegments: [{
+        id: 'seg-live', deliverableId: 'd-existing',
+        startDate: '2021-08-17', endDate: '2031-12-31', status: RPTI_IMPORT_LIVE_STATUS_ID,
+      } as DeliverableSegment],
+      deliverableStatuses: SEEDED_DELIVERABLE_STATUSES,
+    });
+    expect(out.unresolved).toHaveLength(0);
+    expect(out.deliverableSegments).toHaveLength(1);
+    expect(out.deliverableSegments[0]).toMatchObject({
+      startDate: '2027-07-01', endDate: '2027-09-30', status: RPTI_IMPORT_PRELAUNCH_STATUS_ID,
+    });
+  });
+
+  it('still regenerates as an upgrade in both cases', () => {
+    const live = {
+      id: 'seg-live', deliverableId: 'd-existing',
+      startDate: '2021-08-17', endDate: '2031-12-31', status: RPTI_IMPORT_LIVE_STATUS_ID,
+    } as DeliverableSegment;
+
+    const cases: { label: string; ex: Parameters<typeof deriveWorkspaceFromRptiImport>[2] }[] = [
+      { label: 'no live history', ex: inventory },
+      { label: 'already live', ex: { ...inventory, deliverableSegments: [live], deliverableStatuses: SEEDED_DELIVERABLE_STATUSES } },
+    ];
+    for (const { label, ex } of cases) {
+      const out = deriveWorkspaceFromRptiImport(parse({ jenis: 'upgrade', quarter: 'Q3' }), 2027, ex);
+      const segments = [...(ex.deliverableSegments ?? []), ...out.deliverableSegments];
+      const regen = generateRptiDetails({
+        deliverableSegments: segments, deliverableStatuses: SEEDED_DELIVERABLE_STATUSES,
+        initiatives: out.initiatives, deliverables: inventory.deliverables,
+        assets: inventory.assets, assetCategories: inventory.assetCategories,
+      }, 2027);
+      expect(regen, label).toHaveLength(1);
+      expect(regen[0].developmentType, label).toBe('upgrade');
+      expect(regen[0].plannedImplementationQuarter, label).toBe('Q3');
+    }
   });
 
   it('gives every derived segment an initiativeId, or regeneration would omit the work', () => {

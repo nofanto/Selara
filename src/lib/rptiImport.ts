@@ -4,7 +4,7 @@ import {
   Initiative, Programme, RptiCategoryCode, RptiDetail, RptiDeveloper, RptiDevelopmentType,
   RptiQuarter, RptiRelatedParty,
 } from '../types';
-import { RPTI_CATEGORY_LABELS, periodForQuarter } from './rpti';
+import { RPTI_CATEGORY_LABELS, periodForQuarter, isLiveStatusId } from './rpti';
 import { PLANNED_STATUS, IN_PRODUCTION_STATUS, SEEDED_DELIVERABLE_STATUSES } from './deliverableStatusDefaults';
 
 /**
@@ -212,7 +212,16 @@ export const RPTI_IMPORT_LIVE_STATUS_ID = IN_PRODUCTION_STATUS.id;
 export function deriveWorkspaceFromRptiImport(
   rows: RptiImportRow[],
   reportYear: number,
-  existing: { deliverables: Deliverable[]; assets: Asset[]; assetCategories: AssetCategory[] },
+  existing: {
+    deliverables: Deliverable[];
+    assets: Asset[];
+    assetCategories: AssetCategory[];
+    // Optional, and only consulted to decide whether an attached upgrade needs a
+    // synthetic prior-live segment. Omit them and it always gets one, which is the
+    // safe direction: a redundant segment, never a missing classification.
+    deliverableSegments?: DeliverableSegment[];
+    deliverableStatuses?: DeliverableStatus[];
+  },
 ): DerivedRptiWorkspace {
   const programmes: Programme[] = [];
   const assetCategories: AssetCategory[] = [];
@@ -338,32 +347,39 @@ export function deriveWorkspaceFromRptiImport(
         initiativeId,
       });
     } else if (hasEntry) {
-      // Attached to an entry that already existed, so this import only adds the
-      // planned enhancement — plus a preceding live period.
+      // Attached to an entry that already existed, so this import adds the planned
+      // enhancement and nothing else — the target carries its own history.
       //
-      // That prior segment is not merely belt-and-braces. Where the target came
-      // from an LKPTI import it is redundant, because that live segment already
-      // starts before the report year. But a target built by hand may carry no
-      // live segment at all, and then nothing else would tell regeneration that
-      // the thing pre-existed: the filed `upgrade` would come back as `new`.
-      deliverableSegments.push({
-        id: `rpti-import-seg-prior-${n}`, deliverableId: targetId,
-        // Ends in the prior year, not on 1 January of this one: it records that
-        // the thing already ran before the plan, so it must not also count as
-        // part of the plan's own report-year activity.
-        startDate: `${reportYear - 1}-01-01`, endDate: `${reportYear - 1}-12-31`,
-        status: RPTI_IMPORT_LIVE_STATUS_ID, initiativeId,
-      });
+      // A synthetic prior-live segment is added only when the target has none of its
+      // own. It exists to keep the filed `upgrade` from regenerating as `new`, which
+      // hasPriorLiveSegment decides from a live segment starting before the report
+      // year. A target that came from an LKPTI import already has one, running from
+      // its go-live date, so adding another drew a second, shorter bar wholly inside
+      // the first. Adding it unconditionally also drew a "Planned" period across
+      // years the inventory says the application was live, which contradicts it.
+      //
+      // No trailing live segment either, for the same reason a `new` build gets none:
+      // the return files an intention, not an outcome.
+      const targetAlreadyLiveBeforeYear = (existing.deliverableSegments ?? []).some(seg =>
+        seg.deliverableId === targetId
+        && seg.startDate < `${reportYear}-01-01`
+        && isLiveStatusId(seg.status, existing.deliverableStatuses ?? []),
+      );
+      if (!targetAlreadyLiveBeforeYear) {
+        deliverableSegments.push({
+          id: `rpti-import-seg-prior-${n}`, deliverableId: targetId,
+          // Ends in the prior year, not on 1 January of this one: it records that
+          // the thing already ran before the plan, so it must not also count as
+          // part of the plan's own report-year activity.
+          startDate: `${reportYear - 1}-01-01`, endDate: `${reportYear - 1}-12-31`,
+          status: RPTI_IMPORT_LIVE_STATUS_ID, initiativeId,
+        });
+      }
       anchorSegmentId = `rpti-import-seg-plan-${n}`;
       deliverableSegments.push({
         id: anchorSegmentId, deliverableId: targetId,
         startDate: qStart, endDate: qEnd,
         status: RPTI_IMPORT_PRELAUNCH_STATUS_ID, initiativeId,
-      });
-      deliverableSegments.push({
-        id: `rpti-import-seg-live-${n}`, deliverableId: targetId,
-        startDate: qEnd, endDate: `${reportYear + 3}-12-31`,
-        status: RPTI_IMPORT_LIVE_STATUS_ID, initiativeId,
       });
     }
 

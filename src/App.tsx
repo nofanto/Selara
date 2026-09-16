@@ -483,6 +483,10 @@ export default function App() {
         deliverables: lkDerived.deliverables,
         assets: lkDerived.assets,
         assetCategories: lkDerived.assetCategories,
+        // So an upgrade attaching to an application the LKPTI already supplied does
+        // not get a second, redundant live period drawn inside the first.
+        deliverableSegments: lkDerived.deliverableSegments,
+        deliverableStatuses: lkDerived.deliverableStatuses,
       });
     }
 
