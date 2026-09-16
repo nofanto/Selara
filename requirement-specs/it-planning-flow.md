@@ -1,8 +1,13 @@
 # The IT Planning Filing Cycle — Design Notes
 
 > **Status:** Domain rules and the onboarding shape are **decided** (see below and
-> confirmed with the product owner). Sequencing is agreed; nothing is implemented.
-> The remaining open questions are listed at the end and are genuinely open.
+> confirmed with the product owner). **Onboarding is built and merged**
+> ([#38](https://github.com/nofanto/Selara/issues/38), 2026-09-16) — the RPTI importer and the
+> two-path picker shipped together. Filings and revisions are decided but unbuilt. The open
+> questions at the end are genuinely open.
+>
+> **Last verified against the code: 2026-09-16.** Line references below were checked on that
+> date; treat them as approximate if the files have since moved.
 
 ## Who this is for
 
@@ -29,10 +34,12 @@ in-flight lifecycle segments; LKPTI from deliverables that have already gone liv
 
 ```mermaid
 flowchart TD
-    subgraph ONBOARD["1 · Onboard (once)"]
-        A1[Existing LKPTI spreadsheet] -->|import as workspace| A2[Assets, Deliverables,<br/>Segments, LKPTI rows derived]
-        A3[RPTI catalogue template] --> A2
-        A4[Blank workspace] --> A2
+    subgraph ONBOARD["1 · Onboard (once) — shipped #38"]
+        A1["LKPTI 3.2.6 — required<br/>+ its reporting year"] -->|imported first| A2["Assets, Deliverables,<br/>Segments, LKPTI rows"]
+        A5["RPTI 3.1 — optional<br/>+ its own reporting year"] -->|matched against the inventory| A6["Initiatives, infrastructure,<br/>plan segments, RPTI rows"]
+        A2 --> A6
+        A4["Start empty<br/>(or demo data)"] --> A2
+        A6 --> A7([Land on Data Health])
     end
 
     subgraph MAINTAIN["2 · Maintain — the year-round work"]
@@ -71,7 +78,7 @@ flowchart TD
         F1 --> F2
     end
 
-    A2 --> B1
+    A7 --> B1
     B4 --> C1
     B4 --> C2
     C3 --> D1
@@ -82,9 +89,13 @@ flowchart TD
     F2 -.->|next cycle baseline| B1
 ```
 
-Generation is **merge-preserving** (ADR-0010): re-running it keeps the manual-only
-fields already filled in. That is what makes step 3 repeatable rather than a cliff
-IT Planning falls off every time the plan moves.
+Generation is **merge-preserving** for both reports: LKPTI since ADR-0010, and RPTI since
+`aabee9f` — re-running keeps the manual-only fields already filled in, and keeps rows that
+generation cannot rebuild at all. That last part matters more than it sounds: an imported
+upgrade whose target was never found has no segment to regenerate from, so wipe-and-rebuild
+silently deleted the one row most needing a person to look at it. See
+`rpti-auto-generation.md`, "Regeneration behavior". This is what makes step 3 repeatable
+rather than a cliff IT Planning falls off every time the plan moves.
 
 ## Decided: what each report covers
 
@@ -100,7 +111,7 @@ The five extra RPTI codes exist purely to describe infrastructure —
 `51` Data Center/DRC, `52` Servers and platforms, `53` Data communication network,
 `54` Security systems, `99` Other infrastructure (`requirement-specs/rpti-schema.md:44-48`).
 OJK states the asymmetry in its own column heading: the RPTI export's second column is
-**`Nama Aplikasi/Infrastruktur Bank`** (`src/lib/rpti.ts:244`).
+**`Nama Aplikasi/Infrastruktur Bank`** (`src/lib/rpti.ts:338`).
 
 The code already matches this, in both directions:
 
@@ -124,7 +135,7 @@ deliverable type:
 - RPTI row with an infrastructure category (`51-54`, `99`) → **must not**; LKPTI has nowhere to put it
 
 Half of this is already structural: `RptiDetail.initiativeId` is non-optional
-(`src/types.ts:203`). The LKPTI half is **enforced nowhere** — `dataHealth` checks only that
+(`src/types.ts:204`). The LKPTI half is **enforced nowhere** — `dataHealth` checks only that
 an RPTI row's initiative, target and segment still exist (`dataHealth.ts:237-256`).
 
 Two obstacles to enforcing it:
@@ -144,20 +155,27 @@ Two obstacles to enforcing it:
 
 | Path | |
 |---|---|
-| **Import LKPTI + RPTI** | the bank's last two filed returns |
-| **Blank** | own structure |
-| **Sample LKPTI and RPTI files** | replaces the demo workspace |
+| **Import LKPTI + RPTI** | the bank's last two filed returns — LKPTI required, RPTI optional |
+| **Start empty** | own structure, or demo data |
+| **Sample LKPTI and RPTI files** | intended to replace the demo workspace |
 
 Samples rather than a demo workspace is the load-bearing choice: it makes the
-**evaluation path and the real path the same path**. A prospective user downloads the
-sample returns and imports them, exercising the real importer — so there is no demo mode
-to escape, and no workspace that is half fabricated with nothing marking which half.
+**evaluation path and the real path the same path**. A prospective user imports the sample
+returns, exercising the real importer — so there is no demo mode to escape, and no workspace
+that is half fabricated with nothing marking which half.
+
+> **Partly shipped, and the difference matters.** The sample returns exist
+> (`docs/sample-data/`, a fictional bank, generated by `scripts/generate-sample-returns.mjs`
+> and guarded by `src/lib/sampleReturns.test.ts`), but two parts of this decision did not land:
+> they are **repo files, not a download in the app**, and **demo data is still in the picker**
+> ("Explore with demo data"). So the evaluation path and the real path are still two paths.
+> Finishing this means surfacing the samples in the picker and retiring the demo workspace.
 
 **Dropped from the picker:**
 
 - **RPTI catalogue template** — nothing is lost. Catalogue assets can already be added from
-  the Visualiser at any time (`Timeline.tsx:2349-2356`), and `externalId` dedup keeps it
-  idempotent (`App.tsx:733-735`). The OJK taxonomy survives where it is more useful: during
+  the Visualiser at any time (`Timeline.tsx:2390-2397`), and `externalId` dedup keeps it
+  idempotent (`App.tsx:783-785`). The OJK taxonomy survives where it is more useful: during
   work, not at the door.
 - **Viewer** — *rehomed, not deleted*. "Open a colleague's shared file" is a real job; it is
   simply not onboarding. It belongs on the import/share surface.
@@ -174,9 +192,21 @@ merged into each other.
 
 ### Why this ships in three steps
 
-Consolidating onto "import both" puts the hardest unbuilt feature in the product — matching —
-on the critical path of the front door. Today's onboarding is flawed but works, so it is not
-worth breaking for a destination that isn't built yet.
+> **Superseded by what happened.** This argued for deferring the picker change: consolidating
+> onto "import both" would put matching — the hardest unbuilt feature — on the critical path of
+> the front door, and the old onboarding was flawed but working. In the event, **steps 1 and 3
+> shipped together in #38** and step 2 is still outstanding, so the sequence was 1+3, then 2.
+>
+> The reasoning did not survive contact because its premise was wrong: consolidating the picker
+> did **not** require matching. Onboarding matches exactly on name and category, attaches when
+> there is exactly one hit, and surfaces everything else in the data-health review rather than
+> guessing. Judgement-based matching is genuinely hard, and genuinely still unbuilt — it just
+> was not a front-door dependency. The step-2 case for it is unaffected and stands below.
+
+The original argument, kept for the record: consolidating onto "import both" puts the hardest
+unbuilt feature in the product — matching — on the critical path of the front door. Today's
+onboarding is flawed but works, so it is not worth breaking for a destination that isn't built
+yet.
 
 ```mermaid
 flowchart LR
@@ -185,7 +215,7 @@ flowchart LR
     S2 -.->|matching arrives here| N2([Contained feature,<br/>not a front-door dependency])
 ```
 
-Step 1 is tractable: the RPTI export is 13 columns (`src/lib/rpti.ts:242-255`) and an
+Step 1 is tractable: the RPTI export is 13 columns (`src/lib/rpti.ts:336-349`) and an
 importer is its inverse, exactly as `lkptiImport` inverts the LKPTI export.
 
 ### Reconciliation is the point, not a chore
@@ -310,6 +340,12 @@ gaps rather than cosmetic ones:
    **141,470**, taking 4.3 s to open — tracked as
    [#36](https://github.com/nofanto/Selara/issues/36). Demo data is 17 deliverables and no
    test exceeds it, so nothing would ever have surfaced it.
+
+   Those counts are **specific to the workspace they were measured on**, not a property of
+   300 rows. A workspace built by importing 300-row returns measures 100,256 and 337,120,
+   because it also carries 300 initiatives and 390 assets, and the per-row `<select>`s
+   enumerate them. The invariant to hold is the **number of full-list selects per row** —
+   one on LKPTI, two on RPTI — not the absolute totals.
 5. **Data Health scales as a computation and collapses as a workflow.** 1,240 issues at 300
    deliverables. A pre-filing checklist nobody can work through stops being used, exactly
    when the stakes are highest. It needs triage-by-exception — and so does the match review
@@ -320,9 +356,13 @@ If RPTI and LKPTI become the product's goal rather than two of its reports, (1) 
 the change that matters most — everything else can be built on top of a filing record,
 and almost nothing can be built without one.
 
-**#36 is a prerequisite for the samples**, not a background performance issue: a
-realistically sized sample walks a prospective bank straight into the 4.3-second RPTI tab on
-their first click, and an unrealistically small one misrepresents the product.
+**#36 was called a prerequisite for the samples. It was not**, and the samples shipped first.
+The sample returns are deliberately 13 rows — large enough to exercise every branch of the
+importer, small enough to avoid the stalling tabs — which sidesteps the problem rather than
+solving it. The original concern stands for a *realistically sized* sample: one would walk a
+prospective bank straight into the 4.3-second RPTI tab on their first click, and the
+unrealistically small one we ship instead misrepresents the scale the product is for. So #36
+is a prerequisite for the samples being **honest**, not for their existing.
 
 ## Answered since the first draft
 
@@ -361,6 +401,15 @@ These need the domain knowledge, not a guess:
    Planning holds its last RPTI in the same Format 3.1 spreadsheet layout Selara exports. If
    what comes back from OJK is a PDF or a reformatted return, the importer needs a different
    input contract — or a different source entirely.
+
+   **This got sharper once the importer existed.** The two importers read their category
+   column in mutually exclusive ways, because each is the strict inverse of Selara's own
+   export: LKPTI reads **only the code** and ignores the label (`05 — Payments` → `05`, and
+   `05` alone also works), while RPTI reads **only the label** and rejects a code outright
+   (`Payments` → `05`, but `05` and `05 — Payments` are both rejected). OJK's own LKPTI
+   layout carries codes, so a genuine filed RPTI plausibly carries them too — in which case
+   Selara's RPTI importer rejects **every row** of it. Nothing here has been tested against a
+   real filed return; until it is, the importer is verified only against files Selara wrote.
 
 ## Deliberately not proposed here
 
