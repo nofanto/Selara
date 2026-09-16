@@ -43,3 +43,4 @@ An ADR is never edited to reverse its outcome — if circumstances change, write
 | [0009](0009-rpti-status-allow-list.md) | RPTI status classification becomes an allow-list, not a deny-list | Accepted |
 | [0010](0010-lkpti-import-onboarding.md) | Import an existing LKPTI report as a workspace template, and make LKPTI generation merge-preserving | Accepted |
 | [0011](0011-history-tab-decisions-as-audit-trail.md) | The decision log is an audit trail, not workspace state | Accepted |
+| [0012](0012-deliverable-segment-title.md) | Give `DeliverableSegment` an optional title, over deriving every label | Accepted |

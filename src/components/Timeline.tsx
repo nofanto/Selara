@@ -2167,13 +2167,17 @@ export function Timeline({ assets, deliverables = [], initiatives, milestones, p
                                 // than one, since otherwise the row header already carries it.
                                 const needsDeliverableName = segDeliverable
                                   && (deliverableCountByAsset.get(segDeliverable.assetId) ?? 0) > 1;
-                                const primaryLabel = initiativeName || statusLabel;
+                                // An explicit title wins outright: someone typed it to say what
+                                // this phase is, which no derivation can second-guess. Only when
+                                // it is absent does the label fall back to what distinguishes the
+                                // bar from its neighbours. See ADR-0012.
+                                const primaryLabel = seg.title?.trim() || initiativeName || statusLabel;
                                 const displayLabel = needsDeliverableName
                                   ? `${segDeliverable!.name} — ${primaryLabel}`
                                   : primaryLabel;
                                 // Suppressed when the label already is the status, rather than
                                 // printing it twice on one bar.
-                                const showStatusPill = !!initiativeName;
+                                const showStatusPill = primaryLabel !== statusLabel;
                                 const isSegSelected = selectedSegmentId === seg.id;
                                 return (
                                   <div
@@ -2204,6 +2208,7 @@ export function Timeline({ assets, deliverables = [], initiatives, milestones, p
                                     style={{ left: `${left}%`, width: `${Math.max(width, 0.5)}%`, height, top }}
                                     // The full picture regardless of what the bar had room for.
                                     title={[
+                                      seg.title?.trim(),
                                       segDeliverable?.name,
                                       initiativeName,
                                       statusLabel,

@@ -175,6 +175,7 @@ export interface Deliverable {
 export interface DeliverableSegment {
   id: string;
   deliverableId: string; // Links segment to a Deliverable record within the asset
+  title?: string;    // Optional label for this phase. Falls back to a derived one — see ADR-0012
   startDate: string; // ISO format: YYYY-MM-DD
   endDate: string;   // ISO format: YYYY-MM-DD
   status: string;

@@ -123,3 +123,32 @@ test.describe('Segment labels distinguish segments on one deliverable', () => {
     }
   });
 });
+
+/**
+ * ADR-0012 — an explicit title overrides the derived label.
+ */
+test.describe('An explicit segment title wins over the derived label', () => {
+  test('typing a title relabels the bar, and clearing it restores the derived label', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector('[data-testid="asset-row-content"]', { timeout: 20000 });
+
+    const bar = page.getByTestId('segment-bar-seg-okta-prod');
+    await expect(bar).toBeVisible();
+    const derived = await bar.getByTestId('segment-label').innerText();
+
+    await bar.dblclick();
+    await page.getByTestId('segment-title').fill('Phase 1 rollout');
+    await page.getByRole('button', { name: /save/i }).first().click();
+
+    // Contains, not equals: the deliverable-name prefix still applies, because this
+    // asset holds more than one deliverable. The title replaces the derived part.
+    await expect(bar.getByTestId('segment-label')).toContainText('Phase 1 rollout');
+    await expect(bar.getByTestId('segment-label')).not.toHaveText(derived);
+
+    // Clearing it falls back to what it said before, rather than to a blank bar.
+    await bar.dblclick();
+    await page.getByTestId('segment-title').fill('');
+    await page.getByRole('button', { name: /save/i }).first().click();
+    await expect(bar.getByTestId('segment-label')).toHaveText(derived);
+  });
+});

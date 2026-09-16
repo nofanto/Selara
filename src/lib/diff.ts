@@ -272,6 +272,12 @@ export function computeDiff(baseVersion: Version, currentData: Version['data']):
     (s) => `${getSegmentDeliverableName(s.deliverableId)} (${s.startDate} → ${s.endDate})`,
     (b, c) => {
       const changes: string[] = [];
+      // Listed explicitly, like every other field here: compareEntities is generic
+      // over entities, not over their fields, so a new field is invisible to the
+      // version diff until it is named.
+      if ((b.title ?? '') !== (c.title ?? '')) {
+        changes.push(`Title: ${b.title || '(none)'} → ${c.title || '(none)'}`);
+      }
       if (b.startDate !== c.startDate) changes.push(`Start date: ${b.startDate} → ${c.startDate}`);
       if (b.endDate !== c.endDate) changes.push(`End date: ${b.endDate} → ${c.endDate}`);
       if (b.status !== c.status) changes.push(`Status: ${getSegmentStatusName(b.status)} → ${getSegmentStatusName(c.status)}`);
