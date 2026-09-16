@@ -7,7 +7,11 @@ test.describe('Resize Initiative Edit Panel', () => {
     });
 
     test('resizing initiative does not open the edit panel', async ({ page }) => {
-        const init = page.getByText('Passkey Rollout');
+        // The initiative bar specifically. Segment bars now carry the name of the
+        // initiative driving them, so a bare getByText matches both this and the
+        // segment beneath it — and this test needs the initiative bar's own box to
+        // drag its right edge. The sibling test below already scopes the same way.
+        const init = page.getByTestId('initiative-bar-i-ciam-passkey');
         await expect(init).toBeVisible();
 
         const box = await init.boundingBox();

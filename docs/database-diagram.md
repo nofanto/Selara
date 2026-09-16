@@ -59,6 +59,7 @@ erDiagram
     DELIVERABLE_SEGMENT {
         string id PK
         string deliverableId FK
+        string title "optional; free-text label for this phase, else derived — ADR-0012"
         date startDate
         date endDate
         string status

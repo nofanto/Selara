@@ -74,3 +74,81 @@ test.describe('Segment label clamps to visible edge', () => {
     expect(labelBox!.x - barBox!.x).toBeLessThan(20);
   });
 });
+
+/**
+ * Issue #41 — segments on one deliverable were indistinguishable.
+ *
+ * Every bar was labelled with its deliverable's name, so a deliverable carrying
+ * several lifecycle segments read as several copies of itself. In the demo
+ * workspace that is 11 of 17 deliverables, up to four bars deep. The status name
+ * existed as a fallback in the code but was unreachable, because the deliverable
+ * name always won.
+ *
+ * The label now says what distinguishes one bar from its neighbours: the
+ * initiative driving it, else its lifecycle stage.
+ */
+test.describe('Segment labels distinguish segments on one deliverable', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector('[data-testid="asset-row-content"]', { timeout: 20000 });
+  });
+
+  test('three segments on one deliverable read differently', async ({ page }) => {
+    // Azure AD B2C runs In Production, then Sunset, then Out of Support.
+    const labels = await page.locator('[data-testid="segment-label"]').allInnerTexts();
+    const azure = labels.filter(l => l.includes('Azure AD B2C'));
+
+    expect(azure.length).toBeGreaterThanOrEqual(3);
+    expect(new Set(azure).size).toBe(azure.length); // all distinct, not N copies of one name
+  });
+
+  test('a segment driven by an initiative is labelled with it', async ({ page }) => {
+    const labels = await page.locator('[data-testid="segment-label"]').allInnerTexts();
+    expect(labels.some(l => l.includes('Passkey Rollout'))).toBe(true);
+  });
+
+  test('the status pill is not repeated when the label already is the status', async ({ page }) => {
+    // Otherwise a bar with no initiative printed "Sunset" twice side by side.
+    const bars = page.locator('[data-testid^="segment-bar-"]');
+    const count = await bars.count();
+    expect(count).toBeGreaterThan(0);
+
+    for (let i = 0; i < count; i++) {
+      const bar = bars.nth(i);
+      const label = await bar.getByTestId('segment-label').innerText();
+      const pill = bar.getByTestId('segment-status-label');
+      if (await pill.count()) {
+        expect(label, `bar ${i}`).not.toBe(await pill.innerText());
+      }
+    }
+  });
+});
+
+/**
+ * ADR-0012 — an explicit title overrides the derived label.
+ */
+test.describe('An explicit segment title wins over the derived label', () => {
+  test('typing a title relabels the bar, and clearing it restores the derived label', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector('[data-testid="asset-row-content"]', { timeout: 20000 });
+
+    const bar = page.getByTestId('segment-bar-seg-okta-prod');
+    await expect(bar).toBeVisible();
+    const derived = await bar.getByTestId('segment-label').innerText();
+
+    await bar.dblclick();
+    await page.getByTestId('segment-title').fill('Phase 1 rollout');
+    await page.getByRole('button', { name: /save/i }).first().click();
+
+    // Contains, not equals: the deliverable-name prefix still applies, because this
+    // asset holds more than one deliverable. The title replaces the derived part.
+    await expect(bar.getByTestId('segment-label')).toContainText('Phase 1 rollout');
+    await expect(bar.getByTestId('segment-label')).not.toHaveText(derived);
+
+    // Clearing it falls back to what it said before, rather than to a blank bar.
+    await bar.dblclick();
+    await page.getByTestId('segment-title').fill('');
+    await page.getByRole('button', { name: /save/i }).first().click();
+    await expect(bar.getByTestId('segment-label')).toHaveText(derived);
+  });
+});

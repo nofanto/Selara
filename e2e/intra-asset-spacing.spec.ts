@@ -11,8 +11,13 @@ test.describe('Intra-Asset Dependency Spacing', () => {
         // In the default data, this has 2 overlapping initiatives: 
         // "Passkey Rollout" and "SSO Consolidation"
         // And they have a dependency between them "blocks"
-        const c1 = page.getByText('Passkey Rollout');
-        const c2 = page.getByText('SSO Consolidation');
+        //
+        // Targeted by test id rather than by text: segment bars now carry the name of
+        // the initiative driving them, so a bare getByText('Passkey Rollout') matches
+        // both the initiative bar and the segment bar beneath it. This measures the
+        // gap between initiative bars, so it has to name them.
+        const c1 = page.getByTestId('initiative-bar-i-ciam-passkey');
+        const c2 = page.getByTestId('initiative-bar-i-ciam-sso');
 
         await expect(c1).toBeVisible();
         await expect(c2).toBeVisible();

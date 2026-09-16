@@ -108,6 +108,20 @@ export function Timeline({ assets, deliverables = [], initiatives, milestones, p
   // ── Stable lookup maps (O(1) instead of O(N) .find() per initiative) ─────
   const programmeMap = useMemo(() => new Map(programmes.map(p => [p.id, p])), [programmes]);
   const strategyMap  = useMemo(() => new Map(strategies.map(s => [s.id, s])), [strategies]);
+  // Segment bars are labelled from these. A segment's own identity is what differs
+  // between bars on one deliverable; the deliverable's name is the same on all of
+  // them, which is why it used to read as several copies of one application.
+  const initiativeNameById = useMemo(
+    () => new Map(initiatives.map(init => [init.id, init.name])),
+    [initiatives]
+  );
+  // The deliverable name only earns space on the bar when its asset holds more than
+  // one deliverable; otherwise the row header beside it already says the same thing.
+  const deliverableCountByAsset = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const d of deliverables) counts.set(d.assetId, (counts.get(d.assetId) ?? 0) + 1);
+    return counts;
+  }, [deliverables]);
   const initiativeAssetIdMap = useMemo(
     () => new Map(initiatives.map(init => [init.id, init.assetId])),
     [initiatives]
@@ -2144,8 +2158,26 @@ export function Timeline({ assets, deliverables = [], initiatives, milestones, p
                               {segLayoutItems.map(({ seg, top, height, left, width, rowSpan, row }) => {
                                 if (left + width < 0 || left > 100) return null;
                                 const colorClass = SEGMENT_COLORS[seg.status] || 'bg-slate-400';
-                                const displayLabel = deliverables.find(a => a.id === seg.deliverableId)?.name
-                                  || SEGMENT_LABELS[seg.status];
+                                const segDeliverable = deliverables.find(a => a.id === seg.deliverableId);
+                                const statusLabel = SEGMENT_LABELS[seg.status] ?? seg.status;
+                                const initiativeName = seg.initiativeId ? initiativeNameById.get(seg.initiativeId) : undefined;
+                                // What this bar is, in order of what distinguishes it from its
+                                // neighbours: the work driving it, else its lifecycle stage. The
+                                // deliverable name is prefixed only where the asset holds more
+                                // than one, since otherwise the row header already carries it.
+                                const needsDeliverableName = segDeliverable
+                                  && (deliverableCountByAsset.get(segDeliverable.assetId) ?? 0) > 1;
+                                // An explicit title wins outright: someone typed it to say what
+                                // this phase is, which no derivation can second-guess. Only when
+                                // it is absent does the label fall back to what distinguishes the
+                                // bar from its neighbours. See ADR-0012.
+                                const primaryLabel = seg.title?.trim() || initiativeName || statusLabel;
+                                const displayLabel = needsDeliverableName
+                                  ? `${segDeliverable!.name} — ${primaryLabel}`
+                                  : primaryLabel;
+                                // Suppressed when the label already is the status, rather than
+                                // printing it twice on one bar.
+                                const showStatusPill = primaryLabel !== statusLabel;
                                 const isSegSelected = selectedSegmentId === seg.id;
                                 return (
                                   <div
@@ -2174,7 +2206,14 @@ export function Timeline({ assets, deliverables = [], initiatives, milestones, p
                                       isSegSelected && "outline outline-2 outline-dashed outline-slate-800 z-[50]"
                                     )}
                                     style={{ left: `${left}%`, width: `${Math.max(width, 0.5)}%`, height, top }}
-                                    title={`${displayLabel}\n${seg.startDate} → ${seg.endDate}`}
+                                    // The full picture regardless of what the bar had room for.
+                                    title={[
+                                      seg.title?.trim(),
+                                      segDeliverable?.name,
+                                      initiativeName,
+                                      statusLabel,
+                                      `${seg.startDate} → ${seg.endDate}`,
+                                    ].filter(Boolean).join('\n')}
                                   >
                                     <div draggable="false" data-testid="segment-resize-left" className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize z-10 flex items-center justify-center"
                                       onMouseDown={(e) => { e.stopPropagation(); setResizingSegment({ id: seg.id, edge: 'start', initialX: e.clientX, initialDate: seg.startDate }); }}>
@@ -2239,9 +2278,11 @@ export function Timeline({ assets, deliverables = [], initiatives, milestones, p
                                       style={left < 0 ? { paddingLeft: `${Math.max(0, (-left / 100) * totalWidth - 8)}px` } : undefined}
                                     >
                                       <div data-testid="segment-label" className="font-bold text-[11px] leading-tight truncate drop-shadow-md">{displayLabel}</div>
-                                      <div data-testid="segment-status-label" className="flex-shrink-0 text-[10px] font-semibold px-1 rounded bg-white/20 text-white truncate max-w-[45%]">
-                                        {SEGMENT_LABELS[seg.status] ?? seg.status}
-                                      </div>
+                                      {showStatusPill && (
+                                        <div data-testid="segment-status-label" className="flex-shrink-0 text-[10px] font-semibold px-1 rounded bg-white/20 text-white truncate max-w-[45%]">
+                                          {statusLabel}
+                                        </div>
+                                      )}
                                     </div>
                                   </div>
                                 );

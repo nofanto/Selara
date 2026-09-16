@@ -116,6 +116,17 @@ export function DeliverableSegmentPanel({
                 </select>
               )}
 
+              {field('Title',
+                <input
+                  data-testid="segment-title"
+                  type="text"
+                  value={formData.title ?? ''}
+                  onChange={e => setFormData({ ...formData, title: e.target.value || undefined })}
+                  placeholder="Optional — e.g. Phase 1 rollout"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              )}
+
               {field('Status',
                 <select
                   data-testid="segment-status"
