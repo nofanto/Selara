@@ -11,8 +11,8 @@ caller does with the result.
    accepted. No caller may pass `new Date().getFullYear()` as a silent fallback.
 2. **Output is a function of `(workspace, reportYear)` only.** Same inputs, same rows. Already
    true; must stay true, because it is what makes a return reproducible.
-3. **Generating does not mutate the workspace.** The Reports-menu path discards the result after
-   display and export; the Data Manager path continues to write stored rows.
+3. **Generating does not mutate the workspace.** Reports derives a transient result for display
+   and export; no Data Manager generation path remains.
 4. **`remarks` comes from the initiative**, not from a stored row, and must appear in the
    generated output for every row whose initiative carries one.
 5. **`ppjtiRelatedParty` comes from the deliverable.** The derived `'n/a'` for a non-PPJTI
@@ -59,9 +59,12 @@ Gains a parameter. This is the behavioural change of the feature.
 
 ## What must not change
 
-19. **Both returns export the same values they export today** for the same workspace, with the
+19. **Both returns preserve their pre-existing filed values** for the same workspace, with the
     single intended exception of (7): a decommissioned application correctly leaving the LKPTI.
-20. **Both Data Manager tabs remain present, populated and editable**, with their generate actions
-    intact (FR-021).
+    Each post-feature export additionally states the selected year; byte identity with a
+    pre-feature export is not a contract.
+20. **Both Data Manager report tabs remain present and populated but read-only**, with no Generate
+    action. The editable sources are Deliverables and Initiatives; Reports is the only generation
+    and export path (FR-021).
 21. **The workspace export/import round trip carries the new fields** with no change to
     `excel.ts` — `flatten()` is generic. Asserted, not assumed.

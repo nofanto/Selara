@@ -1,13 +1,14 @@
 # Report Rows as Projections, Not Storage — Design Notes
 
-> **Status:** Problem verified, diagnosis settled, **all six questions decided** (2026-09-18).
-> Spec Kit to follow, raised jointly with [#40](https://github.com/nofanto/Selara/issues/40) —
-> see "Why this cannot ship before #40". **Nothing is implemented.**
+> **Status:** Problem verified; decisions Q1–Q8 settled (2026-09-18). The first field-ownership
+> slice is implemented; the remaining Spec Kit tasks carry the report-year, read-only-tab, and
+> RPTI projection work. Raised jointly with [#40](https://github.com/nofanto/Selara/issues/40) —
+> see "Why this cannot ship before #40".
 >
-> **Read the title as the destination, not this instalment.** What was decided is the
-> data-model half: the attributes move to the entities they describe (Q1-Q3). The Data Manager
-> tabs are deliberately untouched (Q5/Q6), so importing will still fill them. Making the rows
-> genuine projections is a later step that this one makes possible.
+> **Read the title as the destination, not a claim that stored rows disappear now.** Attributes
+> move to the entities they describe; report generation moves to Reports; and the Data Manager
+> report tabs become read-only projections that remain populated for continuity. Emptying and
+> removing those tabs is a later step.
 
 ## The observation
 
@@ -125,6 +126,22 @@ easier.
 
 ## Decided
 
+### Q9 — post-feature filing correctness outranks byte identity (2026-09-18)
+
+**Decided:** a generated post-feature return must state the year the preparer selected and retain
+every pre-existing filed value, subject only to the intended correction that an application no
+longer live at the LKPTI as-at date is excluded. Byte-identical comparison with a pre-feature
+file is not a meaningful success criterion: the previous file did not state the selected year.
+
+**Rationale:** a regulatory return's correctness is its stated period and filed values, not a
+binary match against an earlier format that omitted required context. The earlier SC-004 wording
+would incorrectly fail an improved export merely because it now tells the preparer and reviewer
+what period it covers.
+
+**Rejected:** preserve pre-feature byte identity (contradicts the requirement to state the year
+in exported output); omit the year from the export while showing it only on screen (contradicts
+FR-003 and leaves an exported filing ambiguous).
+
 ### Q8 — bare-Asset RPTI targets are not supported (2026-09-18)
 
 **Decided: no.** Selara files infrastructure, as OJK Format 3.1 requires, but it models an
@@ -192,6 +209,8 @@ in `InitiativePanel.tsx:132` and dangling-ref-checked in `dataHealth.ts:177`. Wh
 RPTI generation stops grouping by `initiativeId::deliverableId` off the segments and honours the
 initiative's own target instead.
 
+**Historical Q7 enforcement — superseded by Q10 below.** The broad multi-target error described in this paragraph now applies only when no target is declared.
+
 **Enforcement is a data-health error, not a hard block.** Nothing stops a user attaching segments
 on two applications to one initiative, and generation would then emit two rows carrying the same
 budget — a double-count in a filed return, which is why it cannot be a warning. But refusing the
@@ -250,7 +269,7 @@ round-trip is free, `db.ts` needs nothing because IndexedDB is schemaless within
 
 **Costs accepted:**
 
-- The Deliverables tab goes from 10 to 17 columns, roughly 2,800px wide. It scrolls, and the
+- The Deliverables tab goes from 10 to 18 columns, roughly 2,800px wide. It scrolls, and the
   widths work since [#44](https://github.com/nofanto/Selara/issues/44), but it is a lot of columns.
 - Per [#42](https://github.com/nofanto/Selara/issues/42), each new field must be named
   explicitly in `diff.ts` or version history will not see it — silently.
@@ -500,3 +519,27 @@ carried forward, since each is load-bearing for the destination:
 - `requirement-specs/lkpti-integration.md` §3 — why LKPTI generation is not year-scoped
 - `requirement-specs/it-planning-flow.md` — step 2/3 of the cycle this document reconciles
 - ADR-0010 — merge-preserving LKPTI generation, which exists precisely because these fields cannot be regenerated
+
+## Q10 — Existing initiatives without a declared RPTI target (decided 2026-09-18)
+
+Coordinator-approved compatibility rule: an explicit `Initiative.deliverableId` wins.
+Otherwise infer a target only when all the initiative's lifecycle segments name exactly
+one existing Deliverable, including infrastructure. Inference considers all years because
+FR-029 makes the target a property of the initiative, not the filing year. Generation
+uses only qualifying segments on that resolved target for the selected year.
+
+An initiative with qualifying segments but no resolvable target gets a data-health error
+and blocks RPTI export, with instructions to select/repair the target or split ambiguous
+work. Multiple segment targets are an error only without an explicit target; other
+segments on an explicitly targeted initiative remain timeline history. This supersedes
+FR-030's broad multiple-application check: the declared-target generator emits one budget
+once, so its old double-counting justification no longer applies to declared targets.
+
+Rejected: silently skipping undeclared targets loses existing template/hand-built work;
+requiring manual re-keying for an unambiguous target creates unnecessary migration work;
+year-dependent inference lets one initiative change targets between filings; blocking all
+multi-deliverable history falsely rejects an explicitly declared, unambiguous target.
+
+Acceptance: regression tests cover the shipped demo, unambiguous application/infrastructure
+inference, ambiguous and missing targets, explicit target precedence, and the pre-export
+repair gate. Stored rows remain readable in Data Manager; report edits belong on entities.

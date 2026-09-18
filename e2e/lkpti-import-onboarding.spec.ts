@@ -1,3 +1,4 @@
+import { generateReport } from './report-fixtures';
 import { test, expect, Page } from '@playwright/test';
 
 /**
@@ -11,8 +12,8 @@ import { test, expect, Page } from '@playwright/test';
  * there against the new LKPTI slot.
  *
  * AC5 is not, and it is the one that guards a silent data loss, so it stays here
- * re-pointed at the new flow: the importer writes manual-only fields that no
- * cascade can reconstruct, and "Generate LKPTI Rows" must not overwrite them.
+ * re-pointed at the new flow: the importer writes deliverable-owned fields that no
+ * cascade can reconstruct, and Reports generation must not overwrite them.
  */
 const LKPTI_HEADERS = [
   'No.', 'Kategori Aplikasi', 'Nama Aplikasi', 'Deskripsi Fungsi Aplikasi', 'Platform',
@@ -56,7 +57,7 @@ async function freshWorkspace(page: Page) {
 }
 
 test.describe('LKPTI Import Onboarding', () => {
-  test('AC5: regenerating LKPTI rows preserves the manual-only fields the import wrote', async ({ page }) => {
+  test('AC5: regenerating LKPTI rows preserves the deliverable-owned fields the import wrote', async ({ page }) => {
     const buffer = await lkptiWorkbookWithPlatform();
     await freshWorkspace(page);
     await page.getByTestId('onboarding-lkpti-file-input').setInputFiles({
@@ -71,16 +72,12 @@ test.describe('LKPTI Import Onboarding', () => {
     await page.getByTestId('nav-data-manager').click();
     await page.getByTestId('data-manager-tab-lkpti').click();
 
-    // platform has no cascade source — generateLkptiDetails cannot reconstruct it,
-    // so if a regenerate clobbers it the value is gone for good.
-    const platformInput = page
-      .locator('[data-testid="data-manager"] tbody tr[data-real="true"] td[data-key="platform"] input')
-      .first();
-    await expect(platformInput).toHaveValue('Java/Spring', { timeout: 10000 });
-
-    await page.getByTestId('lkpti-generate-btn').click();
-    await page.getByTestId('confirm-modal-confirm').click();
-
-    await expect(platformInput).toHaveValue('Java/Spring', { timeout: 10000 });
+    await expect(page.getByTestId('lkpti-readonly-table')).toContainText('Java/Spring');
+    await generateReport(page, 'lkpti');
+    await expect(page.getByTestId('lkpti-detail-table')).toContainText('Java/Spring');
+    await page.evaluate(() => localStorage.setItem('scenia-e2e', 'true'));
+    await page.reload();
+    await generateReport(page, 'lkpti');
+    await expect(page.getByTestId('lkpti-detail-table')).toContainText('Java/Spring');
   });
 });

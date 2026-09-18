@@ -90,11 +90,21 @@ export function liftReportRowAttributes(input: AttributeLiftInput): AttributeLif
   }
 
   const liftedInitiatives = initiatives.map(initiative => {
-    if (initiative.rptiRemarks !== undefined && initiative.rptiRemarks !== '') return initiative;
     const remarks = remarksByInitiative.get(initiative.id);
-    if (remarks === undefined) return initiative;
+    const legacy = rptiDetails.find(row => row.initiativeId === initiative.id && (
+      (typeof asRecord(row).capexAmount === 'number' && asRecord(row).capexAmount !== initiative.capex)
+      || (typeof asRecord(row).opexAmount === 'number' && asRecord(row).opexAmount !== initiative.opex)
+    ));
+    const legacyRecord = legacy ? asRecord(legacy) : undefined;
+    const capex = typeof legacyRecord?.capexAmount === 'number' ? legacyRecord.capexAmount : initiative.capex;
+    const opex = typeof legacyRecord?.opexAmount === 'number' ? legacyRecord.opexAmount : initiative.opex;
+    const rptiRemarks = initiative.rptiRemarks !== undefined && initiative.rptiRemarks !== ''
+      ? initiative.rptiRemarks
+      : remarks;
+
+    if (capex === initiative.capex && opex === initiative.opex && rptiRemarks === initiative.rptiRemarks) return initiative;
     changed = true;
-    return { ...initiative, rptiRemarks: remarks };
+    return { ...initiative, capex, opex, rptiRemarks };
   });
 
   return { deliverables: liftedDeliverables, initiatives: liftedInitiatives, changed };

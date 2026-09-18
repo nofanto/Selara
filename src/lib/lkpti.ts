@@ -9,16 +9,6 @@ export function isLkptiCategoryCode(code: string): code is LkptiCategoryCode {
   return LKPTI_CATEGORY_CODE_SET.has(code);
 }
 
-/**
- * Today as a local-time ISO date (YYYY-MM-DD). Deliberately not
- * `new Date().toISOString()`, which converts to UTC first and so reports yesterday
- * for anyone east of Greenwich — including every user of an Indonesian filing tool.
- */
-function todayIso(): string {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-}
-
 // Converts Selara's internal ISO date (YYYY-MM-DD) to the LKPTI form's dd-mm-yyyy.
 export function toDdMmYyyy(iso: string): string {
   const [y, m, d] = iso.split('-');
@@ -26,6 +16,8 @@ export function toDdMmYyyy(iso: string): string {
 }
 
 export interface GenerateLkptiDetailsInput {
+  /** ISO date for the inventory's stated "as at" point, supplied by Reports. */
+  asAtDate: string;
   deliverableSegments: DeliverableSegment[];
   deliverableStatuses: DeliverableStatus[];
   deliverables: Deliverable[];
@@ -58,9 +50,8 @@ export function suggestGoLiveDate(
 /**
  * Generates LkptiDetail rows for LKPTI Format 3.2.6 — see
  * requirement-specs/lkpti-integration.md §3 for the generation rule.
- * Unlike generateRptiDetails, this isn't scoped to a report year: it's a point-in-time
- * inventory of Deliverables that have actually gone live, not a plan of activity within
- * a year.
+ * This is an inventory as at `asAtDate`: an application is present only while an
+ * in-production segment spans that stated date, not merely because it was ever live.
  *
  * Merge-preserving, not wipe-and-rebuild (see requirement-specs/lkpti-import-onboarding.md
  * §5): a deliverable with no existing row gets a brand-new, fully cascade-filled one; a
@@ -73,26 +64,23 @@ export function suggestGoLiveDate(
 export function generateLkptiDetails(
   input: GenerateLkptiDetailsInput,
 ): LkptiDetail[] {
-  const { deliverableSegments, deliverableStatuses, deliverables, assets, assetCategories, existingDetails = [] } = input;
+  const { asAtDate, deliverableSegments, deliverableStatuses, deliverables, assets, assetCategories, existingDetails = [] } = input;
+  if (!asAtDate) throw new Error('An as-at date is required to generate an LKPTI return.');
 
-  const today = todayIso();
   const results: LkptiDetail[] = [];
   for (const deliverable of deliverables) {
     if ((deliverable.type ?? 'application') !== 'application') continue;
 
-    // "Has gone live", not merely "has a live segment somewhere on the timeline":
-    // a segment that only starts next year describes a plan, and generating a row for
-    // it produces a future goLiveDate, which OJK validation rule 5.3 rejects outright
-    // (dataHealth.ts raises lkpti-golive-future for exactly this). Comparing ISO
-    // YYYY-MM-DD strings lexicographically is a correct date comparison and keeps this
-    // free of timezone drift. A segment starting today counts as started, matching the
-    // end-of-today boundary dataHealth uses for the same rule.
-    const hasGoneLive = deliverableSegments.some(seg =>
+    // LKPTI is an inventory as at the chosen filing date. ISO YYYY-MM-DD values sort
+    // chronologically, so this remains timezone-free and does not depend on the clock
+    // of the machine that prepared the return.
+    const isLiveAsAt = deliverableSegments.some(seg =>
       seg.deliverableId === deliverable.id
       && isLiveStatusId(seg.status, deliverableStatuses)
-      && seg.startDate <= today
+      && seg.startDate <= asAtDate
+      && seg.endDate >= asAtDate
     );
-    if (!hasGoneLive) continue;
+    if (!isLiveAsAt) continue;
 
     const category = resolveAssetCategory(deliverable, assets, assetCategories);
     const resolvedCategoryCode = deliverable.categoryCode ?? category?.categoryCode;

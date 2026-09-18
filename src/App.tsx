@@ -1248,6 +1248,24 @@ export default function App() {
                         </div>
                       ))}
                       <div className="flex items-center justify-between gap-3 pt-1 border-t border-slate-100">
+                        <label htmlFor="defaultCurrency" className="text-xs text-slate-600 whitespace-nowrap">Currency</label>
+                        <input
+                          id="defaultCurrency"
+                          data-testid="default-currency-input"
+                          type="text"
+                          value={timelineSettings.defaultCurrency || ''}
+                          onChange={(e) => {
+                            handleUpdate({
+                              assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories,
+                              timelineSettings: { ...timelineSettings, defaultCurrency: e.target.value || undefined },
+                              resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails,
+                            });
+                          }}
+                          placeholder="e.g. IDR"
+                          className="px-1.5 py-1 bg-slate-50 border border-slate-200 rounded text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 w-16"
+                        />
+                      </div>
+                      <div className="flex items-center justify-between gap-3 pt-1 border-t border-slate-100">
                         <label htmlFor="clusterName" className="text-xs text-slate-600 whitespace-nowrap">Cluster</label>
                         <input
                           id="clusterName"

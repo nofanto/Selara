@@ -4,10 +4,10 @@ Prerequisites: `npm install`, and a dev server for the browser levels (`npm run 
 
 ## Level 1 — Round-trip fidelity (the feature's reason to exist)
 
-The acceptance test. It already runs today and already fails.
+The acceptance test compares filed values with values regenerated from the workspace.
 
 ```sh
-npx vitest run src/lib/sampleReturns.test.ts
+npx vitest run src/lib/roundTrip.test.ts
 ```
 
 Import `docs/sample-data/sample-lkpti-2026.xlsx` and `sample-rpti-2027.xlsx`, discard the
@@ -17,8 +17,9 @@ imported report rows, regenerate from the workspace, and compare field by field.
 `remarks` on 11/13 and `ppjtiRelatedParty` on 10/13.
 **Target** — zero differences for reproducible rows.
 
-Compare *exported values*, not raw detail fields: `resolveCost` falls back to the initiative's
-figures, so `capexAmount`/`opexAmount` appear lost while the filed number is intact.
+Compare the return's filed values, not an obsolete detail-row cost override. RPTI CapEx/OpEx are
+the Initiative's canonical figures; a legacy override that differs is lifted before overrides are
+removed.
 
 ## Level 2 — The as-at year changes who is in the LKPTI
 
@@ -49,7 +50,8 @@ Load a workspace whose attributes sit on stored LKPTI rows. Confirm the values a
 deliverables, that running the lift twice changes nothing, that a value already on a deliverable
 is not overwritten, and that the orphaned properties remain on the stored rows.
 
-Then press Generate and confirm nothing is lost — the failure mode this guards against.
+Then generate the return from **Reports** and confirm nothing is lost — the failure mode this
+guards against. The Data Manager report tabs are read-only and have no Generate action.
 
 ## Level 5 — Nothing that is filed changes
 
@@ -57,8 +59,9 @@ Then press Generate and confirm nothing is lost — the failure mode this guards
 npm run test:unit && npx playwright test
 ```
 
-Export both returns from the same workspace before and after. Files must be identical, with the
-single intended exception of a decommissioned application leaving the LKPTI.
+Verify that every existing filed value is preserved, with the intended exception of a
+decommissioned application leaving the LKPTI. The prepared return also visibly states its selected
+year, so byte identity is not the relevant assertion for a pre-feature file that lacked that label.
 
 ## Level 6 — Version history sees the new fields
 
@@ -68,5 +71,5 @@ difference report. Both must be listed. An unlisted field changes silently — [
 ## Level 7 — Scale
 
 With 300 applications, generating a return for a stated year stays within the responsiveness of
-generating one today. The Deliverables tab now carries 17 columns; confirm no content clips
+generating one today. The Deliverables tab now carries 18 columns; confirm no content clips
 (the measurement harness from #44).

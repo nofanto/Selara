@@ -56,11 +56,18 @@ written directly onto a row is overwritten by the next generation.
 
 The same applies to `RptiDetail.remarks` and `RptiDetail.ppjtiRelatedParty` (`rpti.ts:382,388`).
 
-### `RptiDetail` — keeps its fields, loses authorship
+### `RptiDetail` — projection only
 
-As above. With `remarks` now derived from `Initiative.rptiRemarks` and `ppjtiRelatedParty` from
-`Deliverable`, the record has **no field the workspace cannot reproduce** — the condition the
-destination depends on. Recorded, not acted on here.
+`remarks` is derived from `Initiative.rptiRemarks`, `ppjtiRelatedParty` from `Deliverable`, and
+the RPTI's CapEx/OpEx come directly from `Initiative.capex`/`Initiative.opex`. The legacy
+`capexAmount` and `opexAmount` overrides are lifted onto the Initiative if they differ, then
+removed. A single Initiative contributes at most one RPTI target; segments touching multiple
+Deliverables are a data-health error rather than a second report line.
+
+The report tab remains populated so imports and historical rows stay visible, but it is read-only.
+Reports derives the transient filing and is the sole export path. A bare-Asset target is not a
+supported RPTI model: it is diagnosed before export and repaired by creating a Deliverable under
+that Asset and targeting the Initiative at it.
 
 ## New concept, not persisted
 
@@ -82,6 +89,7 @@ states it. Never taken from the system clock (FR-005).
 | Decommissioned application | still listed (measured) | correctly excluded |
 | RPTI report year | `new Date().getFullYear()` | asked, never inferred |
 | Report export | whatever rows are stored | derived for the stated year |
+| Data Manager report tabs | editable rows and Generate actions | populated, read-only projections; generation/export moves to Reports |
 
 ## Relationships
 

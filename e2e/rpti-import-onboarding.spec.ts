@@ -79,7 +79,7 @@ test.describe('Onboarding from filed OJK returns', () => {
     // LKPTI-only workspace can never contain.
     await page.getByTestId('nav-data-manager').click();
     await page.getByTestId('data-manager-tab-rpti').click();
-    await expect(page.locator('table tbody tr').first()).toBeVisible();
+    await expect(page.getByTestId('rpti-readonly-table').locator('tbody tr').first()).toBeVisible();
 
     // The Type column is a <select>, so assert on its value rather than on text —
     // the rendered label is "Infrastructure", but the value is what the model holds.
@@ -97,7 +97,7 @@ test.describe('Onboarding from filed OJK returns', () => {
     await expect(page.getByTestId('data-health-report-view')).toBeVisible({ timeout: 20000 });
     await page.getByTestId('nav-data-manager').click();
     await page.getByTestId('data-manager-tab-lkpti').click();
-    await expect(page.locator('table tbody tr').first()).toBeVisible();
+    await expect(page.getByTestId('lkpti-readonly-table').locator('tbody tr').first()).toBeVisible();
   });
 
   test('refuses a file in the wrong slot and leaves the workspace untouched', async ({ page }) => {

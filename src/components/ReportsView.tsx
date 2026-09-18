@@ -10,6 +10,9 @@ import { AssetPanel } from './AssetPanel';
 import { RptiReportView } from './RptiReportView';
 import { LkptiReportView } from './LkptiReportView';
 import { DataHealthReportView } from './DataHealthReportView';
+import { generateRptiDetails } from '../lib/rpti';
+import { generateLkptiDetails } from '../lib/lkpti';
+import { computeDataHealth } from '../lib/dataHealth';
 
 interface ReportsViewProps {
   assets: Asset[];
@@ -102,6 +105,10 @@ function depSentence(dep: Dependency, src: Initiative, tgt: Initiative, perspect
 
 export function ReportsView({ assets, initiatives, milestones, dependencies, currentData, programmes, strategies, assetCategories, resources = [], deliverables = [], deliverableSegments = [], deliverableStatuses = [], rptiDetails = [], lkptiDetails = [], onSaveAsset, onNavigate, initialReport }: ReportsViewProps) {
   const [selectedReport, setSelectedReport] = useState<ReportSlug | null>(initialReport ?? null);
+  const [rptiYearInput, setRptiYearInput] = useState('');
+  const [lkptiYearInput, setLkptiYearInput] = useState('');
+  const [generatedRptiDetails, setGeneratedRptiDetails] = useState<RptiDetail[] | null>(null);
+  const [generatedLkptiDetails, setGeneratedLkptiDetails] = useState<LkptiDetail[] | null>(null);
   /*
    * One piece of state, not two. The panel is open precisely when its asset still
    * exists, so deriving that from `assets` rather than mirroring it into a second
@@ -138,6 +145,36 @@ export function ReportsView({ assets, initiatives, milestones, dependencies, cur
     if (!base) return;
     setDiffResult(computeDiff(base, currentData));
   };
+
+  const reportYear = (value: string): number | undefined => {
+    const parsed = Number(value);
+    return /^\d{4}$/.test(value) && Number.isInteger(parsed) ? parsed : undefined;
+  };
+  const rptiYear = reportYear(rptiYearInput);
+  const lkptiYear = reportYear(lkptiYearInput);
+
+  const generateRptiReport = () => {
+    if (!rptiYear) return;
+    setGeneratedRptiDetails(generateRptiDetails({
+      deliverableSegments, deliverableStatuses, initiatives, deliverables, assets, assetCategories,
+      existingDetails: rptiDetails,
+    }, rptiYear));
+  };
+  const generateLkptiReport = () => {
+    if (!lkptiYear) return;
+    setGeneratedLkptiDetails(generateLkptiDetails({
+      asAtDate: `${lkptiYear}-12-31`, deliverableSegments, deliverableStatuses, deliverables,
+      assets, assetCategories, existingDetails: lkptiDetails,
+    }));
+  };
+  const rptiPreExportIssues = generatedRptiDetails
+    ? computeDataHealth({
+        assets, assetCategories, deliverables, deliverableSegments, deliverableStatuses,
+        initiatives, milestones, dependencies, decisions: currentData.decisions ?? [], resources,
+        programmes, strategies, rptiDetails: generatedRptiDetails, lkptiDetails,
+        timelineSettings: currentData.timelineSettings,
+      }).filter(issue => issue.severity === 'error' && (issue.entityType === 'RptiDetail' || issue.id.startsWith('initiative-rpti-'))).map(issue => issue.message)
+    : [];
 
   const cards: { slug: ReportSlug; icon: React.ReactNode; title: string; description: string }[] = [
     {
@@ -443,14 +480,39 @@ export function ReportsView({ assets, initiatives, milestones, dependencies, cur
               Indonesian OJK IT Development Plan Report (Format 3.1) — planned application and infrastructure development.
             </p>
           </div>
+          <div className="mb-4 flex items-end gap-3">
+            <label className="text-sm font-medium text-slate-700" htmlFor="rpti-report-year-input">
+              Filing year
+            </label>
+            <input
+              id="rpti-report-year-input"
+              data-testid="rpti-report-year-input"
+              type="number"
+              inputMode="numeric"
+              value={rptiYearInput}
+              onChange={event => setRptiYearInput(event.target.value)}
+              placeholder="YYYY"
+              className="w-28 px-3 py-2 border border-slate-300 rounded-lg"
+            />
+            <button
+              data-testid="rpti-generate-report-btn"
+              disabled={!rptiYear}
+              onClick={generateRptiReport}
+              className="px-4 py-2 bg-indigo-600 text-white rounded-lg disabled:opacity-50"
+            >
+              Generate RPTI
+            </button>
+          </div>
           <RptiReportView
-            rptiDetails={rptiDetails}
+            rptiDetails={generatedRptiDetails ?? []}
             initiatives={initiatives}
             deliverables={deliverables}
             assets={assets}
             deliverableSegments={deliverableSegments}
             deliverableStatuses={deliverableStatuses}
             defaultCurrency={currentData.timelineSettings.defaultCurrency || 'USD'}
+            reportYear={generatedRptiDetails ? rptiYear : undefined}
+            blockingIssues={rptiPreExportIssues}
           />
         </div>
       </div>
@@ -469,9 +531,33 @@ export function ReportsView({ assets, initiatives, milestones, dependencies, cur
               Indonesian OJK LKPTI Application List (Format 3.2.6) — an inventory of currently live applications.
             </p>
           </div>
+          <div className="mb-4 flex items-end gap-3">
+            <label className="text-sm font-medium text-slate-700" htmlFor="lkpti-report-year-input">
+              As-at year
+            </label>
+            <input
+              id="lkpti-report-year-input"
+              data-testid="lkpti-report-year-input"
+              type="number"
+              inputMode="numeric"
+              value={lkptiYearInput}
+              onChange={event => setLkptiYearInput(event.target.value)}
+              placeholder="YYYY"
+              className="w-28 px-3 py-2 border border-slate-300 rounded-lg"
+            />
+            <button
+              data-testid="lkpti-generate-report-btn"
+              disabled={!lkptiYear}
+              onClick={generateLkptiReport}
+              className="px-4 py-2 bg-indigo-600 text-white rounded-lg disabled:opacity-50"
+            >
+              Generate LKPTI
+            </button>
+          </div>
           <LkptiReportView
-            lkptiDetails={lkptiDetails}
+            lkptiDetails={generatedLkptiDetails ?? []}
             deliverables={deliverables}
+            reportYear={generatedLkptiDetails ? lkptiYear : undefined}
           />
         </div>
       </div>

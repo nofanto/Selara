@@ -16,7 +16,7 @@ const statuses: DeliverableStatus[] = [
 
 function makeSegment(overrides: Partial<DeliverableSegment> = {}): DeliverableSegment {
   return {
-    id: 'seg-1', deliverableId: 'deliv-1', startDate: '2026-02-01', endDate: '2026-03-01',
+    id: 'seg-1', deliverableId: 'deliv-1', startDate: '2026-02-01', endDate: '2099-12-31',
     status: 'appstatus-planned',
     ...overrides,
   };
@@ -36,6 +36,7 @@ function makeAssetCategory(overrides: Partial<AssetCategory> = {}): AssetCategor
 
 function makeContext(overrides: Partial<GenerateLkptiDetailsInput> = {}): GenerateLkptiDetailsInput {
   return {
+    asAtDate: '2026-12-31',
     deliverableSegments: [],
     deliverableStatuses: statuses,
     deliverables: [makeDeliverable()],
@@ -47,6 +48,38 @@ function makeContext(overrides: Partial<GenerateLkptiDetailsInput> = {}): Genera
 }
 
 describe('generateLkptiDetails', () => {
+  describe('as-at membership', () => {
+    it('includes an application during its live span and excludes it after that span ends', () => {
+      const segments = [makeSegment({
+        status: 'appstatus-in-production', startDate: '2021-06-01', endDate: '2025-06-30',
+      })];
+
+      expect(generateLkptiDetails(makeContext({
+        deliverableSegments: segments, asAtDate: '2024-12-31',
+      } as never))).toHaveLength(1);
+      expect(generateLkptiDetails(makeContext({
+        deliverableSegments: segments, asAtDate: '2026-12-31',
+      } as never))).toHaveLength(0);
+    });
+
+    it('excludes an application that has not yet gone live as at the requested date', () => {
+      const segments = [makeSegment({
+        status: 'appstatus-in-production', startDate: '2025-01-01', endDate: '2028-12-31',
+      })];
+
+      expect(generateLkptiDetails(makeContext({
+        deliverableSegments: segments, asAtDate: '2024-12-31',
+      } as never))).toHaveLength(0);
+    });
+
+    it('requires an explicit as-at date', () => {
+      const segments = [makeSegment({ status: 'appstatus-in-production' })];
+      expect(() => generateLkptiDetails({
+        ...makeContext({ deliverableSegments: segments }), asAtDate: undefined,
+      } as never)).toThrow(/as-at/i);
+    });
+  });
+
   it('generates a row for a deliverable with a live (in-production) segment', () => {
     const segments = [makeSegment({ status: 'appstatus-in-production' })];
     const rows = generateLkptiDetails(makeContext({ deliverableSegments: segments }));
@@ -191,19 +224,14 @@ describe('generateLkptiDetails', () => {
     expect(rows).toHaveLength(1);
   });
 
-  // "Has gone live", not "is live right now": an application whose in-production phase
-  // has ended is still something the bank ran and must report. Dropping it would
-  // under-report to the regulator, and would silently discard the row's manual-only
-  // fields on the next generate.
-  it('includes a deliverable that has gone live even though its live segment has since ended', () => {
+  it('excludes a deliverable whose in-production segment has ended before the as-at date', () => {
     const segments = [
       makeSegment({ id: 'seg-prod', status: 'appstatus-in-production', startDate: '2020-01-01', endDate: '2021-06-30' }),
       makeSegment({ id: 'seg-sunset', status: 'appstatus-sunset', startDate: '2021-07-01', endDate: '2099-12-31' }),
     ];
     const rows = generateLkptiDetails(makeContext({ deliverableSegments: segments }));
 
-    expect(rows).toHaveLength(1);
-    expect(rows[0].goLiveDate).toBe('01-01-2020');
+    expect(rows).toHaveLength(0);
   });
 
   it('never suggests a future goLiveDate when an earlier live segment has started', () => {

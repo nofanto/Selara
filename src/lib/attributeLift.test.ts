@@ -57,6 +57,15 @@ describe('liftReportRowAttributes', () => {
     expect(out.initiatives[0].rptiRemarks).toBe('Vendor-led; related party.');
   });
 
+  it('preserves a legacy RPTI cost override by lifting it onto its initiative', () => {
+    const out = liftReportRowAttributes({
+      deliverables: [deliverable()], initiatives: [initiative({ capex: 100, opex: 10 })],
+      lkptiDetails: [], rptiDetails: [oldRptiRow({ capexAmount: 700, opexAmount: 70 })],
+    });
+
+    expect(out.initiatives[0]).toMatchObject({ capex: 700, opex: 70 });
+  });
+
   it('is idempotent — running it twice changes nothing (contract 15)', () => {
     const input = {
       deliverables: [deliverable()], initiatives: [initiative()],

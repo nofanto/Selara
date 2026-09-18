@@ -97,32 +97,37 @@ guarantee than a lift that cannot be got wrong.
 
 ## R6 — Where generation is triggered from
 
-**Decision**: Add generation to the Reports menu, producing a transient return. Leave both Data
-Manager tabs and their existing Generate buttons exactly as they are (Q5/Q6, FR-021).
+**Decision**: Generation and export live only in the Reports menu, producing a transient return.
+Both Data Manager report tabs remain visible and populated but become read-only; their Generate
+buttons are removed (Q5/Q6 revised, FR-021). Removing the tabs themselves remains a later step.
 
-**Rationale**: `RptiReportView` states its own role today — *"RPTI rows are managed in Data
+**Implementation context**: `RptiReportView` states its own role today — *"RPTI rows are managed in Data
 Manager → RPTI. This screen is a read-only summary and export."* That copy becomes wrong and
 must change. `ReportsView` already routes both reports by slug (`ReportsView.tsx:435`, `:461`),
 so the year prompt and generate action attach there.
 
-**Known tension, accepted**: two generation paths will exist — the Data Manager button (writes
-stored rows, current behaviour) and the Reports menu (transient, year-scoped). They can disagree.
-This is temporary by design: the Data Manager tabs are slated for removal, and until then the
-stored rows remain the editable working set while the Reports menu produces the return.
+**Rationale**: A visible, editable report row whose changes have no effect on the return filed from
+Reports is misleading. Read-only projections make the source of truth unambiguous: the preparer
+maintains Deliverables and Initiatives, then prepares the filing in Reports. The report tabs remain
+for continuity and import visibility until their later removal.
+
+**Alternatives rejected**: retain the two generation paths (they can silently disagree); warn that
+edits to an editable report row do not affect Reports output (labels a hazardous model instead of
+removing the hazard); remove the tabs now (larger navigation and migration change, deferred).
 
 ## R7 — Round-trip fidelity is already measurable
 
 **Decision**: SC-001 is implemented as a unit test comparing imported values against regenerated
 ones, field by field, using the sample returns in `docs/sample-data/`.
 
-**Rationale**: The measurement already exists — it was run to justify this feature. Current
-result: regenerating after discarding imported rows loses `platform`, `database`, `dcProvider`,
+**Rationale**: The measurement already exists — it was run to justify this feature. At feature
+discovery, regenerating after discarding imported rows lost `platform`, `database`, `dcProvider`,
 `drcProvider`, `backupStrategy`, `systemOwner`, `ownership` on **13/13** LKPTI rows and
-`developer` on 9/13; and `capexAmount`, `opexAmount` on 13/13 RPTI rows, `remarks` on 11/13,
-`ppjtiRelatedParty` on 10/13.
+`developer` on 9/13; and `remarks` on 11/13 and `ppjtiRelatedParty` on 10/13 RPTI rows.
 
-The `capexAmount`/`opexAmount` losses are not real: `resolveCost` (`rpti.ts:296-301`) falls back
-to the linked Initiative's figures, which the importer does set, so the exported value survives.
-The test must compare *exported values*, not raw detail fields, or it will chase a phantom.
+RPTI CapEx/OpEx are not a report-row persistence target in the resulting design. The Initiative
+owns the filed figures; a legacy detail override that differs is lifted before the override fields
+are removed (Q7). Round-trip tests therefore compare the figures exported from the Initiative,
+not a removed detail field.
 
 **Target**: zero differences for reproducible rows.

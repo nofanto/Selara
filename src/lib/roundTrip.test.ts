@@ -62,7 +62,7 @@ describe('SC-001: a generated return reproduces the imported one', () => {
     const { lkptiSource, inv, workspace } = importedWorkspace();
 
     // The proposal under test: store no rows, regenerate from the workspace alone.
-    const regenerated = generateLkptiDetails({ ...workspace, existingDetails: [] } as never);
+    const regenerated = generateLkptiDetails({ ...workspace, asAtDate: '2026-12-31', existingDetails: [] } as never);
     const byName = new Map(
       regenerated.map(r => [workspace.deliverables.find(d => d.id === r.targetId)?.name, r]),
     );

@@ -368,8 +368,6 @@ export function computeDiff(baseVersion: Version, currentData: Version['data']):
       if ((b.plannedImplementationQuarter ?? '') !== (c.plannedImplementationQuarter ?? '')) {
         changes.push(`Planned quarter: ${b.plannedImplementationQuarter ?? 'Unset'} → ${c.plannedImplementationQuarter ?? 'Unset'}`);
       }
-      if ((b.capexAmount ?? 0) !== (c.capexAmount ?? 0)) changes.push(`CapEx: ${b.capexAmount ?? 0} → ${c.capexAmount ?? 0}`);
-      if ((b.opexAmount ?? 0) !== (c.opexAmount ?? 0)) changes.push(`OpEx: ${b.opexAmount ?? 0} → ${c.opexAmount ?? 0}`);
       if ((b.remarks ?? '') !== (c.remarks ?? '')) changes.push('Remarks updated');
       return changes;
     },

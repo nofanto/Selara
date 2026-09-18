@@ -3,11 +3,11 @@ import { decisionsStrandedBy, LinkedEntityRef } from '../lib/decisionLinks';
 import { Asset, Deliverable, DeliverableSegment, DeliverableStatus, DeliverableType, Decision, RptiDetail, LkptiDetail, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource } from '../types';
 import { EditableTable, Column } from './EditableTable';
 import { cn } from '../lib/utils';
-import { Database, Layers, Calendar, Flag, Target, Link2, FolderTree, LayoutTemplate, Users, Box, ClipboardList, ListChecks, RefreshCw } from 'lucide-react';
+import { Database, Layers, Calendar, Flag, Target, Link2, FolderTree, LayoutTemplate, Users, Box, ClipboardList, ListChecks } from 'lucide-react';
 import { ConfirmModal } from './ConfirmModal';
 import { clearDeliverablesAndSegments, removeDeliverableAndSegments } from '../lib/deliverableCascade';
-import { rptiCascadeOnInitiativeDelete, rptiCascadeOnDeliverableDelete, rptiCascadeOnAssetDelete, RPTI_CATEGORY_LABELS, generateRptiDetails } from '../lib/rpti';
-import { lkptiCascadeOnDeliverableDelete, generateLkptiDetails, LKPTI_CATEGORY_CODES } from '../lib/lkpti';
+import { rptiCascadeOnInitiativeDelete, rptiCascadeOnDeliverableDelete, rptiCascadeOnAssetDelete, RPTI_CATEGORY_LABELS } from '../lib/rpti';
+import { lkptiCascadeOnDeliverableDelete } from '../lib/lkpti';
 import { DataManagerTab } from '../lib/dataHealth';
 
 interface DataManagerProps {
@@ -55,6 +55,49 @@ interface DataManagerProps {
 }
 
 type Tab = DataManagerTab;
+
+function ReadonlyReportRows({ testId, rows, initiatives, deliverables, assets }: {
+  testId: string;
+  rows: Array<Record<string, unknown>>;
+  initiatives: Initiative[];
+  deliverables: Deliverable[];
+  assets: Asset[];
+}) {
+  const labels: Record<string, string> = {
+    categoryCode: 'Category', developmentType: 'Dev Type', developer: 'Developer',
+    ppjtiRelatedParty: 'Related Party', plannedImplementationQuarter: 'Quarter',
+    dcCity: 'DC City', dcCountry: 'DC Country', drCity: 'DR City', drCountry: 'DR Country',
+    remarks: 'Remarks', functionDescription: 'Function Description', platform: 'Platform',
+    database: 'Database', dcProvider: 'DC Provider', drcProvider: 'DRC Provider',
+    backupStrategy: 'Backup Strategy', systemOwner: 'System Owner', goLiveDate: 'Go-Live Date', ownership: 'Ownership',
+  };
+  // Keep every stored value visible, including fields only an unresolved import owns.
+  const columns = [...new Set(rows.flatMap(row => Object.keys(row)))].filter(key =>
+    !['id', 'targetId', 'targetType', 'initiativeId', 'deliverableSegmentId'].includes(key));
+  return (
+    <div data-testid={testId} className="overflow-auto rounded-lg border border-slate-200 bg-white">
+      {rows.length === 0 ? (
+        <p className="p-4 text-sm text-slate-500">No stored rows. Generate a filing from Reports.</p>
+      ) : (
+        <table className="min-w-full text-sm">
+          <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
+            <tr><th className="px-3 py-2">Row</th><th className="px-3 py-2">Target</th><th className="px-3 py-2">Initiative</th>{columns.map(key => <th key={key} className="px-3 py-2">{labels[key] ?? key}</th>)}</tr>
+          </thead>
+          <tbody>
+            {rows.map((row, index) => (
+              <tr key={String(row.id ?? index)} className="border-t border-slate-100">
+                <td className="px-3 py-2">{index + 1}</td>
+                <td className="px-3 py-2">{deliverables.find(item => item.id === row.targetId)?.name ?? assets.find(item => item.id === row.targetId)?.name ?? 'Missing target'}</td>
+                <td className="px-3 py-2">{initiatives.find(item => item.id === row.initiativeId)?.name ?? '—'}</td>
+                {columns.map(key => <td key={key} className="px-3 py-2 text-slate-600 whitespace-pre-wrap">{row[key] == null ? '—' : typeof row[key] === 'object' ? JSON.stringify(row[key]) : String(row[key])}</td>)}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
 
 export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery, initialTab }: DataManagerProps) {
   const [activeTab, setActiveTab] = useState<Tab>(initialTab ?? 'initiatives');
@@ -203,69 +246,11 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery,
   const strategyOptions = data.strategies.map(s => ({ value: s.id, label: s.name }));
   const initiativeOptions = data.initiatives.map(i => ({ value: i.id, label: i.name }));
   const categoryOptions = data.assetCategories.map(c => ({ value: c.id, label: c.name }));
-  const deliverableOptions = (data.deliverables || []).map(a => ({ value: a.id, label: a.name }));
-  const rptiTargetOptions = [
-    ...deliverableOptions.map(o => ({ value: o.value, label: `Deliverable: ${o.label}` })),
-    ...assetOptions.map(o => ({ value: o.value, label: `Asset: ${o.label}` })),
-  ];
-
-  // Recomputes each row's targetType from whichever list (deliverables vs assets)
-  // its current targetId is actually found in, so targetId is the single source
-  // of truth and the two fields can never fall out of sync via inline editing.
-  const deriveRptiTargetTypes = (rows: RptiDetail[]): RptiDetail[] => {
-    return rows.map(row => {
-      if ((data.deliverables || []).some(a => a.id === row.targetId)) return { ...row, targetType: 'deliverable' as const };
-      if (data.assets.some(a => a.id === row.targetId)) return { ...row, targetType: 'asset' as const };
-      return row;
-    });
-  };
-
-  // Wipes and rebuilds all RPTI rows from the current year's DeliverableSegment data —
-  // see requirement-specs/rpti-auto-generation.md. v1: full replace, no reconciliation
-  // with prior manual edits.
-  const handleGenerateRpti = () => {
-    const reportYear = new Date().getFullYear();
-    const generated = generateRptiDetails({
-      deliverableSegments: data.deliverableSegments || [],
-      deliverableStatuses: data.deliverableStatuses || [],
-      initiatives: data.initiatives,
-      deliverables: data.deliverables || [],
-      assets: data.assets,
-      assetCategories: data.assetCategories,
-      existingDetails: data.rptiDetails || [],
-    }, reportYear);
-    const existingCount = (data.rptiDetails || []).length;
-    const message = existingCount
-      ? `This refreshes RPTI rows from ${reportYear} deliverable segment data, leaving ${generated.length} row(s) in total. Rows that cannot be regenerated — such as an imported row whose target was never found — are kept as they are. Continue?`
-      : `Generate ${generated.length} RPTI row(s) from ${reportYear} deliverable segment data?`;
-    confirm('Generate RPTI Rows', message, () => updateData('rptiDetails', generated));
-  };
-
-  // Merge-preserving: builds one row per currently-live Deliverable — see
-  // requirement-specs/lkpti-integration.md §3. Unlike RPTI, this isn't scoped to a
-  // report year: it's a point-in-time inventory, not a plan of activity. A deliverable
-  // with an existing row (from a prior generate, manual entry, or an LKPTI import)
-  // keeps its manual-only fields and goLiveDate untouched — only cascade-derived
-  // fields refresh. See requirement-specs/lkpti-import-onboarding.md §5.
-  const handleGenerateLkpti = () => {
-    const generated = generateLkptiDetails({
-      deliverableSegments: data.deliverableSegments || [],
-      deliverableStatuses: data.deliverableStatuses || [],
-      deliverables: data.deliverables || [],
-      assets: data.assets,
-      assetCategories: data.assetCategories,
-      existingDetails: data.lkptiDetails || [],
-    });
-    const existingCount = (data.lkptiDetails || []).length;
-    const message = existingCount
-      ? `This generates ${generated.length} LKPTI row(s) from currently-live deliverables, keeping manually-entered fields on rows that already exist. Continue?`
-      : `Generate ${generated.length} LKPTI row(s) from currently-live deliverables?`;
-    confirm('Generate LKPTI Rows', message, () => updateData('lkptiDetails', generated));
-  };
 
   const initiativeColumns: Column<Initiative>[] = [
     { key: 'name', label: 'Initiative Name', type: 'text', width: '280px' },
     { key: 'assetId', label: 'Asset', type: 'select', options: assetOptions, width: '230px' },
+    { key: 'deliverableId', label: 'RPTI Target', type: 'select', options: [{ value: '', label: '— Infer from lifecycle segments —' }, ...data.deliverables.map(deliverable => ({ value: deliverable.id, label: deliverable.name }))], width: '230px' },
     { key: 'programmeId', label: 'Programme', type: 'select', options: programmeOptions, width: '150px' },
     { key: 'strategyId', label: 'Strategy', type: 'select', options: strategyOptions, width: '150px' },
     { key: 'startDate', label: 'Start Date', type: 'date', width: '130px' },
@@ -465,92 +450,6 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery,
     { key: 'isPreLaunchStatus', label: 'Pre-Launch?', type: 'boolean', width: '20%' },
   ];
 
-  const rptiColumns: Column<RptiDetail>[] = [
-    { key: 'initiativeId', label: 'Initiative', type: 'select', options: initiativeOptions, width: '230px' },
-    { key: 'targetId', label: 'Target', type: 'select', options: rptiTargetOptions, width: '230px' },
-    {
-      key: 'categoryCode', label: 'Category', type: 'select', width: '200px',
-      options: [
-        { value: '', label: '— Not set —' },
-        ...(Object.keys(RPTI_CATEGORY_LABELS) as (keyof typeof RPTI_CATEGORY_LABELS)[])
-          .map(code => ({ value: code, label: `${code} — ${RPTI_CATEGORY_LABELS[code]}` })),
-      ],
-    },
-    {
-      key: 'developmentType', label: 'Dev Type', type: 'select', width: '130px',
-      options: [{ value: 'new', label: 'New' }, { value: 'upgrade', label: 'Upgrade' }],
-    },
-    {
-      key: 'developer', label: 'Developer', type: 'select', width: '140px',
-      options: [
-        { value: '', label: '— Not set —' },
-        { value: 'inhouse', label: 'In-house' }, { value: 'PPJTI', label: 'PPJTI' },
-      ],
-    },
-    {
-      key: 'ppjtiRelatedParty', label: 'PPJTI Related Party', type: 'select', width: '150px',
-      options: [
-        { value: '', label: '— Not set —' },
-        { value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }, { value: 'n/a', label: 'N/A' },
-      ],
-    },
-    {
-      key: 'plannedImplementationQuarter', label: 'Quarter', type: 'select', width: '120px',
-      options: [
-        { value: '', label: '— Not set —' },
-        { value: 'Q1', label: 'Q1' }, { value: 'Q2', label: 'Q2' }, { value: 'Q3', label: 'Q3' }, { value: 'Q4', label: 'Q4' },
-      ],
-    },
-    { key: 'capexAmount', label: 'CapEx Override', type: 'number', width: '140px' },
-    { key: 'opexAmount', label: 'OpEx Override', type: 'number', width: '140px' },
-    { key: 'dcCity', label: 'DC City Override', type: 'text', width: '130px' },
-    { key: 'dcCountry', label: 'DC Country Override', type: 'text', width: '130px' },
-    { key: 'drCity', label: 'DR City Override', type: 'text', width: '130px' },
-    { key: 'drCountry', label: 'DR Country Override', type: 'text', width: '130px' },
-    { key: 'remarks', label: 'Remarks', type: 'textarea', width: '220px' },
-  ];
-
-  const lkptiColumns: Column<LkptiDetail>[] = [
-    { key: 'targetId', label: 'Deliverable', type: 'select', options: deliverableOptions, width: '230px' },
-    {
-      key: 'categoryCode', label: 'Category', type: 'select', width: '200px',
-      options: [
-        { value: '', label: '— Not set —' },
-        ...LKPTI_CATEGORY_CODES.map(code => ({ value: code, label: `${code} — ${RPTI_CATEGORY_LABELS[code]}` })),
-      ],
-    },
-    { key: 'functionDescription', label: 'Function Description', type: 'textarea', width: '260px' },
-    { key: 'platform', label: 'Platform', type: 'text', width: '180px' },
-    { key: 'database', label: 'Database', type: 'text', width: '150px' },
-    { key: 'dcCity', label: 'DC City Override', type: 'text', width: '130px' },
-    { key: 'dcCountry', label: 'DC Country Override', type: 'text', width: '130px' },
-    { key: 'dcProvider', label: 'DC Provider', type: 'text', width: '150px', placeholder: "'self' or company name" },
-    { key: 'drCity', label: 'DR City Override', type: 'text', width: '130px' },
-    { key: 'drCountry', label: 'DR Country Override', type: 'text', width: '130px' },
-    { key: 'drcProvider', label: 'DRC Provider', type: 'text', width: '150px', placeholder: "'self' or company name" },
-    {
-      key: 'backupStrategy', label: 'Backup Strategy', type: 'select', width: '190px',
-      options: [
-        { value: '', label: '— Not set —' },
-        { value: 'HA_ACTIVE_ACTIVE', label: 'HA Active-Active' },
-        { value: 'HA_ACTIVE_PASSIVE', label: 'HA Active-Passive' },
-        { value: 'BACKUP_REALTIME', label: 'Backup Realtime' },
-        { value: 'BACKUP_PERIODIC', label: 'Backup Periodic' },
-      ],
-    },
-    { key: 'systemOwner', label: 'System Owner', type: 'text', width: '230px' },
-    { key: 'developer', label: 'Developer', type: 'text', width: '200px', placeholder: "'inhouse' or provider name" },
-    { key: 'goLiveDate', label: 'Go-Live Date (dd-mm-yyyy)', type: 'text', width: '150px' },
-    {
-      key: 'ownership', label: 'Ownership', type: 'select', width: '140px',
-      options: [
-        { value: '', label: '— Not set —' },
-        { value: 'LEASE', label: 'Lease' },
-        { value: 'OUTRIGHT_PURCHASE', label: 'Outright Purchase' },
-      ],
-    },
-  ];
-
   const tabs = [
     { id: 'initiatives', label: 'Initiatives', icon: Layers, count: data.initiatives.length },
     { id: 'dependencies', label: 'Dependencies', icon: Link2, count: data.dependencies.length },
@@ -712,71 +611,21 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery,
         {activeTab === 'rpti' && (
           <div className="flex flex-col h-full">
             <div className="flex items-center gap-2 mb-3">
-              <button
-                onClick={handleGenerateRpti}
-                data-testid="rpti-generate-btn"
-                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-sm font-medium text-sm"
-              >
-                <RefreshCw size={16} />
-                Generate {new Date().getFullYear()} RPTI Rows
-              </button>
               <p className="text-xs text-slate-500">
-                Refreshes rows from this year's deliverable segments. Rows that cannot be
-                regenerated are kept.
+                Stored RPTI rows are read-only. Choose a year and generate the filing from Reports.
               </p>
-              <div className="flex items-center gap-2 ml-auto">
-                <label htmlFor="rpti-default-currency" className="text-xs text-slate-500 whitespace-nowrap">
-                  Default Currency
-                </label>
-                <input
-                  id="rpti-default-currency"
-                  data-testid="rpti-default-currency-input"
-                  type="text"
-                  value={data.timelineSettings.defaultCurrency ?? ''}
-                  onChange={(e) => updateData('timelineSettings', { ...data.timelineSettings, defaultCurrency: e.target.value })}
-                  placeholder="e.g. IDR"
-                  className="w-20 px-2 py-1 text-sm border border-slate-200 rounded-md"
-                />
-              </div>
             </div>
-            <p className="text-xs text-slate-500 mb-3 -mt-2">
-              All CapEx/OpEx figures below are reported in this currency.
-            </p>
-            <EditableTable
-              data={data.rptiDetails || []}
-              columns={getColumnsWithWidths('rpti', rptiColumns)}
-              onUpdate={(newData) => updateData('rptiDetails', deriveRptiTargetTypes(newData))}
-              onDelete={(row) => { updateData('rptiDetails', (data.rptiDetails || []).filter(r => r.id !== row.id)); return true; }}
-              idField="id"
-              tableId="rpti"
-              onColumnResize={(col, w) => handleColumnResize('rpti', col, w)}
-            />
+            <ReadonlyReportRows testId="rpti-readonly-table" rows={data.rptiDetails as unknown as Array<Record<string, unknown>>} initiatives={data.initiatives} deliverables={data.deliverables} assets={data.assets} />
           </div>
         )}
         {activeTab === 'lkpti' && (
           <div className="flex flex-col h-full">
             <div className="flex items-center gap-2 mb-3">
-              <button
-                onClick={handleGenerateLkpti}
-                data-testid="lkpti-generate-btn"
-                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-sm font-medium text-sm"
-              >
-                <RefreshCw size={16} />
-                Generate LKPTI Rows
-              </button>
               <p className="text-xs text-slate-500">
-                Rebuilds rows from currently-live deliverables — replaces all rows below.
+                Stored LKPTI rows are read-only. Choose an as-at year and generate the filing from Reports.
               </p>
             </div>
-            <EditableTable
-              data={data.lkptiDetails || []}
-              columns={getColumnsWithWidths('lkpti', lkptiColumns)}
-              onUpdate={(newData) => updateData('lkptiDetails', newData)}
-              onDelete={(row) => { updateData('lkptiDetails', (data.lkptiDetails || []).filter(r => r.id !== row.id)); return true; }}
-              idField="id"
-              tableId="lkpti"
-              onColumnResize={(col, w) => handleColumnResize('lkpti', col, w)}
-            />
+            <ReadonlyReportRows testId="lkpti-readonly-table" rows={data.lkptiDetails as unknown as Array<Record<string, unknown>>} initiatives={data.initiatives} deliverables={data.deliverables} assets={data.assets} />
           </div>
         )}
       </div>

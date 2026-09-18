@@ -3,7 +3,7 @@ import {
   Initiative, Milestone, Dependency, Decision, Resource, Programme, Strategy,
   RptiDetail, LkptiDetail, TimelineSettings,
 } from '../types';
-import { isLiveStatusId, isPreLaunchStatusId, resolveAssetCategory } from './rpti';
+import { isLiveStatusId, isPreLaunchStatusId, resolveAssetCategory, resolveRptiTarget } from './rpti';
 
 // Tabs of src/components/DataManager.tsx's own `Tab` union — defined here (the pure
 // lib layer) as the source of truth so DataManager can import it instead of the other
@@ -194,6 +194,26 @@ export function computeDataHealth(input: DataHealthInput): HealthIssue[] {
         });
       }
     }
+
+    const initiativeSegments = deliverableSegments.filter(segment => segment.initiativeId === i.id);
+    const reportTargets = new Set(initiativeSegments.map(segment => segment.deliverableId));
+    if (!i.isPlaceholder && !i.deliverableId && reportTargets.size > 1) {
+      issues.push({
+        id: `initiative-rpti-multi-target:${i.id}`, severity: 'error', entityType: 'Initiative', entityId: i.id,
+        entityName: i.name,
+        message: `"${i.name}" has no declared RPTI target and lifecycle segments on multiple deliverables. Select its intended Deliverable on Initiatives, or split it into one initiative per RPTI target before generating the filing.`,
+        location: tab('initiatives'),
+      });
+    } else if (!i.isPlaceholder && initiativeSegments.some(segment =>
+      isLiveStatusId(segment.status, deliverableStatuses) || isPreLaunchStatusId(segment.status, deliverableStatuses)
+    ) && !deliverableIds.has(resolveRptiTarget(i, deliverableSegments, deliverables) ?? '')) {
+      issues.push({
+        id: `initiative-rpti-no-target:${i.id}`, severity: 'error', entityType: 'Initiative', entityId: i.id,
+        entityName: i.name,
+        message: `"${i.name}" has qualifying lifecycle segments but no resolvable RPTI target. Create or repair the Deliverable and select that Deliverable on Initiatives before generating the filing.`,
+        location: tab('initiatives'),
+      });
+    }
   }
 
   for (const m of milestones) {
@@ -253,6 +273,14 @@ export function computeDataHealth(input: DataHealthInput): HealthIssue[] {
       issues.push({
         id: `rpti-initiative:${r.id}`, severity: 'error', entityType: 'RptiDetail', entityId: r.id,
         entityName: label, message: `An RPTI row points at an Initiative that no longer exists.`, location: tab('rpti'),
+      });
+    }
+    if (r.targetType === 'asset') {
+      issues.push({
+        id: `rpti-asset-target:${r.id}`, severity: 'error', entityType: 'RptiDetail', entityId: r.id,
+        entityName: label,
+        message: `The RPTI row for "${label}" targets an Asset. Create a Deliverable under that Asset and point the Initiative at that Deliverable before generating the filing.`,
+        location: tab('deliverables'),
       });
     }
     const targetExists = r.targetType === 'deliverable' ? deliverableIds.has(r.targetId) : assetIds.has(r.targetId);
@@ -582,6 +610,9 @@ export function computeDataHealth(input: DataHealthInput): HealthIssue[] {
  */
 const REPORTS_BY_CHECK: Record<string, HealthReport[]> = {
   // Rows of a return, and the things that stop one being generated at all.
+  'initiative-rpti-multi-target': ['rpti'],
+  'initiative-rpti-no-target': ['rpti'],
+  'rpti-asset-target': ['rpti'],
   'rpti-incomplete': ['rpti'],
   'rpti-initiative': ['rpti'],
   'rpti-segment': ['rpti'],

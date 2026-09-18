@@ -1,49 +1,23 @@
 # Recording an RPTI Row
 
-RPTI (Laporan Rencana Pengembangan Teknologi Informasi) is Indonesia's OJK-regulated IT Development Plan Report — Format 3.1. Each row records a planned development activity on one application or infrastructure item, backed by one of your initiatives.
+RPTI Format 3.1 records planned application and infrastructure work. Generate the filing from **Reports → RPTI Report** after choosing its year.
 
-RPTI rows are managed in **Data Manager → RPTI**, the same spreadsheet-style editor used for every other entity in Selara (Initiatives, Assets, Applications, and so on). The **RPTI Report** screen under Reports is a read-only summary of the same data, plus the Excel export — see [Exporting the RPTI Report](exporting-the-rpti-report.md).
+## Target and cost
 
-## Opening the RPTI tab
+Each initiative contributes at most one generated target and uses its own CapEx and OpEx. In **Data Manager → Initiatives**, select **RPTI Target** to declare its Deliverable. Infrastructure is also a Deliverable under an Asset; a bare Asset is not a supported filing target.
 
-Go to **Data Manager** in the top navigation bar and select the **RPTI** tab.
+If the target is blank, Selara can infer it when all lifecycle segments linked to the initiative point at one existing Deliverable. This considers all years, so the same initiative cannot silently change targets between filings. A declared target takes precedence over other timeline history.
 
-## Creating a Row
+If an undeclared initiative spans several deliverables, Data Health asks you to select the intended target or split the work into separate initiatives. If its target is missing, create or repair the Deliverable and select it. These errors are shown before export, even when there is no stored RPTI row.
 
-1. Click **Add Row**.
-2. Set the **Initiative** column — this supplies the description and the default CapEx/OpEx figures.
-3. Set the **Target** column to the specific application or asset/infrastructure item this row is about. Applications and assets both appear in the same dropdown, labelled `App:` or `Asset:` so you can tell them apart.
-4. Set the **Category** — one of RPTI's 18 regulatory codes (customer management, payments, digital services, data center, etc.).
-5. Set **Dev Type** (New or Upgrade), **Developer** (In-house or PPJTI), and **PPJTI Related Party** status.
-6. Optionally fill in the **DC City** / **DC Country** / **DR City** / **DR Country** columns for the item's Data Center and Disaster Recovery Center location, a **Quarter**, and **Remarks**.
+## Generated values
 
-## Auto-Generating Rows
+Only live or pre-launch lifecycle segments overlapping the selected year qualify. Category and DC/DR locations come from the Deliverable, falling back to its Asset Category. Developer and related-party attributes come from the Deliverable; remarks come from the Initiative. Imported attributes are retained on those entities.
 
-Instead of adding rows by hand, click **Generate `<year>` RPTI Rows** at the top of the RPTI tab to build rows automatically from this year's deliverable lifecycle segments — see [RPTI Row Auto-Generation](../../../requirement-specs/rpti-auto-generation.md) for the full rule. This replaces all existing rows for the current year, so any manual edits made since the last generation are lost.
-
-Generated rows auto-fill as much as they can from the Deliverable being reported on:
-
-- **Category** comes from the Deliverable's own category code if it has one, otherwise from its Asset Category's default.
-- **Developer** comes from the Deliverable's own setting (there's no category-level default for this one — it varies too much deliverable to deliverable). **PPJTI Related Party** auto-fills to `N/A` unless the developer is PPJTI, in which case it's left for you to fill in.
-- **DC City / DC Country / DR City / DR Country** follow the same Deliverable-first, Asset-Category-fallback pattern as Category, resolved independently per field.
-
-Set these defaults once on a Deliverable or its Asset Category (in Data Manager → Deliverables / Categories) and every row generated from that deliverable inherits them — no need to re-enter the same values every report year.
-
-Only a lifecycle segment whose status is recognized as **live** or **pre-launch** (planned/funded) work counts toward generation — a status like "Cancelled" or "On Hold" is excluded by default, so it never produces a false report row. Selara recognizes the built-in Planned/Funded/In Production statuses automatically; if you add a custom status of your own, mark it explicitly using the **Live?** / **Pre-Launch?** checkboxes in Data Manager → App Statuses so generation knows how to treat it.
+**Data Manager → RPTI** displays stored rows and their fields for reference, including unresolved imports. It has no row editing or generation controls. Generating a report does not overwrite those stored rows.
 
 ## Default Currency
 
-All CapEx/OpEx figures in this report are assumed to be in a single currency for the whole workspace. Set it once via the **Default Currency** field at the top of the RPTI tab (e.g. `IDR`, `USD`) — it's a label, not a converter, so if your CapEx/OpEx values aren't already in that currency, convert them yourself before entering them.
+Set the workspace currency in **Visualiser → More → Default Currency**. This labels amounts; it does not convert them.
 
-## One Initiative, Multiple Rows
-
-An initiative often affects more than one application or asset — a migration might touch both an application and the data center it runs in, for example. Rather than changing what an initiative can target, add **one RPTI row per affected item**, all pointing at the same initiative. Each row can independently override the CapEx/OpEx amount via the **CapEx Override** / **OpEx Override** columns, if the initiative's total budget needs to be split across its targets (left blank, they default to the initiative's own CapEx/OpEx).
-
-## Editing and Deleting
-
-Edit any cell inline, the same as any other Data Manager table. Click the trash icon on a row to delete it. Deleting the initiative a row belongs to, or the application/asset it targets, removes that RPTI row automatically.
-
----
-
-- Previous: [Linking Decisions to Portfolio Items](../13-decisions/linking-decisions.md)
 - Next: [Exporting the RPTI Report](exporting-the-rpti-report.md)

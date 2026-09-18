@@ -21,6 +21,8 @@ It has twelve tabs:
 | RPTI | Rows for the Indonesian OJK IT Development Plan Report (Format 3.1) |
 | LKPTI | Rows for the Indonesian OJK Application List Report (Format 3.2.6) |
 
+The RPTI and LKPTI tabs are read-only views of stored report rows. They show target names and all stored report fields, including unresolved imports. Generate a filing for a selected year from **Reports**. Choose an initiative’s **RPTI Target** on the Initiatives tab; leaving it blank allows inference only when all its lifecycle segments name one existing Deliverable.
+
 Each tab shows a row count badge. All tabs are reachable without horizontal scrolling on tablet and narrow viewports.
 
 Use the Data Manager for bulk edits, importing data, and data cleanup. The timeline updates in real time as you make changes.

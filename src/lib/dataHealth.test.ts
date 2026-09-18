@@ -92,6 +92,19 @@ describe('computeDataHealth — hard checks (dangling references)', () => {
     expect(issues.filter(i => i.entityId === init.id && i.severity === 'error')).toHaveLength(0);
   });
 
+  it('flags an initiative whose reportable segments name more than one deliverable', () => {
+    const init = { id: 'init-1', name: 'Split plan', programmeId: 'prog-1', assetId: asset.id, startDate: '2026-01-01', endDate: '2026-12-31', capex: 0, opex: 0 };
+    const second = { ...deliverable, id: 'deliv-2', name: 'App Two' };
+    const segments = [
+      { id: 'seg-1', deliverableId: deliverable.id, initiativeId: init.id, startDate: '2026-01-01', endDate: '2026-03-31', status: 'appstatus-planned' },
+      { id: 'seg-2', deliverableId: second.id, initiativeId: init.id, startDate: '2026-04-01', endDate: '2026-06-30', status: 'appstatus-planned' },
+    ];
+    const issue = findIssue(computeDataHealth(baseInput({ assets: [asset], deliverables: [deliverable, second], initiatives: [init], deliverableSegments: segments })), `initiative-rpti-multi-target:${init.id}`);
+
+    expect(issue).toMatchObject({ severity: 'error', location: { view: 'data', tab: 'initiatives' } });
+    expect(issue?.message).toMatch(/split/i);
+  });
+
   it('flags a Milestone pointing at a missing Asset', () => {
     const milestone = { id: 'mile-1', assetId: 'ghost', date: '2026-01-01', name: 'Milestone One', type: 'info' as const };
     const issues = computeDataHealth(baseInput({ milestones: [milestone] }));
@@ -125,6 +138,15 @@ describe('computeDataHealth — hard checks (dangling references)', () => {
     expect(findIssue(issues, `rpti-initiative:${r.id}`)?.severity).toBe('error');
     expect(findIssue(issues, `rpti-target:${r.id}`)?.severity).toBe('error');
     expect(findIssue(issues, `rpti-segment:${r.id}`)?.severity).toBe('error');
+  });
+
+  it('blocks a legacy asset-target RPTI row and names the source-side repair', () => {
+    const init = { id: 'init-1', name: 'Payments renewal', programmeId: 'prog-1', assetId: asset.id, startDate: '2026-01-01', endDate: '2026-12-31', capex: 0, opex: 0 };
+    const row = { id: 'rpti-asset-1', initiativeId: init.id, targetType: 'asset' as const, targetId: asset.id, developmentType: 'new' as const };
+    const issue = findIssue(computeDataHealth(baseInput({ assets: [asset], initiatives: [init], rptiDetails: [row] })), `rpti-asset-target:${row.id}`);
+
+    expect(issue).toMatchObject({ severity: 'error', location: { view: 'data', tab: 'deliverables' } });
+    expect(issue?.message).toMatch(/create.*deliverable/i);
   });
 
   it('flags an LkptiDetail with a dangling targetId', () => {
@@ -564,5 +586,38 @@ describe('every check declares which return it bears on', () => {
     expect(byCheck('rpti-target')?.reports).toEqual(['rpti']);
     expect(byCheck('deliverable-no-segments')?.reports).toEqual(['rpti', 'lkpti']);
     expect(byCheck('initiative-programme')?.reports).toEqual([]);
+  });
+});
+
+
+describe('RPTI target compatibility', () => {
+  const init = { id: 'target-init', name: 'Target work', programmeId: programme.id, assetId: asset.id,
+    startDate: '2026-01-01', endDate: '2026-12-31', capex: 1, opex: 0 };
+  const segment = { id: 'target-seg', initiativeId: init.id, deliverableId: deliverable.id,
+    status: 'appstatus-planned', startDate: '2026-01-01', endDate: '2026-12-31' };
+  it('names the repair when qualifying segments have no existing target', () => {
+    const issues = computeDataHealth(baseInput({ initiatives: [init], deliverableSegments: [segment] }));
+    const issue = findIssue(issues, `initiative-rpti-no-target:${init.id}`);
+    expect(issue?.severity).toBe('error');
+    expect(issue?.message).toMatch(/select.*deliverable/i);
+    expect(issue?.reports).toContain('rpti');
+  });
+  it('does not flag a single inferred target', () => {
+    const issues = computeDataHealth(baseInput({ initiatives: [init], deliverables: [deliverable], deliverableSegments: [segment] }));
+    expect(findIssue(issues, `initiative-rpti-no-target:${init.id}`)).toBeUndefined();
+  });
+  it('accepts a declared target despite other timeline history', () => {
+    const issues = computeDataHealth(baseInput({ initiatives: [{ ...init, deliverableId: deliverable.id }],
+      deliverables: [deliverable, { ...deliverable, id: 'other' }],
+      deliverableSegments: [segment, { ...segment, id: 'other-seg', deliverableId: 'other' }] }));
+    expect(findIssue(issues, `initiative-rpti-multi-target:${init.id}`)).toBeUndefined();
+  });
+  it('flags ambiguous infrastructure targets as RPTI errors', () => {
+    const issues = computeDataHealth(baseInput({ initiatives: [init],
+      deliverables: [{ ...deliverable, type: 'infrastructure' }, { ...deliverable, id: 'other', type: 'infrastructure' }],
+      deliverableSegments: [segment, { ...segment, id: 'other-seg', deliverableId: 'other' }] }));
+    const issue = findIssue(issues, `initiative-rpti-multi-target:${init.id}`);
+    expect(issue?.severity).toBe('error');
+    expect(issue?.reports).toContain('rpti');
   });
 });

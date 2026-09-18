@@ -90,6 +90,17 @@ function classifySegmentKind(statusId: string, deliverableStatuses: DeliverableS
   return 'excluded';
 }
 
+/** Q10: target ownership is initiative-wide, never inferred separately per filing year. */
+export function resolveRptiTarget(
+  initiative: Initiative, segments: DeliverableSegment[], deliverables: Deliverable[],
+): string | undefined {
+  if (initiative.deliverableId) return initiative.deliverableId;
+  const targets = new Set(segments.filter(segment => segment.initiativeId === initiative.id).map(segment => segment.deliverableId));
+  if (targets.size !== 1) return undefined;
+  const target = [...targets][0];
+  return deliverables.some(deliverable => deliverable.id === target) ? target : undefined;
+}
+
 export interface GenerateRptiDetailsInput {
   deliverableSegments: DeliverableSegment[];
   deliverableStatuses: DeliverableStatus[];
@@ -166,9 +177,16 @@ export function generateRptiDetails(
     .map(seg => ({ segment: seg, kind: classifySegmentKind(seg.status, deliverableStatuses) }))
     .filter((s): s is { segment: DeliverableSegment; kind: 'new' | 'live' } => s.kind !== 'excluded');
 
+  const targets = new Map(initiatives.map(initiative => [initiative.id, resolveRptiTarget(initiative, deliverableSegments, deliverables)]));
   const groups = new Map<string, { segment: DeliverableSegment; kind: 'new' | 'live' }[]>();
   for (const item of qualifying) {
-    const key = `${item.segment.initiativeId}::${item.segment.deliverableId}`;
+    const initiative = initiatives.find(candidate => candidate.id === item.segment.initiativeId);
+    // The Initiative is the canonical RPTI plan line. Segments on another
+    // deliverable remain timeline history but are not a second filing target.
+    const target = initiative && targets.get(initiative.id);
+    // Unresolved/ambiguous targets are diagnosed by data health and gate export.
+    if (!initiative || !target || item.segment.deliverableId !== target) continue;
+    const key = initiative.id;
     const group = groups.get(key);
     if (group) group.push(item);
     else groups.set(key, [item]);
@@ -178,8 +196,9 @@ export function generateRptiDetails(
     a.segment.startDate.localeCompare(b.segment.startDate);
 
   const results: RptiDetail[] = [];
-  for (const [key, items] of groups) {
-    const [initiativeId, deliverableId] = key.split('::');
+  for (const [initiativeId, items] of groups) {
+    const deliverableId = targets.get(initiativeId);
+    if (!deliverableId) continue;
     const newItems = items.filter(i => i.kind === 'new').sort(byStartDateAsc);
     const liveItems = items.filter(i => i.kind === 'live').sort(byStartDateAsc);
 
@@ -245,9 +264,9 @@ export function generateRptiDetails(
  *
  * A row is matched to its regenerated counterpart by (initiative, target) rather than
  * by id, because an imported row and a generated one for the same work carry different
- * ids. On a match the derived fields refresh and the row keeps its id and the fields
- * generation has no source for. With no existing rows supplied this returns the
- * generated list unchanged.
+ * ids. On a match canonical fields refresh and only the stored id survives.
+ * Unreproduced rows keep all filed values until their sources are repaired.
+ * With no existing rows supplied this returns the generated list unchanged.
  */
 function mergeWithExisting(generated: RptiDetail[], existing: RptiDetail[]): RptiDetail[] {
   if (existing.length === 0) return generated;
@@ -271,12 +290,6 @@ function mergeWithExisting(generated: RptiDetail[], existing: RptiDetail[]): Rpt
     merged.push({
       ...fresh,
       id: row.id,
-      // Generation has no source for these: CapEx/OpEx are overrides on top of the
-      // initiative's figures, and remarks is free text. Rebuilding them from segments
-      // is impossible, so they survive the refresh.
-      capexAmount: row.capexAmount,
-      opexAmount: row.opexAmount,
-      remarks: row.remarks,
     });
   }
 
@@ -307,10 +320,10 @@ export function suggestDeliverableQuarter(
   return { quarter: deriveQuarterFromDate(match.startDate), segmentId: match.id };
 }
 
-export function resolveCost(detail: RptiDetail, initiative: Initiative | undefined): { capexAmount: number; opexAmount: number } {
+export function resolveCost(_detail: RptiDetail, initiative: Initiative | undefined): { capexAmount: number; opexAmount: number } {
   return {
-    capexAmount: detail.capexAmount ?? initiative?.capex ?? 0,
-    opexAmount: detail.opexAmount ?? initiative?.opex ?? 0,
+    capexAmount: initiative?.capex ?? 0,
+    opexAmount: initiative?.opex ?? 0,
   };
 }
 

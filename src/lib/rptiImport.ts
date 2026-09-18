@@ -440,8 +440,6 @@ export function deriveWorkspaceFromRptiImport(
       ppjtiRelatedParty: row.ppjtiRelatedParty,
       dcCity: row.dcCity, dcCountry: row.dcCountry,
       drCity: row.drCity, drCountry: row.drCountry,
-      capexAmount: row.capexAmount,
-      opexAmount: row.opexAmount,
       plannedImplementationQuarter: row.plannedQuarter,
       deliverableSegmentId: anchorSegmentId,
       remarks: row.remarks,

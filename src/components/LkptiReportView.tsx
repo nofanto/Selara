@@ -7,9 +7,10 @@ import { exportLkptiReportToExcel } from '../lib/lkpti';
 interface LkptiReportViewProps {
   lkptiDetails: LkptiDetail[];
   deliverables: Deliverable[];
+  reportYear?: number;
 }
 
-export function LkptiReportView({ lkptiDetails, deliverables }: LkptiReportViewProps) {
+export function LkptiReportView({ lkptiDetails, deliverables, reportYear }: LkptiReportViewProps) {
   const targetName = (detail: LkptiDetail): string =>
     deliverables.find(d => d.id === detail.targetId)?.name ?? '—';
 
@@ -17,7 +18,7 @@ export function LkptiReportView({ lkptiDetails, deliverables }: LkptiReportViewP
     <div data-testid="lkpti-report-view" className="space-y-4">
       <div className="flex items-center gap-2">
         <p className="text-sm text-slate-500">
-          LKPTI rows are managed in <span className="font-medium text-slate-700">Data Manager → LKPTI</span>. This screen is a read-only summary and export.
+          {reportYear ? `LKPTI application inventory as at 31 December ${reportYear}.` : 'Choose an as-at year to generate an LKPTI filing.'}
         </p>
         <div className="flex-1" />
         {lkptiDetails.length > 0 && (

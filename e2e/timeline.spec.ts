@@ -133,6 +133,7 @@ test.describe('Snap to Month', () => {
 
     await page.getByTestId('display-more-btn').click();
     await page.getByLabel('Snap to Month').selectOption('off');
+    await page.getByTestId('display-more-btn').click(); // Close settings before dragging beneath it.
 
     const box1 = await bar.boundingBox();
     await bar.hover();
@@ -146,6 +147,7 @@ test.describe('Snap to Month', () => {
 
     await page.getByTestId('display-more-btn').click();
     await page.getByLabel('Snap to Month').selectOption('month');
+    await page.getByTestId('display-more-btn').click();
 
     await bar.hover();
     await page.mouse.down();

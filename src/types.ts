@@ -235,15 +235,14 @@ export type RptiCategoryCode =
 
 /**
  * One row of the RPTI (IT Development Plan Report) regulatory report — an
- * Initiative's planned development activity on a specific Deliverable or
- * Asset. One Initiative may back multiple RptiDetail rows, one per affected
- * target, without changing Initiative's own single-asset targeting.
+ * Initiative's planned development activity on its linked Deliverable. It is a
+ * generated projection; the Initiative owns the filed cost.
  */
 export interface RptiDetail {
   id: string;
   initiativeId: string;
   targetType: RptiTargetType;
-  targetId: string; // Deliverable.id or Asset.id, per targetType
+  targetId: string; // Deliverable.id for generated rows; legacy Asset targets are a data-health error
   categoryCode?: RptiCategoryCode; // Cascades from Deliverable.categoryCode ?? AssetCategory.categoryCode
   developmentType: RptiDevelopmentType;
   developer?: RptiDeveloper; // Derived from Deliverable.developer: 'inhouse', else 'PPJTI' for any named provider (ADR-0013)
@@ -252,8 +251,6 @@ export interface RptiDetail {
   dcCountry?: string;
   drCity?: string;
   drCountry?: string;
-  capexAmount?: number; // Defaults to the linked Initiative's capex when unset. Always in TimelineSettings.defaultCurrency — this app reports in a single workspace-wide currency, no per-row conversion.
-  opexAmount?: number; // Defaults to the linked Initiative's opex when unset. Always in TimelineSettings.defaultCurrency, same as capexAmount.
   plannedImplementationQuarter?: RptiQuarter;
   deliverableSegmentId?: string; // Set when the quarter is auto-derived (targetType 'deliverable' only)
   remarks?: string; // Projection of Initiative.rptiRemarks (ADR-0013) — the RPTI `Keterangan` column
@@ -339,7 +336,7 @@ export interface TimelineSettings {
   templateId?: string;           // Which workspace template was selected on first load
   showRptiCatalogue?: boolean;   // When false, the RPTI asset catalogue section is hidden (default: true)
   clusterName?: string;          // Agency cluster name — shown in the timeline header
-  defaultCurrency?: string;      // Single workspace-wide currency for RptiDetail.capexAmount/opexAmount, e.g. 'USD', 'IDR'
+  defaultCurrency?: string;      // Single workspace-wide currency for Initiative CapEx/OpEx, e.g. 'USD', 'IDR'
 }
 
 /**

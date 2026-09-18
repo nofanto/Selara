@@ -138,7 +138,7 @@ At onboarding the preparer states which year each uploaded return covers — an 
 - **FR-021b**: An imported row that cannot be reproduced MUST be repairable from the source side — by creating or correcting the application the filed plan refers to — and its data-health message MUST say so.
 - **FR-028**: The cost of a plan line MUST be the initiative's own `capex`/`opex`. `RptiDetail.capexAmount` and `opexAmount` MUST be removed; there is no per-row override and no fallback chain (Q7).
 - **FR-029**: An initiative MUST have at most one RPTI target. Generation MUST honour the initiative's own target rather than grouping by segment, so one initiative yields at most one row per report year.
-- **FR-030**: Attaching segments on more than one application to a single initiative MUST be reported by data health as an **error**, naming the split as the fix. It MUST NOT be blocked at the point of drawing. Left unflagged it files one budget twice; blocked outright it would make the timeline refuse a legal arrangement of work for one consumer's benefit.
+- **FR-030**: An initiative without an explicit target whose lifecycle segments span more than one Deliverable MUST receive a data-health **error**, naming target selection or splitting into one initiative per target as the repair. Explicit targets take precedence over other timeline history. The error MUST block RPTI export, not timeline drawing. This supersedes the broad multiple-application rule (Q10); undeclared single-target initiatives infer their target across all years, including infrastructure.
 - **FR-032**: An RPTI row MUST NOT target a bare Asset. Infrastructure is filed as OJK Format 3.1 requires, but an infrastructure item MUST be recorded as a Deliverable under its Asset, the same as an application (Q8).
 - **FR-033**: An existing row targeting a bare Asset MUST raise a data-health **error** before export, naming the repair — record the item as a Deliverable under its Asset and point the initiative at it. Error, not warning: no generated return can reproduce such a row, so it otherwise leaves the filing in silence.
 - **FR-031**: A hand-edited cost override that differs from its initiative's figure MUST be lifted onto the initiative before the fields are removed. Imported overrides already equal it and lift without change.
@@ -160,7 +160,9 @@ At onboarding the preparer states which year each uploaded return covers — an 
 - **SC-001a**: After repairing everything the data-health review flags, the generated returns differ from the imported ones in **no** row and **no** field.
 - **SC-002**: Every generated return states the year it covers, on screen and in the exported file.
 - **SC-003**: Regenerating report rows loses none of the fourteen values a filed return supplies that generation cannot derive — measured by importing the sample returns, regenerating, and comparing field by field.
-- **SC-004**: Both returns export byte-identical files before and after this change for the same workspace.
+- **SC-004**: Each post-feature export states the preparer-selected year and preserves every
+  pre-existing filed value required by FR-017. Byte identity with a pre-feature file is neither
+  expected nor meaningful, because that file did not state its selected year.
 - **SC-005**: A workspace imported before this change either retains its attributes through a regeneration, or shows the preparer a warning naming what will be lost before it happens. Silent loss occurs in no path.
 - **SC-006**: Changing any newly relocated field appears in the version difference report.
 - **SC-007**: Preparing a return never uses a report year the preparer has not seen and confirmed.
