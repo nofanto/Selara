@@ -42,6 +42,23 @@ describe('computeDataHealth — hard checks (dangling references)', () => {
     expect(findIssue(issues, `deliverable-asset:${deliverable.id}`)).toBeUndefined();
   });
 
+  it('clears a stale LKPTI target when its retained filing name identifies exactly one replacement', () => {
+    const stale = { id: 'lk-stale', targetId: 'deleted-deliverable', targetName: 'App One' };
+    const issues = computeDataHealth(baseInput({
+      assets: [asset], deliverables: [deliverable], lkptiDetails: [stale],
+    }));
+    expect(findIssue(issues, `lkpti-target:${stale.id}`)).toBeUndefined();
+  });
+
+  it('requires re-import for an already-orphaned LKPTI row with no retained filing name', () => {
+    const stale = { id: 'lk-stale', targetId: 'deleted-deliverable' };
+    const issue = findIssue(computeDataHealth(baseInput({
+      assets: [asset], deliverables: [deliverable], lkptiDetails: [stale],
+    })), `lkpti-target:${stale.id}`);
+    expect(issue?.message).toMatch(/re-import/i);
+    expect(issue?.message).toMatch(/name.*not.*recorded/i);
+  });
+
   it('flags an Asset pointing at a missing AssetCategory', () => {
     const issues = computeDataHealth(baseInput({ assets: [asset] }));
     expect(findIssue(issues, `asset-category:${asset.id}`)?.severity).toBe('error');

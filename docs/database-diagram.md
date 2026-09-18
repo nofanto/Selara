@@ -165,6 +165,7 @@ erDiagram
     LKPTI_DETAIL {
         string id PK
         string targetId FK "Deliverable.id — application-scoped only, unlike RptiDetail"
+        string targetName "optional; filed application-name identity evidence for stale-target repair (ADR-0013 Q12)"
         string categoryCode "narrowed to the 13 LKPTI-eligible codes (excludes 51-54, 99)"
         string developer "'inhouse', or the IT service provider's name (free text)"
         string dcCity

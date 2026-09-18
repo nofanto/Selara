@@ -6,7 +6,7 @@ If your bank has already filed an LKPTI Format 3.2.6 report, you can upload it w
 
 On the template picker (shown the first time you open Selara, or after **Clear data and start again** in Data Manager), choose the **Import LKPTI Report** card and select your `.xlsx` file.
 
-The importer only accepts the standard OJK Format 3.2.6 layout — the same single-sheet, 15-column, Indonesian-header layout Selara's own [LKPTI export](recording-lkpti-rows.md#exporting-to-excel) produces. If the file's sheet name or headers don't match exactly, the whole import is rejected up front with an error, and the template picker stays open so you can try a different file. No partial workspace is created.
+The importer only accepts the standard OJK Format 3.2.6 data worksheet — the same 15-column, Indonesian-header **LKPTI Format 3.2.6** sheet Selara's own [LKPTI export](recording-lkpti-rows.md#exporting-to-excel) produces. The export's separate **Report Metadata** sheet does not alter that layout and is ignored by the importer. If the filing sheet name or headers don't match exactly, the whole import is rejected up front with an error, and the template picker stays open so you can try a different file. No partial workspace is created.
 
 A row with a problem — an unrecognized category code, backup strategy, or ownership label, or a go-live date that isn't `dd-mm-yyyy` text or a real date cell — is skipped individually rather than failing the whole file; you'll see how many rows were skipped and why after the import finishes.
 

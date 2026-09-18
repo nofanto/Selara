@@ -9,7 +9,8 @@ import type { Deliverable, Initiative } from '../types';
  * is only safe while the orphaned values survive. IndexedDB is schemaless within a
  * store, so they persist untouched after the type drops them — right up until the
  * first press of Generate rebuilds the rows from the deliverable and discards them
- * permanently. This lift runs before that can happen.
+ * permanently. This lift runs before that can happen. Legacy cost properties are
+ * removed after lifting so their absence durably marks that one-time migration done.
  */
 const deliverable = (over: Partial<Deliverable> = {}): Deliverable =>
   ({ id: 'd-1', assetId: 'a-1', name: 'Core Banking GL', type: 'application', ...over } as Deliverable);
@@ -66,13 +67,34 @@ describe('liftReportRowAttributes', () => {
     expect(out.initiatives[0]).toMatchObject({ capex: 700, opex: 70 });
   });
 
+  it('removes lifted legacy costs so a later canonical edit survives reload', () => {
+    const input = {
+      deliverables: [deliverable()], initiatives: [initiative({ capex: 100, opex: 10 })],
+      lkptiDetails: [], rptiDetails: [oldRptiRow({ capexAmount: 700, opexAmount: 70 })],
+    };
+    const lifted = liftReportRowAttributes(input);
+
+    expect(lifted.initiatives[0]).toMatchObject({ capex: 700, opex: 70 });
+    expect(lifted.rptiDetails[0]).not.toHaveProperty('capexAmount');
+    expect(lifted.rptiDetails[0]).not.toHaveProperty('opexAmount');
+
+    const edited = [{ ...lifted.initiatives[0], capex: 900 }];
+    const afterReload = liftReportRowAttributes({
+      ...input, initiatives: edited, rptiDetails: lifted.rptiDetails,
+    });
+    expect(afterReload.initiatives[0].capex).toBe(900);
+  });
+
   it('is idempotent — running it twice changes nothing (contract 15)', () => {
     const input = {
       deliverables: [deliverable()], initiatives: [initiative()],
       lkptiDetails: [oldLkptiRow()], rptiDetails: [oldRptiRow()],
     };
     const once = liftReportRowAttributes(input);
-    const twice = liftReportRowAttributes({ ...input, deliverables: once.deliverables, initiatives: once.initiatives });
+    const twice = liftReportRowAttributes({
+      ...input, deliverables: once.deliverables, initiatives: once.initiatives,
+      rptiDetails: once.rptiDetails,
+    });
     expect(twice.deliverables).toEqual(once.deliverables);
     expect(twice.initiatives).toEqual(once.initiatives);
     expect(twice.changed).toBe(false);

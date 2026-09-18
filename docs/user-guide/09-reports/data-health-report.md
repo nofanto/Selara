@@ -41,6 +41,9 @@ Click any issue to jump straight to where it can be fixed:
 - Most issues open **Data Manager**, on the tab that owns the record, with the record's name already typed into the search box at the top — so the row you need is the one already showing.
 - An issue on a portfolio **Decision** opens the **Decisions** view instead, since decisions aren't managed in Data Manager.
 - The application-name checks open the **Deliverables** tab, because that's where the name is edited, even though the problem shows up in the LKPTI export.
+- A newly imported LKPTI row retains its filed application name, so creating exactly one same-name
+  replacement Deliverable clears a stale-target finding. An older orphaned row may not contain that
+  identity evidence; in that case the finding tells you to re-import the filing instead of guessing.
 - The workspace currency issue opens the **RPTI** tab, where the currency is set. It's a property of the workspace rather than of any one record, so nothing is pre-filled into the search box.
 
 This report is read-only — there's no editing here. It only tells you what needs attention and takes you to the screen where you'd normally make that fix.

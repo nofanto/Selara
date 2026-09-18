@@ -54,6 +54,11 @@ What changes is the **source of truth**, not the shape. The `Deliverable` owns t
 `generateLkptiDetails` fills the row from it. The type now says so, and warns that a value
 written directly onto a row is overwritten by the next generation.
 
+Newly imported rows also retain optional `targetName` identity evidence. Export still resolves the
+application name from the current Deliverable; this snapshot exists only so Data Health can match a
+future stale target id to exactly one recreated same-name Deliverable without comparing report
+contents. Already-orphaned legacy rows are not backfilled by inference.
+
 The same applies to `RptiDetail.remarks` and `RptiDetail.ppjtiRelatedParty` (`rpti.ts:382,388`).
 
 ### `RptiDetail` — projection only

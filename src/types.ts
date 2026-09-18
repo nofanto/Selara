@@ -271,6 +271,12 @@ export type LkptiOwnership = 'LEASE' | 'OUTRIGHT_PURCHASE';
 export interface LkptiDetail {
   id: string;
   targetId: string; // Deliverable.id — LKPTI 3.2.6 is scoped to applications only, unlike RptiDetail which also targets bare Assets
+  /**
+   * Application name retained as identity evidence for a filed row. The exported
+   * name is normally resolved through targetId; keeping this snapshot lets data
+   * health recognise a uniquely recreated application if that id later goes stale.
+   */
+  targetName?: string;
   categoryCode?: LkptiCategoryCode; // Cascades: this row's value ?? Deliverable.categoryCode ?? AssetCategory.categoryCode, narrowed to application-eligible codes
   developer?: string; // 'inhouse', or the IT service provider's name — free text per the LKPTI form (unlike RptiDetail.developer's two-value enum, which only marks *that* it's third-party, not who). Auto-suggested as 'inhouse' when Deliverable.developer === 'inhouse'; left blank for manual entry (the provider name) otherwise.
   dcCity?: string;   // Cascades: this row's value ?? Deliverable.dcCity ?? AssetCategory.dcCity

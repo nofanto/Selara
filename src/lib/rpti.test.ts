@@ -507,12 +507,12 @@ describe('reconcileRptiReturn — stored rows are reconciliation evidence, never
       name: 'other-year reproducible — absent from 2026, but NOT a defect', stored: [storedRow()], segments: [segment()], expectFinding: false,
     },
     {
-      name: 'unsupported asset target', stored: [storedRow({ targetType: 'asset', targetId: 'asset-1' })], segments: [segment()], expectFinding: true,
+      name: 'unsupported asset target before the named repair', stored: [storedRow({ targetType: 'asset', targetId: 'asset-1' })], segments: [], expectFinding: true,
       pattern: /create a deliverable under that asset/i,
     },
     {
-      name: 'dangling target', stored: [storedRow({ targetId: 'deliv-gone' })], segments: [segment()], expectFinding: true,
-      pattern: /no longer exists/i,
+      name: 'dangling target before the named repair', stored: [storedRow({ targetId: 'deliv-gone' })], segments: [], expectFinding: true,
+      pattern: /no longer exists|segment/i,
     },
   ];
   for (const c of cases) {
@@ -528,11 +528,40 @@ describe('reconcileRptiReturn — stored rows are reconciliation evidence, never
     });
   }
 
-  it('names a row whose initiative is gone', () => {
-    const findings = reconcileRptiReturn(ctx([storedRow({ initiativeId: 'init-gone' })], [segment()]));
+  it('names a row whose initiative and target are both gone', () => {
+    const findings = reconcileRptiReturn(ctx([storedRow({ initiativeId: 'init-gone', targetId: 'deliv-gone' })], [segment()]));
     expect(findings).toHaveLength(1);
     expect(findings[0].reason).toBe('missing-initiative');
     expect(findings[0].message).toMatch(/Initiative that no longer exists/i);
+  });
+
+  it('clears an asset-target finding after the named source repair creates a canonical counterpart', () => {
+    const row = storedRow({ targetType: 'asset', targetId: 'asset-1' });
+    const repaired = ctx([row], [segment()]);
+    repaired.initiatives = [makeInitiative({ deliverableId: 'deliv-1' })];
+    expect(reconcileRptiReturn(repaired)).toEqual([]);
+  });
+
+  it('clears a missing-target finding when the same initiative explicitly points at its replacement', () => {
+    const repaired = ctx([storedRow({ targetId: 'deliv-gone' })], [segment()]);
+    repaired.initiatives = [makeInitiative({ deliverableId: 'deliv-1' })];
+    expect(reconcileRptiReturn(repaired)).toEqual([]);
+  });
+
+  it('clears a missing-initiative finding when exactly one canonical row has the same target', () => {
+    expect(reconcileRptiReturn(ctx(
+      [storedRow({ initiativeId: 'init-gone' })],
+      [segment()],
+    ))).toEqual([]);
+  });
+
+  it('does not let two stored rows claim the same canonical row', () => {
+    const findings = reconcileRptiReturn(ctx(
+      [storedRow(), storedRow({ id: 'row-2' })],
+      [segment()],
+    ));
+    expect(findings).toHaveLength(2);
+    expect(findings.every(f => f.reason === 'identity-conflict')).toBe(true);
   });
 
   it('names a row whose (initiative, target) pair no segment can reproduce in any year', () => {

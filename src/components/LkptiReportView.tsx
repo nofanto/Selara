@@ -23,7 +23,7 @@ export function LkptiReportView({ lkptiDetails, deliverables, reportYear }: Lkpt
         <div className="flex-1" />
         {lkptiDetails.length > 0 && (
           <button
-            onClick={() => exportLkptiReportToExcel(lkptiDetails, deliverables)}
+            onClick={() => exportLkptiReportToExcel(lkptiDetails, deliverables, reportYear!)}
             data-testid="lkpti-report-export-btn"
             className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors text-sm font-medium"
           >

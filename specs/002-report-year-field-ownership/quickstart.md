@@ -48,7 +48,9 @@ asks before producing anything.
 
 Load a workspace whose attributes sit on stored LKPTI rows. Confirm the values appear on the
 deliverables, that running the lift twice changes nothing, that a value already on a deliverable
-is not overwritten, and that the orphaned properties remain on the stored rows.
+is not overwritten, and that non-cost orphaned properties remain on the stored rows. Confirm legacy
+`capexAmount`/`opexAmount` properties are removed after lifting and a later Initiative cost edit
+survives reload.
 
 Then generate the return from **Reports** and confirm nothing is lost — the failure mode this
 guards against. The Data Manager report tabs are read-only and have no Generate action.

@@ -111,7 +111,7 @@ export interface LkptiDetail {
 
 ### 5. Export wiring — dedicated exporter in a new `src/lib/lkpti.ts`
 
-**Decision:** a new `exportLkptiReportToExcel()` function, co-located with the generation logic in `src/lib/lkpti.ts` (mirroring `rpti.ts`, which houses both `generateRptiDetails()` and `exportRptiReportToExcel()` together). It builds a single-sheet workbook using `XLSX.utils.aoa_to_sheet()` with the exact Indonesian header row and 1–15 column order mandated by `lkpti-schema.md` §8, downloaded as `lkpti-report-<date>.xlsx` — the same shape as `exportRptiReportToExcel()`, not routed through the general multi-entity `src/lib/excel.ts` workbook exporter (RPTI's report export isn't either — it's a separate, self-contained single-report download, and this report should follow the same convention for consistency).
+**Decision:** a new `exportLkptiReportToExcel()` function, co-located with the generation logic in `src/lib/lkpti.ts` (mirroring `rpti.ts`, which houses both generation and export). Its primary `LKPTI Format 3.2.6` worksheet uses `XLSX.utils.aoa_to_sheet()` with the exact Indonesian header row and 1–15 column order mandated by `lkpti-schema.md` §8. A second `Report Metadata` worksheet states the selected as-at year without changing the import-compatible regulatory layout, and the file is downloaded as `lkpti-report-<year>.xlsx`. It remains a separate, self-contained report download rather than using the general multi-entity `src/lib/excel.ts` workbook exporter.
 
 ---
 

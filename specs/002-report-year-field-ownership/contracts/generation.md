@@ -50,8 +50,10 @@ Gains a parameter. This is the behavioural change of the feature.
 15. **The lift is idempotent.** Running it twice changes nothing after the first.
 16. **The lift never overwrites a value already on the deliverable.** Where both hold a value, the
     deliverable wins — it is the newer home and the one the preparer edits.
-17. **The lift leaves the orphaned properties in place.** It does not delete them from the stored
-    row, so a later migration tool can still find them.
+17. **The lift leaves non-cost orphaned properties in place, but removes legacy cost overrides.**
+    `capexAmount`/`opexAmount` are deleted after their one-time lift and the cleaned rows are
+    persisted; their absence is the durable completion signal that prevents a later reload from
+    overwriting a newer Initiative cost. Other legacy properties remain available to later tooling.
 
 ## Version history
 
@@ -78,12 +80,22 @@ Gains a parameter. This is the behavioural change of the feature.
     into a return or an export.
 23. **The two axes stay independent.** A stored row reproducible in some year other than the
     selected one produces **no** finding — absence from the selected year is correct, not a
-    defect. A row the source model cannot reproduce in *any* year (bare-Asset target, dangling
-    initiative or deliverable, or an (initiative, target) pair with no qualifying segment) always
-    produces one, and the Reports pre-export gate blocks until it is repaired.
+    defect. A row corresponds to a current canonical row by exact identity, by the same surviving
+    Initiative after an explicit target repair, or by the same surviving target after an Initiative
+    repair. Correspondence is one-to-one: multiple stored rows cannot claim one generated row.
 24. **Global is the honest scope.** `RptiDetail` has no report year and none may be inferred
     (quarter, id suffix, segment link), so findings are stated per workspace, not per year: an
     unreproducible row blocks every year's export. Exact selected-year attribution is deferred to
     option 5 (see `merge-path-options.md`); no anchor may be invented to fake it.
 25. **Reconciliation is read-only.** It never mutates the stored rows or the entities, asserted
     by a unit test on frozen inputs.
+
+## Export and LKPTI identity evidence (Q12)
+
+26. **Each downloaded workbook states the selected year in a `Report Metadata` worksheet and in
+    its filename.** The regulatory data worksheet keeps its exact standard headers and column order,
+    so the existing importer remains compatible.
+27. **Newly imported LKPTI rows retain the filed application name as identity evidence.** If their
+    target id later becomes stale, exactly one same-name Deliverable clears the finding. An older
+    orphan without that evidence directs the preparer to re-import; identity is never guessed by
+    elimination or report-content equality.

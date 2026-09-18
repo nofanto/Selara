@@ -258,9 +258,10 @@ export function projectRptiReturn(
  * independent). Reasons are checked in the order a repair must follow.
  */
 export type RptiReconciliationReason =
-  | 'asset-target'      // bare-Asset targets are not a supported way to file (Q8) — in any year
-  | 'missing-initiative' // the canonical plan line it describes is gone
-  | 'missing-target'     // the application/infrastructure it names no longer exists
+  | 'asset-target'       // no repaired canonical Deliverable counterpart exists for the legacy Asset row
+  | 'missing-initiative' // no unique current canonical identity replaces the missing Initiative
+  | 'missing-target'     // no unique current canonical identity replaces the missing target
+  | 'identity-conflict'  // zero/one canonical identity cannot account for multiple/ambiguous stored rows
   | 'unanchored';        // references resolve, but no segment pair can reproduce it in any year
 
 export interface RptiReconciliationFinding {
@@ -292,28 +293,87 @@ export interface ReconcileRptiInput {
  * Compares stored RPTI rows against the source model and returns findings, not rows
  * (FR-024, issue #40). Where the old merge turned every unmatched stored row into a
  * projection member — leaking a 2027 line into a 2026 filing — this asks only
- * "can the current canonical entities reproduce this row in *some* year?". A valid
+ * "does this evidence have one current canonical row identity in *some* year?". A valid
  * other-year row produces no finding: its absence from the selected year is correct,
  * not a defect.
  *
  * The honesty limit, accepted with option 1 and fixed by the deferred option 5:
  * `RptiDetail` carries no report year, so a finding cannot say *which* year the row
  * was filed for, and these findings block every year's export, not just the row's
- * own. That global gate is the chosen policy — an unreproducible filed row must never
+ * own. That global gate is the chosen policy — unaccounted-for filed evidence must never
  * leave a return silently — and the messages say "no filing year" rather than
  * inventing an attribution the data cannot support.
  */
 export function reconcileRptiReturn(input: ReconcileRptiInput): RptiReconciliationFinding[] {
   const { storedDetails, initiatives, deliverables, deliverableSegments, deliverableStatuses } = input;
   const initiativeById = new Map(initiatives.map(i => [i.id, i]));
+  const deliverableById = new Map(deliverables.map(d => [d.id, d]));
   const findings: RptiReconciliationFinding[] = [];
 
-  for (const row of storedDetails) {
+  // A canonical row identity exists independently of any selected filing year: one
+  // Initiative, its resolved target, and at least one qualifying segment on that pair.
+  // Filed values are deliberately not compared here (Q12); that policy remains open.
+  const canonical = initiatives.flatMap(initiative => {
+    if (initiative.isPlaceholder === true) return [];
+    const targetId = resolveRptiTarget(initiative, deliverableSegments, deliverables);
+    if (!targetId || !deliverableById.has(targetId)) return [];
+    const anchored = deliverableSegments.some(seg =>
+      seg.initiativeId === initiative.id
+      && seg.deliverableId === targetId
+      && classifySegmentKind(seg.status, deliverableStatuses) !== 'excluded');
+    return anchored ? [{ key: `${initiative.id}\u0000${targetId}`, initiative, targetId }] : [];
+  });
+
+  const candidateFor = (row: RptiDetail) => {
+    const exact = canonical.filter(c =>
+      row.targetType === 'deliverable'
+      && c.initiative.id === row.initiativeId
+      && c.targetId === row.targetId);
+    if (exact.length === 1) return { candidate: exact[0], ambiguous: false };
+
+    // When the target was recreated (including a legacy bare-Asset target), the
+    // surviving Initiative identifies its replacement only after the preparer has
+    // explicitly selected it. Inference alone is not the named repair.
+    const byInitiative = canonical.filter(c => {
+      if (c.initiative.id !== row.initiativeId || c.initiative.deliverableId !== c.targetId) return false;
+      if (row.targetType === 'asset') return deliverableById.get(c.targetId)?.assetId === row.targetId;
+      return true;
+    });
+    if (byInitiative.length === 1) return { candidate: byInitiative[0], ambiguous: false };
+    if (byInitiative.length > 1) return { candidate: undefined, ambiguous: true };
+
+    // When the Initiative was recreated, the still-existing filed target identifies
+    // it. More than one current row on that target is not enough evidence to choose.
+    const byTarget = row.targetType === 'deliverable'
+      ? canonical.filter(c => c.targetId === row.targetId)
+      : [];
+    if (byTarget.length === 1) return { candidate: byTarget[0], ambiguous: false };
+    return { candidate: undefined, ambiguous: byTarget.length > 1 };
+  };
+
+  const matches = storedDetails.map(row => ({ row, ...candidateFor(row) }));
+  const claimCount = new Map<string, number>();
+  for (const match of matches) if (match.candidate) {
+    claimCount.set(match.candidate.key, (claimCount.get(match.candidate.key) ?? 0) + 1);
+  }
+
+  for (const match of matches) {
+    const { row } = match;
     const initiative = initiativeById.get(row.initiativeId);
     const label = initiative?.name ?? row.id;
     const add = (reason: RptiReconciliationReason, message: string) => {
       findings.push({ id: `rpti-reconcile-${reason}-${row.id}`, rowId: row.id, reason, message, row });
     };
+
+    if (match.ambiguous) {
+      add('identity-conflict', `The stored RPTI row "${row.id}" matches more than one current plan line by identity. Make the Initiative target unambiguous before generating the filing.`);
+      continue;
+    }
+    if (match.candidate && claimCount.get(match.candidate.key) === 1) continue;
+    if (match.candidate) {
+      add('identity-conflict', `More than one stored RPTI row maps to the same current plan line for "${label}". One generated row cannot account for every stored row; repair or re-import the filing evidence before exporting.`);
+      continue;
+    }
 
     if (row.targetType === 'asset') {
       add('asset-target', `The stored RPTI row for "${label}" targets an Asset directly, which no filing year can reproduce. Create a Deliverable under that Asset and point the Initiative at that Deliverable before generating the filing.`);
@@ -405,6 +465,7 @@ export function exportRptiReportToExcel(
   initiatives: Initiative[],
   deliverables: Deliverable[],
   assets: Asset[],
+  reportYear: number,
   deliverableSegments: DeliverableSegment[] = [],
   deliverableStatuses: DeliverableStatus[] = [],
 ) {
@@ -453,5 +514,9 @@ export function exportRptiReportToExcel(
   const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'RPTI Format 3.1');
-  XLSX.writeFile(wb, `rpti-report-${new Date().toISOString().split('T')[0]}.xlsx`);
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
+    ['Report', 'RPTI Format 3.1'],
+    ['Report year', reportYear],
+  ]), 'Report Metadata');
+  XLSX.writeFile(wb, `rpti-report-${reportYear}.xlsx`);
 }

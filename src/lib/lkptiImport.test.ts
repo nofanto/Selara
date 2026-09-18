@@ -219,6 +219,7 @@ describe('deriveWorkspaceFromLkptiImport', () => {
     expect(result.lkptiDetails).toHaveLength(2);
     expect(result.lkptiDetails[0]).toMatchObject({
       targetId: result.deliverables[0].id,
+      targetName: 'Core Banking App',
       categoryCode: '01',
       platform: 'Java/Spring',
       database: 'PostgreSQL',

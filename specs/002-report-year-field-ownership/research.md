@@ -86,9 +86,11 @@ That protection disappears the moment rows are rebuilt from the application rath
 The first press of Generate would then discard them permanently. Until that press they are
 recoverable and a later migration tool can still find them.
 
-**Approach**: lift the values onto the `Deliverable` on load, before any generation can replace
-the rows that hold them. This is a read-time lift, not a stored migration — cheap, idempotent,
-and it leaves the orphaned properties in place for any future tool.
+**Approach**: lift the values onto the `Deliverable` on normal workspace load, before any generation
+can replace the rows that hold them, and persist the lifted state immediately. Non-cost orphaned
+properties remain for future tooling. Legacy RPTI cost properties are the exception: remove them
+after lifting, because their absence is the durable completion signal that prevents a later load
+from overwriting a newer Initiative cost.
 
 **Alternative rejected**: warn the preparer that Generate will discard the imported return.
 Defensible for a pre-1.0 local-first tool and explicitly allowed by FR-019, but a warning that

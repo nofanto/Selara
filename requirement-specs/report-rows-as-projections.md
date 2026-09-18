@@ -232,6 +232,13 @@ initiative).
   Under (c) that arrangement is a defect to detect, so what it needs is a data-health test, not a
   supported case.
 
+**One-time lift completion (2026-09-19).** Legacy `capexAmount`/`opexAmount` properties are removed
+from stored rows immediately after their values are lifted and the cleaned rows are persisted on
+normal workspace load. This is the durable completion signal. Leaving those two properties as
+orphaned evidence was rejected because every later load would treat them as authoritative again
+and overwrite a newer Initiative edit. This exception applies only to costs; the other deferred-
+migration properties remain non-destructive evidence as Q4 records.
+
 **Rejected:** a cost on `DeliverableSegment` (the segment is a time slice, so an initiative with
 three phases on one application would need a summing rule that the filing never asks for); a new
 `InitiativeTarget` join entity (exact grain, but a new store is the expensive change in this
@@ -617,3 +624,36 @@ carry. No foreign row can enter an LKPTI return, so no projection-only API is im
 reconciliation contracts (22–25); the pre-export gate in `ReportsView.tsx` is
 source diagnostics + `reconcileRptiReturn` findings, never merge residue; `rpti-auto-generation.md`
 records the merge as v2, superseded.
+
+## Q12 — Repair stale row identities by canonical correspondence, never by editing evidence (decided 2026-09-19)
+
+**Decided:** stored report rows remain immutable evidence. A source-side repair clears an RPTI
+finding when the stored row corresponds one-to-one with a current canonical row by the surviving
+filing identity: the same Initiative identifies a replacement target, or the same target identifies
+a replacement Initiative. A bare-Asset row therefore becomes repairable when its Initiative is
+pointed at a generatable Deliverable under that Asset. Cardinality is part of identity: two stored
+rows cannot both be accounted for by one canonical row.
+
+This deliberately does **not** compare filed contents. Development type, quarter, category,
+provider, locations, related-party answer and remarks remain outside the reconciliation policy
+until the product owner decides what a faithful reproduction means field by field. The gate says
+only whether each stored row has exactly one current canonical counterpart and each counterpart
+accounts for at most one stored row.
+
+LKPTI has an important asymmetric case. `LkptiDetail` historically stored only `targetId` plus
+report contents; the filing identity — the application name — was resolved from the Deliverable.
+Once that Deliverable is gone, an already-orphaned row contains no identity from which a newly
+created application can be recognised. For those rows the honest repair is to re-import the
+filing, and `lkpti-target` must say why. Newly imported LKPTI rows retain the application name as
+identity evidence so a future orphan can be matched to exactly one same-named Deliverable. There
+is no inference-based backfill or migration of already-orphaned rows.
+
+**Rejected — an identity-remap editor in Data Health.** It would make stored rows editable again
+one screen removed from the report tabs, recreating the split-brain authorship that Q5/Q6 removed.
+
+**Rejected — exact-one-by-elimination for LKPTI.** One orphan plus one new application does not
+prove they are the same application. A wrong automatic attachment would be silent regulatory
+misclassification precisely when the workspace is least trustworthy.
+
+**Rejected — matching by report contents.** That would settle the still-open field-fidelity
+policy by accident. Identity repair must not invent equality rules for filed values.

@@ -19,11 +19,13 @@ import type { Deliverable, Initiative, LkptiDetail, RptiDetail } from '../types'
  * deliverable and would discard them permanently. This runs on load, before any
  * generation can, and is the whole of FR-019.
  *
- * Pure, and deliberately non-destructive:
+ * Pure, and non-destructive except for the legacy cost completion marker:
  *   - a value already on the entity always wins — it is the newer home and the one
  *     the preparer edits, so the old row must never overwrite a deliberate edit;
- *   - the orphaned properties are left where they are, so a proper migration tool
- *     written later can still find them.
+ *   - non-cost orphaned properties are left where they are, so a later migration
+ *     tool can still find them;
+ *   - legacy cost properties are removed after lifting, because leaving them would
+ *     make every later load overwrite newer Initiative edits (F3/Q7).
  */
 
 /** Fields that moved from `LkptiDetail` to `Deliverable`. */
@@ -42,6 +44,8 @@ export interface AttributeLiftInput {
 export interface AttributeLiftResult {
   deliverables: Deliverable[];
   initiatives: Initiative[];
+  /** Stored rows with legacy cost overrides removed after they have been lifted. */
+  rptiDetails: RptiDetail[];
   /** False when nothing moved, so a caller can skip a pointless save. */
   changed: boolean;
 }
@@ -107,5 +111,18 @@ export function liftReportRowAttributes(input: AttributeLiftInput): AttributeLif
     return { ...initiative, capex, opex, rptiRemarks };
   });
 
-  return { deliverables: liftedDeliverables, initiatives: liftedInitiatives, changed };
+  // Cost fields are the exception to the otherwise non-destructive lift. They used
+  // to override Initiative costs, so leaving them behind is not a harmless archive:
+  // every later load would mistake them for an unfinished migration and overwrite a
+  // newer canonical edit. Their absence is the durable, per-row completion signal.
+  const cleanedRptiDetails = rptiDetails.map(row => {
+    const record = asRecord(row);
+    if (!Object.prototype.hasOwnProperty.call(record, 'capexAmount')
+      && !Object.prototype.hasOwnProperty.call(record, 'opexAmount')) return row;
+    const { capexAmount: _capexAmount, opexAmount: _opexAmount, ...cleaned } = record;
+    changed = true;
+    return cleaned as unknown as RptiDetail;
+  });
+
+  return { deliverables: liftedDeliverables, initiatives: liftedInitiatives, rptiDetails: cleanedRptiDetails, changed };
 }

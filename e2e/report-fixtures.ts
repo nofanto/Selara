@@ -44,7 +44,9 @@ export async function exportedReportText(page: Page, report: 'rpti' | 'lkpti') {
   const file = await download.path();
   if (!file) throw new Error('No downloaded workbook');
   const workbook = XLSX.read(fs.readFileSync(file), { type: 'buffer' });
-  return XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1 }).flat().join(' | ');
+  return workbook.SheetNames.flatMap(name =>
+    XLSX.utils.sheet_to_json(workbook.Sheets[name], { header: 1 }).flat()
+  ).join(' | ');
 }
 
 /** Read a store straight out of IndexedDB, to prove what generation did or did not write. */

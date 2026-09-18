@@ -38,8 +38,9 @@ year from an ID, a quarter, or a possibly missing segment is not a safe fix.
 
 ## Requirements used to assess the options
 
-- **FR-020:** an imported row that cannot be regenerated survives, stays visible,
-  and remains attributable to a report year.
+- **FR-020 (revised 2026-09-19):** an imported row that cannot be regenerated
+  survives, stays visible, and is named before a filing is produced. The earlier
+  year-attribution clause was removed because the model has no safe provenance.
 - **FR-024:** an unreproducible filed row is named before a return is produced; it
   is never silently absent.
 - **FR-025:** following the named repair is sufficient to make regeneration faithful;
@@ -75,11 +76,9 @@ return.
 
 ### Effect on the requirements and contracts
 
-- **FR-020:** preserves the row in the read-only stored-row view, but does not fully
-  satisfy "attributable to a report year" for legacy/unresolved rows because there is
-  still no year to display. An existential "derivable in some year" check avoids
-  falsely calling a known other-year row broken, but cannot name its year when no
-  source anchor exists.
+- **FR-020:** preserves the row in the read-only stored-row view and names it through
+  the global compatibility gate. The gate deliberately does not display a year that
+  the stored evidence does not contain.
 - **FR-024:** satisfies the known structural cases if the gate explicitly scans
   stored rows rather than only projected rows. It cannot prove that every unmatched
   legacy row belongs to the selected year, so the policy must be explicit: report

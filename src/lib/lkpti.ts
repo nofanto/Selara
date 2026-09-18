@@ -184,6 +184,7 @@ export const LKPTI_EXPORT_HEADERS = [
 export function exportLkptiReportToExcel(
   details: LkptiDetail[],
   deliverables: Deliverable[],
+  reportYear: number,
 ) {
   const headers = LKPTI_EXPORT_HEADERS;
 
@@ -211,5 +212,9 @@ export function exportLkptiReportToExcel(
   const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, LKPTI_SHEET_NAME);
-  XLSX.writeFile(wb, `lkpti-report-${new Date().toISOString().split('T')[0]}.xlsx`);
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
+    ['Report', 'LKPTI Format 3.2.6'],
+    ['As-at date', `31 December ${reportYear}`],
+  ]), 'Report Metadata');
+  XLSX.writeFile(wb, `lkpti-report-${reportYear}.xlsx`);
 }

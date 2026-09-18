@@ -313,11 +313,27 @@ export default function App() {
             lkptiDetails: (dbData as any).lkptiDetails || [],
             rptiDetails: (dbData as any).rptiDetails || [],
           });
+          const liftedInitiatives = lifted.initiatives.map(i => ({
+            ...i, capex: Number(i.capex) || 0, opex: Number(i.opex) || 0,
+          }));
+
+          // Persist the lift immediately. In particular, removing legacy cost
+          // properties is the one-time migration marker: without this save a later
+          // reload could treat the same stale row as authoritative again and undo a
+          // preparer's newer Initiative edit (F3 / design Q7).
+          if (lifted.changed) {
+            await saveAppData({
+              ...dbData,
+              deliverables: lifted.deliverables,
+              initiatives: liftedInitiatives,
+              rptiDetails: lifted.rptiDetails,
+            });
+          }
 
           setAssets(dbData.assets);
           setDeliverables(lifted.deliverables);
           setDeliverableSegments((dbData as any).deliverableSegments || []);
-          setInitiatives(lifted.initiatives.map(i => ({ ...i, capex: Number(i.capex) || 0, opex: Number(i.opex) || 0 })));
+          setInitiatives(liftedInitiatives);
           setMilestones(dbData.milestones);
           setProgrammes(dbData.programmes);
           setStrategies(dbData.strategies || []);
@@ -326,7 +342,7 @@ export default function App() {
           setResources(dbData.resources || []);
           setDeliverableStatuses((dbData as any).deliverableStatuses || []);
           setDecisions((dbData as any).decisions || []);
-          setRptiDetails((dbData as any).rptiDetails || []);
+          setRptiDetails(lifted.rptiDetails);
           setLkptiDetails((dbData as any).lkptiDetails || []);
           const rawSettings = dbData.timelineSettings || {};
           // Migration: if we have legacy startYear but no startDate, convert it

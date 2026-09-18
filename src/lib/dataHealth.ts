@@ -3,7 +3,7 @@ import {
   Initiative, Milestone, Dependency, Decision, Resource, Programme, Strategy,
   RptiDetail, LkptiDetail, TimelineSettings,
 } from '../types';
-import { isLiveStatusId, isPreLaunchStatusId, resolveAssetCategory, resolveRptiTarget } from './rpti';
+import { isLiveStatusId, isPreLaunchStatusId, reconcileRptiReturn, resolveAssetCategory, resolveRptiTarget } from './rpti';
 
 // Tabs of src/components/DataManager.tsx's own `Tab` union — defined here (the pure
 // lib layer) as the source of truth so DataManager can import it instead of the other
@@ -266,9 +266,29 @@ export function computeDataHealth(input: DataHealthInput): HealthIssue[] {
     }
   }
 
+  const rptiReconciliationByRow = new Map(reconcileRptiReturn({
+    storedDetails: rptiDetails,
+    initiatives,
+    deliverables,
+    deliverableSegments,
+    deliverableStatuses,
+  }).map(finding => [finding.rowId, finding]));
+
   for (const r of rptiDetails) {
+    const reconciliation = rptiReconciliationByRow.get(r.id);
+    // A stale stored id is not itself a defect once the row has one unambiguous
+    // current canonical counterpart (Q12). The evidence remains immutable; the
+    // source-side repair is what clears both Data Health and the export gate.
+    if (!reconciliation) continue;
     const initiative = initiativeById.get(r.initiativeId);
     const label = initiative?.name ?? r.id;
+    if (reconciliation.reason === 'identity-conflict') {
+      issues.push({
+        id: `rpti-identity-conflict:${r.id}`, severity: 'error', entityType: 'RptiDetail', entityId: r.id,
+        entityName: label, message: reconciliation.message, location: tab('initiatives'),
+      });
+      continue;
+    }
     if (!initiativeIds.has(r.initiativeId)) {
       issues.push({
         id: `rpti-initiative:${r.id}`, severity: 'error', entityType: 'RptiDetail', entityId: r.id,
@@ -300,11 +320,18 @@ export function computeDataHealth(input: DataHealthInput): HealthIssue[] {
 
   for (const l of lkptiDetails) {
     const deliverable = deliverableById.get(l.targetId);
-    const label = deliverable?.name ?? l.id;
+    const label = deliverable?.name ?? l.targetName ?? l.id;
     if (!deliverableIds.has(l.targetId)) {
+      const sameName = l.targetName
+        ? deliverables.filter(d => d.name.trim().toLocaleLowerCase() === l.targetName!.trim().toLocaleLowerCase())
+        : [];
+      if (sameName.length === 1) continue;
+      const message = l.targetName
+        ? `The filed LKPTI row for "${l.targetName}" no longer resolves to its original application. ${sameName.length > 1 ? 'More than one current Deliverable has that filing name; rename or remove duplicates so exactly one identifies the application.' : 'Create or correct exactly one application with that filing name on the Deliverables tab.'}`
+        : `A filed LKPTI row refers to an application that is not recorded, and its application name was not recorded on the old row. Re-import the filing to restore that identity; creating an application cannot safely attach this already-orphaned row.`;
       issues.push({
         id: `lkpti-target:${l.id}`, severity: 'error', entityType: 'LkptiDetail', entityId: l.id,
-        entityName: label, message: `A filed LKPTI row refers to an application that is not recorded. Create or correct it on the Deliverables tab so the inventory can be generated.`, location: tab('deliverables'),
+        entityName: label, message, location: tab('deliverables'),
       });
     }
   }
@@ -616,6 +643,7 @@ const REPORTS_BY_CHECK: Record<string, HealthReport[]> = {
   'initiative-rpti-no-target': ['rpti'],
   'rpti-asset-target': ['rpti'],
   'rpti-incomplete': ['rpti'],
+  'rpti-identity-conflict': ['rpti'],
   'rpti-initiative': ['rpti'],
   'rpti-segment': ['rpti'],
   'rpti-target': ['rpti'],

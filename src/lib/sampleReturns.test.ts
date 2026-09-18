@@ -100,19 +100,23 @@ describe('the published sample returns', () => {
     const statuses = mergeDeliverableStatuses(out.deliverableStatuses ?? []);
     const deliverables = [...inv.deliverables, ...out.deliverables];
 
-    // The repair FR-025 describes: the application the filed plan refers to is
-    // recorded, and the initiative points at it. Nothing filed is re-keyed —
-    // the placeholder target the importer created *is* the deliverable to name.
+    // The repair FR-025 describes: create the application the filed plan refers to
+    // and point the Initiative at it. A real UI-created Deliverable receives a new id;
+    // reconciliation must use the surviving Initiative identity, not require the
+    // impossible act of recreating the importer's synthetic placeholder id.
+    const replacementTargetId = 'repair-deliv';
     const repaired = {
-      initiatives: out.initiatives,
+      initiatives: out.initiatives.map(i => i.id === unresolvedRow.initiativeId
+        ? { ...i, deliverableId: replacementTargetId }
+        : i),
       deliverables: [...deliverables, {
-        id: unresolvedRow.targetId, assetId: inv.assets[0].id, name: 'Legacy Teller Application',
+        id: replacementTargetId, assetId: inv.assets[0].id, name: 'Legacy Teller Application',
       }],
       // The segment is the whole repair. Naming the initiative's RPTI Target would not
       // be enough on its own — generation derives a row from a lifecycle segment, so a
       // target with no segment stays underivable. The finding says exactly that.
       deliverableSegments: [...out.deliverableSegments, {
-        id: 'repair-seg', deliverableId: unresolvedRow.targetId,
+        id: 'repair-seg', deliverableId: replacementTargetId,
         initiativeId: unresolvedRow.initiativeId,
         status: statuses.find(st => st.isLiveStatus)!.id,
         startDate: '2027-04-01', endDate: '2027-12-31',
@@ -126,7 +130,7 @@ describe('the published sample returns', () => {
     const regenerated = projectRptiReturn({
       ...repaired, assets: inv.assets, assetCategories: inv.assetCategories,
     } as never, 2027);
-    expect(regenerated.some(r => r.targetId === unresolvedRow.targetId),
+    expect(regenerated.some(r => r.targetId === replacementTargetId),
       'and the next generation must actually produce the row').toBe(true);
   });
 });

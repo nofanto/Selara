@@ -8,7 +8,7 @@ The generated row reads platform, database, providers, backup strategy, system o
 
 **Data Manager → LKPTI** is a read-only view of stored rows. It displays the stored fields and offers no row editing or generation controls. Generating from Reports leaves these stored records unchanged.
 
-Click **Export to Excel** in the generated report to download the Format 3.2.6 workbook. The general workspace export separately backs up stored records.
+Click **Export to Excel** in the generated report to download `lkpti-report-<year>.xlsx`. The exact Format 3.2.6 columns remain on the **LKPTI Format 3.2.6** worksheet, while **Report Metadata** states the selected 31 December as-at year. The general workspace export separately backs up stored records.
 
 - Previous: [Exporting the RPTI Report](../14-rpti-report/exporting-the-rpti-report.md)
 - Next: [Importing an Existing LKPTI Report](importing-an-lkpti-report.md)

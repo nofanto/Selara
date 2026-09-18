@@ -19,7 +19,7 @@ laziness, the only year available — and `exportRptiReportToExcel` filtered by 
 means a workspace holding a 2027 and a 2028 plan filed them to OJK as one return with no warning.
 
 Raised jointly as [issue #40](https://github.com/nofanto/Selara/issues/40) and the design notes in
-`requirement-specs/report-rows-as-projections.md`, whose Q1–Q11 record the decisions this ADR
+`requirement-specs/report-rows-as-projections.md`, whose Q1–Q12 record the decisions this ADR
 summarises. Specification and task breakdown in `specs/002-report-year-field-ownership/`.
 
 ## Decision Drivers
@@ -60,10 +60,15 @@ Concretely:
 - `generateLkptiDetails` takes a **required** `asAtDate` and tests a live span rather than "has ever
   gone live". `deriveWorkspaceFromLkptiImport` takes a **required** `asAtYear` for the same reason.
 - Generation moves to Reports, which asks for the year. Both Data Manager report tabs become
-  read-only; their stored rows remain visible and exportable but are no longer inputs.
+  read-only; their stored rows remain visible as reconciliation evidence but are no longer inputs
+  or direct filing exports.
 - `projectRptiReturn(input, reportYear)` is the projection, and its input type has no
   `existingDetails` key, so handing it stored rows is a compile error. `reconcileRptiReturn`
-  compares stored rows against the source model and returns **findings**, never rows (Q11).
+  matches stored evidence one-to-one to canonical row identities and returns **findings**, never
+  rows (Q11/Q12). It deliberately does not claim field-by-field fidelity.
+- Both filing exports receive the selected year, state it on a `Report Metadata` worksheet, and
+  include it in the filename. Their regulatory data worksheets keep the standard layouts used by
+  the importers.
 
 ### Pros and Cons of the Options
 
@@ -107,8 +112,8 @@ without saying so is worse than one that does not change at all.
   previously not true — membership tested only that a live segment had *started*, never whether it
   had ended, so an application the bank had retired still appeared on the inventory.
 - **Both Data Manager report tabs are read-only, and their Generate buttons are gone.** A filing is
-  produced from **Reports**, which asks for the year it covers. The stored rows remain visible and
-  exportable; they are no longer somewhere to type. Anything that used to be edited on a report row
+  produced from **Reports**, which asks for the year it covers. The stored rows remain visible as
+  reconciliation evidence but are not exported directly; they are no longer somewhere to type. Anything that used to be edited on a report row
   is now edited on the application or the initiative that owns it.
 - **A filing covers the year you state.** Previously "Generate RPTI Rows" used the current calendar
   year because that was the only year available, and the export filtered by nothing at all — a
@@ -121,10 +126,14 @@ without saying so is worse than one that does not change at all.
   rather than assumed — the workspace export/import round trip is asserted field by field.
 - **The orphaned-property hazard is handled, not ignored.** A workspace imported before this change
   holds the values on its rows and not yet on its entities, so `liftReportRowAttributes` runs on
-  load, before any generation can replace a row. Migration tooling for exports, shares and saved
-  versions is deliberately deferred (Q4).
-- **Data-health findings were repointed.** Eight pointed at the report tabs; after those tabs became
-  read-only each would have named a problem without naming a repair.
+  load, before any generation can replace a row. Legacy cost overrides are removed after the lift
+  and the cleaned rows are persisted immediately; their absence is the durable marker that stops a
+  later reload from undoing a newer Initiative edit. Other migration tooling for exports, shares
+  and saved versions is deliberately deferred (Q4).
+- **Data-health findings were repointed and identity repairs are source-side.** RPTI evidence maps
+  to a current canonical row through the surviving Initiative or target, one-to-one. Newly imported
+  LKPTI evidence retains the filed application name; an older orphan without that name instructs
+  re-import rather than guessing by elimination or comparing filed contents.
 - **Exact per-year attribution of a stored row is not possible and is not faked.** `RptiDetail`
   carries no report year and none may be inferred from a quarter, an id suffix or a segment link,
   so reconciliation findings are stated per workspace. A persisted year-bearing record is the

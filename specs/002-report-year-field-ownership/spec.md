@@ -4,9 +4,9 @@
 
 **Created**: 2026-09-18
 
-**Status**: Draft
+**Status**: Complete
 
-**Input**: Store the OJK report year, and move report-row fields onto the entities they describe. Implements [#40](https://github.com/nofanto/Selara/issues/40) and the decisions recorded in `requirement-specs/report-rows-as-projections.md` (Q1–Q6, decided 2026-09-17/18).
+**Input**: Generate OJK returns for a preparer-stated year, retain onboarding years as defaults, and move report-row fields onto the entities they describe. Implements [#40](https://github.com/nofanto/Selara/issues/40) and the decisions recorded in `requirement-specs/report-rows-as-projections.md` (Q1–Q12, decided 2026-09-17/19).
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -81,7 +81,7 @@ At onboarding the preparer states which year each uploaded return covers — an 
 ### Edge Cases
 
 - **A workspace with no report year recorded at all** — every existing workspace is in this state. Preparing a return must remain possible, and whatever year is used must be visible rather than silently assumed from the system clock.
-- **Rows that cannot be regenerated.** An imported upgrade whose target was never found in the inventory has no segment and no initiative link, so nothing can derive it. It must survive whatever the year model does, and must not become invisible by belonging to no year.
+- **Rows that cannot be regenerated.** An imported upgrade whose target was never found in the inventory has no segment and no initiative link, so nothing can derive it. It must survive, remain visible as evidence, and be named by the pre-export gate; no year is invented for the stored row.
 - **Pressing Generate on a workspace imported before this change.** The eight attributes exist on the old rows and nowhere else; a regenerate that rebuilds rows from applications would discard them. Either the values are lifted first, or the loss is stated plainly before it happens — it must not be silent.
 - **An application whose provider answer differs across two of its rows.** Consolidating onto one record forces one answer; the preparer must be able to see which value was kept.
 - **Two report years in one workspace where one has no rows yet.** Selecting an empty year must read as empty rather than as an error or as the other year's data.
@@ -115,7 +115,7 @@ At onboarding the preparer states which year each uploaded return covers — an 
 - **FR-014**: The answer to whether a service provider is a related party MUST be recorded against the application, held per application.
 - **FR-015**: Regenerating LKPTI or RPTI rows MUST NOT lose any value recorded under FR-011 to FR-014.
 - **FR-016**: Every field introduced by FR-011 to FR-014 MUST appear in the version difference report when it changes. *(Version history compares only the fields it is told about; an unlisted field changes silently — see [#42](https://github.com/nofanto/Selara/issues/42).)*
-- **FR-017**: Both returns MUST export exactly the values they export today, with one intended exception: an application whose live period ended before the as-at date correctly leaves the LKPTI (FR-009a). This change moves where data is held; apart from that correction it MUST NOT change what is filed.
+- **FR-017**: Both regulatory data worksheets MUST export exactly the filed values they export today, with one intended exception: an application whose live period ended before the as-at date correctly leaves the LKPTI (FR-009a). The additional year-bearing metadata worksheet is required by FR-003 and does not change those regulatory columns.
 - **FR-018**: The data-health checks that currently report these fields as missing MUST point the preparer at the place the value is now recorded.
 
 **Round-trip fidelity**
@@ -129,28 +129,28 @@ At onboarding the preparer states which year each uploaded return covers — an 
 **Not losing what is already there**
 
 - **FR-019**: A workspace created before this change MUST NOT silently lose the eight attributes. Either the values are carried onto the applications before any regeneration can replace the rows holding them, or the preparer is told plainly, before it happens, that regenerating will discard them.
-- **FR-020**: An imported row that cannot be regenerated — because its target was never found in the inventory — MUST survive this change, and MUST remain visible and attributable to a report year.
+- **FR-020**: An imported row that cannot be regenerated — because its target was never found in the inventory — MUST survive this change, MUST remain visible, and MUST be named before a filing is produced. *(Revised 2026-09-19: Q11 established that stored rows have no report year and none can be safely inferred, so the earlier year-attribution clause contradicted the accepted generation-time year model.)*
 
 **The Data Manager report tabs** *(section renamed 2026-09-18 — it read "Unchanged by this feature", which the read-only decision made false)*
 
 - **FR-021**: Both Data Manager report tabs MUST become **read-only**. They remain present and populated — importing continues to fill them — but MUST NOT accept edits, because every field they show is derived from the Deliverable or Initiative that owns it. *(Unblocked 2026-09-18 by Q7, which removed the two fields — `capexAmount`/`opexAmount` — for which that justification was false.)* Generation moves to the Reports tab. *(Revised 2026-09-18, superseding the earlier decision to leave the tabs untouched: an editable screen whose edits cannot reach the filing is worse than one that says it is a projection.)*
 - **FR-021a**: Every data-health finding that currently directs the preparer to one of those tabs MUST direct them instead to the entity that owns the value. A finding that points at a read-only screen tells the preparer where the problem is and not where to fix it.
-- **FR-021b**: An imported row that cannot be reproduced MUST be repairable from the source side — by creating or correcting the application the filed plan refers to — and its data-health message MUST say so.
+- **FR-021b**: An RPTI row with a stale entity id MUST be repairable from the source side by creating or correcting its canonical Initiative/Deliverable counterpart, and its data-health message MUST say so. A newly imported LKPTI row MUST retain its application name as identity evidence so the same source-side repair is possible; an already-orphaned LKPTI row that predates that evidence MUST honestly direct the preparer to re-import rather than guessing an identity (Q12).
 - **FR-028**: The cost of a plan line MUST be the initiative's own `capex`/`opex`. `RptiDetail.capexAmount` and `opexAmount` MUST be removed; there is no per-row override and no fallback chain (Q7).
 - **FR-029**: An initiative MUST have at most one RPTI target. Generation MUST honour the initiative's own target rather than grouping by segment, so one initiative yields at most one row per report year.
 - **FR-030**: An initiative without an explicit target whose lifecycle segments span more than one Deliverable MUST receive a data-health **error**, naming target selection or splitting into one initiative per target as the repair. Explicit targets take precedence over other timeline history. The error MUST block RPTI export, not timeline drawing. This supersedes the broad multiple-application rule (Q10); undeclared single-target initiatives infer their target across all years, including infrastructure.
 - **FR-032**: An RPTI row MUST NOT target a bare Asset. Infrastructure is filed as OJK Format 3.1 requires, but an infrastructure item MUST be recorded as a Deliverable under its Asset, the same as an application (Q8).
 - **FR-033**: An existing row targeting a bare Asset MUST raise a data-health **error** before export, naming the repair — record the item as a Deliverable under its Asset and point the initiative at it. Error, not warning: no generated return can reproduce such a row, so it otherwise leaves the filing in silence.
-- **FR-031**: A hand-edited cost override that differs from its initiative's figure MUST be lifted onto the initiative before the fields are removed. Imported overrides already equal it and lift without change.
+- **FR-031**: A hand-edited cost override that differs from its initiative's figure MUST be lifted onto the initiative before the fields are removed. The legacy cost properties MUST then be removed and the result persisted as the durable completion signal, so a later reload cannot overwrite a newer Initiative edit.
 - **FR-022**: The LKPTI MUST remain a point-in-time inventory. Its as-at date selects which applications were live at a moment; it MUST NOT become a filter over a period the way the RPTI's report year is. *(FR-009a supplies that moment; this requirement constrains its meaning, not its existence.)*
 
 ### Key Entities *(include if feature involves data)*
 
 - **Application (Deliverable)** — the thing a bank runs. Gains the attributes that describe it: what it is built on, who operates its data centres, who owns it, how it is backed up, how it was acquired, and whether its provider is a related party. Already carries name, type, category, and data-centre locations.
 - **Initiative** — a piece of planned work. Gains the commentary that appears in the plan's remarks column, alongside the description it already supplies to that return.
-- **RPTI row** — one line of the development plan for one report year. Gains a report year, or is grouped by one.
-- **LKPTI row** — one line of the application inventory. Loses the eight attributes it was holding on the application's behalf; keeps what it derives.
-- **Report year** — the period a plan covers. Newly persistent; the thing this feature exists to record.
+- **RPTI row** — one line of the development plan. Stored rows are yearless reconciliation evidence; a transient generated row belongs to the year selected for that filing.
+- **LKPTI row** — one line of the application inventory. Keeps its exported fields as derived output and, for new imports, retains the application name as identity evidence.
+- **Report year** — the generation-time period a filing covers. It is not persisted on a report row or entity; only the onboarding defaults persist in `TimelineSettings.onboardingRptiYear` and `onboardingLkptiYear`.
 
 ## Success Criteria *(mandatory)*
 
@@ -176,13 +176,13 @@ At onboarding the preparer states which year each uploaded return covers — an 
 - **The Data Manager report tabs are on their way out.** They stay in this spec (Q5/Q6), but the destination is that returns are produced from the Reports menu and the tabs are removed. Nothing here should make that harder.
 - **Existing workspaces are few and known.** Migration tooling is deliberately out of scope (Q4 of the design notes); only the hazard of silent loss on regeneration is in scope here.
 - **The report year is a calendar year**, matching how both returns are filed, rather than a fiscal year offset.
-- **Exports remain unchanged in content.** This is a change to where data is held, not to what OJK receives; any difference in an exported file is a defect.
+- **Regulatory worksheet values remain unchanged.** The export adds the selected-year metadata required by FR-003, but moving field ownership must not otherwise change what OJK receives.
 - **The eight attributes apply to any deliverable, not only applications.** A bank leases servers and its data centres have providers. The LKPTI report is applications-only; the attributes are not.
 
 ## Dependencies
 
 - [#40](https://github.com/nofanto/Selara/issues/40) — this specification implements it.
-- `requirement-specs/report-rows-as-projections.md` — Q1, Q2, Q3 fix where each field goes; Q4 defers migration; Q5/Q6 keep both tabs unchanged. Q11 (decided 2026-09-18) makes the RPTI path a pure projection with a separate reconciliation gate, closing #40's year-leak defect. These are settled and are not re-opened here.
+- `requirement-specs/report-rows-as-projections.md` — Q1–Q3 fix where each field goes; Q4 defers broad migration; revised Q5/Q6 make both report tabs read-only; Q11 makes RPTI a pure projection with a separate reconciliation gate; Q12 defines one-to-one identity repair. These are settled and are not re-opened here.
 - [#42](https://github.com/nofanto/Selara/issues/42) — version history compares only listed fields, so FR-016 is a real requirement rather than an assumption.
 - [#38](https://github.com/nofanto/Selara/issues/38) — the unresolved imported row that FR-020 must keep alive.
 

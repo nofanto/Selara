@@ -1,4 +1,4 @@
-import { seedReportRecords, reportFixture, generateReport, readStore } from './report-fixtures';
+import { seedReportRecords, reportFixture, generateReport, exportedReportText, readStore } from './report-fixtures';
 import { expect, test } from '@playwright/test';
 
 test.describe('Report year', () => {
@@ -29,39 +29,70 @@ test.describe('Report year', () => {
     await expect(page.getByTestId('lkpti-report-view')).toContainText('2026');
   });
 
-  test('blocks export for a legacy asset-target RPTI row and names its repair', async ({ page }) => {
-    await page.evaluate(() => new Promise<void>((resolve, reject) => {
-      const request = indexedDB.open('it-initiative-visualiser');
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => {
-        const db = request.result;
-        const transaction = db.transaction(['assets', 'initiatives', 'rptiDetails'], 'readwrite');
-        const assets = transaction.objectStore('assets').openCursor();
-        const initiatives = transaction.objectStore('initiatives').openCursor();
-        let assetId: string | undefined;
-        let initiativeId: string | undefined;
-        assets.onsuccess = () => { assetId = assets.result?.value.id; };
-        initiatives.onsuccess = () => { initiativeId = initiatives.result?.value.id; };
-        transaction.oncomplete = () => {
-          if (!assetId || !initiativeId) { reject(new Error('Demo workspace is missing an asset or initiative')); return; }
-          const write = db.transaction(['rptiDetails'], 'readwrite');
-          write.objectStore('rptiDetails').put({
-            id: 'legacy-asset-target', initiativeId, targetType: 'asset', targetId: assetId, developmentType: 'new',
-          });
-          write.oncomplete = () => { db.close(); resolve(); };
-          write.onerror = () => reject(write.error);
-        };
-        transaction.onerror = () => reject(transaction.error);
-      };
-    }));
+  test('states the selected year inside each downloaded workbook', async ({ page }) => {
+    await seedReportRecords(page, reportFixture, [
+      'assets', 'assetCategories', 'programmes', 'initiatives', 'deliverables',
+      'deliverableSegments', 'rptiDetails', 'lkptiDetails',
+    ]);
 
-    await page.reload();
-    await page.getByTestId('nav-reports').click();
-    await page.getByTestId('report-card-rpti').click();
-    await page.getByTestId('rpti-report-year-input').fill('2027');
-    await page.getByTestId('rpti-generate-report-btn').click();
+    await generateReport(page, 'rpti', '2026');
+    expect(await exportedReportText(page, 'rpti')).toContain('2026');
+
+    await generateReport(page, 'lkpti', '2026');
+    expect(await exportedReportText(page, 'lkpti')).toContain('2026');
+  });
+
+  test('following the named asset-target repair clears the finding and enables export', async ({ page }) => {
+    await seedReportRecords(page, {
+      ...reportFixture,
+      rptiDetails: [{
+        id: 'legacy-asset-target', initiativeId: 'filing-initiative',
+        targetType: 'asset', targetId: 'filing-asset', developmentType: 'new',
+      }],
+    }, ['assets', 'assetCategories', 'programmes', 'initiatives', 'deliverables', 'deliverableSegments', 'rptiDetails']);
+
+    await generateReport(page, 'rpti', '2026');
     await expect(page.getByTestId('rpti-pre-export-gate')).toContainText(/create.*deliverable/i);
     await expect(page.getByTestId('rpti-report-export-btn')).toHaveCount(0);
+
+    // Follow the repair the gate names: the Deliverable already exists under the
+    // Asset, so point the Initiative at it on the owning source entity.
+    await page.getByTestId('nav-data-manager').click();
+    await page.getByTestId('data-manager-tab-initiatives').click();
+    const row = page.locator('tbody tr[data-real="true"]').filter({ has: page.locator('input[value="Filing Initiative"]') });
+    await row.locator('td[data-key="deliverableId"] select').selectOption('filing-deliverable');
+
+    await generateReport(page, 'rpti', '2026');
+    await expect(page.getByTestId('rpti-pre-export-gate')).toHaveCount(0);
+    await expect(page.getByTestId('rpti-report-export-btn')).toBeVisible();
+  });
+
+  test('a lifted legacy cost cannot overwrite a newer Initiative edit on reload', async ({ page }) => {
+    await seedReportRecords(page, {
+      ...reportFixture,
+      rptiDetails: [{
+        id: 'legacy-cost', initiativeId: 'filing-initiative', targetType: 'deliverable',
+        targetId: 'filing-deliverable', developmentType: 'upgrade',
+        capexAmount: 700, opexAmount: 70,
+      }],
+    }, ['assets', 'assetCategories', 'programmes', 'initiatives', 'deliverables', 'deliverableSegments', 'rptiDetails']);
+
+    await expect.poll(async () => (await readStore(page, 'initiatives'))[0]?.capex).toBe(700);
+    await expect.poll(async () => (await readStore(page, 'rptiDetails'))[0]?.capexAmount).toBeUndefined();
+
+    await page.getByTestId('nav-data-manager').click();
+    await page.getByTestId('data-manager-tab-initiatives').click();
+    const row = page.locator('tbody tr[data-real="true"]').filter({ has: page.locator('input[value="Filing Initiative"]') });
+    const capex = row.getByTestId('real-input-capex');
+    await capex.fill('900');
+    await capex.press('Enter');
+    await expect.poll(async () => (await readStore(page, 'initiatives'))[0]?.capex).toBe(900);
+
+    await page.reload();
+    await page.getByTestId('nav-data-manager').click();
+    await page.getByTestId('data-manager-tab-initiatives').click();
+    const reloaded = page.locator('tbody tr[data-real="true"]').filter({ has: page.locator('input[value="Filing Initiative"]') });
+    await expect(reloaded.getByTestId('real-input-capex')).toHaveValue('900');
   });
 
   test('blocks an ambiguous initiative before export and permits filing after target repair', async ({ page }) => {

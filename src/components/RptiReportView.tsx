@@ -30,7 +30,7 @@ export function RptiReportView({ rptiDetails, initiatives, deliverables, assets,
         <div className="flex-1" />
         {rptiDetails.length > 0 && blockingIssues.length === 0 && (
           <button
-            onClick={() => exportRptiReportToExcel(rptiDetails, initiatives, deliverables, assets, deliverableSegments, deliverableStatuses)}
+            onClick={() => exportRptiReportToExcel(rptiDetails, initiatives, deliverables, assets, reportYear!, deliverableSegments, deliverableStatuses)}
             data-testid="rpti-report-export-btn"
             className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors text-sm font-medium"
           >

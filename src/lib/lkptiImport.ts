@@ -318,6 +318,10 @@ export function deriveWorkspaceFromLkptiImport(
     lkptiDetails.push({
       id: `lkpti-import-lk-${n}`,
       targetId: deliverableId,
+      // Unlike RPTI, LKPTI has no second surviving identity when its Deliverable
+      // disappears. Retain the filing name so a future same-name replacement can
+      // be recognised without guessing from report contents (design Q12).
+      targetName: row.name,
       categoryCode: isLkptiCategoryCode(row.categoryCode) ? row.categoryCode : undefined,
       // Preserved verbatim, unlike generateLkptiDetails' cascade rule — the raw provider
       // name from the source report is worth keeping even for non-inhouse developers.
