@@ -340,7 +340,7 @@ export function reconcileRptiReturn(input: ReconcileRptiInput): RptiReconciliati
         classifySegmentKind(seg.status, deliverableStatuses) !== 'excluded');
     if (!derivable) {
       const targetName = deliverables.find(d => d.id === row.targetId)?.name ?? row.targetId;
-      add('unanchored', `The stored RPTI row for "${label}" has no lifecycle segment on "${targetName}" that generation could reproduce in any filing year. Restore that segment on the timeline, or select the row's Deliverable as the initiative's RPTI Target, before generating the filing.`);
+      add('unanchored', `The stored RPTI row for "${label}" has no lifecycle segment on "${targetName}" that generation could reproduce in any filing year. Add that segment to the timeline for this initiative — naming the Deliverable as the initiative's RPTI Target does not on its own give generation anything to derive.`);
     }
   }
 

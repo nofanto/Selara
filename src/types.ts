@@ -330,6 +330,15 @@ export interface TimelineSettings {
   mobileBucketMode?: 'timeline' | 'quarter' | 'year' | 'programme' | 'strategy';
   criticalPath?: 'on' | 'off';
   groupBy?: 'asset' | 'programme' | 'strategy';
+  /**
+   * The years the preparer stated at onboarding, kept so Reports can offer them back
+   * as defaults (FR-009). Before this they positioned the imported segments and then
+   * survived only as banner text, which is why "Generate" had nothing to use but the
+   * clock — the defect [#40](https://github.com/nofanto/Selara/issues/40) was raised for.
+   * Offered, never assumed: the preparer still sees and confirms the year.
+   */
+  onboardingLkptiYear?: number;
+  onboardingRptiYear?: number;
   colorBy?: 'programme' | 'strategy' | 'status' | 'rag';
   showResources?: 'on' | 'off';
   display?: 'both' | 'initiatives' | 'deliverables';

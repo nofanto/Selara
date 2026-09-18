@@ -11,7 +11,7 @@ It has twelve tabs:
 | Initiatives | All initiatives — name, dates, status, budget, owner, progress, etc. |
 | Dependencies | All dependency relationships between initiatives and milestones |
 | Assets | IT assets (e.g. CIAM Platform, Mobile App) |
-| Deliverables | The applications, infrastructure, documents, and procedures belonging to assets |
+| Deliverables | The applications, infrastructure, documents, and procedures belonging to assets — and everything the OJK returns say *about* an application |
 | Categories | The categories that group assets (e.g. Customer Identity, Mobile) |
 | Programmes | Programme definitions used for grouping and colouring |
 | Strategies | Strategic themes |
@@ -20,6 +20,15 @@ It has twelve tabs:
 | Deliverable Statuses | The lifecycle statuses and colours used by segments on the timeline |
 | RPTI | Rows for the Indonesian OJK IT Development Plan Report (Format 3.1) |
 | LKPTI | Rows for the Indonesian OJK Application List Report (Format 3.2.6) |
+
+**Where the OJK return fields live.** Everything that describes an application — Platform,
+Database, DC/DRC Provider, Backup Strategy, System Owner, Ownership, Developer and the PPJTI
+related-party answer — is recorded on the **Deliverables** tab, on the application itself. The RPTI
+`Keterangan` column comes from **RPTI Remarks** on the Initiatives tab, alongside the Description
+that supplies `Deskripsi`.
+
+That is the only place to change them, and it is deliberate: a generated filing is built from your
+applications and initiatives, so a value recorded there cannot be lost when a report is regenerated.
 
 The RPTI and LKPTI tabs are read-only views of stored report rows. They show target names and all stored report fields, including unresolved imports. Generate a filing for a selected year from **Reports**. Choose an initiative’s **RPTI Target** on the Initiatives tab; leaving it blank allows inference only when all its lifecycle segments name one existing Deliverable.
 

@@ -65,7 +65,7 @@ export interface LkptiDetail {
 
 ### 3. Row generation rule — live Deliverables only, no year-scoping
 
-**Decision:** one row per `Deliverable` (`type: 'application'`, or `undefined` which is treated as `'application'`) that has at least one `DeliverableSegment` classified `'live'` (in-production) by `classifySegmentKind()` — mirroring the helper `rpti.ts` already uses for its own "has this deliverable gone live" check. Unlike RPTI generation, this is **not scoped to a report year**: LKPTI 3.2.6 is a point-in-time inventory of what's currently running, not a plan of activity within a year, so "Generate LKPTI Rows" always re-evaluates against current Deliverable/DeliverableSegment state.
+**Decision:** one row per `Deliverable` (`type: 'application'`, or `undefined` which is treated as `'application'`) that has at least one `DeliverableSegment` classified `'live'` (in-production) by `classifySegmentKind()` — mirroring the helper `rpti.ts` already uses for its own "has this deliverable gone live" check. Unlike RPTI generation, this is **not scoped to a report year**: LKPTI 3.2.6 is a point-in-time inventory of what's currently running, not a plan of activity within a year, so it is not filtered to activity *within* a year the way RPTI is. It is still evaluated **at a moment**, and since ADR-0013 that moment is stated by the preparer rather than taken from the clock — an as-at date selects which applications were live then, which is a different thing from scoping a plan to a year.
 
 > **Amended (2026-09-02), "has a live segment" → "has gone live":** as originally written and implemented, the rule asked only whether a live-classified segment *existed*, with no regard for when it starts. A Deliverable whose in-production phase begins next year therefore generated a row today, carrying a `goLiveDate` in the future — precisely the regulatory-invalid output this rule's own stated purpose ("valid by construction") exists to prevent, and which `computeDataHealth` independently flags as a `lkpti-golive-future` error. The check is now `isLiveStatusId(seg.status, ...) && seg.startDate <= today`. Surfaced by a user against the demo template, where "React Native Shell" (in production from next April) appeared on the filing.
 >
@@ -75,6 +75,23 @@ export interface LkptiDetail {
 > - **Is currently live** — a live segment must also cover today (`endDate >= today`). Rejected on two grounds. First, it under-reports: an application that is sunset, out of support, or merely sitting in a gap left by imprecise segment dates is still deployed and still reportable, and under-reporting to a regulator is a worse failure than over-reporting. Second, it interacts badly with merge-preserving generation — because a Deliverable that no longer qualifies drops out of the result even when it has an existing row, a lapsed segment would silently discard that row's seven manual-only fields, which have no cascade source and cannot be reconstructed.
 >
 > Consequence, stated plainly: a decommissioned application remains on the generated report until someone deletes its row. That is intentional — dropping it is a filing decision for a person to make, not one for a date comparison to make silently.
+
+> **Amended again (2026-09-18), "has gone live" → "was live as at a stated date" (ADR-0013):**
+> `startDate <= today` fixed the not-yet-live half and left the other half open — an application
+> the bank has **decommissioned** still generated a row, because the test asked only whether a live
+> phase had *started*, never whether it had ended. LKPTI 3.2.6 asks what was live **as at 31
+> December of the report year**, so membership is now a span test, `startDate <= asAt && endDate >=
+> asAt`, and `generateLkptiDetails` takes a **required** `asAtDate`.
+>
+> Required, not defaulted: `today` is exactly the wrong answer for a return about a year that has
+> ended, and a silent default is how the report-year defect ([#40](https://github.com/nofanto/Selara/issues/40))
+> happened in the first place. The date is asked of the preparer in Reports, which is now the only
+> place a filing is generated — the Data Manager's "Generate LKPTI Rows" button is gone, and both
+> report tabs are read-only.
+>
+> **This is a behaviour change to filed output:** a decommissioned application drops out of the
+> inventory where it previously remained. That is the intended reading of the format, and it is
+> stated here rather than shipped quietly.
 
 > **Amended by [ADR-0010](../docs/adr/0010-lkpti-import-onboarding.md):** the original version of this rule wiped and rebuilt every row from scratch on each generate (matching RPTI generation, minus the year parameter). Since the LKPTI import-onboarding feature made it possible for `LkptiDetail` rows to carry real, non-reconstructable manual data (the 7 fields with no cascade source) from the moment a workspace exists, generation is now **merge-preserving**: a new row is created only for a `Deliverable` that has none yet; an existing row (from import, a prior generation, or manual entry) has only its cascade-derived fields (`categoryCode`, `developer`, `dcCity`/`dcCountry`, `drCity`/`drCountry`, `functionDescription`) refreshed — the 7 manual-only fields and `goLiveDate` are never touched once a row exists.
 

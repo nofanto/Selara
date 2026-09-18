@@ -33,7 +33,7 @@ const REPORT_YEAR = 2027;
 function importedWorkspace() {
   const lkptiSource = parseLkptiImportWorkbook(load('sample-lkpti-2026.xlsx')).rows;
   const rptiSource = parseRptiImportWorkbook(load('sample-rpti-2027.xlsx')).rows;
-  const inv = deriveWorkspaceFromLkptiImport(lkptiSource);
+  const inv = deriveWorkspaceFromLkptiImport(lkptiSource, 2026);
   const out = deriveWorkspaceFromRptiImport(rptiSource, REPORT_YEAR, {
     deliverables: inv.deliverables, assets: inv.assets, assetCategories: inv.assetCategories,
     deliverableSegments: inv.deliverableSegments, deliverableStatuses: inv.deliverableStatuses,

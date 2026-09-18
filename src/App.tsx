@@ -484,7 +484,7 @@ export default function App() {
         ? `No rows could be imported — every row had a problem (e.g. row ${lk.skipped[0].rowNumber}: ${lk.skipped[0].reason}).`
         : 'No data rows found in this LKPTI file.');
     }
-    const lkDerived = deriveWorkspaceFromLkptiImport(lk.rows);
+    const lkDerived = deriveWorkspaceFromLkptiImport(lk.rows, request.lkptiYear);
 
     let rpDerived: ReturnType<typeof deriveWorkspaceFromRptiImport> | null = null;
     let rpSkipped: { rowNumber: number; reason: string }[] = [];
@@ -522,6 +522,16 @@ export default function App() {
       programmes: rpDerived?.programmes ?? [],
       rptiDetails: rpDerived?.rptiDetails ?? [],
       lkptiDetails: lkDerived.lkptiDetails,
+      // Keep the years the preparer stated, so Reports can offer them back rather than
+      // reaching for the clock (T031/FR-009). Until now they positioned the imported
+      // segments and then survived only as banner text. They go into `data` rather than
+      // into a later setState because `saveAppData(data)` below is what persists them —
+      // set afterwards, they would live until the next reload and no longer.
+      timelineSettings: {
+        ...blank.timelineSettings,
+        onboardingLkptiYear: request.lkptiYear,
+        ...(request.rptiYear ? { onboardingRptiYear: request.rptiYear } : {}),
+      },
       versions: [],
     };
 

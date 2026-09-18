@@ -105,8 +105,13 @@ function depSentence(dep: Dependency, src: Initiative, tgt: Initiative, perspect
 
 export function ReportsView({ assets, initiatives, milestones, dependencies, currentData, programmes, strategies, assetCategories, resources = [], deliverables = [], deliverableSegments = [], deliverableStatuses = [], rptiDetails = [], lkptiDetails = [], onSaveAsset, onNavigate, initialReport }: ReportsViewProps) {
   const [selectedReport, setSelectedReport] = useState<ReportSlug | null>(initialReport ?? null);
-  const [rptiYearInput, setRptiYearInput] = useState('');
-  const [lkptiYearInput, setLkptiYearInput] = useState('');
+  // Offered, not assumed: the year the preparer stated at onboarding pre-fills the box
+  // they still have to see and confirm (FR-009, contract 1). An empty default is correct
+  // when nothing was stated — the one thing that must never fill it is the clock.
+  const [rptiYearInput, setRptiYearInput] = useState(
+    currentData.timelineSettings.onboardingRptiYear ? String(currentData.timelineSettings.onboardingRptiYear) : '');
+  const [lkptiYearInput, setLkptiYearInput] = useState(
+    currentData.timelineSettings.onboardingLkptiYear ? String(currentData.timelineSettings.onboardingLkptiYear) : '');
   const [generatedRptiDetails, setGeneratedRptiDetails] = useState<RptiDetail[] | null>(null);
   const [generatedLkptiDetails, setGeneratedLkptiDetails] = useState<LkptiDetail[] | null>(null);
   /*

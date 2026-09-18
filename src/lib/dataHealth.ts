@@ -272,7 +272,7 @@ export function computeDataHealth(input: DataHealthInput): HealthIssue[] {
     if (!initiativeIds.has(r.initiativeId)) {
       issues.push({
         id: `rpti-initiative:${r.id}`, severity: 'error', entityType: 'RptiDetail', entityId: r.id,
-        entityName: label, message: `An RPTI row points at an Initiative that no longer exists.`, location: tab('rpti'),
+        entityName: label, message: `A filed RPTI row refers to an Initiative that no longer exists, so nothing can derive it. Recreate that initiative — or re-import the return it came from — on the Initiatives tab.`, location: tab('initiatives'),
       });
     }
     if (r.targetType === 'asset') {
@@ -287,13 +287,13 @@ export function computeDataHealth(input: DataHealthInput): HealthIssue[] {
     if (!targetExists) {
       issues.push({
         id: `rpti-target:${r.id}`, severity: 'error', entityType: 'RptiDetail', entityId: r.id,
-        entityName: label, message: `An RPTI row for "${label}" points at a ${r.targetType} that no longer exists.`, location: tab('rpti'),
+        entityName: label, message: `The filed RPTI row for "${label}" refers to an application that is not recorded. Create or correct it on the Deliverables tab and point its initiative at it, so the next generation reproduces the row.`, location: tab('deliverables'),
       });
     }
     if (r.deliverableSegmentId && !segmentIds.has(r.deliverableSegmentId)) {
       issues.push({
         id: `rpti-segment:${r.id}`, severity: 'error', entityType: 'RptiDetail', entityId: r.id,
-        entityName: label, message: `An RPTI row for "${label}" points at a lifecycle segment that no longer exists.`, location: tab('rpti'),
+        entityName: label, message: `The filed RPTI row for "${label}" refers to a lifecycle segment that no longer exists. Restore that work on the timeline — generation derives the row's quarter from it.`, location: tab('deliverables'),
       });
     }
   }
@@ -304,7 +304,7 @@ export function computeDataHealth(input: DataHealthInput): HealthIssue[] {
     if (!deliverableIds.has(l.targetId)) {
       issues.push({
         id: `lkpti-target:${l.id}`, severity: 'error', entityType: 'LkptiDetail', entityId: l.id,
-        entityName: label, message: `An LKPTI row points at a Deliverable that no longer exists.`, location: tab('lkpti'),
+        entityName: label, message: `A filed LKPTI row refers to an application that is not recorded. Create or correct it on the Deliverables tab so the inventory can be generated.`, location: tab('deliverables'),
       });
     }
   }
@@ -405,7 +405,7 @@ export function computeDataHealth(input: DataHealthInput): HealthIssue[] {
     if (missing.length > 0) {
       issues.push({
         id: `lkpti-incomplete:${l.id}`, severity: 'warning', entityType: 'LkptiDetail', entityId: l.id,
-        entityName: label, message: `The LKPTI row for "${label}" is missing: ${missing.join(', ')}.`, location: tab('lkpti'),
+        entityName: label, message: `"${label}" is missing: ${missing.join(', ')}. These are recorded on the application itself (ADR-0013), on the Deliverables tab.`, location: tab('deliverables'),
       });
     }
   }
@@ -422,7 +422,7 @@ export function computeDataHealth(input: DataHealthInput): HealthIssue[] {
     if (missing.length > 0) {
       issues.push({
         id: `rpti-incomplete:${r.id}`, severity: 'warning', entityType: 'RptiDetail', entityId: r.id,
-        entityName: label, message: `The RPTI row for "${label}" is missing: ${missing.join(', ')}.`, location: tab('rpti'),
+        entityName: label, message: `The plan line for "${label}" is missing: ${missing.join(', ')}. These are recorded on the application it targets (ADR-0013), on the Deliverables tab.`, location: tab('deliverables'),
       });
     }
   }
@@ -470,9 +470,11 @@ export function computeDataHealth(input: DataHealthInput): HealthIssue[] {
     const applicationName = deliverable?.name;
     const label = deliverable?.name ?? l.id;
     const entityName = label;
-    // The name is edited on the Deliverables tab; every other column on the LKPTI tab.
+    // Both now land on the Deliverables tab: since ADR-0013 the application owns these
+    // values, and since Q5/Q6's read-only revision the LKPTI tab cannot be edited at all,
+    // so sending anyone there would name the problem without naming a repair (FR-021a).
     const NAME_TAB = tab('deliverables');
-    const ROW_TAB = tab('lkpti');
+    const ROW_TAB = tab('deliverables');
 
     if (l.goLiveDate) {
       const parsed = parseDdMmYyyy(l.goLiveDate);
@@ -581,8 +583,8 @@ export function computeDataHealth(input: DataHealthInput): HealthIssue[] {
     validityIssues.push({
       id: 'workspace-currency-not-idr', severity: 'warning', entityType: 'Workspace', entityId: 'workspace',
       entityName: 'Workspace settings',
-      message: `The workspace currency is ${currency}. RPTI requires IDR-equivalent amounts, and this app reports in a single currency with no per-row conversion, so the export cannot be schema-compliant until the workspace reports in IDR.`,
-      location: tab('rpti'),
+      message: `The workspace currency is ${currency}. RPTI requires IDR-equivalent amounts, and this app reports in a single currency with no per-row conversion, so the export cannot be schema-compliant until the workspace reports in IDR. Change it in the visualiser's display settings.`,
+      location: tab('initiatives'),
     });
   }
 

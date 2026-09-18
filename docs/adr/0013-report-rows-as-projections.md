@@ -1,0 +1,133 @@
+# ADR-0013: Report rows describe the entities they belong to, and a return is generated for a stated year
+
+## Status
+
+Accepted
+
+## Context and Problem Statement
+
+`LkptiDetail` and `RptiDetail` were the only home for values that describe an application — what it
+runs on, who operates its data centres, who owns it, who built it. They are report rows, so those
+values existed only for as long as a row did: pressing "Generate LKPTI Rows" rebuilt the rows from
+the workspace and every filed value that generation could not derive was gone. Measured on the
+sample returns, a regenerate lost **110 filed values**.
+
+The second half of the same problem is that an RPTI return is a plan for a **specific year**, and
+nothing recorded which year. `reportYear` existed only as a call-time parameter; onboarding asked
+for two reporting years and kept neither. So "Generate" used `new Date().getFullYear()` — not
+laziness, the only year available — and `exportRptiReportToExcel` filtered by nothing at all, which
+means a workspace holding a 2027 and a 2028 plan filed them to OJK as one return with no warning.
+
+Raised jointly as [issue #40](https://github.com/nofanto/Selara/issues/40) and the design notes in
+`requirement-specs/report-rows-as-projections.md`, whose Q1–Q11 record the decisions this ADR
+summarises. Specification and task breakdown in `specs/002-report-year-field-ownership/`.
+
+## Decision Drivers
+
+- A wrong regulatory classification is the expensive failure in this product; a wrong pixel is not.
+- Silent loss is worse than loud failure. A preparer who is told what will be lost can act; one who
+  is not cannot.
+- `AppState` is enumerated at every call site, so a new store is expensive here and extending an
+  existing entity is cheap.
+- IndexedDB is schemaless within a store, so a dropped TypeScript field persists as an orphaned
+  property rather than erroring — which makes "it still works" a poor signal.
+
+## Considered Options
+
+- Keep the values on the report rows and make generation merge-preserving.
+- Move the values onto the entities they describe, and derive the rows.
+- Add a child table or a supplier/vendor entity to hold them.
+- Store the report year on `RptiDetail`, as a workspace setting, or as a first-class filing entity.
+
+## Decision Outcome
+
+Chosen option: **move the values onto the entities they describe, and generate each return for a
+year the preparer states**, because a value that describes an application belongs to the
+application. Once it lives there, regeneration cannot lose it — there is nothing to lose.
+
+Concretely:
+
+- Nine fields move: `platform`, `database`, `dcProvider`, `drcProvider`, `backupStrategy`,
+  `systemOwner`, `ownership` and `ppjtiRelatedParty` onto `Deliverable`, and the RPTI `Keterangan`
+  column onto `Initiative.rptiRemarks` (distinct from `description`, which supplies `Deskripsi`).
+- `Deliverable.developer` widens from the two-value `RptiDeveloper` enum to also carry a service
+  provider's **name**, which is what LKPTI files. RPTI derives its own classification from it:
+  anything that is not `'inhouse'` is PPJTI. One field serves both returns and the name is not lost.
+- Cost stops being a per-row override. `RptiDetail.capexAmount`/`opexAmount` are removed and
+  `Initiative.capex`/`opex` are the filed figures (Q7). An initiative has at most one RPTI target;
+  where none is declared it is inferred when the initiative's segments unambiguously name one
+  deliverable (Q10).
+- `generateLkptiDetails` takes a **required** `asAtDate` and tests a live span rather than "has ever
+  gone live". `deriveWorkspaceFromLkptiImport` takes a **required** `asAtYear` for the same reason.
+- Generation moves to Reports, which asks for the year. Both Data Manager report tabs become
+  read-only; their stored rows remain visible and exportable but are no longer inputs.
+- `projectRptiReturn(input, reportYear)` is the projection, and its input type has no
+  `existingDetails` key, so handing it stored rows is a compile error. `reconcileRptiReturn`
+  compares stored rows against the source model and returns **findings**, never rows (Q11).
+
+### Pros and Cons of the Options
+
+#### Keep the values on the rows, make generation merge-preserving
+
+- Good, because it is the smallest change and it shipped first, as v2 of the auto-generation rules.
+- Bad, because it treats the symptom. The values still have no owner, so two rows about the same
+  application can disagree and nothing notices.
+- Bad, because the merge is **year-agnostic carry-forward**, which is exactly wrong for a
+  year-scoped output. Wired into the projection path it put a 2027 plan line inside a 2026 filing —
+  the defect that produced Q11 and this ADR's projection split.
+
+#### Move the values onto the entities they describe
+
+- Good, because regeneration cannot lose what it does not own: 110 lost values became 0.
+- Good, because each value gains exactly one editing surface, which the data-health findings can
+  point at.
+- Bad, because the Deliverables tab grows from 10 to 18 columns, on a table already ~1800px wide.
+- Bad, because every new field must be named explicitly in `diff.ts` or version history will not
+  see it — silently ([#42](https://github.com/nofanto/Selara/issues/42)).
+
+#### A child table, or a supplier/vendor entity
+
+- Good, because a vendor answered once could not then be answered inconsistently per application.
+- Bad, because a new store is the expensive change in this codebase, and the duplication it avoids
+  is an accepted, recorded simplification (Q3).
+
+#### Store the report year on `RptiDetail`
+
+- Bad, because it makes the row the authority on which return it belongs to, when the row is meant
+  to be derived. Rejected in favour of the preparer stating the year at generation.
+
+## Consequences
+
+### Behaviour changes a preparer will notice
+
+Both are intended. Both are stated here because a regulatory tool that changes what it files
+without saying so is worse than one that does not change at all.
+
+- **A decommissioned application now drops out of the generated LKPTI.** Previously intended,
+  previously not true — membership tested only that a live segment had *started*, never whether it
+  had ended, so an application the bank had retired still appeared on the inventory.
+- **Both Data Manager report tabs are read-only, and their Generate buttons are gone.** A filing is
+  produced from **Reports**, which asks for the year it covers. The stored rows remain visible and
+  exportable; they are no longer somewhere to type. Anything that used to be edited on a report row
+  is now edited on the application or the initiative that owns it.
+- **A filing covers the year you state.** Previously "Generate RPTI Rows" used the current calendar
+  year because that was the only year available, and the export filtered by nothing at all — a
+  workspace holding two plan years filed both as one return.
+
+### Other consequences
+
+- **No IndexedDB version bump is needed.** Stores are schemaless within a store and `flatten()` is
+  generic, so `db.ts` and `excel.ts` need nothing for new fields on an existing entity. Verified
+  rather than assumed — the workspace export/import round trip is asserted field by field.
+- **The orphaned-property hazard is handled, not ignored.** A workspace imported before this change
+  holds the values on its rows and not yet on its entities, so `liftReportRowAttributes` runs on
+  load, before any generation can replace a row. Migration tooling for exports, shares and saved
+  versions is deliberately deferred (Q4).
+- **Data-health findings were repointed.** Eight pointed at the report tabs; after those tabs became
+  read-only each would have named a problem without naming a repair.
+- **Exact per-year attribution of a stored row is not possible and is not faked.** `RptiDetail`
+  carries no report year and none may be inferred from a quarter, an id suffix or a segment link,
+  so reconciliation findings are stated per workspace. A persisted year-bearing record is the
+  deferred fix, analysed as option 5 in `specs/002-report-year-field-ownership/merge-path-options.md`.
+- **Still open:** emptying or removing the read-only report tabs, and the residual that a stored
+  LKPTI row's non-cascaded fields (`goLiveDate` in particular) still reach generated output.

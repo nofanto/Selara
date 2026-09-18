@@ -197,6 +197,15 @@ export function computeDiff(baseVersion: Version, currentData: Version['data']):
         const newAsset = currentData.assets.find(a => a.id === c.assetId)?.name || 'Unknown';
         changes.push(`Moved from Asset "${oldAsset}" to "${newAsset}"`);
       }
+      // Both RPTI free-text columns, named separately because they are separate columns
+      // in the filing: Deskripsi from `description`, Keterangan from `rptiRemarks`
+      // (ADR-0013). `description` was never compared either — the same #42 blind spot.
+      if ((b.description ?? '') !== (c.description ?? '')) {
+        changes.push(`Description: ${b.description || 'Unset'} → ${c.description || 'Unset'}`);
+      }
+      if ((b.rptiRemarks ?? '') !== (c.rptiRemarks ?? '')) {
+        changes.push(`RPTI remarks: ${b.rptiRemarks || 'Unset'} → ${c.rptiRemarks || 'Unset'}`);
+      }
       return changes;
     },
     (i) => ({ asset: resolveAsset(i.assetId) })
@@ -250,6 +259,22 @@ export function computeDiff(baseVersion: Version, currentData: Version['data']):
         const oldAsset = baseVersion.data.assets.find(a => a.id === b.assetId)?.name || 'Unknown';
         const newAsset = currentData.assets.find(a => a.id === c.assetId)?.name || 'Unknown';
         changes.push(`Moved from Asset "${oldAsset}" to "${newAsset}"`);
+      }
+      // The nine fields ADR-0013 moved onto the entities that own them. Each must be
+      // named explicitly: `compareEntities` is generic over entities, not over their
+      // fields, so an unlisted field changes with no history entry and no error
+      // (https://github.com/nofanto/Selara/issues/42). These feed a regulatory return,
+      // which makes "changed, but nobody can see when" the wrong failure to accept.
+      for (const [field, label] of [
+        ['platform', 'Platform'], ['database', 'Database'],
+        ['dcProvider', 'DC provider'], ['drcProvider', 'DRC provider'],
+        ['backupStrategy', 'Backup strategy'], ['systemOwner', 'System owner'],
+        ['ownership', 'Ownership'], ['developer', 'Developer'],
+        ['ppjtiRelatedParty', 'PPJTI related party'],
+      ] as const) {
+        const before = (b as unknown as Record<string, unknown>)[field] ?? '';
+        const after = (c as unknown as Record<string, unknown>)[field] ?? '';
+        if (before !== after) changes.push(`${label}: ${before || 'Unset'} → ${after || 'Unset'}`);
       }
       return changes;
     },

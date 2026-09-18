@@ -273,6 +273,10 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery,
     { key: 'owner', label: 'Owner', type: 'text', width: '150px' },
     { key: 'isPlaceholder', label: 'Placeholder?', type: 'boolean', width: '80px' },
     { key: 'description', label: 'Description', type: 'textarea', width: '260px', placeholder: 'Add a description...' },
+    // The RPTI's two free-text columns are both owned here (ADR-0013): Deskripsi from
+    // `description` above, Keterangan from this. Labelled by what it feeds, because
+    // "Description" and "Remarks" alone would not tell anyone which column is which.
+    { key: 'rptiRemarks', label: 'RPTI Remarks (Keterangan)', type: 'textarea', width: '260px', placeholder: 'Noted about this work in the plan…' },
   ];
 
   const assetColumns: Column<Asset>[] = [
@@ -391,17 +395,48 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery,
           .map(code => ({ value: code, label: `${code} — ${RPTI_CATEGORY_LABELS[code]}` })),
       ],
     },
+    // Free text, not a two-value select: ADR-0013 widened this to carry a service
+    // provider's *name*, which is what LKPTI files. RPTI derives its own classification
+    // from it — anything that is not 'inhouse' is PPJTI — so one field serves both
+    // returns and the name is never lost.
+    { key: 'developer', label: 'Developer', type: 'text', width: '200px', placeholder: "'inhouse' or provider name" },
     {
-      key: 'developer', label: 'Developer', type: 'select', width: '140px',
+      key: 'ppjtiRelatedParty', label: 'PPJTI Related Party', type: 'select', width: '150px',
       options: [
         { value: '', label: '— Not set —' },
-        { value: 'inhouse', label: 'In-house' }, { value: 'PPJTI', label: 'PPJTI' },
+        { value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }, { value: 'n/a', label: 'N/A' },
       ],
     },
     { key: 'dcCity', label: 'DC City Override', type: 'text', width: '130px' },
     { key: 'dcCountry', label: 'DC Country Override', type: 'text', width: '130px' },
     { key: 'drCity', label: 'DR City Override', type: 'text', width: '130px' },
     { key: 'drCountry', label: 'DR Country Override', type: 'text', width: '130px' },
+    // The seven LKPTI attributes ADR-0013 moved off the report row onto the application
+    // they describe. This is the only place they are now editable, and the data-health
+    // findings for them point here (FR-021a).
+    { key: 'platform', label: 'Platform', type: 'text', width: '180px' },
+    { key: 'database', label: 'Database', type: 'text', width: '150px' },
+    { key: 'dcProvider', label: 'DC Provider', type: 'text', width: '150px', placeholder: "'self' or company name" },
+    { key: 'drcProvider', label: 'DRC Provider', type: 'text', width: '150px', placeholder: "'self' or company name" },
+    {
+      key: 'backupStrategy', label: 'Backup Strategy', type: 'select', width: '190px',
+      options: [
+        { value: '', label: '— Not set —' },
+        { value: 'HA_ACTIVE_ACTIVE', label: 'HA Active-Active' },
+        { value: 'HA_ACTIVE_PASSIVE', label: 'HA Active-Passive' },
+        { value: 'BACKUP_REALTIME', label: 'Backup Realtime' },
+        { value: 'BACKUP_PERIODIC', label: 'Backup Periodic' },
+      ],
+    },
+    { key: 'systemOwner', label: 'System Owner', type: 'text', width: '230px' },
+    {
+      key: 'ownership', label: 'Ownership', type: 'select', width: '140px',
+      options: [
+        { value: '', label: '— Not set —' },
+        { value: 'LEASE', label: 'Lease' },
+        { value: 'OUTRIGHT_PURCHASE', label: 'Outright Purchase' },
+      ],
+    },
   ];
 
   const handleDeleteDeliverable = (deliverable: Deliverable): boolean => {

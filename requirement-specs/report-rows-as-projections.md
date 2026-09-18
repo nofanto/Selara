@@ -1,9 +1,9 @@
 # Report Rows as Projections, Not Storage — Design Notes
 
-> **Status:** Problem verified; decisions Q1–Q8 settled (2026-09-18). The first field-ownership
-> slice is implemented; the remaining Spec Kit tasks carry the report-year, read-only-tab, and
-> RPTI projection work. Raised jointly with [#40](https://github.com/nofanto/Selara/issues/40) —
-> see "Why this cannot ship before #40".
+> **Status:** Q1-Q3 and Q5-Q11 implemented and shipped on branch `002-report-year-field-ownership`
+> (see [ADR-0013](../docs/adr/0013-report-rows-as-projections.md)). Q4 — migration tooling for
+> existing exports, shares and saved versions — remains deliberately deferred. Raised jointly with
+> [#40](https://github.com/nofanto/Selara/issues/40) — see "Why this cannot ship before #40".
 >
 > **Read the title as the destination, not a claim that stored rows disappear now.** Attributes
 > move to the entities they describe; report generation moves to Reports; and the Data Manager
@@ -142,7 +142,7 @@ what period it covers.
 in exported output); omit the year from the export while showing it only on screen (contradicts
 FR-003 and leaves an exported filing ambiguous).
 
-### Q8 — bare-Asset RPTI targets are not supported (2026-09-18)
+### Q8 — bare-Asset RPTI targets are not supported (2026-09-18) — **IMPLEMENTED** (ADR-0013)
 
 **Decided: no.** Selara files infrastructure, as OJK Format 3.1 requires, but it models an
 infrastructure item as a **Deliverable** under its Asset — the same as an application. An RPTI row
@@ -181,7 +181,7 @@ path would need a canonical source defined for each of the four before it could 
 more work than the rest of this feature, for a shape nothing in the product or the samples needs.
 
 
-### Q7 — cost belongs to the initiative, and an initiative has at most one RPTI target (2026-09-18)
+### Q7 — cost belongs to the initiative, and an initiative has at most one RPTI target (2026-09-18) — **IMPLEMENTED** (ADR-0013)
 
 **Decided: option (c).** `RptiDetail.capexAmount` and `opexAmount` are removed. `Initiative.capex`
 and `Initiative.opex` are the filed figures, with no per-row override and no fallback chain.
@@ -240,7 +240,7 @@ editable in an otherwise read-only tab (reinstates the split-brain the decision 
 the two columns most likely to be wrong).
 
 
-### Q1 — the eight attributes move onto `Deliverable` (2026-09-17)
+### Q1 — the eight attributes move onto `Deliverable` (2026-09-17) — **IMPLEMENTED** (ADR-0013)
 
 `Deliverable` gains the seven fields it lacks — `platform`, `database`, `dcProvider`,
 `drcProvider`, `backupStrategy`, `systemOwner`, `ownership` — taking it from 11 fields to 18.
@@ -292,7 +292,7 @@ that `LkptiDetail` is not what it sounds like — and it entrenches the conflati
 set out to remove. Worth revisiting only if the migration in Q3 proves more dangerous than
 expected.
 
-### Q2 — `remarks` moves onto `Initiative` (2026-09-17)
+### Q2 — `remarks` moves onto `Initiative` (2026-09-17) — **IMPLEMENTED** (ADR-0013)
 
 `RptiDetail.remarks` — the RPTI's `Keterangan` column — becomes a field on `Initiative`.
 Confirmed with the product owner: *Keterangan is commentary on the item*, not on this year's
@@ -327,7 +327,7 @@ from ever emptying.
 **Rejected — accept that regeneration discards it.** That is precisely the data loss fixed in
 `aabee9f`, reintroduced on purpose.
 
-### Q3 — `ppjtiRelatedParty` moves onto `Deliverable` (2026-09-18)
+### Q3 — `ppjtiRelatedParty` moves onto `Deliverable` (2026-09-18) — **IMPLEMENTED** (ADR-0013)
 
 `Deliverable` gains `ppjtiRelatedParty`, joining the Q1 fields. Confirmed with the product
 owner: the bank holds this **per application**, not centrally per vendor.
@@ -451,7 +451,7 @@ Two consequences stopped it being a small change, and both should be carried for
    record as what was actually submitted — which also makes the filing record the natural owner
    of the report year.
 
-### Q5/Q6 revised — the report tabs become read-only, and generation moves to Reports (2026-09-18)
+### Q5/Q6 revised — the report tabs become read-only, and generation moves to Reports (2026-09-18) — **IMPLEMENTED** (ADR-0013)
 
 **Decided, superseding the above.** Both Data Manager report tabs become **read-only**, and will
 be removed once the destination is reached. Generation moves to the Reports tab, where the
@@ -520,7 +520,7 @@ carried forward, since each is load-bearing for the destination:
 - `requirement-specs/it-planning-flow.md` — step 2/3 of the cycle this document reconciles
 - ADR-0010 — merge-preserving LKPTI generation, which exists precisely because these fields cannot be regenerated
 
-## Q10 — Existing initiatives without a declared RPTI target (decided 2026-09-18)
+## Q10 — Existing initiatives without a declared RPTI target (decided 2026-09-18) — **IMPLEMENTED** (ADR-0013)
 
 Coordinator-approved compatibility rule: an explicit `Initiative.deliverableId` wins.
 Otherwise infer a target only when all the initiative's lifecycle segments name exactly
@@ -544,7 +544,7 @@ Acceptance: regression tests cover the shipped demo, unambiguous application/inf
 inference, ambiguous and missing targets, explicit target precedence, and the pre-export
 repair gate. Stored rows remain readable in Data Manager; report edits belong on entities.
 
-## Q11 — The Reports path is a pure projection; stored rows are reconciliation evidence (decided 2026-09-18)
+## Q11 — The Reports path is a pure projection; stored rows are reconciliation evidence (decided 2026-09-18) — **IMPLEMENTED** (ADR-0013)
 
 **Decided: option 3 + option 1 of `specs/002-report-year-field-ownership/merge-path-options.md`.**
 `generateRptiDetails(input, reportYear)` — which accepted an optional `existingDetails` and ran

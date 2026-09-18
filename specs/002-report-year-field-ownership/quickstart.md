@@ -73,3 +73,9 @@ difference report. Both must be listed. An unlisted field changes silently — [
 With 300 applications, generating a return for a stated year stays within the responsiveness of
 generating one today. The Deliverables tab now carries 18 columns; confirm no content clips
 (the measurement harness from #44).
+
+**Automated** as `src/lib/scale.test.ts`, so it is checked on every run rather than by hand: 300
+applications through `projectRptiReturn`, `generateLkptiDetails` and `reconcileRptiReturn`, with a
+deliberately loose bound that catches an accidental O(n²) and ignores millisecond drift. The column
+clipping half remains a visual check — the #44 harness measures it, but "no content clips" is not
+a property a unit test can hold.

@@ -65,6 +65,36 @@ test.describe('Onboarding from filed OJK returns', () => {
     await expect(page.getByTestId('data-health-report-view')).toBeVisible({ timeout: 20000 });
   });
 
+  /**
+   * T031 / FR-009. Onboarding has always asked for both years; until now it positioned
+   * the imported segments with them and then kept them only as banner text, which is
+   * why "Generate" had nothing to reach for but the clock (#40). Offered, not assumed —
+   * the preparer still sees and confirms the year before a filing is produced.
+   */
+  test('offers the stated years back as the defaults in Reports', async ({ page }) => {
+    await page.getByTestId('onboarding-lkpti-file-input').setInputFiles(LKPTI);
+    await page.getByTestId('onboarding-lkpti-year').fill('2026');
+    await page.getByTestId('onboarding-rpti-file-input').setInputFiles(RPTI);
+    await page.getByTestId('onboarding-rpti-year').fill('2027');
+    await page.getByTestId('onboarding-import-btn').click();
+    await expect(page.getByTestId('data-health-report-view')).toBeVisible({ timeout: 20000 });
+
+    // `freshWorkspace` clears this flag to reach the first-run picker; restore it before
+    // reloading, or the tutorial modal opens over the nav. Reloading matters: it proves
+    // the years were persisted rather than merely held in component state.
+    await page.evaluate(() => localStorage.setItem('scenia-e2e', 'true'));
+    await page.reload();
+    await page.getByTestId('nav-reports').click();
+    await page.getByTestId('report-card-rpti').click();
+    await expect(page.getByTestId('rpti-report-year-input'),
+      'the RPTI year stated at onboarding must be offered back').toHaveValue('2027');
+
+    await page.getByTestId('report-back-btn').click();
+    await page.getByTestId('report-card-lkpti').click();
+    await expect(page.getByTestId('lkpti-report-year-input'),
+      'the LKPTI year is a different year, and must not be confused with the RPTI one').toHaveValue('2026');
+  });
+
   test('imports both returns and ends on the data-health review', async ({ page }) => {
     await page.getByTestId('onboarding-lkpti-file-input').setInputFiles(LKPTI);
     await page.getByTestId('onboarding-lkpti-year').fill('2026');

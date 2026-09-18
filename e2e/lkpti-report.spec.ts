@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { seedReportRecords, reportFixture, generateReport } from './report-fixtures';
+import { seedReportRecords, reportFixture, generateReport, exportedReportText } from './report-fixtures';
 
 test.describe('LKPTI stored rows and Reports', () => {
   test.beforeEach(async ({ page }) => {
@@ -58,5 +58,45 @@ test.describe('LKPTI stored rows and Reports', () => {
     await generateReport(page, 'lkpti');
     const [download] = await Promise.all([page.waitForEvent('download'), page.getByTestId('lkpti-report-export-btn').click()]);
     expect(download.suggestedFilename()).toMatch(/lkpti-report/i);
+  });
+});
+
+/**
+ * T027. The eight attributes ADR-0013 moved onto the application are only useful if the
+ * application is where you can actually type them. `developer` matters most: it was a
+ * two-value select until this task, so a service provider's *name* — the thing LKPTI
+ * files — could not be entered at all on the tab that owns the field.
+ */
+test.describe('the moved attributes are editable on the application that owns them', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await page.getByTestId('nav-data-manager').click();
+    await seedReportRecords(page, reportFixture);
+  });
+
+  test('editing them on Deliverables reaches the generated LKPTI', async ({ page }) => {
+    await page.getByTestId('nav-data-manager').click();
+    await page.getByTestId('data-manager-tab-deliverables').click();
+    const row = page.locator('tbody tr[data-real="true"]').filter({ has: page.locator('input[value="Filing Application"]') });
+
+    for (const [key, value] of Object.entries({
+      platform: 'AIX 7.2', database: 'Db2 11.5', dcProvider: 'PT Telkom Sigma',
+      drcProvider: 'PT Lintasarta', systemOwner: 'Treasury Operations',
+      developer: 'PT Anabatic Technologies',
+    })) {
+      await row.locator(`td[data-key="${key}"] input`).fill(value);
+      await row.locator(`td[data-key="${key}"] input`).press('Tab');
+    }
+    await row.locator('td[data-key="ownership"] select').selectOption('LEASE');
+    await row.locator('td[data-key="backupStrategy"] select').selectOption('HA_ACTIVE_PASSIVE');
+
+    await page.reload();
+    await generateReport(page, 'lkpti', '2026');
+    const exported = await exportedReportText(page, 'lkpti');
+
+    for (const value of ['AIX 7.2', 'Db2 11.5', 'PT Telkom Sigma', 'PT Lintasarta',
+                         'Treasury Operations', 'PT Anabatic Technologies']) {
+      expect(exported, `"${value}" was entered on the Deliverable but did not reach the filing`).toContain(value);
+    }
   });
 });

@@ -94,3 +94,43 @@ describe('Excel export/import — decisions (#22)', () => {
     expect(parseWorkbook(wb).assets).toEqual([{ id: 'a-1', name: 'Core Ledger', categoryId: 'cat-1' }]);
   });
 });
+
+/**
+ * T030 / contract 21. The claim `excel.ts` needed no change for ADR-0013's nine moved
+ * fields is a claim about `flatten()` being generic — plausible, and exactly the kind of
+ * thing that is asserted in a plan and never checked. A field that exports but does not
+ * come back is silent data loss on every share and every backup, so this verifies the
+ * round trip field by field rather than trusting the reasoning.
+ */
+describe('the fields ADR-0013 moved survive the workspace round trip (contract 21)', () => {
+  const deliverable = {
+    id: 'deliv-1', assetId: 'asset-1', name: 'Payment Gateway', type: 'application' as const,
+    platform: 'Linux RHEL 9', database: 'PostgreSQL 16',
+    dcProvider: 'PT Telkom Sigma', drcProvider: 'PT Lintasarta',
+    backupStrategy: 'HA_ACTIVE_PASSIVE' as const, systemOwner: 'Digital Channels',
+    ownership: 'LEASE' as const, developer: 'PT Anabatic Technologies',
+    ppjtiRelatedParty: 'no' as const,
+  };
+  const initiative = {
+    id: 'init-1', name: 'Gateway Upgrade', programmeId: 'prog-1', assetId: 'asset-1',
+    startDate: '2027-01-01', endDate: '2027-12-31', capex: 100, opex: 10,
+    description: 'Deskripsi text', rptiRemarks: 'Keterangan text',
+  };
+
+  it('carries all eight Deliverable attributes plus the widened developer', () => {
+    const wb = buildWorkbook({ ...emptyWorkspace, deliverables: [deliverable] } as never);
+    const [back] = parseWorkbook(wb).deliverables as unknown as Record<string, unknown>[];
+
+    for (const [field, value] of Object.entries(deliverable)) {
+      expect(back?.[field], `Deliverable.${field} did not survive the round trip`).toBe(value);
+    }
+  });
+
+  it('carries rptiRemarks distinctly from description on the Initiative', () => {
+    const wb = buildWorkbook({ ...emptyWorkspace, initiatives: [initiative] } as never);
+    const [back] = parseWorkbook(wb).initiatives as unknown as Record<string, unknown>[];
+
+    expect(back?.description).toBe('Deskripsi text');
+    expect(back?.rptiRemarks, 'rptiRemarks did not survive the round trip').toBe('Keterangan text');
+  });
+});

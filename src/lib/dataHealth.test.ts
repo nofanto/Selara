@@ -375,7 +375,9 @@ describe('computeDataHealth — validity: length caps', () => {
     const issues = computeDataHealth(lkptiInput({ dcCity: 'x'.repeat(60), dcCountry: 'y'.repeat(60) }));
     const issue = findIssue(issues, `lkpti-too-long:${fullLkpti.id}:dcLocation`);
     expect(issue?.severity).toBe('error');
-    expect(issue?.location).toEqual({ view: 'data', tab: 'lkpti' });
+    // Repointed by T028: the LKPTI tab is read-only, and these values live on the
+    // application (ADR-0013), so the repair is on the Deliverables tab (FR-021a).
+    expect(issue?.location).toEqual({ view: 'data', tab: 'deliverables' });
   });
 
   it('accepts a composed dcLocation within the cap', () => {
@@ -460,7 +462,9 @@ describe('computeDataHealth — validity: RPTI workspace currency', () => {
     expect(issue?.severity).toBe('warning');
     expect(issue?.phase).toBe('validity');
     expect(issue?.entityType).toBe('Workspace');
-    expect(issue?.location).toEqual({ view: 'data', tab: 'rpti' });
+    // Repointed by T028: the currency control moved out of the RPTI tab into the
+    // visualiser's display settings when that tab became read-only.
+    expect(issue?.location).toEqual({ view: 'data', tab: 'initiatives' });
   });
 
   it('does not flag IDR', () => {
@@ -494,9 +498,12 @@ describe('computeDataHealth — unresolved RPTI import references (#38)', () => 
 
   it('reports an imported row whose upgrade target was never resolved', () => {
     const issues = computeDataHealth(baseInput({ initiatives: [initiative], rptiDetails: [unresolvedRow] }));
+    // T028a: the repair is source-side now. The RPTI tab no longer has a Target
+    // dropdown to fix, so the finding must send the preparer to the application the
+    // filed plan refers to — otherwise FR-025 has no remaining repair path.
     expect(findIssue(issues, `rpti-target:${unresolvedRow.id}`)).toMatchObject({
       severity: 'error',
-      location: { view: 'data', tab: 'rpti' },
+      location: { view: 'data', tab: 'deliverables' },
     });
   });
 
@@ -619,5 +626,46 @@ describe('RPTI target compatibility', () => {
     const issue = findIssue(issues, `initiative-rpti-multi-target:${init.id}`);
     expect(issue?.severity).toBe('error');
     expect(issue?.reports).toContain('rpti');
+  });
+});
+
+/**
+ * T028 / FR-021a. Both report tabs became read-only (Q5/Q6 revised), so a finding whose
+ * `location` still points at one tells the preparer where the problem *is* and not where
+ * to fix it — and nothing else fails when that happens, because a location naming a real
+ * tab is still a valid location. That silence is why this guard is behavioural rather
+ * than a code review note.
+ */
+describe('no data-health finding sends the preparer to a read-only report tab (FR-021a)', () => {
+  const READ_ONLY = ['rpti', 'lkpti'];
+
+  it('holds for a workspace whose every report-row check is tripped at once', () => {
+    const issues = computeDataHealth(baseInput({
+      assetCategories: [cat], assets: [asset], deliverables: [deliverable], programmes: [programme],
+      timelineSettings: { defaultCurrency: 'USD' },
+      initiatives: [{ id: 'init-1', name: 'Init One', programmeId: 'prog-1', assetId: 'asset-1',
+        startDate: '2027-01-01', endDate: '2027-12-31', capex: 0, opex: 0 }],
+      rptiDetails: [
+        // dangling initiative, dangling target, dangling segment, bare-Asset target,
+        // and a row missing every manual-only field.
+        { id: 'r-ghost-init', initiativeId: 'gone', targetType: 'deliverable', targetId: 'deliv-1', developmentType: 'new' },
+        { id: 'r-ghost-target', initiativeId: 'init-1', targetType: 'deliverable', targetId: 'gone', developmentType: 'new' },
+        { id: 'r-ghost-seg', initiativeId: 'init-1', targetType: 'deliverable', targetId: 'deliv-1',
+          developmentType: 'new', deliverableSegmentId: 'gone' },
+        { id: 'r-asset', initiativeId: 'init-1', targetType: 'asset', targetId: 'asset-1', developmentType: 'new' },
+      ] as never,
+      lkptiDetails: [
+        { id: 'l-ghost', targetId: 'gone' },
+        { id: 'l-bare', targetId: 'deliv-1' },
+      ] as never,
+    }));
+
+    // Guard: if the fixture stopped tripping checks this would pass vacuously.
+    expect(issues.length, 'guard: the fixture must actually produce findings').toBeGreaterThan(5);
+
+    const stranded = issues
+      .filter(i => i.location.view === 'data' && READ_ONLY.includes((i.location as { tab: string }).tab))
+      .map(i => `${i.id} → ${(i.location as { tab: string }).tab}`);
+    expect(stranded, 'these findings point at a tab the preparer cannot edit').toEqual([]);
   });
 });

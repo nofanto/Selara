@@ -60,7 +60,7 @@ it, and US3 adds the surface for maintaining them.
 - [x] T009 [P] [US1] Add failing tests to `src/lib/rptiImport.test.ts` asserting `remarks` lands on the `Initiative` as `rptiRemarks` and `ppjtiRelatedParty` on the `Deliverable`.
 - [x] T010 [P] [US1] Add failing tests to `src/lib/lkpti.test.ts` asserting `generateLkptiDetails` reads the eight attributes from the deliverable and emits them identically to today (contract 9).
 - [x] T011 [P] [US1] Add failing tests to `src/lib/rpti.test.ts` asserting `generateRptiDetails` reads `rptiRemarks` from the initiative and `ppjtiRelatedParty` from the deliverable (contracts 4, 5).
-- [ ] T012 [US1] Add a failing test in `src/lib/sampleReturns.test.ts` asserting an unreproducible row is named before a file is produced, and that repairing it makes the next generation reproduce it (contracts 12, 13 / FR-024, FR-025).
+- [x] T012 [US1] Add a failing test in `src/lib/sampleReturns.test.ts` asserting an unreproducible row is named before a file is produced, and that repairing it makes the next generation reproduce it (contracts 12, 13 / FR-024, FR-025).
 
 ### Implementation for User Story 1
 
@@ -117,11 +117,11 @@ gate is deliberately implemented with the Reports workflow in Phase 4 (T018).
 
 **Independent Test**: Edit each attribute on the Deliverables tab; regenerate; the value survives and data health sends you to the same place.
 
-- [ ] T027 [P] [US3] Add the eight columns to `deliverableColumns` and `rptiRemarks` to `initiativeColumns` in `src/components/DataManager.tsx`, sized by content per #44 — the Deliverables tab goes 10 → 18 columns.
-- [ ] T028 [US3] Repoint **every** data-health finding whose `location` is `tab('lkpti')` or `tab('rpti')` at the entity that now holds the value, updating both message and `location` (FR-018, FR-021a). Seven locations across eleven check kinds: `lkpti-duplicate-name`, `lkpti-golive-future`, `lkpti-golive-invalid`, `lkpti-incomplete`, `lkpti-target`, `lkpti-too-long`, `lkpti-untidy-text`, `rpti-incomplete`, `rpti-initiative`, `rpti-segment`, `rpti-target`. Once T026a lands, each of these sends the preparer to a screen where nothing can be fixed — this is the task most easily missed, because none of them fail a test today.
-- [ ] T028a [US3] Rewrite the `rpti-target` finding for source-side repair (FR-021b). Today it reads "An RPTI row for X points at a deliverable that no longer exists" and is fixed by editing the Target dropdown in the read-only-to-be RPTI tab. It must instead name the application the filed plan refers to and direct the preparer to create or correct it on the Deliverables tab, which is what makes the next generation reproduce the row. Without this, FR-025 — repairing what data health flags is sufficient — has no remaining repair path.
-- [ ] T029 [P] [US3] Add nine explicit field comparisons to `diff.ts` — eight on `Deliverable`, one on `Initiative` — with a test that each appears in the difference report. `compareEntities` is generic over entities, not fields, so an unlisted field changes silently ([#42](https://github.com/nofanto/Selara/issues/42)).
-- [ ] T030 [P] [US3] Assert the workspace export/import round trip carries the new fields with no change to `excel.ts` (contract 21) — verify rather than assume.
+- [x] T027 [P] [US3] Add the eight columns to `deliverableColumns` and `rptiRemarks` to `initiativeColumns` in `src/components/DataManager.tsx`, sized by content per #44 — the Deliverables tab goes 10 → 18 columns.
+- [x] T028 [US3] Repoint **every** data-health finding whose `location` is `tab('lkpti')` or `tab('rpti')` at the entity that now holds the value, updating both message and `location` (FR-018, FR-021a). Seven locations across eleven check kinds: `lkpti-duplicate-name`, `lkpti-golive-future`, `lkpti-golive-invalid`, `lkpti-incomplete`, `lkpti-target`, `lkpti-too-long`, `lkpti-untidy-text`, `rpti-incomplete`, `rpti-initiative`, `rpti-segment`, `rpti-target`. Once T026a lands, each of these sends the preparer to a screen where nothing can be fixed — this is the task most easily missed, because none of them fail a test today.
+- [x] T028a [US3] Rewrite the `rpti-target` finding for source-side repair (FR-021b). Today it reads "An RPTI row for X points at a deliverable that no longer exists" and is fixed by editing the Target dropdown in the read-only-to-be RPTI tab. It must instead name the application the filed plan refers to and direct the preparer to create or correct it on the Deliverables tab, which is what makes the next generation reproduce the row. Without this, FR-025 — repairing what data health flags is sufficient — has no remaining repair path.
+- [x] T029 [P] [US3] Add nine explicit field comparisons to `diff.ts` — eight on `Deliverable`, one on `Initiative` — with a test that each appears in the difference report. `compareEntities` is generic over entities, not fields, so an unlisted field changes silently ([#42](https://github.com/nofanto/Selara/issues/42)).
+- [x] T030 [P] [US3] Assert the workspace export/import round trip carries the new fields with no change to `excel.ts` (contract 21) — verify rather than assume.
 
 **Checkpoint**: Attributes are editable, diffed, and exported in one place.
 
@@ -133,8 +133,8 @@ gate is deliberately implemented with the Reports workflow in Phase 4 (T018).
 
 **Independent Test**: Import with 2026/2027, then generate; those years are what is offered.
 
-- [ ] T031 [US4] Retain both onboarding years in `src/App.tsx` so generation can offer them, replacing their current use as banner text only.
-- [ ] T032 [US4] Pass the LKPTI year through to `deriveWorkspaceFromLkptiImport`, which takes only rows today, so the imported inventory records when it was true.
+- [x] T031 [US4] Retain both onboarding years in `src/App.tsx` so generation can offer them, replacing their current use as banner text only.
+- [x] T032 [US4] Pass the LKPTI year through to `deriveWorkspaceFromLkptiImport`, which takes only rows today, so the imported inventory records when it was true.
 
 **Checkpoint**: All four stories functional.
 
@@ -144,14 +144,14 @@ gate is deliberately implemented with the Reports workflow in Phase 4 (T018).
 
 **Purpose**: What the lifecycle requires for a data-model change.
 
-- [ ] T033 [P] Write an ADR in `docs/adr/` recording the field moves, the rejected child-store option, why no IndexedDB version bump is needed, and the LKPTI membership change. Add it to the ADR index.
-- [ ] T034 [P] Update `docs/database-diagram.md` with the nine fields across two entities.
-- [ ] T035 [P] Update `requirement-specs/lkpti-integration.md` — the as-at rule replaces "has ever gone live".
-- [ ] T036 [P] Mark Q1–Q3 as implemented in `requirement-specs/report-rows-as-projections.md`, and Q5/Q6 as superseded by the read-only decision recorded there on 2026-09-18.
-- [ ] T037 [P] Update `docs/user-guide/` — the Reports menu now asks for a year, and the eight attributes are recorded on the application rather than on the LKPTI row. Three lines become actively wrong and must change, not merely be extended: `14-rpti-report/recording-an-rpti-row.md:5` and `:44` ("Edit any cell inline, the same as any other Data Manager table" — the sharpest, since it instructs an edit that no longer reaches the filing) and `15-lkpti-report/recording-lkpti-rows.md:5`. Also revise `15-lkpti-report/importing-an-lkpti-report.md:27`, which describes a Generate button that no longer exists.
-- [ ] T038 **Release note** in the PR description and `docs/adr/` entry from T033: a decommissioned application will drop out of the generated LKPTI. Correct, previously intended, but a behaviour change that must be stated rather than shipped quietly (research.md R2). The note must also state the second behaviour change: both Data Manager report tabs become read-only and generation moves to Reports.
-- [ ] T039 Run `quickstart.md` levels 1–7, including the 300-application scale check and the #44 column-clipping harness.
-- [ ] T040 Full verification: `npm run test:unit`, `npx playwright test`, `npx eslint .` at 0 errors, `npx tsc --noEmit` at no more than the 1 known baseline error.
+- [x] T033 [P] Write an ADR in `docs/adr/` recording the field moves, the rejected child-store option, why no IndexedDB version bump is needed, and the LKPTI membership change. Add it to the ADR index.
+- [x] T034 [P] Update `docs/database-diagram.md` with the nine fields across two entities.
+- [x] T035 [P] Update `requirement-specs/lkpti-integration.md` — the as-at rule replaces "has ever gone live".
+- [x] T036 [P] Mark Q1–Q3 as implemented in `requirement-specs/report-rows-as-projections.md`, and Q5/Q6 as superseded by the read-only decision recorded there on 2026-09-18.
+- [x] T037 [P] Update `docs/user-guide/` — the Reports menu now asks for a year, and the eight attributes are recorded on the application rather than on the LKPTI row. Three lines become actively wrong and must change, not merely be extended: `14-rpti-report/recording-an-rpti-row.md:5` and `:44` ("Edit any cell inline, the same as any other Data Manager table" — the sharpest, since it instructs an edit that no longer reaches the filing) and `15-lkpti-report/recording-lkpti-rows.md:5`. Also revise `15-lkpti-report/importing-an-lkpti-report.md:27`, which describes a Generate button that no longer exists.
+- [x] T038 **Release note** *(ADR half done — see "Behaviour changes a preparer will notice" in `docs/adr/0013-report-rows-as-projections.md`; the PR-description half lands when the PR is opened.)* — original: **Release note** in the PR description and `docs/adr/` entry from T033: a decommissioned application will drop out of the generated LKPTI. Correct, previously intended, but a behaviour change that must be stated rather than shipped quietly (research.md R2). The note must also state the second behaviour change: both Data Manager report tabs become read-only and generation moves to Reports.
+- [x] T039 Run `quickstart.md` levels 1–7, including the 300-application scale check and the #44 column-clipping harness.
+- [x] T040 Full verification *(run clean 2026-09-19: unit exit 0 / 380 tests, Playwright exit 0 — 666 passed, 4 skipped, 0 failed, 0 flaky; eslint exit 0; tsc at the 1 known `excel.ts` baseline error)*:  `npm run test:unit`, `npx playwright test`, `npx eslint .` at 0 errors, `npx tsc --noEmit` at no more than the 1 known baseline error.
 
 ---
 

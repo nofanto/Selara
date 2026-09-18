@@ -218,16 +218,22 @@ export interface DerivedLkptiWorkspace {
 // an ongoing live segment (see src/demoData.ts) rather than inventing a null-endDate concept.
 const OPEN_ENDED_YEARS_OUT = 5;
 
-function openEndedDate(): string {
-  const year = new Date().getUTCFullYear() + OPEN_ENDED_YEARS_OUT;
-  return `${year}-12-31`;
+// Anchored to the year the preparer stated the return covers, never to the clock.
+// Reading `new Date()` here meant the same filed return imported in 2026 and in 2030
+// produced different workspaces from identical input (T032).
+function openEndedDate(asAtYear: number): string {
+  return `${asAtYear + OPEN_ENDED_YEARS_OUT}-12-31`;
 }
 
 /**
  * Derives a starter workspace from parsed LKPTI rows — see
  * requirement-specs/lkpti-import-onboarding.md §2-5.
  */
-export function deriveWorkspaceFromLkptiImport(rows: LkptiImportRow[]): DerivedLkptiWorkspace {
+export function deriveWorkspaceFromLkptiImport(
+  rows: LkptiImportRow[],
+  /** The year the filed return states it covers — required, so no caller can infer it. */
+  asAtYear: number,
+): DerivedLkptiWorkspace {
   const assetCategories: AssetCategory[] = [];
   const categoryIdByCode = new Map<string, string>();
   const assets: Asset[] = [];
@@ -305,7 +311,7 @@ export function deriveWorkspaceFromLkptiImport(rows: LkptiImportRow[]): DerivedL
       id: `lkpti-import-seg-${n}`,
       deliverableId,
       startDate: row.goLiveDateIso,
-      endDate: openEndedDate(),
+      endDate: openEndedDate(asAtYear),
       status: liveStatus.id,
     });
 

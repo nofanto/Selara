@@ -472,3 +472,57 @@ describe('computeDiff — entity identity', () => {
     expect(diff.dependencies.modified[0].deliverable).toBeUndefined();
   });
 });
+
+/**
+ * T029 / FR-019, and the reason [#42](https://github.com/nofanto/Selara/issues/42) exists:
+ * `compareEntities` is generic over *entities*, not over their fields. A field nobody
+ * names in the comparator changes with no entry in version history and no error — the
+ * quietest failure in the codebase. ADR-0013 moved nine fields onto Deliverable and
+ * Initiative, so nine names had to be added; this asserts each one individually rather
+ * than trusting that they were.
+ */
+describe('the fields ADR-0013 moved are visible in version history (#42)', () => {
+  const DELIVERABLE_FIELDS: [string, string, string][] = [
+    ['platform', 'Linux RHEL 8', 'Linux RHEL 9'],
+    ['database', 'Oracle 19c', 'PostgreSQL 16'],
+    ['dcProvider', 'self', 'PT Telkom Sigma'],
+    ['drcProvider', 'self', 'PT Lintasarta'],
+    ['backupStrategy', 'BACKUP_PERIODIC', 'HA_ACTIVE_PASSIVE'],
+    ['systemOwner', 'Retail Banking', 'Digital Channels'],
+    ['ownership', 'LEASE', 'OUTRIGHT_PURCHASE'],
+    ['developer', 'inhouse', 'PT Anabatic Technologies'],
+    ['ppjtiRelatedParty', 'no', 'yes'],
+  ];
+
+  it.each(DELIVERABLE_FIELDS)('reports a change to Deliverable.%s', (field, before, after) => {
+    const base = makeVersion({
+      assets: [{ id: 'asset-1', name: 'Core', categoryId: 'cat-1' }],
+      deliverables: [{ id: 'deliv-1', assetId: 'asset-1', name: 'Payment Gateway', [field]: before } as never],
+    });
+    const current = {
+      ...base.data,
+      deliverables: [{ id: 'deliv-1', assetId: 'asset-1', name: 'Payment Gateway', [field]: after } as never],
+    };
+
+    const modified = (computeDiff(base, current) as never as Record<string, { modified: { changes: string[] }[] }>).deliverables.modified;
+    expect(modified, `Deliverable.${field} changed but produced no diff entry`).toHaveLength(1);
+    expect(modified[0].changes.join(' | '), `the entry must name the new value of ${field}`).toContain(after);
+  });
+
+  it('reports a change to Initiative.rptiRemarks, distinctly from description', () => {
+    const base = makeVersion({
+      assets: [{ id: 'asset-1', name: 'Core', categoryId: 'cat-1' }],
+      initiatives: [{ id: 'init-1', name: 'Upgrade', programmeId: 'prog-1', assetId: 'asset-1',
+        startDate: '2027-01-01', endDate: '2027-12-31', capex: 0, opex: 0,
+        description: 'Deskripsi text', rptiRemarks: 'Phase one only' } as never],
+    });
+    const current = {
+      ...base.data,
+      initiatives: [{ ...(base.data.initiatives[0] as object), rptiRemarks: 'Deferred to phase two' } as never],
+    };
+
+    const modified = (computeDiff(base, current) as never as Record<string, { modified: { changes: string[] }[] }>).initiatives.modified;
+    expect(modified, 'Initiative.rptiRemarks changed but produced no diff entry').toHaveLength(1);
+    expect(modified[0].changes.join(' | ')).toContain('Deferred to phase two');
+  });
+});
