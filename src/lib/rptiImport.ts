@@ -28,7 +28,7 @@ export const RPTI_IMPORT_HEADERS = [
 /**
  * The five codes that describe infrastructure rather than an application.
  * RPTI carries both; LKPTI (Daftar Aplikasi) carries only applications, which is
- * why `generateLkptiDetails` filters by type and `generateRptiDetails` must not.
+ * why `generateLkptiDetails` filters by type and `projectRptiReturn` must not.
  */
 const INFRASTRUCTURE_CODES = new Set<string>(['51', '52', '53', '54', '99']);
 

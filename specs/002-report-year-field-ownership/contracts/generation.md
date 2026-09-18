@@ -2,15 +2,17 @@
 
 The interfaces this feature exposes. Each numbered item is a property a test can hold.
 
-## `generateRptiDetails(input, reportYear)`
+## `projectRptiReturn(input, reportYear)`
 
-Unchanged in shape — it already takes the year. What changes is who supplies it and what the
-caller does with the result.
+*(Renamed from `generateRptiDetails` per Q11 of `requirement-specs/report-rows-as-projections.md`:
+the old signature carried an optional `existingDetails`, and one caller used it — a 2027 plan line
+appeared inside a 2026 filing. The input type now cannot name stored rows at all.)*
 
 1. **The year is always supplied by a person's answer**, directly or as a default they saw and
    accepted. No caller may pass `new Date().getFullYear()` as a silent fallback.
-2. **Output is a function of `(workspace, reportYear)` only.** Same inputs, same rows. Already
-   true; must stay true, because it is what makes a return reproducible.
+2. **Output is a function of the canonical planning entities and `reportYear` only.** Stored
+   report rows are not an input and cannot become members of the return; passing them is a
+   compile error, asserted with `@ts-expect-error`, not merely discouraged.
 3. **Generating does not mutate the workspace.** Reports derives a transient result for display
    and export; no Data Manager generation path remains.
 4. **`remarks` comes from the initiative**, not from a stored row, and must appear in the
@@ -68,3 +70,20 @@ Gains a parameter. This is the behavioural change of the feature.
     and export path (FR-021).
 21. **The workspace export/import round trip carries the new fields** with no change to
     `excel.ts` — `flatten()` is generic. Asserted, not assumed.
+
+## `reconcileRptiReturn(input)` — stored rows are evidence, not output (Q11)
+
+22. **It returns findings, not rows.** Each finding carries a reason code, a message naming a
+    source-side repair, and the stored row as evidence. Nothing of its output may be concatenated
+    into a return or an export.
+23. **The two axes stay independent.** A stored row reproducible in some year other than the
+    selected one produces **no** finding — absence from the selected year is correct, not a
+    defect. A row the source model cannot reproduce in *any* year (bare-Asset target, dangling
+    initiative or deliverable, or an (initiative, target) pair with no qualifying segment) always
+    produces one, and the Reports pre-export gate blocks until it is repaired.
+24. **Global is the honest scope.** `RptiDetail` has no report year and none may be inferred
+    (quarter, id suffix, segment link), so findings are stated per workspace, not per year: an
+    unreproducible row blocks every year's export. Exact selected-year attribution is deferred to
+    option 5 (see `merge-path-options.md`); no anchor may be invented to fake it.
+25. **Reconciliation is read-only.** It never mutates the stored rows or the entities, asserted
+    by a unit test on frozen inputs.

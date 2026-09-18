@@ -10,7 +10,7 @@ import { AssetPanel } from './AssetPanel';
 import { RptiReportView } from './RptiReportView';
 import { LkptiReportView } from './LkptiReportView';
 import { DataHealthReportView } from './DataHealthReportView';
-import { generateRptiDetails } from '../lib/rpti';
+import { projectRptiReturn, reconcileRptiReturn } from '../lib/rpti';
 import { generateLkptiDetails } from '../lib/lkpti';
 import { computeDataHealth } from '../lib/dataHealth';
 
@@ -155,9 +155,10 @@ export function ReportsView({ assets, initiatives, milestones, dependencies, cur
 
   const generateRptiReport = () => {
     if (!rptiYear) return;
-    setGeneratedRptiDetails(generateRptiDetails({
+    // Pure selected-year projection (issue #40, contract 2): the input type cannot
+    // carry the stored rows, so nothing filed can join the return silently.
+    setGeneratedRptiDetails(projectRptiReturn({
       deliverableSegments, deliverableStatuses, initiatives, deliverables, assets, assetCategories,
-      existingDetails: rptiDetails,
     }, rptiYear));
   };
   const generateLkptiReport = () => {
@@ -167,13 +168,26 @@ export function ReportsView({ assets, initiatives, milestones, dependencies, cur
       assets, assetCategories, existingDetails: lkptiDetails,
     }));
   };
+  // Pre-export gate = source diagnostics + reconciliation of the stored rows against
+  // the source model (option 1). The projection itself is never the evidence: stored
+  // rows may block an export by being unreproducible, but they enter the return only
+  // as projections of the canonical entities (requirement-specs/report-rows-as-projections.md Q11).
+  const rptiReconciliationFindings = generatedRptiDetails
+    ? reconcileRptiReturn({
+        storedDetails: rptiDetails, initiatives, deliverables,
+        deliverableSegments, deliverableStatuses,
+      })
+    : [];
   const rptiPreExportIssues = generatedRptiDetails
-    ? computeDataHealth({
-        assets, assetCategories, deliverables, deliverableSegments, deliverableStatuses,
-        initiatives, milestones, dependencies, decisions: currentData.decisions ?? [], resources,
-        programmes, strategies, rptiDetails: generatedRptiDetails, lkptiDetails,
-        timelineSettings: currentData.timelineSettings,
-      }).filter(issue => issue.severity === 'error' && (issue.entityType === 'RptiDetail' || issue.id.startsWith('initiative-rpti-'))).map(issue => issue.message)
+    ? [
+        ...computeDataHealth({
+          assets, assetCategories, deliverables, deliverableSegments, deliverableStatuses,
+          initiatives, milestones, dependencies, decisions: currentData.decisions ?? [], resources,
+          programmes, strategies, rptiDetails: generatedRptiDetails, lkptiDetails,
+          timelineSettings: currentData.timelineSettings,
+        }).filter(issue => issue.severity === 'error' && (issue.entityType === 'RptiDetail' || issue.id.startsWith('initiative-rpti-'))).map(issue => issue.message),
+        ...rptiReconciliationFindings.map(finding => finding.message),
+      ]
     : [];
 
   const cards: { slug: ReportSlug; icon: React.ReactNode; title: string; description: string }[] = [

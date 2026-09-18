@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { parseLkptiImportWorkbook, deriveWorkspaceFromLkptiImport } from './lkptiImport';
 import { parseRptiImportWorkbook, deriveWorkspaceFromRptiImport } from './rptiImport';
 import { generateLkptiDetails } from './lkpti';
-import { generateRptiDetails, resolveCost } from './rpti';
+import { projectRptiReturn, resolveCost } from './rpti';
 import { mergeDeliverableStatuses } from './deliverableStatusDefaults';
 
 const load = (n: string) =>
@@ -106,7 +106,7 @@ describe('SC-001: a generated return reproduces the imported one', () => {
   it('RPTI: every value the filed return supplied survives regeneration', () => {
     const { rptiSource, out, workspace } = importedWorkspace();
 
-    const regenerated = generateRptiDetails({ ...workspace, existingDetails: [] } as never, REPORT_YEAR);
+    const regenerated = projectRptiReturn(workspace as never, REPORT_YEAR);
     const unresolved = new Set(out.unresolved.map(u => u.name));
     const byName = new Map(
       regenerated.map(r => [workspace.deliverables.find(d => d.id === r.targetId)?.name, r]),

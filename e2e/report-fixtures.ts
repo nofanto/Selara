@@ -46,3 +46,17 @@ export async function exportedReportText(page: Page, report: 'rpti' | 'lkpti') {
   const workbook = XLSX.read(fs.readFileSync(file), { type: 'buffer' });
   return XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1 }).flat().join(' | ');
 }
+
+/** Read a store straight out of IndexedDB, to prove what generation did or did not write. */
+export async function readStore(page: Page, store: string): Promise<Record<string, unknown>[]> {
+  return page.evaluate((store) => new Promise<Record<string, unknown>[]>((resolve, reject) => {
+    const request = indexedDB.open('it-initiative-visualiser');
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const db = request.result;
+      const all = db.transaction(store, 'readonly').objectStore(store).getAll();
+      all.onsuccess = () => { db.close(); resolve(all.result as Record<string, unknown>[]); };
+      all.onerror = () => { db.close(); reject(all.error); };
+    };
+  }), store);
+}

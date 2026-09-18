@@ -3,7 +3,7 @@ import * as XLSX from 'xlsx';
 import { readFileSync } from 'node:fs';
 import { parseLkptiImportWorkbook, deriveWorkspaceFromLkptiImport } from './lkptiImport';
 import { parseRptiImportWorkbook, deriveWorkspaceFromRptiImport } from './rptiImport';
-import { generateRptiDetails } from './rpti';
+import { projectRptiReturn } from './rpti';
 import { mergeDeliverableStatuses } from './deliverableStatusDefaults';
 
 const load = (n: string) => XLSX.read(readFileSync(new URL(`../../docs/sample-data/${n}`, import.meta.url)), { type: 'buffer' });
@@ -93,7 +93,7 @@ describe('a planned enhancement to an application the bank already runs', () => 
 
     expect(w.out.rptiDetails.find(r => r.targetId === pg.id)?.developmentType).toBe('upgrade');
 
-    const regen = generateRptiDetails({
+    const regen = projectRptiReturn({
       deliverableSegments: w.deliverableSegments, deliverableStatuses: w.deliverableStatuses,
       initiatives: w.out.initiatives, deliverables: w.deliverables,
       assets: w.assets, assetCategories: w.assetCategories,
@@ -107,7 +107,7 @@ describe('a planned enhancement to an application the bank already runs', () => 
 
   it('keeps the three new applications classified as new', () => {
     const w = merged();
-    const regen = generateRptiDetails({
+    const regen = projectRptiReturn({
       deliverableSegments: w.deliverableSegments, deliverableStatuses: w.deliverableStatuses,
       initiatives: w.out.initiatives, deliverables: w.deliverables,
       assets: w.assets, assetCategories: w.assetCategories,
@@ -173,7 +173,7 @@ describe('the sample plan upgrades infrastructure the LKPTI cannot hold', () => 
     const dc = out.deliverables.find(d => d.name === 'Primary Data Center Jakarta');
     expect(dc?.type).toBe('infrastructure');
 
-    const regen = generateRptiDetails({
+    const regen = projectRptiReturn({
       deliverableSegments: [...inv.deliverableSegments, ...out.deliverableSegments],
       deliverableStatuses: mergeDeliverableStatuses(inv.deliverableStatuses, out.deliverableStatuses),
       initiatives: out.initiatives,

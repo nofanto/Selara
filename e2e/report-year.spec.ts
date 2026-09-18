@@ -1,4 +1,4 @@
-import { seedReportRecords, reportFixture, generateReport } from './report-fixtures';
+import { seedReportRecords, reportFixture, generateReport, readStore } from './report-fixtures';
 import { expect, test } from '@playwright/test';
 
 test.describe('Report year', () => {
@@ -103,6 +103,59 @@ test.describe('Report year', () => {
       await expect(table).toContainText(value);
     }
     await expect(table.locator('input, select, textarea')).toHaveCount(0);
+  });
+
+  // Issue #40, option 1 + 3. The projection must be pure, and reconciliation must be
+  // explicit: a valid 2027 row absent from a 2026 return is correct (no finding), while
+  // an unreproducible stored row is named as a finding and never carried into the return.
+  test('generating 2026 omits the 2027 plan line and names the unreproducible stored row instead of carrying it', async ({ page }) => {
+    await seedReportRecords(page, {
+      ...reportFixture,
+      deliverableSegments: [{ ...reportFixture.deliverableSegments[0], startDate: '2027-03-15', endDate: '2027-12-31' }],
+      rptiDetails: [
+        { id: 'rpti-gen-filing-initiative-filing-deliverable-2027', initiativeId: 'filing-initiative',
+          targetType: 'deliverable', targetId: 'filing-deliverable', developmentType: 'new',
+          plannedImplementationQuarter: 'Q1', deliverableSegmentId: 'filing-segment' },
+        { id: 'ghost-row', initiativeId: 'ghost-initiative', targetType: 'deliverable',
+          targetId: 'ghost-deliverable', developmentType: 'upgrade' },
+      ],
+    }, ['initiatives', 'deliverables', 'deliverableSegments', 'rptiDetails']);
+
+    await generateReport(page, 'rpti', '2026');
+    await expect(page.getByTestId('rpti-report-view')).toContainText('2026');
+    // The 2027 line stays out of the 2026 filing — under the old merge it was carried in.
+    await expect(page.getByTestId('rpti-detail-table')).toHaveCount(0);
+    await expect(page.getByText(/no rpti rows recorded yet/i)).toBeVisible();
+    // The unreproducible row is reconciliation evidence, surfaced as a named repair...
+    await expect(page.getByTestId('rpti-pre-export-gate')).toContainText(/no longer exists/i);
+    await expect(page.getByTestId('rpti-report-export-btn')).toHaveCount(0);
+
+    // ...and generating its own year shows the 2027 line with no finding about it.
+    await generateReport(page, 'rpti', '2027');
+    await expect(page.getByTestId('rpti-detail-table')).toContainText('Filing Application');
+    // The ghost row's repair still blocks: option 1's gate is global, not selected-year.
+    await expect(page.getByTestId('rpti-pre-export-gate')).toContainText(/no longer exists/i);
+  });
+
+  // Contract 3 / FR-021. The whole model rests on Reports deriving a transient result:
+  // if generating quietly rewrote the stored rows, the "read-only" tabs would still be
+  // changing underneath the preparer, just without a visible editor.
+  test('generating a filing from Reports leaves the stored rows untouched', async ({ page }) => {
+    const stored = {
+      id: 'stored-untouched', initiativeId: 'filing-initiative', targetType: 'deliverable',
+      targetId: 'filing-deliverable', categoryCode: '06', developmentType: 'upgrade',
+      plannedImplementationQuarter: 'Q4', remarks: 'Stored wording, not the initiative\'s',
+    };
+    await seedReportRecords(page, { ...reportFixture, rptiDetails: [stored] });
+
+    const before = await readStore(page, 'rptiDetails');
+    expect(before, 'guard: the row must actually be stored, or this asserts nothing').toHaveLength(1);
+
+    await generateReport(page, 'rpti', '2026');
+    await expect(page.getByTestId('rpti-report-view')).toContainText('2026');
+
+    expect(await readStore(page, 'rptiDetails'),
+      'generating from Reports must not write to the stored rows').toEqual(before);
   });
 
   test('keeps imported report rows readable but does not offer report-row edits in Data Manager', async ({ page }) => {

@@ -121,7 +121,7 @@ At onboarding the preparer states which year each uploaded return covers — an 
 **Round-trip fidelity**
 
 - **FR-023**: Importing a return and generating it back for the same year MUST reproduce every value the return supplied, for rows that the workspace can reproduce at all.
-- **FR-024**: Where a row cannot be reproduced, the preparer MUST be told before the return is produced, and told what to repair. A filed row MUST NOT be silently absent from a generated return.
+- **FR-024**: Where a row cannot be reproduced, the preparer MUST be told before the return is produced, and told what to repair. A filed row MUST NOT be silently absent from a generated return. *(Revised 2026-09-18 per Q11: "told" means a reconciliation **finding** on the pre-export gate — stored rows are never carried into the return to make themselves visible, because that carry was #40's defect. A row reproducible only in another year is correctly absent and is not reported; a row the source model cannot reproduce in any year blocks every year's export until repaired, because no report year can be attributed to a stored row.)*
 - **FR-025**: Repairing what the data-health review flags MUST be sufficient to make the round trip faithful. Nothing MUST require the preparer to re-key a value the return already supplied.
 - **FR-026**: The system MUST NOT be required to hold a copy of what was imported. Confirming that a generated return matches the filed one is the preparer's own comparison, against the file they still have — they exported it from OJK's process and it does not stop existing when it is imported.
 - **FR-027**: Because that comparison is manual, the system MUST make the differences it *can* detect loud rather than leaving all of them to the reader — FR-024 is what carries this, and it matters more than it would if the tool verified the round trip itself.
@@ -182,7 +182,7 @@ At onboarding the preparer states which year each uploaded return covers — an 
 ## Dependencies
 
 - [#40](https://github.com/nofanto/Selara/issues/40) — this specification implements it.
-- `requirement-specs/report-rows-as-projections.md` — Q1, Q2, Q3 fix where each field goes; Q4 defers migration; Q5/Q6 keep both tabs unchanged. These are settled and are not re-opened here.
+- `requirement-specs/report-rows-as-projections.md` — Q1, Q2, Q3 fix where each field goes; Q4 defers migration; Q5/Q6 keep both tabs unchanged. Q11 (decided 2026-09-18) makes the RPTI path a pure projection with a separate reconciliation gate, closing #40's year-leak defect. These are settled and are not re-opened here.
 - [#42](https://github.com/nofanto/Selara/issues/42) — version history compares only listed fields, so FR-016 is a real requirement rather than an assumption.
 - [#38](https://github.com/nofanto/Selara/issues/38) — the unresolved imported row that FR-020 must keep alive.
 

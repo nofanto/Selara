@@ -543,3 +543,77 @@ multi-deliverable history falsely rejects an explicitly declared, unambiguous ta
 Acceptance: regression tests cover the shipped demo, unambiguous application/infrastructure
 inference, ambiguous and missing targets, explicit target precedence, and the pre-export
 repair gate. Stored rows remain readable in Data Manager; report edits belong on entities.
+
+## Q11 — The Reports path is a pure projection; stored rows are reconciliation evidence (decided 2026-09-18)
+
+**Decided: option 3 + option 1 of `specs/002-report-year-field-ownership/merge-path-options.md`.**
+`generateRptiDetails(input, reportYear)` — which accepted an optional `existingDetails` and ran
+`mergeWithExisting` over its result — is removed. In its place:
+
+- **`projectRptiReturn(input, reportYear)`** — the projection, whose input type
+  (`ProjectRptiInput`) has no `existingDetails` key. Reports calls this. Handing stored
+  rows to the projection is a **compile error**, asserted by a `@ts-expect-error` test in
+  `src/lib/rpti.test.ts`, so the fix cannot be bypassed by convenience at a call site.
+- **`reconcileRptiReturn(input)`** — the gate's other half. It compares stored rows against
+  the source model and returns **findings** (typed `RptiReconciliationFinding`, reason codes
+  `asset-target | missing-initiative | missing-target | unanchored`, each naming a source-side
+  repair), never rows. The gate may display `finding.row` as evidence; the row enters neither
+  the return nor the export.
+
+**The defect this closes (#40):** `ReportsView.tsx` passed stored `rptiDetails` as
+`existingDetails`, so `mergeWithExisting` carried every unmatched stored row into the selected-year
+return — measured: a workspace whose only segments sit in 2027, generated for 2026, returned a row
+`rpti-gen-i1-d1-2027`. A 2027 plan line inside a 2026 filing was contract 2 (`generation.md`)
+broken in the shipped path.
+
+**The rule the reconciler encodes — the two axes are independent.** Selected-year membership and
+reproducibility are different questions: a valid 2027 row absent from a 2026 projection is
+*correct* and produces no finding; an asset-target, dangling-reference, or permanently-unanchored
+row is unreproducible *in any year* and blocks until repaired. Derivability is therefore tested
+across all years (resolve the initiative's Q10 target; require one qualifying-status segment on
+that (initiative, target) pair), never against the selected year's output.
+
+**The merge is deleted, not renamed.** `regenerateStoredRptiRows` (the analysis's name for a
+preserved merge API) has no caller to preserve it for: DataManager's Generate buttons left in
+the read-only revision (Q5/Q6), Reports was the only production caller, and Reports must not
+merge. The v2 safety net the merge provided — unreproduced rows surviving with filed values —
+is replaced by the gate: the row stays visible in Data Manager, and its absence from the return
+is now *loud* (FR-024) instead of papered over by carrying it.
+
+**The accepted honesty limit.** `RptiDetail` carries no report year and one cannot be inferred: a
+quarter is not a year, generated-id suffixes are not a contract, and `deliverableSegmentId` is
+absent in exactly the unresolved cases that matter. So findings are global — an unreproducible
+row blocks *every* year's export until repaired — and messages say "no filing year can reproduce"
+rather than naming a year the data cannot support. Precise selected-year attribution is the job of
+the deferred option 5 (a year-bearing unreconciled-row ledger at import time); it is explicitly
+not built here.
+
+**Verified, not assumed — LKPTI has no equivalent hazard.** `generateLkptiDetails` does take
+`existingDetails`, but its row membership is purely derived: a deliverable live as at the as-at
+date is in, everything else is out "even if an existing row was present for it" (pinned by a unit
+test in `src/lib/lkpti.test.ts`). `existingDetails` there only refreshes values *on a row whose
+membership already holds* (its id and pre-lift manual attributes) — a cascade, per ADR-0010, not a
+carry. No foreign row can enter an LKPTI return, so no projection-only API is imposed on it.
+
+**Rejected (full analysis in `merge-path-options.md`):**
+- **Option 2, year-scoped preservation merge** — requires authoritative year provenance the type
+  does not have; the metadata-free version (guess the year from segment, id suffix, or quarter) is
+  the same inference this decision rules out, and it keeps the return a union rather than a
+  projection.
+- **Option 4, filing/import snapshots** — the right long-term shape for reconciling a whole prior
+  filing, but a new persisted concept with baseline-selection UX; heavier than this defect needs.
+- **Option 5, unreconciled-row ledger** — deferred, not refused: it is what later fixes exact
+  year attribution and import-time completeness. Building ledger + gate now would design the gate
+  twice.
+- **Leaving `existingDetails` optional on `projectRptiReturn` "for now"** — the analysis's trap
+  warning: an `Omit` wrapper over an API that still accepts stored rows is cosmetic. The whole
+  point of option 3 is that the projection's input *cannot* carry them.
+- **Branding projected vs stored row types** (the analysis's "stronger variant") — deferred;
+  `RptiDetail` flows through DataManager, diff, excel and the exporter, and the input-type split
+  already makes the observed defect uncompilable. Revisit if a caller ever constructs stored rows
+  from projection output.
+
+**Consequences:** contract 2 of `generation.md` is restored and restated with explicit
+reconciliation contracts (22–25); the pre-export gate in `ReportsView.tsx` is
+source diagnostics + `reconcileRptiReturn` findings, never merge residue; `rpti-auto-generation.md`
+records the merge as v2, superseded.

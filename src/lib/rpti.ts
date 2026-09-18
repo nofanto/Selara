@@ -101,19 +101,20 @@ export function resolveRptiTarget(
   return deliverables.some(deliverable => deliverable.id === target) ? target : undefined;
 }
 
-export interface GenerateRptiDetailsInput {
+/**
+ * The complete input of the projection. Deliberately has no `existingDetails` key:
+ * issue #40's defect was exactly one caller being able to hand stored rows to a
+ * return that is supposed to be derived, so the type that could carry them is gone.
+ * (See requirement-specs/report-rows-as-projections.md Q11 — passing stored rows to
+ * the projection is now a compile error, asserted by a @ts-expect-error test.)
+ */
+export interface ProjectRptiInput {
   deliverableSegments: DeliverableSegment[];
   deliverableStatuses: DeliverableStatus[];
   initiatives: Initiative[];
   deliverables: Deliverable[];
   assets: Asset[];
   assetCategories: AssetCategory[];
-  /**
-   * Rows already in the workspace. Supplying them makes generation merge-preserving
-   * instead of wipe-and-rebuild; omitting them keeps the old behaviour of returning
-   * only what could be generated.
-   */
-  existingDetails?: RptiDetail[];
 }
 
 // Resolves the AssetCategory backing a Deliverable's auto-fill defaults, via
@@ -128,18 +129,19 @@ export function resolveAssetCategory(
 }
 
 /**
- * Generates RptiDetail rows for a single report year from DeliverableSegment data —
- * see requirement-specs/rpti-auto-generation.md for the row-generation rule and
- * requirement-specs/rpti-auto-fill-improvements.md for the categoryCode/developer/
- * location auto-fill rules below. Wipe-and-rebuild: callers replace the existing
- * rptiDetails for the year with this function's output, there's no reconciliation
- * with prior manual edits (v1).
+ * Projects the RPTI return for a single report year from the workspace's canonical
+ * planning entities — see requirement-specs/rpti-auto-generation.md for the
+ * row-generation rule and requirement-specs/rpti-auto-fill-improvements.md for the
+ * categoryCode/developer/location auto-fill rules below. The output is a function of
+ * `(input, reportYear)` alone: stored report rows cannot enter it (issue #40,
+ * contract 2), and what it cannot reproduce is named by `reconcileRptiReturn`, not
+ * silently carried.
  */
-export function generateRptiDetails(
-  input: GenerateRptiDetailsInput,
+export function projectRptiReturn(
+  input: ProjectRptiInput,
   reportYear: number,
 ): RptiDetail[] {
-  const { deliverableSegments, deliverableStatuses, initiatives, deliverables, assets, assetCategories, existingDetails = [] } = input;
+  const { deliverableSegments, deliverableStatuses, initiatives, deliverables, assets, assetCategories } = input;
 
   // Overlap, not "starts in": a segment qualifies if any part of its
   // [startDate, endDate] range falls within the report year, even if it
@@ -246,57 +248,103 @@ export function generateRptiDetails(
     });
   }
 
-  return mergeWithExisting(results, existingDetails);
+  return results;
 }
 
 /**
- * Folds freshly generated rows into the rows already present, rather than replacing
- * them wholesale.
- *
- * Wipe-and-rebuild was the shipped v1 (see requirement-specs/rpti-auto-generation.md,
- * "Regeneration behavior"), on the grounds that losing manual edits could be revisited
- * if it hurt. It does. A row that generation cannot reproduce is not necessarily stale:
- * an imported upgrade whose target was not found in the inventory has no segment to
- * regenerate from, so a wipe silently deleted the filed CapEx, OpEx, quarter and
- * remarks of the very row most needing attention — and took its data-health warning
- * with it, so the problem looked solved. Generation is also year-scoped, so rebuilding
- * one year used to destroy every other year's rows.
- *
- * A row is matched to its regenerated counterpart by (initiative, target) rather than
- * by id, because an imported row and a generated one for the same work carry different
- * ids. On a match canonical fields refresh and only the stored id survives.
- * Unreproduced rows keep all filed values until their sources are repaired.
- * With no existing rows supplied this returns the generated list unchanged.
+ * Why a stored RPTI row cannot be reproduced by the source model — a different
+ * question from whether it belongs to the selected year (see
+ * requirement-specs/report-rows-as-projections.md Q11: the two axes are
+ * independent). Reasons are checked in the order a repair must follow.
  */
-function mergeWithExisting(generated: RptiDetail[], existing: RptiDetail[]): RptiDetail[] {
-  if (existing.length === 0) return generated;
+export type RptiReconciliationReason =
+  | 'asset-target'      // bare-Asset targets are not a supported way to file (Q8) — in any year
+  | 'missing-initiative' // the canonical plan line it describes is gone
+  | 'missing-target'     // the application/infrastructure it names no longer exists
+  | 'unanchored';        // references resolve, but no segment pair can reproduce it in any year
 
-  const key = (r: RptiDetail) => `${r.initiativeId}::${r.targetId}`;
-  const freshByKey = new Map(generated.map(r => [key(r), r]));
-  const merged: RptiDetail[] = [];
-  const refreshed = new Set<string>();
+export interface RptiReconciliationFinding {
+  /** Stable: `rpti-reconcile-<reason>-<rowId>`. */
+  id: string;
+  rowId: string;
+  reason: RptiReconciliationReason;
+  /** Names the source-side repair (FR-025): what to fix, not what to re-key. */
+  message: string;
+  /**
+   * The stored row, as evidence for the gate to display. Findings are not rows and
+   * are never merged into a return — this exists so the preparer can see *which*
+   * filed line the finding is about, and nothing may pass it to `projectRptiReturn`
+   * or the exporter.
+   */
+  row: RptiDetail;
+}
 
-  // Existing order first, so regenerating does not reshuffle the table under the user.
-  for (const row of existing) {
-    const k = key(row);
-    const fresh = freshByKey.get(k);
-    if (!fresh || refreshed.has(k)) {
-      // Not reproduced, or a second row for the same pair — keep it exactly as it is.
-      // Preserving a duplicate beats silently dropping filed data.
-      merged.push(row);
+export interface ReconcileRptiInput {
+  /** Stored rows (`AppState.rptiDetails`) — read as evidence, never written or returned. */
+  storedDetails: RptiDetail[];
+  initiatives: Initiative[];
+  deliverables: Deliverable[];
+  deliverableSegments: DeliverableSegment[];
+  deliverableStatuses: DeliverableStatus[];
+}
+
+/**
+ * Compares stored RPTI rows against the source model and returns findings, not rows
+ * (FR-024, issue #40). Where the old merge turned every unmatched stored row into a
+ * projection member — leaking a 2027 line into a 2026 filing — this asks only
+ * "can the current canonical entities reproduce this row in *some* year?". A valid
+ * other-year row produces no finding: its absence from the selected year is correct,
+ * not a defect.
+ *
+ * The honesty limit, accepted with option 1 and fixed by the deferred option 5:
+ * `RptiDetail` carries no report year, so a finding cannot say *which* year the row
+ * was filed for, and these findings block every year's export, not just the row's
+ * own. That global gate is the chosen policy — an unreproducible filed row must never
+ * leave a return silently — and the messages say "no filing year" rather than
+ * inventing an attribution the data cannot support.
+ */
+export function reconcileRptiReturn(input: ReconcileRptiInput): RptiReconciliationFinding[] {
+  const { storedDetails, initiatives, deliverables, deliverableSegments, deliverableStatuses } = input;
+  const initiativeById = new Map(initiatives.map(i => [i.id, i]));
+  const findings: RptiReconciliationFinding[] = [];
+
+  for (const row of storedDetails) {
+    const initiative = initiativeById.get(row.initiativeId);
+    const label = initiative?.name ?? row.id;
+    const add = (reason: RptiReconciliationReason, message: string) => {
+      findings.push({ id: `rpti-reconcile-${reason}-${row.id}`, rowId: row.id, reason, message, row });
+    };
+
+    if (row.targetType === 'asset') {
+      add('asset-target', `The stored RPTI row for "${label}" targets an Asset directly, which no filing year can reproduce. Create a Deliverable under that Asset and point the Initiative at that Deliverable before generating the filing.`);
       continue;
     }
-    refreshed.add(k);
-    merged.push({
-      ...fresh,
-      id: row.id,
-    });
+    if (!initiative) {
+      add('missing-initiative', `The stored RPTI row "${row.id}" points at an Initiative that no longer exists, so no filing year can reproduce it. Recreate the initiative — or re-import the filing it came from — before generating.`);
+      continue;
+    }
+    if (row.targetType === 'deliverable' && !deliverables.some(d => d.id === row.targetId)) {
+      add('missing-target', `The stored RPTI row for "${label}" points at a Deliverable that no longer exists. Create or correct the application the filed plan refers to on the Deliverables tab, so the next generation reproduces the row.`);
+      continue;
+    }
+    // Reproducible in *some* year: the initiative resolves to this row's target
+    // (Q10's rule, year-independent by design) and at least one of its segments on
+    // that target carries a status generation accepts. The selected year is
+    // deliberately not consulted — absence from it proves nothing (contract 2's
+    // companion rule in Q11).
+    const derivable = initiative.isPlaceholder !== true
+      && resolveRptiTarget(initiative, deliverableSegments, deliverables) === row.targetId
+      && deliverableSegments.some(seg =>
+        seg.initiativeId === initiative.id &&
+        seg.deliverableId === row.targetId &&
+        classifySegmentKind(seg.status, deliverableStatuses) !== 'excluded');
+    if (!derivable) {
+      const targetName = deliverables.find(d => d.id === row.targetId)?.name ?? row.targetId;
+      add('unanchored', `The stored RPTI row for "${label}" has no lifecycle segment on "${targetName}" that generation could reproduce in any filing year. Restore that segment on the timeline, or select the row's Deliverable as the initiative's RPTI Target, before generating the filing.`);
+    }
   }
 
-  for (const [k, fresh] of freshByKey) {
-    if (!refreshed.has(k)) merged.push(fresh);
-  }
-  return merged;
+  return findings;
 }
 
 /**

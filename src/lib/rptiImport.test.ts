@@ -8,7 +8,7 @@ import {
   RPTI_IMPORT_PRELAUNCH_STATUS_ID,
   RPTI_IMPORT_LIVE_STATUS_ID,
 } from './rptiImport';
-import { RPTI_CATEGORY_LABELS, generateRptiDetails } from './rpti';
+import { RPTI_CATEGORY_LABELS, projectRptiReturn } from './rpti';
 import type { Asset, AssetCategory, Deliverable, DeliverableSegment } from '../types';
 import { SEEDED_DELIVERABLE_STATUSES } from './deliverableStatusDefaults';
 
@@ -183,7 +183,7 @@ describe('deriveWorkspaceFromRptiImport — placement', () => {
     for (const { label, ex } of cases) {
       const out = deriveWorkspaceFromRptiImport(parse({ jenis: 'upgrade', quarter: 'Q3' }), 2027, ex);
       const segments = [...(ex.deliverableSegments ?? []), ...out.deliverableSegments];
-      const regen = generateRptiDetails({
+      const regen = projectRptiReturn({
         deliverableSegments: segments, deliverableStatuses: SEEDED_DELIVERABLE_STATUSES,
         initiatives: out.initiatives, deliverables: inventory.deliverables,
         assets: inventory.assets, assetCategories: inventory.assetCategories,
@@ -381,7 +381,7 @@ describe('an upgrade to infrastructure the LKPTI cannot contain', () => {
 
   it('gives it the prior-live segment, so it stays an upgrade when regenerated', () => {
     const out = deriveWorkspaceFromRptiImport(infraUpgrade(), 2027, EMPTY);
-    const regen = generateRptiDetails({
+    const regen = projectRptiReturn({
       deliverableSegments: out.deliverableSegments, deliverableStatuses: out.deliverableStatuses,
       initiatives: out.initiatives, deliverables: out.deliverables,
       assets: out.assets, assetCategories: out.assetCategories,
