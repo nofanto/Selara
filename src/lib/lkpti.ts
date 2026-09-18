@@ -99,7 +99,23 @@ export function generateLkptiDetails(
 
     const cascadedFields = {
       categoryCode: resolvedCategoryCode && isLkptiCategoryCode(resolvedCategoryCode) ? resolvedCategoryCode : undefined,
-      developer: deliverable.developer === 'inhouse' ? 'inhouse' : undefined,
+      // The LKPTI column wants whoever built it — 'inhouse', or the provider's name.
+      // Both now live on the Deliverable, so a regenerated return reproduces the filed
+      // value instead of blanking it for every third-party application (ADR-0013).
+      //
+      // The literal 'PPJTI' is the exception: it is the RPTI's classification, not a
+      // name, and says nothing this column asks for. A workspace predating ADR-0013 may
+      // still hold it, so it is treated as "no name given" rather than emitted.
+      developer: deliverable.developer === 'PPJTI' ? undefined : deliverable.developer,
+      // Attributes of the application. Previously these could only be carried over
+      // from an existing row, so generating into an empty set lost all seven.
+      platform: deliverable.platform,
+      database: deliverable.database,
+      dcProvider: deliverable.dcProvider,
+      drcProvider: deliverable.drcProvider,
+      backupStrategy: deliverable.backupStrategy,
+      systemOwner: deliverable.systemOwner,
+      ownership: deliverable.ownership,
       dcCity: deliverable.dcCity ?? category?.dcCity,
       dcCountry: deliverable.dcCountry ?? category?.dcCountry,
       drCity: deliverable.drCity ?? category?.drCity,
@@ -107,9 +123,19 @@ export function generateLkptiDetails(
       functionDescription: deliverable.description,
     };
 
+    // Undefined values are dropped before the spread. The Deliverable is the source of
+    // truth for these fields, but a workspace part-way through the ADR-0013 transition
+    // can hold a value on the row and not yet on the deliverable — spreading undefined
+    // over it would wipe a filed value on regeneration, which is the exact failure this
+    // whole change exists to remove. `liftReportRowAttributes` normally makes this moot;
+    // this is the belt to its braces.
+    const definedCascade = Object.fromEntries(
+      Object.entries(cascadedFields).filter(([, v]) => v !== undefined),
+    );
+
     const existing = existingDetails.find(d => d.targetId === deliverable.id);
     results.push(existing
-      ? { ...existing, ...cascadedFields }
+      ? { ...existing, ...definedCascade }
       : {
           id: `lkpti-gen-${deliverable.id}`,
           targetId: deliverable.id,

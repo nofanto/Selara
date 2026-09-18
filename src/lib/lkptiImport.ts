@@ -263,10 +263,13 @@ export function deriveWorkspaceFromLkptiImport(rows: LkptiImportRow[]): DerivedL
 
     const deliverableId = `lkpti-import-deliv-${n}`;
     const isInhouse = row.developerRaw.toLowerCase() === 'inhouse';
-    // Blank stays unknown rather than becoming 'PPJTI'. Defaulting would assert
-    // third-party sourcing the filed return never stated — inventing regulatory
-    // data is worse than leaving a gap that data health can report.
-    const developer = row.developerRaw === '' ? undefined : (isInhouse ? 'inhouse' : 'PPJTI');
+    // The provider's *name*, not the two-value classification (ADR-0013). Deliverable
+    // .developer now carries either 'inhouse' or whoever built it; the RPTI derives
+    // 'PPJTI' from "not inhouse", while the LKPTI emits the name. Blank stays unknown
+    // rather than becoming 'PPJTI' — defaulting would assert third-party sourcing the
+    // filed return never stated, and inventing regulatory data is worse than leaving a
+    // gap data health can report.
+    const developer = row.developerRaw === '' ? undefined : (isInhouse ? 'inhouse' : row.developerRaw);
     deliverables.push({
       id: deliverableId,
       assetId,
@@ -286,6 +289,16 @@ export function deriveWorkspaceFromLkptiImport(rows: LkptiImportRow[]): DerivedL
       dcCountry: row.dcCountry,
       drCity: row.drCity,
       drCountry: row.drCountry,
+      // Attributes of the application itself. The filed return is their only source,
+      // so recording them here is what lets a regenerated LKPTI reproduce the return
+      // rather than losing eight fields on every row. See ADR-0013.
+      platform: row.platform,
+      database: row.database,
+      dcProvider: row.dcProvider,
+      drcProvider: row.drcProvider,
+      backupStrategy: row.backupStrategy,
+      systemOwner: row.systemOwner,
+      ownership: row.ownership,
     });
 
     deliverableSegments.push({

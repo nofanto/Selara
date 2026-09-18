@@ -73,6 +73,14 @@ export interface Initiative {
   capex: number;     // Capital expenditure
   opex: number;      // Operational expenditure
   description?: string;
+  /**
+   * RPTI `Keterangan` — commentary on this piece of work.
+   *
+   * Distinct from `description`, which supplies the RPTI's *other* free-text column,
+   * `Deskripsi`. Description says what the initiative is; this says what should be
+   * noted about it in the plan. Both end up in the same return, in different columns.
+   */
+  rptiRemarks?: string;
   isPlaceholder?: boolean;
   status?: 'planned' | 'active' | 'done' | 'cancelled';
   ragStatus?: 'green' | 'amber' | 'red';
@@ -160,11 +168,43 @@ export interface Deliverable {
   type?: DeliverableType; // Undefined is treated as 'application' (legacy records predate this field)
   description?: string; // What this deliverable does — no category-level default; cascades into LkptiDetail.functionDescription
   categoryCode?: RptiCategoryCode; // Overrides the parent AssetCategory's default RPTI category when set
-  developer?: RptiDeveloper; // No category-level default — varies too much within one architectural category to make one trustworthy
+  /**
+   * 'inhouse', or the name of the IT service provider that built it.
+   *
+   * Widened from the two-value RptiDeveloper enum so one field serves both returns:
+   * RPTI's `Pengembang` column wants the classification and derives 'PPJTI' from
+   * "a name that is not inhouse", while LKPTI's `Pengembang Aplikasi` wants the name
+   * itself. Previously the name lived on LkptiDetail and the classification here,
+   * which is why a regenerated LKPTI lost the provider on 9 of 13 rows.
+   *
+   * No category-level default — it varies too much within one architectural category
+   * for one to be trustworthy.
+   */
+  developer?: RptiDeveloper | string;
   dcCity?: string;   // Overrides the parent AssetCategory's default RPTI data center location when set, per field
   dcCountry?: string;
   drCity?: string;   // Overrides the parent AssetCategory's default RPTI disaster recovery center location when set, per field
   drCountry?: string;
+
+  // ── Attributes of the thing itself, not of any report row ─────────────────
+  // These describe the deliverable whether or not a return is being prepared, and
+  // are held here rather than on LkptiDetail so a regenerated return can read them.
+  // See requirement-specs/report-rows-as-projections.md Q1/Q3, and ADR-0013.
+  platform?: string;        // LKPTI `Platform`
+  database?: string;        // LKPTI `Pangkalan Data`
+  dcProvider?: string;      // LKPTI `Penyelenggara DC` — a company name, or 'self'
+  drcProvider?: string;     // LKPTI `Penyelenggara DRC`
+  backupStrategy?: LkptiBackupStrategy; // LKPTI `Strategi Backup`
+  systemOwner?: string;     // LKPTI `System Owner` — the person accountable
+  ownership?: LkptiOwnership;           // LKPTI `Kepemilikan` — lease or outright purchase
+  /**
+   * RPTI `PPJTI Pihak Terkait` — is the service provider a related party?
+   *
+   * Held per application, matching how the bank holds it. Known simplification: the
+   * same vendor can be answered inconsistently across applications and nothing will
+   * catch it. Modelling suppliers properly is separate work (Q3).
+   */
+  ppjtiRelatedParty?: RptiRelatedParty;
 }
 
 /**
@@ -204,10 +244,10 @@ export interface RptiDetail {
   initiativeId: string;
   targetType: RptiTargetType;
   targetId: string; // Deliverable.id or Asset.id, per targetType
-  categoryCode?: RptiCategoryCode; // Regulatory classification — no auto-fill source, always set manually
+  categoryCode?: RptiCategoryCode; // Cascades from Deliverable.categoryCode ?? AssetCategory.categoryCode
   developmentType: RptiDevelopmentType;
-  developer?: RptiDeveloper; // No auto-fill source, always set manually
-  ppjtiRelatedParty?: RptiRelatedParty; // No auto-fill source, always set manually
+  developer?: RptiDeveloper; // Derived from Deliverable.developer: 'inhouse', else 'PPJTI' for any named provider (ADR-0013)
+  ppjtiRelatedParty?: RptiRelatedParty; // Projection of Deliverable.ppjtiRelatedParty (ADR-0013); derived as 'n/a' when the developer is not PPJTI
   dcCity?: string;
   dcCountry?: string;
   drCity?: string;
@@ -216,7 +256,7 @@ export interface RptiDetail {
   opexAmount?: number; // Defaults to the linked Initiative's opex when unset. Always in TimelineSettings.defaultCurrency, same as capexAmount.
   plannedImplementationQuarter?: RptiQuarter;
   deliverableSegmentId?: string; // Set when the quarter is auto-derived (targetType 'deliverable' only)
-  remarks?: string;
+  remarks?: string; // Projection of Initiative.rptiRemarks (ADR-0013) — the RPTI `Keterangan` column
 }
 
 // LKPTI 3.2.6's own category_code enum excludes RPTI's infrastructure-only codes
@@ -240,7 +280,18 @@ export interface LkptiDetail {
   dcCountry?: string;
   drCity?: string;   // Cascades: this row's value ?? Deliverable.drCity ?? AssetCategory.drCity
   drCountry?: string;
-  // No auto-fill source — always manual entry:
+  /**
+   * Below here: the row's projection of attributes that live on the Deliverable.
+   *
+   * These were once authored here, because `LkptiDetail` was the only record able to
+   * hold them — which is why regenerating a return used to lose all seven. Since
+   * ADR-0013 the `Deliverable` is the source of truth and `generateLkptiDetails` fills
+   * these from it. They remain on the row because the row *is* the exported line of
+   * the return, and `exportLkptiReportToExcel` reads its columns from here.
+   *
+   * Edit them on the Deliverable. A value written directly onto a row is overwritten
+   * by the next generation.
+   */
   platform?: string;
   database?: string;
   dcProvider?: string;  // company name, or 'self'

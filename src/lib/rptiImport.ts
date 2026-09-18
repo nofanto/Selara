@@ -69,6 +69,13 @@ export interface UnresolvedRptiReference {
 
 export interface DerivedRptiWorkspace {
   programmes: Programme[];
+  /**
+   * Existing deliverables that gained a value from the filed plan — today only the
+   * related-party answer, which the RPTI supplies for applications the LKPTI already
+   * created. The importer does not own those records, so it reports the change rather
+   * than mutating its input; the caller merges by id.
+   */
+  updatedDeliverables: Deliverable[];
   assetCategories: AssetCategory[];
   assets: Asset[];
   deliverables: Deliverable[];
@@ -231,6 +238,7 @@ export function deriveWorkspaceFromRptiImport(
   const initiatives: Initiative[] = [];
   const rptiDetails: RptiDetail[] = [];
   const unresolved: UnresolvedRptiReference[] = [];
+  const updatedDeliverables = new Map<string, Deliverable>();
 
   const categoryIdByCode = new Map<string, string>(
     existing.assetCategories.filter(c => c.categoryCode).map(c => [c.categoryCode as string, c.id]),
@@ -268,6 +276,13 @@ export function deriveWorkspaceFromRptiImport(
       if (matches.length === 1) {
         targetId = matches[0].id;
         initiativeAssetId = matches[0].assetId;
+        // The plan answers the related-party question for an application the inventory
+        // already created. Record it against that application, without overwriting an
+        // answer already there.
+        if (row.ppjtiRelatedParty !== undefined && matches[0].ppjtiRelatedParty === undefined) {
+          const current = updatedDeliverables.get(matches[0].id) ?? matches[0];
+          updatedDeliverables.set(matches[0].id, { ...current, ppjtiRelatedParty: row.ppjtiRelatedParty });
+        }
       } else if (matches.length === 0 && INFRASTRUCTURE_CODES.has(row.categoryCode)) {
         // Falls through to creation below, deliberately (FR-019a).
         //
@@ -320,6 +335,8 @@ export function deriveWorkspaceFromRptiImport(
         developer: row.developer,
         dcCity: row.dcCity, dcCountry: row.dcCountry,
         drCity: row.drCity, drCountry: row.drCountry,
+        // A fact about this application's supplier, not about the row (ADR-0013).
+        ppjtiRelatedParty: row.ppjtiRelatedParty,
       });
       targetId = deliverableId;
     }
@@ -407,6 +424,9 @@ export function deriveWorkspaceFromRptiImport(
       capex: row.capexAmount ?? 0,
       opex: row.opexAmount ?? 0,
       description: row.description,
+      // The RPTI's two free-text columns both come from the Initiative now: Deskripsi
+      // from `description`, Keterangan from here (ADR-0013).
+      rptiRemarks: row.remarks,
     });
 
     rptiDetails.push({
@@ -435,5 +455,5 @@ export function deriveWorkspaceFromRptiImport(
   const deliverableStatuses: DeliverableStatus[] =
     deliverableSegments.length === 0 ? [] : [...SEEDED_DELIVERABLE_STATUSES];
 
-  return { assetCategories, assets, deliverables, deliverableSegments, deliverableStatuses, initiatives, programmes, rptiDetails, unresolved };
+  return { assetCategories, assets, deliverables, deliverableSegments, deliverableStatuses, initiatives, programmes, rptiDetails, unresolved, updatedDeliverables: [...updatedDeliverables.values()] };
 }

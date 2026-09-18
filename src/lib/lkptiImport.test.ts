@@ -190,10 +190,14 @@ describe('deriveWorkspaceFromLkptiImport', () => {
     );
   });
 
-  it('sets Deliverable.developer to "inhouse" only when the raw text is exactly "inhouse", otherwise "PPJTI"', () => {
+  it('sets Deliverable.developer to "inhouse", or to the provider\'s name', () => {
+    // Changed by ADR-0013. This used to collapse any third party to 'PPJTI', which
+    // discarded the one thing the LKPTI column actually asks for — who built it. The
+    // classification is now derived where the RPTI needs it ("not inhouse" => PPJTI),
+    // so one field serves both returns and the name survives a regeneration.
     const result = deriveWorkspaceFromLkptiImport(rows);
     expect(result.deliverables[0].developer).toBe('inhouse');
-    expect(result.deliverables[1].developer).toBe('PPJTI');
+    expect(result.deliverables[1].developer).toBe('PT Third Party Dev');
   });
 
   it('creates exactly one open-ended live DeliverableSegment per row, anchored on the go-live date', () => {
@@ -343,5 +347,45 @@ describe('imported applications state their type', () => {
     const out = deriveWorkspaceFromLkptiImport(rows);
     expect(out.deliverables).toHaveLength(1);
     expect(out.deliverables[0].type).toBe('application');
+  });
+});
+
+describe('the importer records attributes on the application, not only on the report row', () => {
+  /**
+   * ADR-0013. The filed return is the only source for platform, database, the two
+   * providers, backup strategy, system owner, ownership and the vendor's name. They
+   * now live on the Deliverable so a regenerated LKPTI can read them; before this,
+   * regenerating lost all eight on every row.
+   */
+  it('writes all eight onto the Deliverable', () => {
+    const { rows } = parseLkptiImportWorkbook(makeWorkbook([VALID_ROW]));
+    const out = deriveWorkspaceFromLkptiImport(rows);
+    expect(out.deliverables[0]).toMatchObject({
+      platform: 'Java/Spring',
+      database: 'PostgreSQL',
+      dcProvider: 'Self',
+      drcProvider: 'Self',
+      backupStrategy: 'HA_ACTIVE_ACTIVE',
+      systemOwner: 'Jane Doe',
+      ownership: 'OUTRIGHT_PURCHASE',
+      developer: 'inhouse',
+    });
+  });
+
+  it('carries a provider name onto the Deliverable, not just the classification', () => {
+    const row = [...VALID_ROW];
+    row[12] = 'PT Anabatic Technologies';
+    const { rows } = parseLkptiImportWorkbook(makeWorkbook([row]));
+    const out = deriveWorkspaceFromLkptiImport(rows);
+    // The name itself — the RPTI derives 'PPJTI' from it, the LKPTI emits it verbatim.
+    expect(out.deliverables[0].developer).toBe('PT Anabatic Technologies');
+  });
+
+  it('leaves an attribute the return did not supply unset rather than inventing one', () => {
+    const row = [...VALID_ROW];
+    row[4] = '';  // Platform
+    const { rows } = parseLkptiImportWorkbook(makeWorkbook([row]));
+    const out = deriveWorkspaceFromLkptiImport(rows);
+    expect(out.deliverables[0].platform).toBeUndefined();
   });
 });

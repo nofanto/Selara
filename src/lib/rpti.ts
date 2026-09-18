@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
-import { RptiDetail, RptiCategoryCode, RptiQuarter, Initiative, Deliverable, Asset, AssetCategory, DeliverableSegment, DeliverableStatus } from '../types';
+import { RptiDetail, RptiCategoryCode, RptiQuarter, Initiative, Deliverable, Asset, AssetCategory, DeliverableSegment, DeliverableStatus, RptiDeveloper,
+} from '../types';
 
 export const RPTI_CATEGORY_LABELS: Record<RptiCategoryCode, string> = {
   '01': 'Customer management',
@@ -189,8 +190,17 @@ export function generateRptiDetails(
       : liveItems[liveItems.length - 1];
 
     const deliverable = deliverables.find(d => d.id === deliverableId);
+    const initiative = initiatives.find(i => i.id === initiativeId);
     const category = resolveAssetCategory(deliverable, assets, assetCategories);
-    const developer = deliverable?.developer;
+    // Deliverable.developer now carries either 'inhouse' or a provider's *name*
+    // (ADR-0013). The RPTI column wants the classification, so anything that is not
+    // 'inhouse' is PPJTI — a third party, whoever they are. LKPTI emits the name
+    // itself, which is why one field can serve both returns.
+    const rawDeveloper = deliverable?.developer;
+    const developer: RptiDeveloper | undefined =
+      rawDeveloper === undefined || rawDeveloper === ''
+        ? undefined
+        : rawDeveloper === 'inhouse' ? 'inhouse' : 'PPJTI';
 
     results.push({
       id: `rpti-gen-${initiativeId}-${deliverableId}-${reportYear}`,
@@ -200,16 +210,20 @@ export function generateRptiDetails(
       categoryCode: deliverable?.categoryCode ?? category?.categoryCode,
       developmentType,
       developer,
-      // 'n/a' by definition whenever the resolved developer isn't PPJTI — including
-      // when developer itself is unset, since there's no category-level default for
-      // it. Only genuinely ambiguous, so left blank for manual entry, when it's PPJTI.
-      ppjtiRelatedParty: developer !== 'PPJTI' ? 'n/a' : undefined,
+      // 'n/a' by definition whenever the resolved developer isn't PPJTI — there is no
+      // third party, so there is no relationship to disclose. When it *is* PPJTI the
+      // answer is a fact about the vendor that nothing can derive, so it is read from
+      // the deliverable, where the preparer records it (FR-014).
+      ppjtiRelatedParty: developer !== 'PPJTI' ? 'n/a' : deliverable?.ppjtiRelatedParty,
       dcCity: deliverable?.dcCity ?? category?.dcCity,
       dcCountry: deliverable?.dcCountry ?? category?.dcCountry,
       drCity: deliverable?.drCity ?? category?.drCity,
       drCountry: deliverable?.drCountry ?? category?.drCountry,
       plannedImplementationQuarter: deriveQuarterFromDate(anchor.segment.startDate),
       deliverableSegmentId: anchor.segment.id,
+      // Keterangan comes from the work it comments on, matching Deskripsi two columns
+      // earlier, which has always come from the initiative (ADR-0013).
+      remarks: initiative?.rptiRemarks,
     });
   }
 

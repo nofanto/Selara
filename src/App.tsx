@@ -41,6 +41,7 @@ import { buildRestoredWorkspace, isWorkspaceEmpty } from './lib/workspaceState';
 import { HealthIssueLocation, DataManagerTab } from './lib/dataHealth';
 import { SYNC_CHANNEL_NAME, generateTabId, isRemoteSaveMessage, notifyDataSaved } from './lib/tabSync';
 import { mergeDeliverableStatuses } from './lib/deliverableStatusDefaults';
+import { liftReportRowAttributes } from './lib/attributeLift';
 
 // Lazy load modals and heavy components for code splitting
 const FeaturesModal = lazy(() => import('./components/FeaturesModal').then(m => ({ default: m.FeaturesModal })));
@@ -300,10 +301,23 @@ export default function App() {
             setShowTemplatePicker(true);
           }
         } else {
+          // A workspace saved before ADR-0013 holds the eight application attributes on
+          // its LKPTI rows and `remarks` on its RPTI rows, where nothing now reads them.
+          // IndexedDB keeps them (it is schemaless within a store), so they are still
+          // recoverable — but only until the first press of Generate rebuilds the rows
+          // from the deliverable and discards them for good. Lift on load, ahead of that.
+          // See requirement-specs/report-rows-as-projections.md Q4 and FR-019.
+          const lifted = liftReportRowAttributes({
+            deliverables: dbData.deliverables || [],
+            initiatives: dbData.initiatives || [],
+            lkptiDetails: (dbData as any).lkptiDetails || [],
+            rptiDetails: (dbData as any).rptiDetails || [],
+          });
+
           setAssets(dbData.assets);
-          setDeliverables(dbData.deliverables || []);
+          setDeliverables(lifted.deliverables);
           setDeliverableSegments((dbData as any).deliverableSegments || []);
-          setInitiatives(dbData.initiatives.map(i => ({ ...i, capex: Number(i.capex) || 0, opex: Number(i.opex) || 0 })));
+          setInitiatives(lifted.initiatives.map(i => ({ ...i, capex: Number(i.capex) || 0, opex: Number(i.opex) || 0 })));
           setMilestones(dbData.milestones);
           setProgrammes(dbData.programmes);
           setStrategies(dbData.strategies || []);
@@ -495,7 +509,13 @@ export default function App() {
       ...blank,
       assetCategories: [...lkDerived.assetCategories, ...(rpDerived?.assetCategories ?? [])],
       assets: [...lkDerived.assets, ...(rpDerived?.assets ?? [])],
-      deliverables: [...lkDerived.deliverables, ...(rpDerived?.deliverables ?? [])],
+      // The RPTI can answer the related-party question for an application the LKPTI
+      // created, so its patches to existing deliverables are merged in by id. Without
+      // this the filed answer is lost on every upgrade that matched (ADR-0013).
+      deliverables: [
+        ...lkDerived.deliverables.map(d => rpDerived?.updatedDeliverables.find(u => u.id === d.id) ?? d),
+        ...(rpDerived?.deliverables ?? []),
+      ],
       deliverableSegments: [...lkDerived.deliverableSegments, ...(rpDerived?.deliverableSegments ?? [])],
       deliverableStatuses: mergeDeliverableStatuses(lkDerived.deliverableStatuses, rpDerived?.deliverableStatuses),
       initiatives: rpDerived?.initiatives ?? [],
