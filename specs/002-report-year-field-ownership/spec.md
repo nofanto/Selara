@@ -131,9 +131,17 @@ At onboarding the preparer states which year each uploaded return covers — an 
 - **FR-019**: A workspace created before this change MUST NOT silently lose the eight attributes. Either the values are carried onto the applications before any regeneration can replace the rows holding them, or the preparer is told plainly, before it happens, that regenerating will discard them.
 - **FR-020**: An imported row that cannot be regenerated — because its target was never found in the inventory — MUST survive this change, and MUST remain visible and attributable to a report year.
 
-**Unchanged by this feature**
+**The Data Manager report tabs** *(section renamed 2026-09-18 — it read "Unchanged by this feature", which the read-only decision made false)*
 
-- **FR-021**: Both Data Manager report tabs MUST remain present, populated and editable, with their generate actions intact. Importing continues to fill them.
+- **FR-021**: Both Data Manager report tabs MUST become **read-only**. They remain present and populated — importing continues to fill them — but MUST NOT accept edits, because every field they show is derived from the Deliverable or Initiative that owns it. *(Unblocked 2026-09-18 by Q7, which removed the two fields — `capexAmount`/`opexAmount` — for which that justification was false.)* Generation moves to the Reports tab. *(Revised 2026-09-18, superseding the earlier decision to leave the tabs untouched: an editable screen whose edits cannot reach the filing is worse than one that says it is a projection.)*
+- **FR-021a**: Every data-health finding that currently directs the preparer to one of those tabs MUST direct them instead to the entity that owns the value. A finding that points at a read-only screen tells the preparer where the problem is and not where to fix it.
+- **FR-021b**: An imported row that cannot be reproduced MUST be repairable from the source side — by creating or correcting the application the filed plan refers to — and its data-health message MUST say so.
+- **FR-028**: The cost of a plan line MUST be the initiative's own `capex`/`opex`. `RptiDetail.capexAmount` and `opexAmount` MUST be removed; there is no per-row override and no fallback chain (Q7).
+- **FR-029**: An initiative MUST have at most one RPTI target. Generation MUST honour the initiative's own target rather than grouping by segment, so one initiative yields at most one row per report year.
+- **FR-030**: Attaching segments on more than one application to a single initiative MUST be reported by data health as an **error**, naming the split as the fix. It MUST NOT be blocked at the point of drawing. Left unflagged it files one budget twice; blocked outright it would make the timeline refuse a legal arrangement of work for one consumer's benefit.
+- **FR-032**: An RPTI row MUST NOT target a bare Asset. Infrastructure is filed as OJK Format 3.1 requires, but an infrastructure item MUST be recorded as a Deliverable under its Asset, the same as an application (Q8).
+- **FR-033**: An existing row targeting a bare Asset MUST raise a data-health **error** before export, naming the repair — record the item as a Deliverable under its Asset and point the initiative at it. Error, not warning: no generated return can reproduce such a row, so it otherwise leaves the filing in silence.
+- **FR-031**: A hand-edited cost override that differs from its initiative's figure MUST be lifted onto the initiative before the fields are removed. Imported overrides already equal it and lift without change.
 - **FR-022**: The LKPTI MUST remain a point-in-time inventory. Its as-at date selects which applications were live at a moment; it MUST NOT become a filter over a period the way the RPTI's report year is. *(FR-009a supplies that moment; this requirement constrains its meaning, not its existence.)*
 
 ### Key Entities *(include if feature involves data)*
@@ -178,8 +186,7 @@ At onboarding the preparer states which year each uploaded return covers — an 
 
 ## Out of Scope
 
-- Making report rows genuine projections, or emptying either Data Manager tab (deferred by Q5/Q6 of the design notes).
-- Removing the report tabs in favour of generating from the Reports menu — considered and set aside, with its consequences recorded.
+- **Emptying** either Data Manager report tab, or **removing** them. Still deferred. *(Revised 2026-09-18: making them read-only and moving generation to Reports is now IN scope per FR-021 — what stays out is deleting the tabs and ceasing to store the rows.)*
 - A supplier or vendor entity. The related-party answer is held per application, with the resulting duplication accepted and recorded.
 - Migration tooling for existing workspaces, exported files, shared files or saved versions.
 - A filing or revision record. Freezing what was actually submitted is the natural home for a report year and is recorded as the next step, but it is a separate piece of work.

@@ -114,6 +114,22 @@ describe('generateLkptiDetails', () => {
     expect(rows[0].developer).toBeUndefined();
   });
 
+  it('emits a service provider name verbatim — the widened developer field is what LKPTI files', () => {
+    const deliverables = [makeDeliverable({ developer: 'PT Sigma Cipta Caraka' })];
+    const segments = [makeSegment({ status: 'appstatus-in-production' })];
+    const rows = generateLkptiDetails(makeContext({ deliverables, deliverableSegments: segments }));
+
+    expect(rows[0].developer).toBe('PT Sigma Cipta Caraka');
+  });
+
+  it('leaves developer blank when the Deliverable has none, rather than inventing one', () => {
+    const deliverables = [makeDeliverable({ developer: undefined })];
+    const segments = [makeSegment({ status: 'appstatus-in-production' })];
+    const rows = generateLkptiDetails(makeContext({ deliverables, deliverableSegments: segments }));
+
+    expect(rows[0].developer).toBeUndefined();
+  });
+
   it('ignores an infrastructure-only categoryCode (51-54, 99) inherited via cascade — LKPTI 3.2.6 only accepts 01-12/49', () => {
     const assetCategories = [makeAssetCategory({ categoryCode: '52' })];
     const segments = [makeSegment({ status: 'appstatus-in-production' })];

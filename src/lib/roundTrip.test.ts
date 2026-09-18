@@ -23,6 +23,11 @@ const load = (n: string) =>
  * linked initiative — the detail-level fields are overrides, so comparing them raw
  * reports a loss that the exported return does not actually suffer.
  */
+// The two sample returns deliberately carry DIFFERENT years — the RPTI is the 2027 plan,
+// the LKPTI is the 2026 inventory — which is the case onboarding exists to handle. When
+// T022 makes `asAtDate` required, generateLkptiDetails below must be given '2026-12-31',
+// not a date derived from REPORT_YEAR. Reaching for the nearby constant asserts the wrong
+// period and the test would still pass.
 const REPORT_YEAR = 2027;
 
 function importedWorkspace() {
@@ -82,7 +87,18 @@ describe('SC-001: a generated return reproduces the imported one', () => {
       check('drCity', src.drCity);
       check('drCountry', src.drCountry);
       check('functionDescription', src.description);
+      check('developer', src.developerRaw);
     }
+    // Guard against a vacuous developer assertion: the sample must keep carrying both
+    // shapes the field takes, or a regression in either could pass unnoticed.
+    expect(
+      lkptiSource.some(r => r.developerRaw !== '' && r.developerRaw !== 'inhouse'),
+      'guard: the sample must contain at least one named vendor',
+    ).toBe(true);
+    expect(
+      lkptiSource.some(r => r.developerRaw === 'inhouse'),
+      'guard: the sample must contain at least one in-house application',
+    ).toBe(true);
     expect(inv.lkptiDetails.length, 'guard: the import produced rows to compare against').toBe(13);
     expect(lost, `${lost.length} filed value(s) did not survive regeneration`).toEqual([]);
   });

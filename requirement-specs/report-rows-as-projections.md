@@ -125,6 +125,102 @@ easier.
 
 ## Decided
 
+### Q8 — bare-Asset RPTI targets are not supported (2026-09-18)
+
+**Decided: no.** Selara files infrastructure, as OJK Format 3.1 requires, but it models an
+infrastructure item as a **Deliverable** under its Asset — the same as an application. An RPTI row
+whose target is a bare Asset is not a supported way to file, and the rule is now explicit rather
+than implied by what the importer happens to do.
+
+Raised by Codex against the read-only decision. My first answer — "the importer does not create
+them" — was not an argument: it describes one producer, when the question is what a workspace can
+contain. The row is two clicks away. `DataManager.tsx:208-210` builds the RPTI Target dropdown from
+deliverables **and** assets, and `deriveRptiTargetTypes` sets `targetType: 'asset'` from whichever
+list the chosen id is found in. `generateRptiDetails` emits only deliverable-target rows, so once
+the tab is read-only and Reports is the filing path, such a row would leave the filing in silence.
+
+**The evidence that this is an existing answer, not a new restriction** (measured 2026-09-18):
+
+| | Rows | Target type |
+|---|---|---|
+| Infrastructure rows in the sample (category `51`-`54`, `99`) | **5** | all `deliverable` |
+| Every imported row | 13 | all `deliverable` |
+
+`rptiImport.ts:435` sets `targetType: 'deliverable'` unconditionally — there is no asset path
+anywhere in the importer. The bare-asset target is an affordance that predates the importer.
+
+**Consequences:**
+
+- An existing asset-target row gets a **pre-export data-health error** naming the repair: record
+  the infrastructure item as a Deliverable under its Asset, and point the initiative at it. Error,
+  not warning — the row is otherwise dropped from a filing without a word.
+- The Target dropdown stops offering assets. T026a does this anyway by making the tab read-only.
+- A **constructed** test proves such a row cannot vanish silently from a Reports-generated filing.
+  The sample cannot carry this: it holds only deliverable targets and would pass either way.
+
+**Rejected: supporting asset targets.** It reads like the smaller change and is the larger one. An
+Asset carries no `developmentType`, `categoryCode`, planned quarter or cost, so a second generation
+path would need a canonical source defined for each of the four before it could file anything —
+more work than the rest of this feature, for a shape nothing in the product or the samples needs.
+
+
+### Q7 — cost belongs to the initiative, and an initiative has at most one RPTI target (2026-09-18)
+
+**Decided: option (c).** `RptiDetail.capexAmount` and `opexAmount` are removed. `Initiative.capex`
+and `Initiative.opex` are the filed figures, with no per-row override and no fallback chain.
+
+Raised by Codex as a blocker on the read-only decision: those two fields are *not* derived — they
+are per-row overrides (`resolveCost` is `detail.capexAmount ?? initiative?.capex ?? 0`,
+`src/lib/rpti.ts:310-314`) and the RPTI tab is their only editing surface. Read-only would have
+removed it.
+
+**Why (c) rather than a per-target cost.** An RPTI row is a line of the bank's development plan,
+and the plan's unit of work is the initiative. If one initiative needs two different budgets, it
+is two pieces of work. Modelling a cost per (initiative, target) pair would let the tool express
+something the filing has no way to say, and the override existed only because generation had
+nowhere else to put an imported figure.
+
+**This is not a new constraint; it is an existing one made explicit.** Measured 2026-09-18:
+
+| Source | Initiatives | With more than one target |
+|---|---|---|
+| Shipped demo catalogue (`workspaceTemplates.ts`) | 7 | **0** |
+| Imported sample RPTI (`sample-rpti-2027.xlsx`) | 13 | **0** |
+
+`Initiative.deliverableId` (`src/types.ts:70`) has always been a single-valued target link, edited
+in `InitiativePanel.tsx:132` and dangling-ref-checked in `dataHealth.ts:177`. What changes is that
+RPTI generation stops grouping by `initiativeId::deliverableId` off the segments and honours the
+initiative's own target instead.
+
+**Enforcement is a data-health error, not a hard block.** Nothing stops a user attaching segments
+on two applications to one initiative, and generation would then emit two rows carrying the same
+budget — a double-count in a filed return, which is why it cannot be a warning. But refusing the
+arrangement outright would make the timeline reject a legal way to draw work, for the benefit of
+one consumer. So: allow it to be drawn, flag it as an error, and name the fix (split the
+initiative).
+
+**Consequences:**
+
+- `RptiDetail.capexAmount`/`opexAmount` are removed from the type. Every field in the RPTI tab is
+  then genuinely derived, which is what FR-021's read-only justification claimed and, until this
+  decision, was not true of two columns.
+- Lifting is required before the fields go: an imported override equals its initiative's figure
+  (the importer writes both from the same cell, `rptiImport.ts:424-425` and `:443-444`), but a
+  hand-edited one may not. A differing override must be lifted onto the initiative, not dropped.
+- SC-001 is unaffected — it compares through `resolveCost`, which now reads the initiative
+  directly.
+- My earlier recommendation that the fixture needs a multi-target initiative is **withdrawn**.
+  Under (c) that arrangement is a defect to detect, so what it needs is a data-health test, not a
+  supported case.
+
+**Rejected:** a cost on `DeliverableSegment` (the segment is a time slice, so an initiative with
+three phases on one application would need a summing rule that the filing never asks for); a new
+`InitiativeTarget` join entity (exact grain, but a new store is the expensive change in this
+codebase and it buys the ability to express something OJK cannot receive); keeping the two columns
+editable in an otherwise read-only tab (reinstates the split-brain the decision exists to end, on
+the two columns most likely to be wrong).
+
+
 ### Q1 — the eight attributes move onto `Deliverable` (2026-09-17)
 
 `Deliverable` gains the seven fields it lacks — `platform`, `database`, `dcProvider`,
@@ -288,6 +384,10 @@ generation is allowed to replace rows, or the release must be explicit that pres
 on a pre-change workspace discards the imported return. The second is defensible for a pre-1.0
 local-first tool; it is not defensible silently.
 
+### Q5 and Q6 — SUPERSEDED, see below (2026-09-18)
+
+> **Superseded the same day by the decision recorded under "Q5/Q6 revised".** Left in place
+> because the reasoning still explains why the smaller step was attempted first.
 ### Q5 and Q6 — the Data Manager tabs stay exactly as they are (2026-09-18)
 
 **Decided: no change to either tab in this work.** Both keep their rows, stay editable, and
@@ -331,6 +431,44 @@ Two consequences stopped it being a small change, and both should be carried for
    at filing.** Nothing stored while working, and the produced rows frozen into the filing
    record as what was actually submitted — which also makes the filing record the natural owner
    of the report year.
+
+### Q5/Q6 revised — the report tabs become read-only, and generation moves to Reports (2026-09-18)
+
+**Decided, superseding the above.** Both Data Manager report tabs become **read-only**, and will
+be removed once the destination is reached. Generation moves to the Reports tab, where the
+preparer states the year period and the return is shown.
+
+**Why the earlier answer did not hold.** Leaving the tabs editable created a screen whose edits
+would have no effect on the filing — reviewed by Codex, who put it plainly: a preparer could
+reasonably assume that editing a Data Manager report row changes the result generated from
+Reports. The proposed mitigation was a warning. Read-only removes the confusion at its source
+instead of labelling it, and it is the honest description of what those rows now are: a
+projection, not an input.
+
+It also settles a question the mandatory as-at date had opened. `generateLkptiDetails` has exactly
+one production caller, `DataManager.tsx:251` — the tab's Generate button — which has no year
+prompt. Options were to add a prompt there, to pass today's date (reintroducing the very defect
+the as-at rule fixes), or to move generation out. This decision takes the third, and the button
+leaves Data Manager with it.
+
+**Consequences, all of which the spec and task list must now carry:**
+
+- `FR-021` inverts: the tabs remain present and populated but are **not** editable, and their
+  generate actions move to Reports.
+- **Seven data-health findings point at these tabs** as the place to fix something, across eleven
+  check kinds (`rpti-target`, `rpti-incomplete`, `lkpti-incomplete`, `lkpti-golive-future`,
+  `lkpti-too-long` and others). Every one now sends the preparer to a screen where nothing can be
+  fixed. They must be repointed at the entity that owns the value — a significant expansion of
+  T028, and the part of this decision most likely to be missed.
+- **The unresolved imported row is repaired differently.** Today the preparer sets its Target in
+  the RPTI tab. With the tab read-only, the repair is on the source side: create or rename the
+  application the filed plan refers to, and the next generation reproduces the row. That is what
+  FR-025 always intended — repair the workspace, not the row — but the data-health message must
+  say so, because "points at a deliverable that no longer exists" does not.
+- **Seven e2e specs** touch these tabs and will need revisiting.
+
+**Not changed:** the rows remain stored and exported as they are today. This decision is about
+who may write them, not about removing them — that is still the deferred step.
 
 ## Carried into the Spec Kit spec
 
