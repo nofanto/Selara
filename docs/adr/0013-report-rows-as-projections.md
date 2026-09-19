@@ -138,5 +138,12 @@ without saying so is worse than one that does not change at all.
   carries no report year and none may be inferred from a quarter, an id suffix or a segment link,
   so reconciliation findings are stated per workspace. A persisted year-bearing record is the
   deferred fix, analysed as option 5 in `specs/002-report-year-field-ownership/merge-path-options.md`.
-- **Still open:** emptying or removing the read-only report tabs, and the residual that a stored
-  LKPTI row's non-cascaded fields (`goLiveDate` in particular) still reach generated output.
+- **Still open:** emptying or removing the read-only report tabs.
+- **Corrected 2026-09-19.** This entry previously called a stored LKPTI `goLiveDate` reaching
+  generated output a *residual*. It was not: because membership is computed from segment spans
+  against the as-at date while the stored date was spread through untouched, an inventory for
+  2027 could state a go-live in 2028 — a wrong-period filing, not plumbing. `generateLkptiDetails`
+  now falls back to the live segment the membership test itself used whenever the filed date
+  post-dates the as-at date, and keeps a filed date the as-at supports, which is more precise than
+  a segment start (FR-017). Understating it here is the mistake worth recording: the residual
+  framing is why it went unfixed for a whole review cycle.

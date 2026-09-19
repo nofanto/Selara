@@ -9,6 +9,17 @@ export function isLkptiCategoryCode(code: string): code is LkptiCategoryCode {
   return LKPTI_CATEGORY_CODE_SET.has(code);
 }
 
+/**
+ * The inverse, for comparing a filed go-live against an as-at date. Returns undefined
+ * for anything not well-formed: an unparseable date is `lkpti-golive-invalid`'s problem,
+ * and this must not quietly discard a value for a defect it was not written to catch.
+ * Both sides are zero-padded ISO, so lexicographic comparison is exact.
+ */
+function isoFromDdMmYyyy(value: string): string | undefined {
+  const m = /^(\d{2})-(\d{2})-(\d{4})$/.exec(value);
+  return m ? `${m[3]}-${m[2]}-${m[1]}` : undefined;
+}
+
 // Converts Selara's internal ISO date (YYYY-MM-DD) to the LKPTI form's dd-mm-yyyy.
 export function toDdMmYyyy(iso: string): string {
   const [y, m, d] = iso.split('-');
@@ -122,14 +133,26 @@ export function generateLkptiDetails(
     );
 
     const existing = existingDetails.find(d => d.targetId === deliverable.id);
-    results.push(existing
-      ? { ...existing, ...definedCascade }
-      : {
-          id: `lkpti-gen-${deliverable.id}`,
-          targetId: deliverable.id,
-          ...cascadedFields,
-          goLiveDate: suggestGoLiveDate(deliverable.id, deliverableSegments, deliverableStatuses),
-        });
+    if (existing) {
+      // Membership is computed from segment spans against `asAtDate`, but the stored
+      // row's own `goLiveDate` used to be spread through untouched — so an inventory
+      // for 2027 could state a go-live in 2028, answering a different question than
+      // the one it claims to answer (F4). Where the filed date post-dates the as-at,
+      // fall back to the live segment the membership test itself used. A filed date
+      // the as-at supports is more precise than a segment start and is kept (FR-017).
+      const storedIso = existing.goLiveDate ? isoFromDdMmYyyy(existing.goLiveDate) : undefined;
+      const goLiveDate = storedIso !== undefined && storedIso > asAtDate
+        ? suggestGoLiveDate(deliverable.id, deliverableSegments, deliverableStatuses)
+        : existing.goLiveDate;
+      results.push({ ...existing, ...definedCascade, goLiveDate });
+      continue;
+    }
+    results.push({
+      id: `lkpti-gen-${deliverable.id}`,
+      targetId: deliverable.id,
+      ...cascadedFields,
+      goLiveDate: suggestGoLiveDate(deliverable.id, deliverableSegments, deliverableStatuses),
+    });
   }
 
   return results;

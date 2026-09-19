@@ -333,3 +333,53 @@ describe('lkptiCascadeOnDeliverableDelete', () => {
     expect(result).toEqual([{ id: 'a2', targetId: 'deliv-2' }]);
   });
 });
+
+/**
+ * F4, from the final adversarial review. Q11 established that an existing row cannot make
+ * a non-live application *join* the inventory — membership is computed from segment spans
+ * against the as-at date. That is true, and it is only about membership. The row's own
+ * `goLiveDate` was still spread through untouched, so a filing could state a go-live
+ * *after* the as-at date it claims to describe.
+ *
+ * That is a wrong-period filing, not a cosmetic carry-over: LKPTI 3.2.6 asks what was live
+ * as at 31 December of the report year, and a date later than that answers a different
+ * question. ADR-0013 called this residual; it was not.
+ */
+describe('a generated LKPTI never states a go-live after its own as-at date (F4)', () => {
+  const deliverables = [makeDeliverable()];
+  const segments = [makeSegment({
+    status: 'appstatus-in-production', startDate: '2020-01-01', endDate: '2030-12-31',
+  })];
+
+  it('does not carry a stored go-live that post-dates the as-at date', () => {
+    const rows = generateLkptiDetails(makeContext({
+      deliverables, deliverableSegments: segments, asAtDate: '2027-12-31',
+      // A stored row from an earlier filing, or hand-entered: live from 2028.
+      existingDetails: [{ id: 'l1', targetId: 'deliv-1', goLiveDate: '01-01-2028' }],
+    } as never));
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].goLiveDate,
+      'a 2027 inventory cannot state a 2028 go-live').not.toBe('01-01-2028');
+  });
+
+  it('falls back to the live segment the membership test actually used', () => {
+    const rows = generateLkptiDetails(makeContext({
+      deliverables, deliverableSegments: segments, asAtDate: '2027-12-31',
+      existingDetails: [{ id: 'l1', targetId: 'deliv-1', goLiveDate: '01-01-2028' }],
+    } as never));
+
+    expect(rows[0].goLiveDate).toBe('01-01-2020');
+  });
+
+  it('keeps a stored go-live that is consistent with the as-at date', () => {
+    const rows = generateLkptiDetails(makeContext({
+      deliverables, deliverableSegments: segments, asAtDate: '2027-12-31',
+      // The filed value, more precise than the segment start — it must survive (FR-017).
+      existingDetails: [{ id: 'l1', targetId: 'deliv-1', goLiveDate: '15-03-2021' }],
+    } as never));
+
+    expect(rows[0].goLiveDate,
+      'a filed date the as-at supports is not ours to discard').toBe('15-03-2021');
+  });
+});
