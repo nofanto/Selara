@@ -67,6 +67,9 @@ function groupByCheck(issues: HealthIssue[]): IssueGroup[] {
  */
 function summarise(check: string): string {
   const SUMMARIES: Record<string, string> = {
+    'initiative-rpti-multi-target': 'Initiatives with an ambiguous RPTI target',
+    'initiative-rpti-no-target': 'Initiatives with no resolvable RPTI target',
+    'rpti-asset-target': 'RPTI rows targeting a bare Asset',
     'rpti-incomplete': 'RPTI rows missing a manual-only field',
     'rpti-initiative': 'RPTI rows pointing at a missing Initiative',
     'rpti-segment': 'RPTI rows pointing at a missing lifecycle segment',

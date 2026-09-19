@@ -1,6 +1,7 @@
+import { demoInitiatives, demoDeliverables, demoDeliverableSegments, demoDeliverableStatuses, demoAssets, demoAssetCategories } from '../demoData';
 import { describe, expect, it } from 'vitest';
-import { generateRptiDetails, GenerateRptiDetailsInput, periodForQuarter, deriveQuarterFromDate } from './rpti';
-import type { AssetCategory, Asset, Deliverable, DeliverableSegment, DeliverableStatus, Initiative } from '../types';
+import { projectRptiReturn, reconcileRptiReturn, ProjectRptiInput, periodForQuarter, deriveQuarterFromDate } from './rpti';
+import type { AssetCategory, Asset, Deliverable, DeliverableSegment, DeliverableStatus, Initiative, RptiDetail } from '../types';
 
 const statuses: DeliverableStatus[] = [
   { id: 'appstatus-planned', name: 'Planned', color: 'slate' },
@@ -13,7 +14,7 @@ const statuses: DeliverableStatus[] = [
 
 function makeInitiative(overrides: Partial<Initiative> = {}): Initiative {
   return {
-    id: 'init-1', name: 'Test Initiative', programmeId: 'prog-1', assetId: 'asset-1',
+    id: 'init-1', name: 'Test Initiative', programmeId: 'prog-1', assetId: 'asset-1', deliverableId: 'deliv-1',
     startDate: '2026-01-01', endDate: '2026-12-31', capex: 1000, opex: 100,
     ...overrides,
   };
@@ -39,7 +40,7 @@ function makeAssetCategory(overrides: Partial<AssetCategory> = {}): AssetCategor
   return { id: 'cat-1', name: 'Test Category', ...overrides };
 }
 
-function makeContext(overrides: Partial<GenerateRptiDetailsInput> = {}): GenerateRptiDetailsInput {
+function makeContext(overrides: Partial<ProjectRptiInput> = {}): ProjectRptiInput {
   return {
     deliverableSegments: [],
     deliverableStatuses: statuses,
@@ -51,10 +52,33 @@ function makeContext(overrides: Partial<GenerateRptiDetailsInput> = {}): Generat
   };
 }
 
-describe('generateRptiDetails', () => {
+describe('projectRptiReturn', () => {
+  it('generates the shipped demo without requiring newly declared targets', () => {
+    const rows = projectRptiReturn({ initiatives: demoInitiatives, deliverables: demoDeliverables,
+      deliverableSegments: demoDeliverableSegments, deliverableStatuses: demoDeliverableStatuses,
+      assets: demoAssets, assetCategories: demoAssetCategories }, new Date().getFullYear());
+    expect(rows).toHaveLength(7);
+    expect(new Set(rows.map(row => row.initiativeId)).size).toBe(rows.length);
+  });
+
+  it.each(['application', 'infrastructure'] as const)('infers an undeclared single %s target', type => {
+    const rows = projectRptiReturn(makeContext({ initiatives: [makeInitiative({ deliverableId: undefined })],
+      deliverables: [makeDeliverable({ type })], deliverableSegments: [makeSegment()] }), 2026);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].targetId).toBe('deliv-1');
+  });
+
+  it('does not infer a different target in each year for ambiguous work', () => {
+    const context = makeContext({ initiatives: [makeInitiative({ deliverableId: undefined })],
+      deliverables: [makeDeliverable(), makeDeliverable({ id: 'deliv-2' })],
+      deliverableSegments: [makeSegment(), makeSegment({ id: 'later', deliverableId: 'deliv-2', startDate: '2027-01-01', endDate: '2027-12-31' })] });
+    expect(projectRptiReturn(context, 2026)).toEqual([]);
+    expect(projectRptiReturn(context, 2027)).toEqual([]);
+  });
+
   it('generates a "new" row for a planned segment in the report year', () => {
     const segments = [makeSegment({ id: 'seg-planned', status: 'appstatus-planned', startDate: '2026-02-01' })];
-    const rows = generateRptiDetails(makeContext({ deliverableSegments: segments }), 2026);
+    const rows = projectRptiReturn(makeContext({ deliverableSegments: segments }), 2026);
 
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
@@ -69,7 +93,7 @@ describe('generateRptiDetails', () => {
 
   it('generates an "upgrade" row for an in-production segment with no planning segment that year', () => {
     const segments = [makeSegment({ id: 'seg-prod', status: 'appstatus-in-production', startDate: '2026-08-01' })];
-    const rows = generateRptiDetails(makeContext({ deliverableSegments: segments }), 2026);
+    const rows = projectRptiReturn(makeContext({ deliverableSegments: segments }), 2026);
 
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
@@ -84,7 +108,7 @@ describe('generateRptiDetails', () => {
       makeSegment({ id: 'seg-planned', status: 'appstatus-planned', startDate: '2026-01-15' }),
       makeSegment({ id: 'seg-funded', status: 'appstatus-funded', startDate: '2026-04-15' }),
     ];
-    const rows = generateRptiDetails(makeContext({ deliverableSegments: segments }), 2026);
+    const rows = projectRptiReturn(makeContext({ deliverableSegments: segments }), 2026);
 
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
@@ -99,7 +123,7 @@ describe('generateRptiDetails', () => {
       makeSegment({ id: 'seg-planned', status: 'appstatus-planned', startDate: '2026-01-15' }),
       makeSegment({ id: 'seg-prod', status: 'appstatus-in-production', startDate: '2026-09-01' }),
     ];
-    const rows = generateRptiDetails(makeContext({ deliverableSegments: segments }), 2026);
+    const rows = projectRptiReturn(makeContext({ deliverableSegments: segments }), 2026);
 
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
@@ -114,7 +138,7 @@ describe('generateRptiDetails', () => {
       makeSegment({ id: 'seg-planned', status: 'appstatus-planned', startDate: '2025-01-15', endDate: '2025-02-15' }),
       makeSegment({ id: 'seg-prod', status: 'appstatus-in-production', startDate: '2026-09-01' }),
     ];
-    const rows = generateRptiDetails(makeContext({ deliverableSegments: segments }), 2026);
+    const rows = projectRptiReturn(makeContext({ deliverableSegments: segments }), 2026);
 
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ developmentType: 'upgrade', deliverableSegmentId: 'seg-prod' });
@@ -125,7 +149,7 @@ describe('generateRptiDetails', () => {
       makeSegment({ id: 'seg-went-live-2025', status: 'appstatus-in-production', startDate: '2025-01-01', endDate: '2025-06-01' }),
       makeSegment({ id: 'seg-planned-2026', status: 'appstatus-planned', startDate: '2026-02-01', endDate: '2026-03-01' }),
     ];
-    const rows = generateRptiDetails(makeContext({ deliverableSegments: segments }), 2026);
+    const rows = projectRptiReturn(makeContext({ deliverableSegments: segments }), 2026);
 
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ developmentType: 'upgrade', deliverableSegmentId: 'seg-planned-2026' });
@@ -137,7 +161,7 @@ describe('generateRptiDetails', () => {
       makeSegment({ id: 'seg-planned-2026', initiativeId: 'init-1', status: 'appstatus-planned', startDate: '2026-02-01', endDate: '2026-03-01' }),
     ];
     const initiatives = [makeInitiative({ id: 'init-1' }), makeInitiative({ id: 'init-2' })];
-    const rows = generateRptiDetails(makeContext({ deliverableSegments: segments, initiatives }), 2026);
+    const rows = projectRptiReturn(makeContext({ deliverableSegments: segments, initiatives }), 2026);
 
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ initiativeId: 'init-1', developmentType: 'upgrade' });
@@ -149,14 +173,14 @@ describe('generateRptiDetails', () => {
       makeSegment({ id: 'seg-oos', status: 'appstatus-out-of-support', startDate: '2026-05-01' }),
       makeSegment({ id: 'seg-retired', status: 'appstatus-retired', startDate: '2026-08-01' }),
     ];
-    const rows = generateRptiDetails(makeContext({ deliverableSegments: segments }), 2026);
+    const rows = projectRptiReturn(makeContext({ deliverableSegments: segments }), 2026);
 
     expect(rows).toHaveLength(0);
   });
 
   it('excludes segments with no linked initiative', () => {
     const segments = [makeSegment({ id: 'seg-unlinked', initiativeId: undefined })];
-    const rows = generateRptiDetails(makeContext({ deliverableSegments: segments }), 2026);
+    const rows = projectRptiReturn(makeContext({ deliverableSegments: segments }), 2026);
 
     expect(rows).toHaveLength(0);
   });
@@ -164,7 +188,7 @@ describe('generateRptiDetails', () => {
   it('excludes a segment with an unrecognized custom status — generation is an allow-list, not a deny-list', () => {
     const customStatuses = [...statuses, { id: 'appstatus-cancelled', name: 'Cancelled', color: 'red' }];
     const segments = [makeSegment({ status: 'appstatus-cancelled' })];
-    const rows = generateRptiDetails(makeContext({ deliverableSegments: segments, deliverableStatuses: customStatuses }), 2026);
+    const rows = projectRptiReturn(makeContext({ deliverableSegments: segments, deliverableStatuses: customStatuses }), 2026);
 
     expect(rows).toHaveLength(0);
   });
@@ -175,7 +199,7 @@ describe('generateRptiDetails', () => {
       { id: 'status-custom-approved', name: 'Budget Approved', color: 'blue', isPreLaunchStatus: true },
     ];
     const segments = [makeSegment({ status: 'status-custom-approved' })];
-    const rows = generateRptiDetails(makeContext({ deliverableSegments: segments, deliverableStatuses: customStatuses }), 2026);
+    const rows = projectRptiReturn(makeContext({ deliverableSegments: segments, deliverableStatuses: customStatuses }), 2026);
 
     expect(rows).toHaveLength(1);
   });
@@ -186,7 +210,7 @@ describe('generateRptiDetails', () => {
       { id: 'status-custom-approved', name: 'Budget Approved', color: 'blue', isPreLaunchStatus: true },
     ];
     const segments = [makeSegment({ status: 'appstatus-planned' })];
-    const rows = generateRptiDetails(makeContext({ deliverableSegments: segments, deliverableStatuses: customStatuses }), 2026);
+    const rows = projectRptiReturn(makeContext({ deliverableSegments: segments, deliverableStatuses: customStatuses }), 2026);
 
     // Once the workspace has opted in explicitly anywhere, the unflagged "Planned" id no
     // longer qualifies via fallback guessing.
@@ -196,21 +220,21 @@ describe('generateRptiDetails', () => {
   it('excludes a segment linked to a placeholder Initiative', () => {
     const initiatives = [makeInitiative({ isPlaceholder: true })];
     const segments = [makeSegment()];
-    const rows = generateRptiDetails(makeContext({ deliverableSegments: segments, initiatives }), 2026);
+    const rows = projectRptiReturn(makeContext({ deliverableSegments: segments, initiatives }), 2026);
 
     expect(rows).toHaveLength(0);
   });
 
   it('excludes segments entirely outside the report year (no overlap)', () => {
     const segments = [makeSegment({ id: 'seg-2025', startDate: '2025-06-01', endDate: '2025-07-01' })];
-    const rows = generateRptiDetails(makeContext({ deliverableSegments: segments }), 2026);
+    const rows = projectRptiReturn(makeContext({ deliverableSegments: segments }), 2026);
 
     expect(rows).toHaveLength(0);
   });
 
   it('includes a segment that started before the report year but overlaps into it', () => {
     const segments = [makeSegment({ id: 'seg-straddle', startDate: '2025-11-01', endDate: '2026-02-01' })];
-    const rows = generateRptiDetails(makeContext({ deliverableSegments: segments }), 2026);
+    const rows = projectRptiReturn(makeContext({ deliverableSegments: segments }), 2026);
 
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ deliverableSegmentId: 'seg-straddle' });
@@ -218,35 +242,39 @@ describe('generateRptiDetails', () => {
 
   it('includes a segment that starts in the report year and ends after it', () => {
     const segments = [makeSegment({ id: 'seg-tail', startDate: '2026-11-01', endDate: '2027-02-01' })];
-    const rows = generateRptiDetails(makeContext({ deliverableSegments: segments }), 2026);
+    const rows = projectRptiReturn(makeContext({ deliverableSegments: segments }), 2026);
 
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ deliverableSegmentId: 'seg-tail' });
   });
 
-  it('keeps distinct (initiative, deliverable) pairs as separate rows', () => {
+  it('uses each initiative’s declared deliverable rather than every segment target', () => {
     const segments = [
       makeSegment({ id: 'seg-a', deliverableId: 'deliv-a', initiativeId: 'init-1', status: 'appstatus-planned' }),
       makeSegment({ id: 'seg-b', deliverableId: 'deliv-b', initiativeId: 'init-1', status: 'appstatus-planned' }),
       makeSegment({ id: 'seg-c', deliverableId: 'deliv-a', initiativeId: 'init-2', status: 'appstatus-planned' }),
     ];
-    const initiatives = [makeInitiative({ id: 'init-1' }), makeInitiative({ id: 'init-2' })];
-    const rows = generateRptiDetails(makeContext({ deliverableSegments: segments, initiatives }), 2026);
+    const initiatives = [
+      makeInitiative({ id: 'init-1', deliverableId: 'deliv-a' }),
+      makeInitiative({ id: 'init-2', deliverableId: 'deliv-a' }),
+    ];
+    const rows = projectRptiReturn(makeContext({ deliverableSegments: segments, initiatives }), 2026);
 
-    expect(rows).toHaveLength(3);
+    expect(rows).toHaveLength(2);
+    expect(rows.map(row => row.targetId)).toEqual(['deliv-a', 'deliv-a']);
   });
 
   it('produces no rows when there is no qualifying segment data', () => {
-    expect(generateRptiDetails(makeContext(), 2026)).toEqual([]);
+    expect(projectRptiReturn(makeContext(), 2026)).toEqual([]);
   });
 });
 
-describe('generateRptiDetails — categoryCode auto-fill', () => {
+describe('projectRptiReturn — categoryCode auto-fill', () => {
   const segments = [makeSegment({ id: 'seg-planned', status: 'appstatus-planned', startDate: '2026-02-01' })];
 
   it('uses the Deliverable.categoryCode when set', () => {
     const deliverables = [makeDeliverable({ categoryCode: '06' })];
-    const rows = generateRptiDetails(makeContext({ deliverableSegments: segments, deliverables }), 2026);
+    const rows = projectRptiReturn(makeContext({ deliverableSegments: segments, deliverables }), 2026);
 
     expect(rows[0].categoryCode).toBe('06');
   });
@@ -255,7 +283,7 @@ describe('generateRptiDetails — categoryCode auto-fill', () => {
     const deliverables = [makeDeliverable()];
     const assets = [makeAsset({ categoryId: 'cat-1' })];
     const assetCategories = [makeAssetCategory({ id: 'cat-1', categoryCode: '07' })];
-    const rows = generateRptiDetails(makeContext({ deliverableSegments: segments, deliverables, assets, assetCategories }), 2026);
+    const rows = projectRptiReturn(makeContext({ deliverableSegments: segments, deliverables, assets, assetCategories }), 2026);
 
     expect(rows[0].categoryCode).toBe('07');
   });
@@ -264,7 +292,7 @@ describe('generateRptiDetails — categoryCode auto-fill', () => {
     const deliverables = [makeDeliverable({ categoryCode: '04' })];
     const assets = [makeAsset({ categoryId: 'cat-1' })];
     const assetCategories = [makeAssetCategory({ id: 'cat-1', categoryCode: '07' })];
-    const rows = generateRptiDetails(makeContext({ deliverableSegments: segments, deliverables, assets, assetCategories }), 2026);
+    const rows = projectRptiReturn(makeContext({ deliverableSegments: segments, deliverables, assets, assetCategories }), 2026);
 
     expect(rows[0].categoryCode).toBe('04');
   });
@@ -273,18 +301,18 @@ describe('generateRptiDetails — categoryCode auto-fill', () => {
     const deliverables = [makeDeliverable()];
     const assets = [makeAsset({ categoryId: 'cat-1' })];
     const assetCategories = [makeAssetCategory({ id: 'cat-1' })];
-    const rows = generateRptiDetails(makeContext({ deliverableSegments: segments, deliverables, assets, assetCategories }), 2026);
+    const rows = projectRptiReturn(makeContext({ deliverableSegments: segments, deliverables, assets, assetCategories }), 2026);
 
     expect(rows[0].categoryCode).toBeUndefined();
   });
 });
 
-describe('generateRptiDetails — developer / ppjtiRelatedParty auto-fill', () => {
+describe('projectRptiReturn — developer / ppjtiRelatedParty auto-fill', () => {
   const segments = [makeSegment({ id: 'seg-planned', status: 'appstatus-planned', startDate: '2026-02-01' })];
 
   it('uses Deliverable.developer, and auto-fills ppjtiRelatedParty to "n/a" for in-house', () => {
     const deliverables = [makeDeliverable({ developer: 'inhouse' })];
-    const rows = generateRptiDetails(makeContext({ deliverableSegments: segments, deliverables }), 2026);
+    const rows = projectRptiReturn(makeContext({ deliverableSegments: segments, deliverables }), 2026);
 
     expect(rows[0].developer).toBe('inhouse');
     expect(rows[0].ppjtiRelatedParty).toBe('n/a');
@@ -292,7 +320,7 @@ describe('generateRptiDetails — developer / ppjtiRelatedParty auto-fill', () =
 
   it('leaves ppjtiRelatedParty blank for manual entry when developer is PPJTI', () => {
     const deliverables = [makeDeliverable({ developer: 'PPJTI' })];
-    const rows = generateRptiDetails(makeContext({ deliverableSegments: segments, deliverables }), 2026);
+    const rows = projectRptiReturn(makeContext({ deliverableSegments: segments, deliverables }), 2026);
 
     expect(rows[0].developer).toBe('PPJTI');
     expect(rows[0].ppjtiRelatedParty).toBeUndefined();
@@ -300,19 +328,19 @@ describe('generateRptiDetails — developer / ppjtiRelatedParty auto-fill', () =
 
   it('auto-fills ppjtiRelatedParty to "n/a" when developer is not set at all (no category-level default exists)', () => {
     const deliverables = [makeDeliverable()];
-    const rows = generateRptiDetails(makeContext({ deliverableSegments: segments, deliverables }), 2026);
+    const rows = projectRptiReturn(makeContext({ deliverableSegments: segments, deliverables }), 2026);
 
     expect(rows[0].developer).toBeUndefined();
     expect(rows[0].ppjtiRelatedParty).toBe('n/a');
   });
 });
 
-describe('generateRptiDetails — DC/DR location auto-fill', () => {
+describe('projectRptiReturn — DC/DR location auto-fill', () => {
   const segments = [makeSegment({ id: 'seg-planned', status: 'appstatus-planned', startDate: '2026-02-01' })];
 
   it('uses the Deliverable location fields when set', () => {
     const deliverables = [makeDeliverable({ dcCity: 'Jakarta', dcCountry: 'Indonesia', drCity: 'Surabaya', drCountry: 'Indonesia' })];
-    const rows = generateRptiDetails(makeContext({ deliverableSegments: segments, deliverables }), 2026);
+    const rows = projectRptiReturn(makeContext({ deliverableSegments: segments, deliverables }), 2026);
 
     expect(rows[0]).toMatchObject({ dcCity: 'Jakarta', dcCountry: 'Indonesia', drCity: 'Surabaya', drCountry: 'Indonesia' });
   });
@@ -321,7 +349,7 @@ describe('generateRptiDetails — DC/DR location auto-fill', () => {
     const deliverables = [makeDeliverable()];
     const assets = [makeAsset({ categoryId: 'cat-1' })];
     const assetCategories = [makeAssetCategory({ id: 'cat-1', dcCity: 'Singapore', dcCountry: 'Singapore', drCity: 'Batam', drCountry: 'Indonesia' })];
-    const rows = generateRptiDetails(makeContext({ deliverableSegments: segments, deliverables, assets, assetCategories }), 2026);
+    const rows = projectRptiReturn(makeContext({ deliverableSegments: segments, deliverables, assets, assetCategories }), 2026);
 
     expect(rows[0]).toMatchObject({ dcCity: 'Singapore', dcCountry: 'Singapore', drCity: 'Batam', drCountry: 'Indonesia' });
   });
@@ -330,7 +358,7 @@ describe('generateRptiDetails — DC/DR location auto-fill', () => {
     const deliverables = [makeDeliverable({ dcCity: 'Jakarta' })]; // only dcCity overridden
     const assets = [makeAsset({ categoryId: 'cat-1' })];
     const assetCategories = [makeAssetCategory({ id: 'cat-1', dcCity: 'Singapore', dcCountry: 'Singapore', drCity: 'Batam', drCountry: 'Indonesia' })];
-    const rows = generateRptiDetails(makeContext({ deliverableSegments: segments, deliverables, assets, assetCategories }), 2026);
+    const rows = projectRptiReturn(makeContext({ deliverableSegments: segments, deliverables, assets, assetCategories }), 2026);
 
     expect(rows[0]).toMatchObject({ dcCity: 'Jakarta', dcCountry: 'Singapore', drCity: 'Batam', drCountry: 'Indonesia' });
   });
@@ -339,7 +367,7 @@ describe('generateRptiDetails — DC/DR location auto-fill', () => {
     const deliverables = [makeDeliverable()];
     const assets = [makeAsset({ categoryId: 'cat-1' })];
     const assetCategories = [makeAssetCategory({ id: 'cat-1' })];
-    const rows = generateRptiDetails(makeContext({ deliverableSegments: segments, deliverables, assets, assetCategories }), 2026);
+    const rows = projectRptiReturn(makeContext({ deliverableSegments: segments, deliverables, assets, assetCategories }), 2026);
 
     expect(rows[0].dcCity).toBeUndefined();
     expect(rows[0].dcCountry).toBeUndefined();
@@ -395,7 +423,7 @@ describe('an application that is continuously live counts as pre-existing', () =
   });
 
   it('classifies planned work on a continuously live application as "upgrade"', () => {
-    const rows = generateRptiDetails(makeContext({
+    const rows = projectRptiReturn(makeContext({
       deliverableSegments: [
         stillLive(),
         makeSegment({ id: 'seg-plan-2027', status: 'appstatus-planned', startDate: '2027-01-01', endDate: '2027-03-31' }),
@@ -408,7 +436,7 @@ describe('an application that is continuously live counts as pre-existing', () =
   });
 
   it('still calls a first-ever build "new" — nothing of it was live before the year', () => {
-    const rows = generateRptiDetails(makeContext({
+    const rows = projectRptiReturn(makeContext({
       deliverableSegments: [
         makeSegment({ id: 'seg-plan-2027', status: 'appstatus-planned', startDate: '2027-01-01', endDate: '2027-06-30' }),
         makeSegment({ id: 'seg-live-2027', status: 'appstatus-in-production', startDate: '2027-06-30', endDate: '2030-12-31' }),
@@ -421,79 +449,189 @@ describe('an application that is continuously live counts as pre-existing', () =
   });
 });
 
-describe('regenerating merges instead of wiping', () => {
+
+describe('projectRptiReturn is the selected-year projection only (#40)', () => {
   /**
-   * Wipe-and-rebuild was the shipped v1. It meant a row generation cannot reproduce
-   * was deleted — and the row that most needs a person, an imported upgrade whose
-   * target was never found, is exactly that kind of row: it has no segment, so it
-   * regenerates to nothing. One click destroyed its filed CapEx, OpEx, quarter and
-   * remarks, and removed its data-health warning, so the problem looked solved.
+   * The defect: the Reports path supplied stored rows as `existingDetails`, so
+   * `mergeWithExisting` carried every unmatched row into the return — a 2027 plan
+   * line inside a 2026 filing. The projection API has no such input: membership is
+   * derived from the workspace's canonical entities for the requested year, full stop.
    */
-  const liveSegment = () => makeSegment({
-    id: 'seg-live', status: 'appstatus-in-production',
-    startDate: '2021-01-01', endDate: '2031-12-31', initiativeId: undefined,
-  });
-  const plannedSegment = () => makeSegment({
-    id: 'seg-plan', status: 'appstatus-planned', startDate: '2027-01-01', endDate: '2027-03-31',
-  });
-  const ctx = (existingDetails: any[]) => makeContext({
-    deliverableSegments: [liveSegment(), plannedSegment()],
-    initiatives: [makeInitiative({ startDate: '2027-01-01', endDate: '2027-03-31' })],
-    existingDetails,
+  const plan2027Only = () => makeContext({
+    deliverables: [makeDeliverable()],
+    deliverableSegments: [makeSegment({ id: 'seg-2027', startDate: '2027-02-01', endDate: '2027-03-31' })],
   });
 
-  const orphan = {
-    id: 'rpti-import-row-9', initiativeId: 'init-orphan', targetType: 'deliverable',
-    targetId: 'rpti-import-unresolved-9', developmentType: 'upgrade',
-    capexAmount: 4200, opexAmount: 900, plannedImplementationQuarter: 'Q4',
-    remarks: 'Filed against an application not in the inventory.',
-  } as any;
+  it('returns nothing for a year the plan does not touch', () => {
+    expect(projectRptiReturn(plan2027Only(), 2027)).toHaveLength(1);
+    expect(projectRptiReturn(plan2027Only(), 2026)).toEqual([]);
+    expect(projectRptiReturn(plan2027Only(), 2028)).toEqual([]);
+  });
 
-  it('keeps a row it cannot reproduce, with its filed figures intact', () => {
-    const rows = generateRptiDetails(ctx([orphan]), 2027);
-    const kept = rows.find(r => r.id === 'rpti-import-row-9');
-    expect(kept).toBeDefined();
-    expect(kept).toMatchObject({
-      capexAmount: 4200, opexAmount: 900, plannedImplementationQuarter: 'Q4',
-      developmentType: 'upgrade', remarks: 'Filed against an application not in the inventory.',
+  it('cannot be handed stored rows — the projection input has no existingDetails', () => {
+    const input = plan2027Only();
+    // @ts-expect-error — compile-time guard (option 3): passing stored rows to the
+    // projection must be a type error, not a runtime possibility.
+    projectRptiReturn({ ...input, existingDetails: [] }, 2026);
+  });
+});
+
+describe('reconcileRptiReturn — stored rows are reconciliation evidence, never projection members (#40)', () => {
+  /**
+   * Selected-year membership and reproducibility are independent questions. A valid
+   * 2027 row absent from a 2026 projection is correct; an asset-target or dangling
+   * row is unreproducible in *any* year. The reconciler reports only the latter, and
+   * returns findings — messages naming a source-side repair — not rows.
+   */
+  const storedRow = (overrides: Partial<RptiDetail> = {}): RptiDetail => ({
+    id: 'row-1', initiativeId: 'init-1', targetType: 'deliverable', targetId: 'deliv-1',
+    developmentType: 'new', ...overrides,
+  });
+  const segment = (overrides: Partial<DeliverableSegment> = {}) => makeSegment({
+    id: 'seg-live-2027', status: 'appstatus-planned',
+    startDate: '2027-02-01', endDate: '2027-03-31', ...overrides,
+  });
+  const ctx = (storedDetails: RptiDetail[], segments: DeliverableSegment[]) => ({
+    storedDetails,
+    initiatives: [makeInitiative({ deliverableId: undefined })],
+    deliverables: [makeDeliverable()],
+    deliverableSegments: segments,
+    deliverableStatuses: statuses,
+  });
+  /** The four states the merge conflated, as a table. */
+  const cases: { name: string; stored: RptiDetail[]; segments: DeliverableSegment[]; expectFinding: boolean; pattern?: RegExp }[] = [
+    {
+      name: 'same-year reproducible', stored: [storedRow()], segments: [segment({ startDate: '2026-02-01', endDate: '2026-03-31' })], expectFinding: false,
+    },
+    {
+      name: 'other-year reproducible — absent from 2026, but NOT a defect', stored: [storedRow()], segments: [segment()], expectFinding: false,
+    },
+    {
+      name: 'unsupported asset target before the named repair', stored: [storedRow({ targetType: 'asset', targetId: 'asset-1' })], segments: [], expectFinding: true,
+      pattern: /Deliverables tab.*Initiatives tab.*timeline/i,
+    },
+    {
+      name: 'dangling target before the named repair', stored: [storedRow({ targetId: 'deliv-gone' })], segments: [], expectFinding: true,
+      pattern: /Deliverables tab.*Initiatives tab.*timeline/i,
+    },
+  ];
+  for (const c of cases) {
+    it(`reports nothing for: ${c.name}`, () => {
+      const findings = reconcileRptiReturn(ctx(c.stored, c.segments));
+      if (!c.expectFinding) {
+        expect(findings, c.name).toEqual([]);
+      } else {
+        expect(findings, c.name).toHaveLength(1);
+        expect(findings[0].message).toMatch(c.pattern!);
+        expect(findings[0].rowId).toBe(c.stored[0].id);
+      }
     });
+  }
+
+  it('names every source step when the initiative is gone but its target survives', () => {
+    const findings = reconcileRptiReturn(ctx([storedRow({ initiativeId: 'init-gone' })], []));
+    expect(findings).toHaveLength(1);
+    expect(findings[0].reason).toBe('missing-initiative');
+    expect(findings[0].message).toMatch(/Initiatives tab.*Deliverable column.*timeline.*lifecycle segment/i);
   });
 
-  it('refreshes a row it can reproduce, keeping its id and the fields it has no source for', () => {
-    const existing = {
-      id: 'rpti-import-row-1', initiativeId: 'init-1', targetType: 'deliverable', targetId: 'deliv-1',
-      developmentType: 'new', capexAmount: 5000, opexAmount: 750,
-      remarks: 'Board approved.', plannedImplementationQuarter: 'Q4',
-    } as any;
-    const rows = generateRptiDetails(ctx([existing]), 2027);
-    const row = rows.find(r => r.initiativeId === 'init-1');
-    expect(rows).toHaveLength(1);
-    expect(row!.id).toBe('rpti-import-row-1');          // id survives
-    expect(row!.capexAmount).toBe(5000);                 // no generation source
-    expect(row!.remarks).toBe('Board approved.');        // no generation source
-    expect(row!.developmentType).toBe('upgrade');        // derived — refreshed
-    expect(row!.plannedImplementationQuarter).toBe('Q1'); // derived from the segment
+  it('directs re-import when both identity anchors are gone', () => {
+    const findings = reconcileRptiReturn(ctx([storedRow({ initiativeId: 'init-gone', targetId: 'deliv-gone' })], []));
+    expect(findings).toHaveLength(1);
+    expect(findings[0].reason).toBe('missing-initiative');
+    expect(findings[0].message).toMatch(/both.*missing.*re-import/i);
   });
 
-  it('does not destroy rows belonging to another report year', () => {
-    const otherYear = { ...orphan, id: 'row-2028', initiativeId: 'init-2028', targetId: 'deliv-2028' };
-    const rows = generateRptiDetails(ctx([otherYear]), 2027);
-    expect(rows.map(r => r.id)).toContain('row-2028');
+  it('keeps an asset-target finding until the named source repair also adds its segment', () => {
+    const row = storedRow({ targetType: 'asset', targetId: 'asset-1' });
+    const repaired = ctx([row], []);
+    repaired.initiatives = [makeInitiative({ deliverableId: 'deliv-1' })];
+    const partial = reconcileRptiReturn(repaired);
+    expect(partial).toHaveLength(1);
+    expect(partial[0].reason).toBe('asset-target');
+    expect(partial[0].message).toMatch(/remaining step.*timeline.*lifecycle segment/i);
+
+    repaired.deliverableSegments = [segment()];
+    expect(reconcileRptiReturn(repaired)).toEqual([]);
   });
 
-  it('behaves exactly as before when no existing rows are supplied', () => {
-    const without = generateRptiDetails(makeContext({
-      deliverableSegments: [liveSegment(), plannedSegment()],
-      initiatives: [makeInitiative({ startDate: '2027-01-01', endDate: '2027-03-31' })],
-    }), 2027);
-    expect(without).toHaveLength(1);
-    expect(without[0].id).toMatch(/^rpti-gen-/);
+  it('keeps a missing-target finding until its replacement also has the named segment', () => {
+    const repaired = ctx([storedRow({ targetId: 'deliv-gone' })], []);
+    repaired.initiatives = [makeInitiative({ deliverableId: 'deliv-1' })];
+    const partial = reconcileRptiReturn(repaired);
+    expect(partial).toHaveLength(1);
+    expect(partial[0].reason).toBe('missing-target');
+    expect(partial[0].message).toMatch(/remaining step.*timeline.*lifecycle segment/i);
+
+    repaired.deliverableSegments = [segment()];
+    expect(reconcileRptiReturn(repaired)).toEqual([]);
   });
 
-  it('keeps a duplicate pair rather than silently dropping one', () => {
-    const a = { id: 'dup-a', initiativeId: 'init-1', targetType: 'deliverable', targetId: 'deliv-1', developmentType: 'new' } as any;
-    const b = { ...a, id: 'dup-b', remarks: 'second row for the same work' };
-    const rows = generateRptiDetails(ctx([a, b]), 2027);
-    expect(rows.map(r => r.id).sort()).toEqual(['dup-a', 'dup-b']);
+  it('keeps a missing-initiative finding until its replacement also has the named segment', () => {
+    const repaired = ctx([storedRow({ initiativeId: 'init-gone' })], []);
+    repaired.initiatives = [makeInitiative({ deliverableId: 'deliv-1' })];
+    const partial = reconcileRptiReturn(repaired);
+    expect(partial).toHaveLength(1);
+    expect(partial[0].reason).toBe('missing-initiative');
+    expect(partial[0].message).toMatch(/remaining step.*timeline.*lifecycle segment/i);
+
+    repaired.deliverableSegments = [segment()];
+    expect(reconcileRptiReturn(repaired)).toEqual([]);
+  });
+
+  it('does not let two stored rows claim the same canonical row', () => {
+    const findings = reconcileRptiReturn(ctx(
+      [storedRow(), storedRow({ id: 'row-2' })],
+      [segment()],
+    ));
+    expect(findings).toHaveLength(2);
+    expect(findings.every(f => f.reason === 'identity-conflict')).toBe(true);
+  });
+
+  it('names a row whose (initiative, target) pair no segment can reproduce in any year', () => {
+    // References all resolve — the merge-preserving gate saw nothing wrong with this
+    // shape — but generation has no source for the row in any year, so it would
+    // vanish from the filing silently. That is precisely what FR-024 forbids.
+    const findings = reconcileRptiReturn(ctx([storedRow()], []));
+    expect(findings).toHaveLength(1);
+    expect(findings[0].reason).toBe('unanchored');
+    expect(findings[0].message).toMatch(/segment/i);
+  });
+
+  it('does not re-report a reproducible row that merely differs from the projection', () => {
+    // The stored row's filed quarter predates a segment move; the pair is still
+    // derivable, so the projection will carry it and no finding is warranted.
+    const findings = reconcileRptiReturn(ctx(
+      [storedRow({ plannedImplementationQuarter: 'Q4', remarks: 'old wording' })],
+      [segment({ startDate: '2026-05-01', endDate: '2026-06-30' })],
+    ));
+    expect(findings).toEqual([]);
+  });
+
+  it('yields one finding per row, asset-target taking priority over other reasons', () => {
+    const findings = reconcileRptiReturn(ctx(
+      [storedRow({ targetType: 'asset', targetId: 'asset-gone', initiativeId: 'init-gone' })],
+      [],
+    ));
+    expect(findings).toHaveLength(1);
+    expect(findings[0].reason).toBe('asset-target');
+  });
+
+  it('returns findings, not rows: a finding carries the stored row only as evidence', () => {
+    const findings = reconcileRptiReturn(ctx([storedRow({ targetType: 'asset' })], [segment()]));
+    expect(findings).toHaveLength(1);
+    expect(findings[0].row).toMatchObject({ id: 'row-1', targetType: 'asset' });
+    // `row` is typed RptiReconciliationFinding['row'] — the return type has no
+    // RptiDetail[] slot for the gate to leak into the filing.
+  });
+
+  it('is read-only: reconciliation leaves the stored rows untouched', () => {
+    const stored = [storedRow({ targetType: 'asset' }), storedRow({ id: 'row-2', initiativeId: 'init-gone' })];
+    const snapshot = JSON.parse(JSON.stringify(stored));
+    const segments = [segment()];
+    const segmentsSnapshot = JSON.parse(JSON.stringify(segments));
+    reconcileRptiReturn(ctx(stored, segments));
+    expect(stored).toEqual(snapshot);
+    expect(segments).toEqual(segmentsSnapshot);
   });
 });

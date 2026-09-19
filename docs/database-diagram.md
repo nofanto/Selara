@@ -49,11 +49,19 @@ erDiagram
         string type "deliverable kind: application/infrastructure/document/procedure/other; undefined treated as 'application'"
         string description "optional; what this deliverable does — no category-level default; cascades into LkptiDetail.functionDescription"
         string categoryCode "optional; overrides AssetCategory.categoryCode when set"
-        string developer "optional; 'inhouse' or 'PPJTI' — no category-level default"
+        string developer "optional; 'inhouse' or the service provider's NAME (ADR-0013) — LKPTI files the name, RPTI derives 'PPJTI' from anything not 'inhouse'"
         string dcCity "optional; overrides AssetCategory.dcCity when set"
         string dcCountry "optional"
         string drCity "optional; overrides AssetCategory.drCity when set"
         string drCountry "optional"
+        string platform "optional; ADR-0013 — moved off LkptiDetail"
+        string database "optional; ADR-0013"
+        string dcProvider "optional; 'self' or company name; ADR-0013"
+        string drcProvider "optional; 'self' or company name; ADR-0013"
+        string backupStrategy "optional; HA_ACTIVE_ACTIVE/HA_ACTIVE_PASSIVE/BACKUP_REALTIME/BACKUP_PERIODIC; ADR-0013"
+        string systemOwner "optional; ADR-0013"
+        string ownership "optional; LEASE/OUTRIGHT_PURCHASE; ADR-0013"
+        string ppjtiRelatedParty "optional; 'yes'/'no'/'n/a'; held per application, ADR-0013 Q3"
     }
 
     DELIVERABLE_SEGMENT {
@@ -93,9 +101,10 @@ erDiagram
         string_array resourceIds FK
         date startDate
         date endDate
-        number capex
-        number opex
-        string description
+        number capex "the filed RPTI figure — ADR-0013 Q7 removed the per-row override"
+        number opex "the filed RPTI figure — ADR-0013 Q7 removed the per-row override"
+        string description "supplies the RPTI Deskripsi column"
+        string rptiRemarks "optional; supplies the RPTI Keterangan column — ADR-0013 Q2, distinct from description"
         boolean isPlaceholder
         string status
         string ragStatus
@@ -148,8 +157,6 @@ erDiagram
         string dcCountry
         string drCity
         string drCountry
-        number capexAmount "always in SETTINGS.defaultCurrency"
-        number opexAmount "always in SETTINGS.defaultCurrency"
         string plannedImplementationQuarter
         string deliverableSegmentId FK "optional; set when quarter is auto-derived"
         string remarks
@@ -158,6 +165,7 @@ erDiagram
     LKPTI_DETAIL {
         string id PK
         string targetId FK "Deliverable.id — application-scoped only, unlike RptiDetail"
+        string targetName "optional; filed application-name identity evidence for stale-target repair (ADR-0013 Q12)"
         string categoryCode "narrowed to the 13 LKPTI-eligible codes (excludes 51-54, 99)"
         string developer "'inhouse', or the IT service provider's name (free text)"
         string dcCity
@@ -207,7 +215,9 @@ erDiagram
         string templateId "optional; which workspace template was chosen"
         boolean showRptiCatalogue "optional, default true"
         string clusterName "optional"
-        string defaultCurrency "optional; single workspace-wide currency for RptiDetail.capexAmount/opexAmount"
+        string defaultCurrency "optional; single workspace-wide currency for the filed CapEx/OpEx figures on INITIATIVE"
+        int onboardingLkptiYear "optional; the as-at year stated at onboarding, offered back as the Reports default (ADR-0013)"
+        int onboardingRptiYear "optional; the plan year stated at onboarding, offered back as the Reports default (ADR-0013)"
     }
 
     ASSET_CATEGORY ||--o{ ASSET : "categorizes"

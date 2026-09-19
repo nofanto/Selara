@@ -176,13 +176,13 @@ describe('deriveWorkspaceFromLkptiImport', () => {
   ];
 
   it('creates one AssetCategory per distinct category code, shared across rows', () => {
-    const result = deriveWorkspaceFromLkptiImport(rows);
+    const result = deriveWorkspaceFromLkptiImport(rows, 2026);
     expect(result.assetCategories).toHaveLength(1);
     expect(result.assetCategories[0].categoryCode).toBe('01');
   });
 
   it('creates one placeholder Asset per row, 1:1 with the resulting Deliverable', () => {
-    const result = deriveWorkspaceFromLkptiImport(rows);
+    const result = deriveWorkspaceFromLkptiImport(rows, 2026);
     expect(result.assets).toHaveLength(2);
     expect(result.deliverables).toHaveLength(2);
     expect(result.assets.map(a => a.id).sort()).toEqual(
@@ -190,31 +190,36 @@ describe('deriveWorkspaceFromLkptiImport', () => {
     );
   });
 
-  it('sets Deliverable.developer to "inhouse" only when the raw text is exactly "inhouse", otherwise "PPJTI"', () => {
-    const result = deriveWorkspaceFromLkptiImport(rows);
+  it('sets Deliverable.developer to "inhouse", or to the provider\'s name', () => {
+    // Changed by ADR-0013. This used to collapse any third party to 'PPJTI', which
+    // discarded the one thing the LKPTI column actually asks for — who built it. The
+    // classification is now derived where the RPTI needs it ("not inhouse" => PPJTI),
+    // so one field serves both returns and the name survives a regeneration.
+    const result = deriveWorkspaceFromLkptiImport(rows, 2026);
     expect(result.deliverables[0].developer).toBe('inhouse');
-    expect(result.deliverables[1].developer).toBe('PPJTI');
+    expect(result.deliverables[1].developer).toBe('PT Third Party Dev');
   });
 
   it('creates exactly one open-ended live DeliverableSegment per row, anchored on the go-live date', () => {
-    const result = deriveWorkspaceFromLkptiImport(rows);
+    const result = deriveWorkspaceFromLkptiImport(rows, 2026);
     expect(result.deliverableSegments).toHaveLength(2);
     expect(result.deliverableSegments[0].startDate).toBe('2021-03-15');
     expect(result.deliverableSegments.every(s => s.endDate > '2021-03-15')).toBe(true);
   });
 
   it('creates exactly one live DeliverableStatus, shared by every segment', () => {
-    const result = deriveWorkspaceFromLkptiImport(rows);
+    const result = deriveWorkspaceFromLkptiImport(rows, 2026);
     expect(result.deliverableStatuses).toHaveLength(1);
     expect(result.deliverableStatuses[0].isLiveStatus).toBe(true);
     expect(result.deliverableSegments.every(s => s.status === result.deliverableStatuses[0].id)).toBe(true);
   });
 
   it('writes an LkptiDetail row per import row with all 15 columns worth of data, including the 7 manual-only fields', () => {
-    const result = deriveWorkspaceFromLkptiImport(rows);
+    const result = deriveWorkspaceFromLkptiImport(rows, 2026);
     expect(result.lkptiDetails).toHaveLength(2);
     expect(result.lkptiDetails[0]).toMatchObject({
       targetId: result.deliverables[0].id,
+      targetName: 'Core Banking App',
       categoryCode: '01',
       platform: 'Java/Spring',
       database: 'PostgreSQL',
@@ -229,7 +234,7 @@ describe('deriveWorkspaceFromLkptiImport', () => {
   });
 
   it('preserves the raw developer text on LkptiDetail.developer even for third-party developers', () => {
-    const result = deriveWorkspaceFromLkptiImport(rows);
+    const result = deriveWorkspaceFromLkptiImport(rows, 2026);
     expect(result.lkptiDetails[1].developer).toBe('PT Third Party Dev');
   });
 });
@@ -255,14 +260,14 @@ describe('a blank developer cell is accepted, not a reason to drop the row', () 
 
   it('leaves the developer unknown rather than defaulting it to PPJTI', () => {
     const { rows } = parseLkptiImportWorkbook(makeWorkbook([blankDeveloperRow()]));
-    const derived = deriveWorkspaceFromLkptiImport(rows);
+    const derived = deriveWorkspaceFromLkptiImport(rows, 2026);
     expect(derived.deliverables[0].developer).toBeUndefined();
     expect(derived.lkptiDetails[0].developer).toBeUndefined();
   });
 
   it('still reads an explicit developer', () => {
     const { rows } = parseLkptiImportWorkbook(makeWorkbook([VALID_ROW]));
-    const derived = deriveWorkspaceFromLkptiImport(rows);
+    const derived = deriveWorkspaceFromLkptiImport(rows, 2026);
     expect(derived.deliverables[0].developer).toBe('inhouse');
     expect(derived.lkptiDetails[0].developer).toBe('inhouse');
   });
@@ -293,7 +298,7 @@ describe('round trip against the real exporter', () => {
 
   it('turns that return into one application per filed row', () => {
     const { rows } = parseLkptiImportWorkbook(load('lkpti-format-3.2.6.xlsx'));
-    const out = deriveWorkspaceFromLkptiImport(rows);
+    const out = deriveWorkspaceFromLkptiImport(rows, 2026);
     expect(out.deliverables).toHaveLength(rows.length);
     expect(out.lkptiDetails).toHaveLength(rows.length);
   });
@@ -309,7 +314,7 @@ describe('a blank category cell is accepted, but a wrong one is not', () => {
   it('keeps a row that states no category, and buckets it visibly', () => {
     const { rows, skipped } = parseLkptiImportWorkbook(withCategory(''));
     expect(skipped).toEqual([]);
-    const out = deriveWorkspaceFromLkptiImport(rows);
+    const out = deriveWorkspaceFromLkptiImport(rows, 2026);
     expect(out.deliverables[0].categoryCode).toBeUndefined();
     expect(out.assetCategories[0].name).toBe('Uncategorised');
     expect(out.assetCategories[0].categoryCode).toBeUndefined();
@@ -327,7 +332,7 @@ describe('colours are Tailwind classes, not hex or bare colour names', () => {
   // class, so every imported lifecycle segment drew with no fill.
   it('gives every imported deliverable status a class the visualiser can render', () => {
     const { rows } = parseLkptiImportWorkbook(makeWorkbook([VALID_ROW]));
-    const out = deriveWorkspaceFromLkptiImport(rows);
+    const out = deriveWorkspaceFromLkptiImport(rows, 2026);
     expect(out.deliverableStatuses.length).toBeGreaterThan(0);
     for (const s of out.deliverableStatuses) expect(s.color).toMatch(/^bg-[a-z]+-\d{2,3}$/);
   });
@@ -340,8 +345,82 @@ describe('imported applications state their type', () => {
   // select on all 13 imported rows, which reads as missing data.
   it('sets type to application rather than leaving it to a fallback', () => {
     const { rows } = parseLkptiImportWorkbook(makeWorkbook([VALID_ROW]));
-    const out = deriveWorkspaceFromLkptiImport(rows);
+    const out = deriveWorkspaceFromLkptiImport(rows, 2026);
     expect(out.deliverables).toHaveLength(1);
     expect(out.deliverables[0].type).toBe('application');
+  });
+});
+
+describe('the importer records attributes on the application, not only on the report row', () => {
+  /**
+   * ADR-0013. The filed return is the only source for platform, database, the two
+   * providers, backup strategy, system owner, ownership and the vendor's name. They
+   * now live on the Deliverable so a regenerated LKPTI can read them; before this,
+   * regenerating lost all eight on every row.
+   */
+  it('writes all eight onto the Deliverable', () => {
+    const { rows } = parseLkptiImportWorkbook(makeWorkbook([VALID_ROW]));
+    const out = deriveWorkspaceFromLkptiImport(rows, 2026);
+    expect(out.deliverables[0]).toMatchObject({
+      platform: 'Java/Spring',
+      database: 'PostgreSQL',
+      dcProvider: 'Self',
+      drcProvider: 'Self',
+      backupStrategy: 'HA_ACTIVE_ACTIVE',
+      systemOwner: 'Jane Doe',
+      ownership: 'OUTRIGHT_PURCHASE',
+      developer: 'inhouse',
+    });
+  });
+
+  it('carries a provider name onto the Deliverable, not just the classification', () => {
+    const row = [...VALID_ROW];
+    row[12] = 'PT Anabatic Technologies';
+    const { rows } = parseLkptiImportWorkbook(makeWorkbook([row]));
+    const out = deriveWorkspaceFromLkptiImport(rows, 2026);
+    // The name itself — the RPTI derives 'PPJTI' from it, the LKPTI emits it verbatim.
+    expect(out.deliverables[0].developer).toBe('PT Anabatic Technologies');
+  });
+
+  it('leaves an attribute the return did not supply unset rather than inventing one', () => {
+    const row = [...VALID_ROW];
+    row[4] = '';  // Platform
+    const { rows } = parseLkptiImportWorkbook(makeWorkbook([row]));
+    const out = deriveWorkspaceFromLkptiImport(rows, 2026);
+    expect(out.deliverables[0].platform).toBeUndefined();
+  });
+});
+
+/**
+ * T032 / FR-009. The LKPTI is a point-in-time inventory, and onboarding asks which
+ * point that is — then, until now, threw the answer away and asked the system clock
+ * instead. `openEndedDate()` read `new Date()`, so importing the same filed return in
+ * 2026 and again in 2030 produced different workspaces from identical input. That is
+ * the same class of defect as the report year #40 was raised for: a regulatory artefact
+ * whose meaning depends on when you happened to open the app.
+ */
+describe('the stated as-at year, not the clock, anchors an imported inventory (T032)', () => {
+  const row: LkptiImportRow = {
+    categoryCode: '01', name: 'Core Banking App', description: 'Ledger',
+    platform: 'Java/Spring', database: 'PostgreSQL',
+    dcCity: 'Jakarta', dcCountry: 'Indonesia', dcProvider: 'Self',
+    drCity: 'Surabaya', drCountry: 'Indonesia', drcProvider: 'Self',
+    backupStrategy: 'HA_ACTIVE_ACTIVE', systemOwner: 'Jane Doe',
+    developerRaw: 'inhouse', goLiveDateIso: '2020-03-01', ownership: 'LEASE',
+  };
+
+  it('derives the open-ended live segment from the stated year', () => {
+    const a = deriveWorkspaceFromLkptiImport([row], 2026);
+    const b = deriveWorkspaceFromLkptiImport([row], 2030);
+
+    expect(a.deliverableSegments[0].endDate).toBe('2031-12-31');
+    expect(b.deliverableSegments[0].endDate).toBe('2035-12-31');
+  });
+
+  it('gives the same workspace for the same file and year, whenever it is run', () => {
+    const first = deriveWorkspaceFromLkptiImport([row], 2026);
+    const second = deriveWorkspaceFromLkptiImport([row], 2026);
+    expect(first.deliverableSegments.map(s => s.endDate))
+      .toEqual(second.deliverableSegments.map(s => s.endDate));
   });
 });

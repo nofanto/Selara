@@ -42,6 +42,23 @@ describe('computeDataHealth — hard checks (dangling references)', () => {
     expect(findIssue(issues, `deliverable-asset:${deliverable.id}`)).toBeUndefined();
   });
 
+  it('clears a stale LKPTI target when its retained filing name identifies exactly one replacement', () => {
+    const stale = { id: 'lk-stale', targetId: 'deleted-deliverable', targetName: 'App One' };
+    const issues = computeDataHealth(baseInput({
+      assets: [asset], deliverables: [deliverable], lkptiDetails: [stale],
+    }));
+    expect(findIssue(issues, `lkpti-target:${stale.id}`)).toBeUndefined();
+  });
+
+  it('requires re-import for an already-orphaned LKPTI row with no retained filing name', () => {
+    const stale = { id: 'lk-stale', targetId: 'deleted-deliverable' };
+    const issue = findIssue(computeDataHealth(baseInput({
+      assets: [asset], deliverables: [deliverable], lkptiDetails: [stale],
+    })), `lkpti-target:${stale.id}`);
+    expect(issue?.message).toMatch(/re-import/i);
+    expect(issue?.message).toMatch(/name.*not.*recorded/i);
+  });
+
   it('flags an Asset pointing at a missing AssetCategory', () => {
     const issues = computeDataHealth(baseInput({ assets: [asset] }));
     expect(findIssue(issues, `asset-category:${asset.id}`)?.severity).toBe('error');
@@ -92,6 +109,19 @@ describe('computeDataHealth — hard checks (dangling references)', () => {
     expect(issues.filter(i => i.entityId === init.id && i.severity === 'error')).toHaveLength(0);
   });
 
+  it('flags an initiative whose reportable segments name more than one deliverable', () => {
+    const init = { id: 'init-1', name: 'Split plan', programmeId: 'prog-1', assetId: asset.id, startDate: '2026-01-01', endDate: '2026-12-31', capex: 0, opex: 0 };
+    const second = { ...deliverable, id: 'deliv-2', name: 'App Two' };
+    const segments = [
+      { id: 'seg-1', deliverableId: deliverable.id, initiativeId: init.id, startDate: '2026-01-01', endDate: '2026-03-31', status: 'appstatus-planned' },
+      { id: 'seg-2', deliverableId: second.id, initiativeId: init.id, startDate: '2026-04-01', endDate: '2026-06-30', status: 'appstatus-planned' },
+    ];
+    const issue = findIssue(computeDataHealth(baseInput({ assets: [asset], deliverables: [deliverable, second], initiatives: [init], deliverableSegments: segments })), `initiative-rpti-multi-target:${init.id}`);
+
+    expect(issue).toMatchObject({ severity: 'error', location: { view: 'data', tab: 'initiatives' } });
+    expect(issue?.message).toMatch(/split/i);
+  });
+
   it('flags a Milestone pointing at a missing Asset', () => {
     const milestone = { id: 'mile-1', assetId: 'ghost', date: '2026-01-01', name: 'Milestone One', type: 'info' as const };
     const issues = computeDataHealth(baseInput({ milestones: [milestone] }));
@@ -125,6 +155,15 @@ describe('computeDataHealth — hard checks (dangling references)', () => {
     expect(findIssue(issues, `rpti-initiative:${r.id}`)?.severity).toBe('error');
     expect(findIssue(issues, `rpti-target:${r.id}`)?.severity).toBe('error');
     expect(findIssue(issues, `rpti-segment:${r.id}`)?.severity).toBe('error');
+  });
+
+  it('blocks a legacy asset-target RPTI row and names the source-side repair', () => {
+    const init = { id: 'init-1', name: 'Payments renewal', programmeId: 'prog-1', assetId: asset.id, startDate: '2026-01-01', endDate: '2026-12-31', capex: 0, opex: 0 };
+    const row = { id: 'rpti-asset-1', initiativeId: init.id, targetType: 'asset' as const, targetId: asset.id, developmentType: 'new' as const };
+    const issue = findIssue(computeDataHealth(baseInput({ assets: [asset], initiatives: [init], rptiDetails: [row] })), `rpti-asset-target:${row.id}`);
+
+    expect(issue).toMatchObject({ severity: 'error', location: { view: 'data', tab: 'deliverables' } });
+    expect(issue?.message).toMatch(/Deliverables tab.*Initiatives tab.*timeline/i);
   });
 
   it('flags an LkptiDetail with a dangling targetId', () => {
@@ -224,7 +263,7 @@ describe('computeDataHealth — soft checks (report-generation gaps)', () => {
     const issue = findIssue(issues, `rpti-incomplete:${r.id}`);
     expect(issue?.severity).toBe('warning');
     expect(issue?.message).toContain('Category');
-    expect(issue?.message).toContain('PPJTI Related Party');
+    expect(issue?.message).toContain('Provider Related Party');
   });
 
   it('flags an Initiative with no owner and no legacy owner string', () => {
@@ -353,7 +392,9 @@ describe('computeDataHealth — validity: length caps', () => {
     const issues = computeDataHealth(lkptiInput({ dcCity: 'x'.repeat(60), dcCountry: 'y'.repeat(60) }));
     const issue = findIssue(issues, `lkpti-too-long:${fullLkpti.id}:dcLocation`);
     expect(issue?.severity).toBe('error');
-    expect(issue?.location).toEqual({ view: 'data', tab: 'lkpti' });
+    // Repointed by T028: the LKPTI tab is read-only, and these values live on the
+    // application (ADR-0013), so the repair is on the Deliverables tab (FR-021a).
+    expect(issue?.location).toEqual({ view: 'data', tab: 'deliverables' });
   });
 
   it('accepts a composed dcLocation within the cap', () => {
@@ -438,7 +479,9 @@ describe('computeDataHealth — validity: RPTI workspace currency', () => {
     expect(issue?.severity).toBe('warning');
     expect(issue?.phase).toBe('validity');
     expect(issue?.entityType).toBe('Workspace');
-    expect(issue?.location).toEqual({ view: 'data', tab: 'rpti' });
+    // Repointed by T028: the currency control moved out of the RPTI tab into the
+    // visualiser's display settings when that tab became read-only.
+    expect(issue?.location).toEqual({ view: 'data', tab: 'initiatives' });
   });
 
   it('does not flag IDR', () => {
@@ -472,9 +515,12 @@ describe('computeDataHealth — unresolved RPTI import references (#38)', () => 
 
   it('reports an imported row whose upgrade target was never resolved', () => {
     const issues = computeDataHealth(baseInput({ initiatives: [initiative], rptiDetails: [unresolvedRow] }));
+    // T028a: the repair is source-side now. The RPTI tab no longer has a Target
+    // dropdown to fix, so the finding must send the preparer to the application the
+    // filed plan refers to — otherwise FR-025 has no remaining repair path.
     expect(findIssue(issues, `rpti-target:${unresolvedRow.id}`)).toMatchObject({
       severity: 'error',
-      location: { view: 'data', tab: 'rpti' },
+      location: { view: 'data', tab: 'deliverables' },
     });
   });
 
@@ -564,5 +610,128 @@ describe('every check declares which return it bears on', () => {
     expect(byCheck('rpti-target')?.reports).toEqual(['rpti']);
     expect(byCheck('deliverable-no-segments')?.reports).toEqual(['rpti', 'lkpti']);
     expect(byCheck('initiative-programme')?.reports).toEqual([]);
+  });
+});
+
+
+describe('RPTI target compatibility', () => {
+  const init = { id: 'target-init', name: 'Target work', programmeId: programme.id, assetId: asset.id,
+    startDate: '2026-01-01', endDate: '2026-12-31', capex: 1, opex: 0 };
+  const segment = { id: 'target-seg', initiativeId: init.id, deliverableId: deliverable.id,
+    status: 'appstatus-planned', startDate: '2026-01-01', endDate: '2026-12-31' };
+  it('names the repair when qualifying segments have no existing target', () => {
+    const issues = computeDataHealth(baseInput({ initiatives: [init], deliverableSegments: [segment] }));
+    const issue = findIssue(issues, `initiative-rpti-no-target:${init.id}`);
+    expect(issue?.severity).toBe('error');
+    expect(issue?.message).toMatch(/select.*deliverable/i);
+    expect(issue?.reports).toContain('rpti');
+  });
+  it('does not flag a single inferred target', () => {
+    const issues = computeDataHealth(baseInput({ initiatives: [init], deliverables: [deliverable], deliverableSegments: [segment] }));
+    expect(findIssue(issues, `initiative-rpti-no-target:${init.id}`)).toBeUndefined();
+  });
+  it('accepts a declared target despite other timeline history', () => {
+    const issues = computeDataHealth(baseInput({ initiatives: [{ ...init, deliverableId: deliverable.id }],
+      deliverables: [deliverable, { ...deliverable, id: 'other' }],
+      deliverableSegments: [segment, { ...segment, id: 'other-seg', deliverableId: 'other' }] }));
+    expect(findIssue(issues, `initiative-rpti-multi-target:${init.id}`)).toBeUndefined();
+  });
+  it('flags ambiguous infrastructure targets as RPTI errors', () => {
+    const issues = computeDataHealth(baseInput({ initiatives: [init],
+      deliverables: [{ ...deliverable, type: 'infrastructure' }, { ...deliverable, id: 'other', type: 'infrastructure' }],
+      deliverableSegments: [segment, { ...segment, id: 'other-seg', deliverableId: 'other' }] }));
+    const issue = findIssue(issues, `initiative-rpti-multi-target:${init.id}`);
+    expect(issue?.severity).toBe('error');
+    expect(issue?.reports).toContain('rpti');
+  });
+});
+
+/**
+ * T028 / FR-021a. Both report tabs became read-only (Q5/Q6 revised), so a finding whose
+ * `location` still points at one tells the preparer where the problem *is* and not where
+ * to fix it — and nothing else fails when that happens, because a location naming a real
+ * tab is still a valid location. That silence is why this guard is behavioural rather
+ * than a code review note.
+ */
+describe('no data-health finding sends the preparer to a read-only report tab (FR-021a)', () => {
+  const READ_ONLY = ['rpti', 'lkpti'];
+
+  it('holds for a workspace whose every report-row check is tripped at once', () => {
+    const issues = computeDataHealth(baseInput({
+      assetCategories: [cat], assets: [asset], deliverables: [deliverable], programmes: [programme],
+      timelineSettings: { defaultCurrency: 'USD' },
+      initiatives: [{ id: 'init-1', name: 'Init One', programmeId: 'prog-1', assetId: 'asset-1',
+        startDate: '2027-01-01', endDate: '2027-12-31', capex: 0, opex: 0 }],
+      rptiDetails: [
+        // dangling initiative, dangling target, dangling segment, bare-Asset target,
+        // and a row missing every manual-only field.
+        { id: 'r-ghost-init', initiativeId: 'gone', targetType: 'deliverable', targetId: 'deliv-1', developmentType: 'new' },
+        { id: 'r-ghost-target', initiativeId: 'init-1', targetType: 'deliverable', targetId: 'gone', developmentType: 'new' },
+        { id: 'r-ghost-seg', initiativeId: 'init-1', targetType: 'deliverable', targetId: 'deliv-1',
+          developmentType: 'new', deliverableSegmentId: 'gone' },
+        { id: 'r-asset', initiativeId: 'init-1', targetType: 'asset', targetId: 'asset-1', developmentType: 'new' },
+      ] as never,
+      lkptiDetails: [
+        { id: 'l-ghost', targetId: 'gone' },
+        { id: 'l-bare', targetId: 'deliv-1' },
+      ] as never,
+    }));
+
+    // Guard: if the fixture stopped tripping checks this would pass vacuously.
+    expect(issues.length, 'guard: the fixture must actually produce findings').toBeGreaterThan(5);
+
+    const stranded = issues
+      .filter(i => i.location.view === 'data' && READ_ONLY.includes((i.location as { tab: string }).tab))
+      .map(i => `${i.id} → ${(i.location as { tab: string }).tab}`);
+    expect(stranded, 'these findings point at a tab the preparer cannot edit').toEqual([]);
+  });
+});
+
+/**
+ * F6, from the final adversarial review. Q10 made an explicit RPTI target win over
+ * timeline history, and the multi-target error is correctly suppressed when one is
+ * declared. But "the target exists" was then treated as "the target is generatable":
+ * an initiative declaring D1 while all its work sits on D2 produces no plan line at
+ * all, and — with no stored row for reconciliation to inspect — no explanation either.
+ *
+ * A silently absent filing row is the failure this feature exists to remove, and this
+ * is the case where preparer intent is least safely inferred: the only qualifying work
+ * points somewhere other than the declared filing target.
+ */
+describe('an explicit RPTI target with no qualifying work on it is reported (F6)', () => {
+  const second = { id: 'deliv-2', assetId: 'asset-1', name: 'App Two', type: 'application' as const };
+  const declaringD1WorkingOnD2 = () => baseInput({
+    assetCategories: [cat], assets: [asset], deliverables: [deliverable, second], programmes: [programme],
+    initiatives: [{ id: 'init-1', name: 'Misaimed Initiative', programmeId: 'prog-1', assetId: 'asset-1',
+      deliverableId: 'deliv-1', startDate: '2027-01-01', endDate: '2027-12-31', capex: 0, opex: 0 }],
+    deliverableSegments: [{ id: 'seg-1', deliverableId: 'deliv-2', initiativeId: 'init-1',
+      status: 'appstatus-in-production', startDate: '2027-02-01', endDate: '2027-12-31' }],
+  });
+
+  it('raises an error naming the declared target and where the work actually is', () => {
+    const issue = findIssue(computeDataHealth(declaringD1WorkingOnD2()), 'initiative-rpti-unanchored-target:init-1');
+
+    expect(issue, 'nothing explains why this initiative files no row').toBeDefined();
+    expect(issue?.severity).toBe('error');
+    expect(issue?.message).toContain('App One');
+    expect(issue?.message, 'the preparer needs to know where the work actually sits').toContain('App Two');
+    expect(issue?.location).toEqual({ view: 'data', tab: 'initiatives' });
+  });
+
+  it('stays silent once the declared target carries qualifying work', () => {
+    const input = declaringD1WorkingOnD2();
+    input.deliverableSegments = [{ id: 'seg-1', deliverableId: 'deliv-1', initiativeId: 'init-1',
+      status: 'appstatus-in-production', startDate: '2027-02-01', endDate: '2027-12-31' }];
+
+    expect(findIssue(computeDataHealth(input), 'initiative-rpti-unanchored-target:init-1')).toBeUndefined();
+  });
+
+  it('does not fire for an initiative with no qualifying segments at all', () => {
+    const input = declaringD1WorkingOnD2();
+    input.deliverableSegments = [];
+
+    // Nothing is being filed, so there is no absent row to explain. Reporting here
+    // would flag every initiative that has not been scheduled yet.
+    expect(findIssue(computeDataHealth(input), 'initiative-rpti-unanchored-target:init-1')).toBeUndefined();
   });
 });

@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
-import { RptiDetail, RptiCategoryCode, RptiQuarter, Initiative, Deliverable, Asset, AssetCategory, DeliverableSegment, DeliverableStatus } from '../types';
+import { RptiDetail, RptiCategoryCode, RptiQuarter, Initiative, Deliverable, Asset, AssetCategory, DeliverableSegment, DeliverableStatus, RptiDeveloper,
+} from '../types';
 
 export const RPTI_CATEGORY_LABELS: Record<RptiCategoryCode, string> = {
   '01': 'Customer management',
@@ -89,19 +90,31 @@ function classifySegmentKind(statusId: string, deliverableStatuses: DeliverableS
   return 'excluded';
 }
 
-export interface GenerateRptiDetailsInput {
+/** Q10: target ownership is initiative-wide, never inferred separately per filing year. */
+export function resolveRptiTarget(
+  initiative: Initiative, segments: DeliverableSegment[], deliverables: Deliverable[],
+): string | undefined {
+  if (initiative.deliverableId) return initiative.deliverableId;
+  const targets = new Set(segments.filter(segment => segment.initiativeId === initiative.id).map(segment => segment.deliverableId));
+  if (targets.size !== 1) return undefined;
+  const target = [...targets][0];
+  return deliverables.some(deliverable => deliverable.id === target) ? target : undefined;
+}
+
+/**
+ * The complete input of the projection. Deliberately has no `existingDetails` key:
+ * issue #40's defect was exactly one caller being able to hand stored rows to a
+ * return that is supposed to be derived, so the type that could carry them is gone.
+ * (See requirement-specs/report-rows-as-projections.md Q11 — passing stored rows to
+ * the projection is now a compile error, asserted by a @ts-expect-error test.)
+ */
+export interface ProjectRptiInput {
   deliverableSegments: DeliverableSegment[];
   deliverableStatuses: DeliverableStatus[];
   initiatives: Initiative[];
   deliverables: Deliverable[];
   assets: Asset[];
   assetCategories: AssetCategory[];
-  /**
-   * Rows already in the workspace. Supplying them makes generation merge-preserving
-   * instead of wipe-and-rebuild; omitting them keeps the old behaviour of returning
-   * only what could be generated.
-   */
-  existingDetails?: RptiDetail[];
 }
 
 // Resolves the AssetCategory backing a Deliverable's auto-fill defaults, via
@@ -116,18 +129,19 @@ export function resolveAssetCategory(
 }
 
 /**
- * Generates RptiDetail rows for a single report year from DeliverableSegment data —
- * see requirement-specs/rpti-auto-generation.md for the row-generation rule and
- * requirement-specs/rpti-auto-fill-improvements.md for the categoryCode/developer/
- * location auto-fill rules below. Wipe-and-rebuild: callers replace the existing
- * rptiDetails for the year with this function's output, there's no reconciliation
- * with prior manual edits (v1).
+ * Projects the RPTI return for a single report year from the workspace's canonical
+ * planning entities — see requirement-specs/rpti-auto-generation.md for the
+ * row-generation rule and requirement-specs/rpti-auto-fill-improvements.md for the
+ * categoryCode/developer/location auto-fill rules below. The output is a function of
+ * `(input, reportYear)` alone: stored report rows cannot enter it (issue #40,
+ * contract 2), and what it cannot reproduce is named by `reconcileRptiReturn`, not
+ * silently carried.
  */
-export function generateRptiDetails(
-  input: GenerateRptiDetailsInput,
+export function projectRptiReturn(
+  input: ProjectRptiInput,
   reportYear: number,
 ): RptiDetail[] {
-  const { deliverableSegments, deliverableStatuses, initiatives, deliverables, assets, assetCategories, existingDetails = [] } = input;
+  const { deliverableSegments, deliverableStatuses, initiatives, deliverables, assets, assetCategories } = input;
 
   // Overlap, not "starts in": a segment qualifies if any part of its
   // [startDate, endDate] range falls within the report year, even if it
@@ -165,9 +179,16 @@ export function generateRptiDetails(
     .map(seg => ({ segment: seg, kind: classifySegmentKind(seg.status, deliverableStatuses) }))
     .filter((s): s is { segment: DeliverableSegment; kind: 'new' | 'live' } => s.kind !== 'excluded');
 
+  const targets = new Map(initiatives.map(initiative => [initiative.id, resolveRptiTarget(initiative, deliverableSegments, deliverables)]));
   const groups = new Map<string, { segment: DeliverableSegment; kind: 'new' | 'live' }[]>();
   for (const item of qualifying) {
-    const key = `${item.segment.initiativeId}::${item.segment.deliverableId}`;
+    const initiative = initiatives.find(candidate => candidate.id === item.segment.initiativeId);
+    // The Initiative is the canonical RPTI plan line. Segments on another
+    // deliverable remain timeline history but are not a second filing target.
+    const target = initiative && targets.get(initiative.id);
+    // Unresolved/ambiguous targets are diagnosed by data health and gate export.
+    if (!initiative || !target || item.segment.deliverableId !== target) continue;
+    const key = initiative.id;
     const group = groups.get(key);
     if (group) group.push(item);
     else groups.set(key, [item]);
@@ -177,8 +198,9 @@ export function generateRptiDetails(
     a.segment.startDate.localeCompare(b.segment.startDate);
 
   const results: RptiDetail[] = [];
-  for (const [key, items] of groups) {
-    const [initiativeId, deliverableId] = key.split('::');
+  for (const [initiativeId, items] of groups) {
+    const deliverableId = targets.get(initiativeId);
+    if (!deliverableId) continue;
     const newItems = items.filter(i => i.kind === 'new').sort(byStartDateAsc);
     const liveItems = items.filter(i => i.kind === 'live').sort(byStartDateAsc);
 
@@ -189,8 +211,17 @@ export function generateRptiDetails(
       : liveItems[liveItems.length - 1];
 
     const deliverable = deliverables.find(d => d.id === deliverableId);
+    const initiative = initiatives.find(i => i.id === initiativeId);
     const category = resolveAssetCategory(deliverable, assets, assetCategories);
-    const developer = deliverable?.developer;
+    // Deliverable.developer now carries either 'inhouse' or a provider's *name*
+    // (ADR-0013). The RPTI column wants the classification, so anything that is not
+    // 'inhouse' is PPJTI — a third party, whoever they are. LKPTI emits the name
+    // itself, which is why one field can serve both returns.
+    const rawDeveloper = deliverable?.developer;
+    const developer: RptiDeveloper | undefined =
+      rawDeveloper === undefined || rawDeveloper === ''
+        ? undefined
+        : rawDeveloper === 'inhouse' ? 'inhouse' : 'PPJTI';
 
     results.push({
       id: `rpti-gen-${initiativeId}-${deliverableId}-${reportYear}`,
@@ -200,76 +231,222 @@ export function generateRptiDetails(
       categoryCode: deliverable?.categoryCode ?? category?.categoryCode,
       developmentType,
       developer,
-      // 'n/a' by definition whenever the resolved developer isn't PPJTI — including
-      // when developer itself is unset, since there's no category-level default for
-      // it. Only genuinely ambiguous, so left blank for manual entry, when it's PPJTI.
-      ppjtiRelatedParty: developer !== 'PPJTI' ? 'n/a' : undefined,
+      // 'n/a' by definition whenever the resolved developer isn't PPJTI — there is no
+      // third party, so there is no relationship to disclose. When it *is* PPJTI the
+      // answer is a fact about the vendor that nothing can derive, so it is read from
+      // the deliverable, where the preparer records it (FR-014).
+      ppjtiRelatedParty: developer !== 'PPJTI' ? 'n/a' : deliverable?.ppjtiRelatedParty,
       dcCity: deliverable?.dcCity ?? category?.dcCity,
       dcCountry: deliverable?.dcCountry ?? category?.dcCountry,
       drCity: deliverable?.drCity ?? category?.drCity,
       drCountry: deliverable?.drCountry ?? category?.drCountry,
       plannedImplementationQuarter: deriveQuarterFromDate(anchor.segment.startDate),
       deliverableSegmentId: anchor.segment.id,
+      // Keterangan comes from the work it comments on, matching Deskripsi two columns
+      // earlier, which has always come from the initiative (ADR-0013).
+      remarks: initiative?.rptiRemarks,
     });
   }
 
-  return mergeWithExisting(results, existingDetails);
+  return results;
 }
 
 /**
- * Folds freshly generated rows into the rows already present, rather than replacing
- * them wholesale.
- *
- * Wipe-and-rebuild was the shipped v1 (see requirement-specs/rpti-auto-generation.md,
- * "Regeneration behavior"), on the grounds that losing manual edits could be revisited
- * if it hurt. It does. A row that generation cannot reproduce is not necessarily stale:
- * an imported upgrade whose target was not found in the inventory has no segment to
- * regenerate from, so a wipe silently deleted the filed CapEx, OpEx, quarter and
- * remarks of the very row most needing attention — and took its data-health warning
- * with it, so the problem looked solved. Generation is also year-scoped, so rebuilding
- * one year used to destroy every other year's rows.
- *
- * A row is matched to its regenerated counterpart by (initiative, target) rather than
- * by id, because an imported row and a generated one for the same work carry different
- * ids. On a match the derived fields refresh and the row keeps its id and the fields
- * generation has no source for. With no existing rows supplied this returns the
- * generated list unchanged.
+ * Why a stored RPTI row cannot be reproduced by the source model — a different
+ * question from whether it belongs to the selected year (see
+ * requirement-specs/report-rows-as-projections.md Q11: the two axes are
+ * independent). Reasons are checked in the order a repair must follow.
  */
-function mergeWithExisting(generated: RptiDetail[], existing: RptiDetail[]): RptiDetail[] {
-  if (existing.length === 0) return generated;
+export type RptiReconciliationReason =
+  | 'asset-target'       // no repaired canonical Deliverable counterpart exists for the legacy Asset row
+  | 'missing-initiative' // no unique current canonical identity replaces the missing Initiative
+  | 'missing-target'     // no unique current canonical identity replaces the missing target
+  | 'identity-conflict'  // zero/one canonical identity cannot account for multiple/ambiguous stored rows
+  | 'unanchored';        // references resolve, but no segment pair can reproduce it in any year
 
-  const key = (r: RptiDetail) => `${r.initiativeId}::${r.targetId}`;
-  const freshByKey = new Map(generated.map(r => [key(r), r]));
-  const merged: RptiDetail[] = [];
-  const refreshed = new Set<string>();
+export interface RptiReconciliationFinding {
+  /** Stable: `rpti-reconcile-<reason>-<rowId>`. */
+  id: string;
+  rowId: string;
+  reason: RptiReconciliationReason;
+  /** Names the source-side repair (FR-025): what to fix, not what to re-key. */
+  message: string;
+  /**
+   * The stored row, as evidence for the gate to display. Findings are not rows and
+   * are never merged into a return — this exists so the preparer can see *which*
+   * filed line the finding is about, and nothing may pass it to `projectRptiReturn`
+   * or the exporter.
+   */
+  row: RptiDetail;
+}
 
-  // Existing order first, so regenerating does not reshuffle the table under the user.
-  for (const row of existing) {
-    const k = key(row);
-    const fresh = freshByKey.get(k);
-    if (!fresh || refreshed.has(k)) {
-      // Not reproduced, or a second row for the same pair — keep it exactly as it is.
-      // Preserving a duplicate beats silently dropping filed data.
-      merged.push(row);
+export interface ReconcileRptiInput {
+  /** Stored rows (`AppState.rptiDetails`) — read as evidence, never written or returned. */
+  storedDetails: RptiDetail[];
+  initiatives: Initiative[];
+  deliverables: Deliverable[];
+  deliverableSegments: DeliverableSegment[];
+  deliverableStatuses: DeliverableStatus[];
+}
+
+/**
+ * Compares stored RPTI rows against the source model and returns findings, not rows
+ * (FR-024, issue #40). Where the old merge turned every unmatched stored row into a
+ * projection member — leaking a 2027 line into a 2026 filing — this asks only
+ * "does this evidence have one current canonical row identity in *some* year?". A valid
+ * other-year row produces no finding: its absence from the selected year is correct,
+ * not a defect.
+ *
+ * The honesty limit, accepted with option 1 and fixed by the deferred option 5:
+ * `RptiDetail` carries no report year, so a finding cannot say *which* year the row
+ * was filed for, and these findings block every year's export, not just the row's
+ * own. That global gate is the chosen policy — unaccounted-for filed evidence must never
+ * leave a return silently — and the messages say "no filing year" rather than
+ * inventing an attribution the data cannot support.
+ */
+export function reconcileRptiReturn(input: ReconcileRptiInput): RptiReconciliationFinding[] {
+  const { storedDetails, initiatives, deliverables, deliverableSegments, deliverableStatuses } = input;
+  const initiativeById = new Map(initiatives.map(i => [i.id, i]));
+  const deliverableById = new Map(deliverables.map(d => [d.id, d]));
+  const findings: RptiReconciliationFinding[] = [];
+
+  // A canonical row identity exists independently of any selected filing year: one
+  // Initiative, its resolved target, and at least one qualifying segment on that pair.
+  // Filed values are deliberately not compared here (Q12); that policy remains open.
+  const canonical = initiatives.flatMap(initiative => {
+    if (initiative.isPlaceholder === true) return [];
+    const targetId = resolveRptiTarget(initiative, deliverableSegments, deliverables);
+    if (!targetId || !deliverableById.has(targetId)) return [];
+    const anchored = deliverableSegments.some(seg =>
+      seg.initiativeId === initiative.id
+      && seg.deliverableId === targetId
+      && classifySegmentKind(seg.status, deliverableStatuses) !== 'excluded');
+    return anchored ? [{ key: `${initiative.id}\u0000${targetId}`, initiative, targetId }] : [];
+  });
+
+  const candidateFor = (row: RptiDetail) => {
+    const exact = canonical.filter(c =>
+      row.targetType === 'deliverable'
+      && c.initiative.id === row.initiativeId
+      && c.targetId === row.targetId);
+    if (exact.length === 1) return { candidate: exact[0], ambiguous: false };
+
+    // When the target was recreated (including a legacy bare-Asset target), the
+    // surviving Initiative identifies its replacement only after the preparer has
+    // explicitly selected it. Inference alone is not the named repair.
+    const byInitiative = canonical.filter(c => {
+      if (c.initiative.id !== row.initiativeId || c.initiative.deliverableId !== c.targetId) return false;
+      if (row.targetType === 'asset') return deliverableById.get(c.targetId)?.assetId === row.targetId;
+      return true;
+    });
+    if (byInitiative.length === 1) return { candidate: byInitiative[0], ambiguous: false };
+    if (byInitiative.length > 1) return { candidate: undefined, ambiguous: true };
+
+    // When the Initiative was recreated, the still-existing filed target identifies
+    // it. More than one current row on that target is not enough evidence to choose.
+    const byTarget = row.targetType === 'deliverable'
+      ? canonical.filter(c => c.targetId === row.targetId)
+      : [];
+    if (byTarget.length === 1) return { candidate: byTarget[0], ambiguous: false };
+    return { candidate: undefined, ambiguous: byTarget.length > 1 };
+  };
+
+  const matches = storedDetails.map(row => ({ row, ...candidateFor(row) }));
+  const claimCount = new Map<string, number>();
+  for (const match of matches) if (match.candidate) {
+    claimCount.set(match.candidate.key, (claimCount.get(match.candidate.key) ?? 0) + 1);
+  }
+
+  // Reconciliation deliberately requires a qualifying segment before a canonical
+  // identity exists. These helpers only make the repair copy reflect how far the
+  // preparer has already progressed; they do not relax that anchored rule.
+  const hasQualifyingSegment = (initiativeId: string, targetId: string) =>
+    deliverableSegments.some(seg =>
+      seg.initiativeId === initiativeId
+      && seg.deliverableId === targetId
+      && classifySegmentKind(seg.status, deliverableStatuses) !== 'excluded');
+  const remainingSegmentMessage = (initiativeName: string, targetName: string) =>
+    `The Deliverable and the Initiative's Deliverable selection for "${initiativeName}" are already in place. The remaining step is on the Visualiser timeline: add a qualifying lifecycle segment that links this Initiative to "${targetName}"; selecting the Deliverable alone does not give generation a row to derive.`;
+
+  for (const match of matches) {
+    const { row } = match;
+    const initiative = initiativeById.get(row.initiativeId);
+    const label = initiative?.name ?? row.id;
+    const add = (reason: RptiReconciliationReason, message: string) => {
+      findings.push({ id: `rpti-reconcile-${reason}-${row.id}`, rowId: row.id, reason, message, row });
+    };
+
+    if (match.ambiguous) {
+      add('identity-conflict', `The stored RPTI row "${row.id}" matches more than one current plan line by identity. Make the Initiative target unambiguous before generating the filing.`);
       continue;
     }
-    refreshed.add(k);
-    merged.push({
-      ...fresh,
-      id: row.id,
-      // Generation has no source for these: CapEx/OpEx are overrides on top of the
-      // initiative's figures, and remarks is free text. Rebuilding them from segments
-      // is impossible, so they survive the refresh.
-      capexAmount: row.capexAmount,
-      opexAmount: row.opexAmount,
-      remarks: row.remarks,
-    });
+    if (match.candidate && claimCount.get(match.candidate.key) === 1) continue;
+    if (match.candidate) {
+      add('identity-conflict', `More than one stored RPTI row maps to the same current plan line for "${label}". One generated row cannot account for every stored row; repair or re-import the filing evidence before exporting.`);
+      continue;
+    }
+
+    if (row.targetType === 'asset') {
+      const selectedReplacement = initiative?.deliverableId
+        ? deliverableById.get(initiative.deliverableId)
+        : undefined;
+      if (initiative?.isPlaceholder !== true
+        && selectedReplacement?.assetId === row.targetId
+        && !hasQualifyingSegment(initiative.id, selectedReplacement.id)) {
+        add('asset-target', remainingSegmentMessage(initiative.name, selectedReplacement.name));
+      } else {
+        add('asset-target', `The stored RPTI row for "${label}" targets an Asset directly, which no filing year can reproduce. On the Deliverables tab, create the application or infrastructure item as a Deliverable under that Asset. On the Initiatives tab, select it in this Initiative's Deliverable column. Then, on the Visualiser timeline, add a qualifying lifecycle segment linking the Initiative to the Deliverable.`);
+      }
+      continue;
+    }
+    if (!initiative) {
+      const target = deliverableById.get(row.targetId);
+      const replacements = target
+        ? initiatives.filter(candidate =>
+            candidate.isPlaceholder !== true
+            && candidate.deliverableId === target.id)
+        : [];
+      if (target && replacements.length === 1
+        && !hasQualifyingSegment(replacements[0].id, target.id)) {
+        add('missing-initiative', remainingSegmentMessage(replacements[0].name, target.name));
+      } else if (target) {
+        add('missing-initiative', `The stored RPTI row "${row.id}" points at an Initiative that no longer exists, so no filing year can reproduce it. On the Initiatives tab, recreate the Initiative and select "${target.name}" in its Deliverable column. Then, on the Visualiser timeline, add a qualifying lifecycle segment linking that Initiative to the Deliverable. If the intended Initiative cannot be identified safely, re-import the filing instead.`);
+      } else {
+        add('missing-initiative', `The stored RPTI row "${row.id}" has both its Initiative and Deliverable missing, so no current source pair can identify it safely. Re-import the filing it came from before generating.`);
+      }
+      continue;
+    }
+    if (row.targetType === 'deliverable' && !deliverables.some(d => d.id === row.targetId)) {
+      const selectedReplacement = initiative.deliverableId
+        ? deliverableById.get(initiative.deliverableId)
+        : undefined;
+      if (selectedReplacement
+        && initiative.isPlaceholder !== true
+        && !hasQualifyingSegment(initiative.id, selectedReplacement.id)) {
+        add('missing-target', remainingSegmentMessage(initiative.name, selectedReplacement.name));
+      } else {
+        add('missing-target', `The stored RPTI row for "${label}" points at a Deliverable that no longer exists. On the Deliverables tab, create or correct the application the filed plan refers to. On the Initiatives tab, select it in this Initiative's Deliverable column. Then, on the Visualiser timeline, add a qualifying lifecycle segment linking the Initiative to the Deliverable, so generation has a row to derive.`);
+      }
+      continue;
+    }
+    // Reproducible in *some* year: the initiative resolves to this row's target
+    // (Q10's rule, year-independent by design) and at least one of its segments on
+    // that target carries a status generation accepts. The selected year is
+    // deliberately not consulted — absence from it proves nothing (contract 2's
+    // companion rule in Q11).
+    const derivable = initiative.isPlaceholder !== true
+      && resolveRptiTarget(initiative, deliverableSegments, deliverables) === row.targetId
+      && deliverableSegments.some(seg =>
+        seg.initiativeId === initiative.id &&
+        seg.deliverableId === row.targetId &&
+        classifySegmentKind(seg.status, deliverableStatuses) !== 'excluded');
+    if (!derivable) {
+      const targetName = deliverables.find(d => d.id === row.targetId)?.name ?? row.targetId;
+      add('unanchored', `The stored RPTI row for "${label}" has no lifecycle segment on "${targetName}" that generation could reproduce in any filing year. Add that segment to the Visualiser timeline for this Initiative — selecting the Deliverable on the Initiatives tab does not on its own give generation anything to derive.`);
+    }
   }
 
-  for (const [k, fresh] of freshByKey) {
-    if (!refreshed.has(k)) merged.push(fresh);
-  }
-  return merged;
+  return findings;
 }
 
 /**
@@ -293,10 +470,10 @@ export function suggestDeliverableQuarter(
   return { quarter: deriveQuarterFromDate(match.startDate), segmentId: match.id };
 }
 
-export function resolveCost(detail: RptiDetail, initiative: Initiative | undefined): { capexAmount: number; opexAmount: number } {
+export function resolveCost(_detail: RptiDetail, initiative: Initiative | undefined): { capexAmount: number; opexAmount: number } {
   return {
-    capexAmount: detail.capexAmount ?? initiative?.capex ?? 0,
-    opexAmount: detail.opexAmount ?? initiative?.opex ?? 0,
+    capexAmount: initiative?.capex ?? 0,
+    opexAmount: initiative?.opex ?? 0,
   };
 }
 
@@ -330,6 +507,7 @@ export function exportRptiReportToExcel(
   initiatives: Initiative[],
   deliverables: Deliverable[],
   assets: Asset[],
+  reportYear: number,
   deliverableSegments: DeliverableSegment[] = [],
   deliverableStatuses: DeliverableStatus[] = [],
 ) {
@@ -378,5 +556,9 @@ export function exportRptiReportToExcel(
   const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'RPTI Format 3.1');
-  XLSX.writeFile(wb, `rpti-report-${new Date().toISOString().split('T')[0]}.xlsx`);
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
+    ['Report', 'RPTI Format 3.1'],
+    ['Report year', reportYear],
+  ]), 'Report Metadata');
+  XLSX.writeFile(wb, `rpti-report-${reportYear}.xlsx`);
 }

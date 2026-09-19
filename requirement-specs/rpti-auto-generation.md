@@ -117,7 +117,7 @@ scratch — no reconciliation with prior manual edits. Shipped as the simplest t
 could work, with an explicit note to revisit "if losing edits on regenerate turns out to
 be painful in practice."
 
-**v2 (current): merge-preserving.** It did turn out to be painful, and worse than losing
+**v2 (superseded by v3 below): merge-preserving.** It did turn out to be painful, and worse than losing
 edits. Generation only produces a row for work it can see in the segments, so a row with
 no segment regenerates to nothing — and under wipe-and-rebuild it was deleted. The row
 that fits that description is an imported `upgrade` whose target was never found in the
@@ -146,9 +146,23 @@ them:
 Verified on the sample: 13 imported rows stay 13 through a regenerate for either 2026 or
 2027, the unresolved row keeps its filed figures, and regenerating twice is idempotent.
 
-**Still open:** the Generate button's report year is `new Date().getFullYear()`, so it
-still acts on the wrong year for a plan filed for a different one. Merging means that no
-longer destroys anything, but it does mean the button can silently refresh nothing.
+**v2 problem (found):** the merge was wired into the *projection* path. `ReportsView` supplied the
+stored rows as `existingDetails`, so any row the current year's derivation didn't match was carried
+into that year's return — a valid 2027 plan line inside a 2026 filing. Merging is year-agnostic
+carry-forward, which is exactly wrong for a year-scoped output (issue #40, contract 2).
+
+**v3 (current): pure projection + separate reconciliation.** The merge-preserving API is gone.
+`projectRptiReturn(input, reportYear)` derives the selected-year rows from the canonical entities
+alone — its input type has no `existingDetails` key, so a stored row cannot enter the return even by
+accident (the old signature is a compile error, asserted). What generation *cannot reproduce* is now
+surfaced by `reconcileRptiReturn`, which compares stored rows against the source model across *all*
+years and emits named findings — it never injects rows. A reproducible-in-another-year row is
+correctly absent and produces no finding; only a genuinely unreproducible row blocks export. See
+`report-rows-as-projections.md` Q11 and `merge-path-options.md` (option 3 + option 1) for the full
+decision and the accepted no-year-attribution limit.
+
+**Closed by v3:** the year is asked of the preparer in Reports (the Data Manager button and its
+`new Date().getFullYear()` are gone), and generation no longer touches stored rows at all.
 
 ## Coupling worth knowing before changing rule 4's third bullet
 

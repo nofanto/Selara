@@ -1,13 +1,15 @@
 # Report Rows as Projections, Not Storage — Design Notes
 
-> **Status:** Problem verified, diagnosis settled, **all six questions decided** (2026-09-18).
-> Spec Kit to follow, raised jointly with [#40](https://github.com/nofanto/Selara/issues/40) —
-> see "Why this cannot ship before #40". **Nothing is implemented.**
+> **Status:** Q1-Q13 implemented and shipped on branch `002-report-year-field-ownership`
+> (see [ADR-0013](../docs/adr/0013-report-rows-as-projections.md)). Q4's broad in-place migration
+> remains deferred, but its boundary-lift design now covers ordinary load, shared-workspace load,
+> generic workbook import and version restore. Raised jointly with
+> [#40](https://github.com/nofanto/Selara/issues/40) — see "Why this cannot ship before #40".
 >
-> **Read the title as the destination, not this instalment.** What was decided is the
-> data-model half: the attributes move to the entities they describe (Q1-Q3). The Data Manager
-> tabs are deliberately untouched (Q5/Q6), so importing will still fill them. Making the rows
-> genuine projections is a later step that this one makes possible.
+> **Read the title as the destination, not a claim that stored rows disappear now.** Attributes
+> move to the entities they describe; report generation moves to Reports; and the Data Manager
+> report tabs become read-only projections that remain populated for continuity. Emptying and
+> removing those tabs is a later step.
 
 ## The observation
 
@@ -123,9 +125,241 @@ model has no way to hold 2027 and 2028 rows at once — filing next year's plan 
 destroy this year's record of what was filed. Doing this first would make #40 harder, not
 easier.
 
+## Open questions
+
+### Q13 — repairing an unresolved imported row is a three-screen manual job (raised 2026-09-19)
+
+**Deferred to its own Spec Kit feature — filed as [#51](https://github.com/nofanto/Selara/issues/51).**
+Raised by the product owner after repairing the sample's unresolved row by hand.
+
+An RPTI row needs three things before generation can reproduce it: the Deliverable, the
+Initiative's selection of it, and a qualifying lifecycle segment linking the two. Those live on
+three different screens — Deliverables tab, Initiatives tab, Visualiser timeline — so clearing
+one finding is a three-step journey the preparer has to assemble themselves.
+
+**The importer already holds everything needed to do it.** It knows the application name, the
+category code, the development type and the planned quarter, because the filed row said so. It
+declines to act on them deliberately (`rptiImport.ts:286-300`): FR-019 holds an unmatched
+*application* back "because the two returns are known to disagree on naming, so a non-match is a
+judgement call for a person." An unmatched *infrastructure* item is auto-created (FR-019a),
+precisely because LKPTI never lists infrastructure, so there is no judgement to defer.
+
+That reasoning is sound and must survive. The risk it guards against is real: the RPTI's
+"Legacy Teller Application" may be the same system the LKPTI already lists under a slightly
+different name, and auto-creating it would put a **duplicate application into the filed LKPTI** —
+worse than the friction it saves.
+
+**But the current design conflates two things.** Making the judgement needs a person; *recording*
+it needs nobody. Today the preparer decides in their head, then performs three manual steps to
+write down what they decided.
+
+**Shape to explore, not yet decided:** the finding offers two one-click, source-side resolutions —
+*"this is the same as &lt;existing application&gt;"* (link the initiative, anchor the segment) or
+*"this is a new application"* (create the Deliverable and its segment from what the filed row
+already says). Both leave the stored row untouched, so this is compatible with Q12 and the
+option-A decision, unlike the identity-remap rejected there. Open within it: whether the
+"new application" path should warn on a near-match to an existing name, which is exactly the case
+FR-019 worries about.
+
+### Q14 — remarks cannot vary by filing year (raised 2026-09-19)
+
+Raised by the product owner asking whether `rptiRemarks` belongs on `DeliverableSegment` rather
+than `Initiative`, since RPTI rows come from segments.
+
+**Measured, and it answers the placement but exposes a gap.** One initiative with three segments
+spanning two years generates **one row in 2027 and one in 2028**:
+
+```
+3 segments  ->  rows2027 = 1 (rpti-gen-i1-d1-2027),  rows2028 = 1 (rpti-gen-i1-d1-2028)
+```
+
+So a row is **not** 1:1 with a segment — several collapse into one — and since Q10 generation
+groups by initiative. Putting remarks on the segment would need an arbitrary rule for which
+segment wins, and the answer would change silently as the timeline is edited. The sample's
+Keterangan values describe the work, not a phase: *"Phase 2 of the digital channel roadmap"*,
+*"Regulatory deadline driven"*. `Initiative` is the right home, as Q2 decided.
+
+**The model, in the product owner's words (2026-09-19):** *"RPTI is a plan for development of
+application/infra; the Initiative is the trigger of the development; the segment is the link of
+the application/infra with the Initiative."*
+
+That framing is better than the one this note started with, and it is worth following through
+because it looks at first like an argument for the segment.
+
+An RPTI row **is the link**, not the trigger — a row says *this application is being developed,
+triggered by this initiative*, which is a pair. But **a segment is not the link; it is one
+time-slice of it.** The same link is normally expressed by several segments, a planned phase and
+then a live one, which is exactly why three collapse into one row above. So "the row is the link"
+argues for hosting remarks on the *pair*, and the segment is not the pair.
+
+**What closes it is Q7.** The owner chose option (c) there: cost belongs to the initiative, and an
+initiative has at most one RPTI target. FR-029 made that binding and Q10 followed by grouping
+generation on the initiative — so `(initiative, deliverable)` and `(initiative)` are now the *same
+grain*. The link has no separate identity because it was deliberately collapsed onto the trigger.
+Remarks on `Initiative` therefore **are** remarks on the link; the link simply happens to be
+spelled "initiative" since Q7.
+
+Worth recording the counterfactual, because it shows the reasoning is not circular: had Q7 gone
+the other way — a cost per `(initiative, target)`, many targets per initiative — the link would be
+a distinct thing needing its own entity, and remarks would belong **there**. Not on the initiative,
+and still not on the segment.
+
+**The rest of the cons stand on their own**, and were measured or read from the code rather than
+argued:
+
+- The anchor moves. `rpti.ts:209-211` picks the last live segment, or the last new one when none
+  are live, among those qualifying *for the selected year*. Change a status, add a phase, or shift
+  a date across a year boundary and a different segment becomes the anchor — so filed commentary
+  would change on its own. For a value a regulator reads, that is the worst property on the list.
+- Deleting a segment would delete filed commentary. Segments are redrawn as ordinary timeline
+  work; initiatives are not.
+- There is no editing surface. Segments have no Data Manager tab, so writing a `Keterangan` would
+  mean finding the right segment on the timeline — worse than a column on Initiatives, and the
+  same friction that made repairing an unresolved row a three-screen job ([#51](https://github.com/nofanto/Selara/issues/51)).
+- It would split the pair. `Deskripsi` comes from `Initiative.description`; sourcing `Keterangan`
+  from a segment would put two adjacent filed columns at two different grains, and they could never
+  be shown side by side in any one table.
+
+**The real finding is the gap.** Segments decide which *years* a row appears in; the initiative
+decides what the row *is*. An initiative filing in both 2027 and 2028 carries identical remarks in
+both, with no way to say "phase 1" in one and "phase 2" in the other — and Keterangan is exactly
+the column where a preparer would want that.
+
+Per-year remarks need a per-(initiative, year) home, which nothing in the model provides. That is
+the **third** thing now pointing at the deferred option-5 ledger (`merge-path-options.md`):
+F4 needs a year anchor, F5 needs per-year reconciliation precision, and this needs per-year
+remarks. Worth weighing when that work is scheduled.
+
+---
+
 ## Decided
 
-### Q1 — the eight attributes move onto `Deliverable` (2026-09-17)
+### Q9 — post-feature filing correctness outranks byte identity (2026-09-18)
+
+**Decided:** a generated post-feature return must state the year the preparer selected and retain
+every pre-existing filed value, subject only to the intended correction that an application no
+longer live at the LKPTI as-at date is excluded. Byte-identical comparison with a pre-feature
+file is not a meaningful success criterion: the previous file did not state the selected year.
+
+**Rationale:** a regulatory return's correctness is its stated period and filed values, not a
+binary match against an earlier format that omitted required context. The earlier SC-004 wording
+would incorrectly fail an improved export merely because it now tells the preparer and reviewer
+what period it covers.
+
+**Rejected:** preserve pre-feature byte identity (contradicts the requirement to state the year
+in exported output); omit the year from the export while showing it only on screen (contradicts
+FR-003 and leaves an exported filing ambiguous).
+
+### Q8 — bare-Asset RPTI targets are not supported (2026-09-18) — **IMPLEMENTED** (ADR-0013)
+
+**Decided: no.** Selara files infrastructure, as OJK Format 3.1 requires, but it models an
+infrastructure item as a **Deliverable** under its Asset — the same as an application. An RPTI row
+whose target is a bare Asset is not a supported way to file, and the rule is now explicit rather
+than implied by what the importer happens to do.
+
+Raised by Codex against the read-only decision. My first answer — "the importer does not create
+them" — was not an argument: it describes one producer, when the question is what a workspace can
+contain. The row is two clicks away. `DataManager.tsx:208-210` builds the Initiative Deliverable dropdown from
+deliverables **and** assets, and `deriveRptiTargetTypes` sets `targetType: 'asset'` from whichever
+list the chosen id is found in. `generateRptiDetails` emits only deliverable-target rows, so once
+the tab is read-only and Reports is the filing path, such a row would leave the filing in silence.
+
+**The evidence that this is an existing answer, not a new restriction** (measured 2026-09-18):
+
+| | Rows | Target type |
+|---|---|---|
+| Infrastructure rows in the sample (category `51`-`54`, `99`) | **5** | all `deliverable` |
+| Every imported row | 13 | all `deliverable` |
+
+`rptiImport.ts:435` sets `targetType: 'deliverable'` unconditionally — there is no asset path
+anywhere in the importer. The bare-asset target is an affordance that predates the importer.
+
+**Consequences:**
+
+- An existing asset-target row gets a **pre-export data-health error** naming the complete repair:
+  record the infrastructure item as a Deliverable under its Asset on the Deliverables tab,
+  select it in the initiative's Deliverable column on the Initiatives tab, and add a qualifying lifecycle segment
+  for that pair on the Visualiser timeline. Error, not warning — the row is otherwise dropped from
+  a filing without a word. Repair copy is progressive: after the Deliverable and target are in
+  place, it names only the remaining timeline segment rather than repeating completed work.
+- The Deliverable dropdown stops offering assets. T026a does this anyway by making the tab read-only.
+- A **constructed** test proves such a row cannot vanish silently from a Reports-generated filing.
+  The sample cannot carry this: it holds only deliverable targets and would pass either way.
+
+**Rejected: supporting asset targets.** It reads like the smaller change and is the larger one. An
+Asset carries no `developmentType`, `categoryCode`, planned quarter or cost, so a second generation
+path would need a canonical source defined for each of the four before it could file anything —
+more work than the rest of this feature, for a shape nothing in the product or the samples needs.
+
+
+### Q7 — cost belongs to the initiative, and an initiative has at most one RPTI target (2026-09-18) — **IMPLEMENTED** (ADR-0013)
+
+**Decided: option (c).** `RptiDetail.capexAmount` and `opexAmount` are removed. `Initiative.capex`
+and `Initiative.opex` are the filed figures, with no per-row override and no fallback chain.
+
+Raised by Codex as a blocker on the read-only decision: those two fields are *not* derived — they
+are per-row overrides (`resolveCost` is `detail.capexAmount ?? initiative?.capex ?? 0`,
+`src/lib/rpti.ts:310-314`) and the RPTI tab is their only editing surface. Read-only would have
+removed it.
+
+**Why (c) rather than a per-target cost.** An RPTI row is a line of the bank's development plan,
+and the plan's unit of work is the initiative. If one initiative needs two different budgets, it
+is two pieces of work. Modelling a cost per (initiative, target) pair would let the tool express
+something the filing has no way to say, and the override existed only because generation had
+nowhere else to put an imported figure.
+
+**This is not a new constraint; it is an existing one made explicit.** Measured 2026-09-18:
+
+| Source | Initiatives | With more than one target |
+|---|---|---|
+| Shipped demo catalogue (`workspaceTemplates.ts`) | 7 | **0** |
+| Imported sample RPTI (`sample-rpti-2027.xlsx`) | 13 | **0** |
+
+`Initiative.deliverableId` (`src/types.ts:70`) has always been a single-valued target link, edited
+in `InitiativePanel.tsx:132` and dangling-ref-checked in `dataHealth.ts:177`. What changes is that
+RPTI generation stops grouping by `initiativeId::deliverableId` off the segments and honours the
+initiative's own target instead.
+
+**Historical Q7 enforcement — superseded by Q10 below.** The broad multi-target error described in this paragraph now applies only when no target is declared.
+
+**Enforcement is a data-health error, not a hard block.** Nothing stops a user attaching segments
+on two applications to one initiative, and generation would then emit two rows carrying the same
+budget — a double-count in a filed return, which is why it cannot be a warning. But refusing the
+arrangement outright would make the timeline reject a legal way to draw work, for the benefit of
+one consumer. So: allow it to be drawn, flag it as an error, and name the fix (split the
+initiative).
+
+**Consequences:**
+
+- `RptiDetail.capexAmount`/`opexAmount` are removed from the type. Every field in the RPTI tab is
+  then genuinely derived, which is what FR-021's read-only justification claimed and, until this
+  decision, was not true of two columns.
+- Lifting is required before the fields go: an imported override equals its initiative's figure
+  (the importer writes both from the same cell, `rptiImport.ts:424-425` and `:443-444`), but a
+  hand-edited one may not. A differing override must be lifted onto the initiative, not dropped.
+- SC-001 is unaffected — it compares through `resolveCost`, which now reads the initiative
+  directly.
+- My earlier recommendation that the fixture needs a multi-target initiative is **withdrawn**.
+  Under (c) that arrangement is a defect to detect, so what it needs is a data-health test, not a
+  supported case.
+
+**One-time lift completion (2026-09-19).** Legacy `capexAmount`/`opexAmount` properties are removed
+from stored rows immediately after their values are lifted and the cleaned rows are persisted on
+the live-state boundary: ordinary load, shared-workspace load, workbook import, or version restore.
+This is the durable completion signal. Leaving those two properties as orphaned evidence was
+rejected because every later entry would treat them as authoritative again and overwrite a newer
+Initiative edit. This exception applies only to costs; the other legacy properties remain
+non-destructive evidence as Q4 records.
+
+**Rejected:** a cost on `DeliverableSegment` (the segment is a time slice, so an initiative with
+three phases on one application would need a summing rule that the filing never asks for); a new
+`InitiativeTarget` join entity (exact grain, but a new store is the expensive change in this
+codebase and it buys the ability to express something OJK cannot receive); keeping the two columns
+editable in an otherwise read-only tab (reinstates the split-brain the decision exists to end, on
+the two columns most likely to be wrong).
+
+
+### Q1 — the eight attributes move onto `Deliverable` (2026-09-17) — **IMPLEMENTED** (ADR-0013)
 
 `Deliverable` gains the seven fields it lacks — `platform`, `database`, `dcProvider`,
 `drcProvider`, `backupStrategy`, `systemOwner`, `ownership` — taking it from 11 fields to 18.
@@ -154,11 +388,12 @@ round-trip is free, `db.ts` needs nothing because IndexedDB is schemaless within
 
 **Costs accepted:**
 
-- The Deliverables tab goes from 10 to 17 columns, roughly 2,800px wide. It scrolls, and the
+- The Deliverables tab goes from 10 to 18 columns, roughly 2,800px wide. It scrolls, and the
   widths work since [#44](https://github.com/nofanto/Selara/issues/44), but it is a lot of columns.
 - Per [#42](https://github.com/nofanto/Selara/issues/42), each new field must be named
   explicitly in `diff.ts` or version history will not see it — silently.
-- Migration would be required, and is deliberately deferred — see Q4.
+- Broad in-place migration remains deferred, while the idempotent entry-boundary lift prevents
+  legacy row values from being lost during live use — see Q4.
 
 **Left open by this decision:** `AssetCategory` already supplies category-level defaults for
 `categoryCode` and the four locations. Several of the new fields — `dcProvider`, `drcProvider`,
@@ -177,7 +412,7 @@ that `LkptiDetail` is not what it sounds like — and it entrenches the conflati
 set out to remove. Worth revisiting only if the migration in Q3 proves more dangerous than
 expected.
 
-### Q2 — `remarks` moves onto `Initiative` (2026-09-17)
+### Q2 — `remarks` moves onto `Initiative` (2026-09-17) — **IMPLEMENTED** (ADR-0013)
 
 `RptiDetail.remarks` — the RPTI's `Keterangan` column — becomes a field on `Initiative`.
 Confirmed with the product owner: *Keterangan is commentary on the item*, not on this year's
@@ -212,7 +447,7 @@ from ever emptying.
 **Rejected — accept that regeneration discards it.** That is precisely the data loss fixed in
 `aabee9f`, reintroduced on purpose.
 
-### Q3 — `ppjtiRelatedParty` moves onto `Deliverable` (2026-09-18)
+### Q3 — `ppjtiRelatedParty` moves onto `Deliverable` (2026-09-18) — **IMPLEMENTED** (ADR-0013)
 
 `Deliverable` gains `ppjtiRelatedParty`, joining the Q1 fields. Confirmed with the product
 owner: the bank holds this **per application**, not centrally per vendor.
@@ -238,56 +473,53 @@ its own piece of work and should be its own decision rather than smuggled in her
 **With this and Q2 settled, `RptiDetail` has no field left without a derivation source** — the
 condition the whole change depends on.
 
-### Q4 — migration is deferred, not designed (2026-09-18)
+### Q4 — broad migration remains deferred; the existing lift covers live-state entry (2026-09-18, revised 2026-09-19)
 
-**Decided: do not solve migration as part of this work.** This is a major overhaul of how
-report rows relate to the entities behind them; migration tooling will be provided if and when
-there is demand for it. Selara is pre-1.0 and local-first, and the population of workspaces
-carrying pre-change data is currently small and known.
+**Original decision (2026-09-18): do not build broad migration tooling as part of this work.**
+This is a major overhaul of how report rows relate to the entities behind them; Selara is pre-1.0
+and local-first, and the population of workspaces carrying pre-change data is small and known.
+At the time, covering live IndexedDB, version snapshots, exported workbooks and shared files was
+framed as one four-surface migration project to undertake only if demand appeared.
 
-Recorded so the consequences are a decision rather than an oversight.
+**Revised decision (2026-09-19): widen the lift across the entry boundaries that already exist.**
+That earlier framing was overtaken when `liftReportRowAttributes` shipped as a pure, idempotent
+function. The choice is no longer whether to build migration machinery for four surfaces; it is
+whether to call an already-tested function at three additional sites. Old-shaped data is now
+lifted and persisted before it enters live state through:
 
-**Four surfaces would have needed handling, and only the first is routine:**
+1. **Ordinary IndexedDB load.** The original lift site. A changed result is saved immediately.
+2. **Shared-workspace load.** The lifted data is folded into the existing write that accepts the
+   shared workspace.
+3. **Generic workbook/viewer import.** An exported `.xlsx` on someone else's disk remains beyond
+   Selara's reach, but the existing import path now lifts it as soon as it becomes reachable and
+   saves only the lifted form.
+4. **Version restore.** Snapshots remain immutable in the versions store; their restored copy is
+   lifted before `handleUpdate` admits it to live state, and `handleUpdate` persists the result.
+   This matters even though a version is Selara's own data: restoring a pre-ADR-0013 snapshot
+   reintroduces legacy cost properties whose removal is the one-time migration marker. Restore
+   followed immediately by Generate must file the lifted values without relying on a reload to
+   self-heal first.
 
-1. **Live IndexedDB stores.** A solved pattern — `v18` already reads every `rptiDetail` inside
-   `upgrade` and rewrites it (`db.ts:208-220`), and the upgrade transaction spans all stores,
-   so reading `lkptiDetails` and writing `deliverables` atomically is available.
-2. **Version snapshots.** `Version.data.lkptiDetails` holds a full copy of the old shape, and
-   **no migration has ever touched the `versions` store** — it is only created and cleared.
-   There is a precedent for the alternative: `Version.data.decisions` is marked
-   `@deprecated — never read`, kept purely so old snapshots still parse, with
-   `buildRestoredWorkspace` deciding what restore actually does (ADR-0011).
-3. **Exported `.xlsx` files.** Cannot be migrated — they are on someone's disk. `parseWorkbook`
-   is generic, so an old export re-imported later lands the eight values on `lkptiDetails`
-   where nothing reads them.
-4. **Shared files.** Surface (3) through a different door.
+**Cross-tab sync is deliberately excluded.** `applyRemoteSync` reads IndexedDB after the writing
+tab has already lifted and persisted the data. Repeating the lift there guards no real ingress and
+would blur the active/passive rule that the receiving tab never re-saves a remote update.
 
-**The approach that was designed and not taken**, recorded because it stays cheap to add later:
-one *lift* function applied at every boundary where old-shaped data enters — restore, `.xlsx`
-import, shared file — moving the eight values onto their deliverable. It keeps snapshots
-immutable, is testable in isolation, and is the only approach that reaches files already
-distributed. Detecting old-shaped data has no clean signal today (`"this lkptiDetail has a
-platform field"` is presence-based, not version-based), which argues for stamping a schema
-version onto snapshots and exports whenever this is picked up.
+**What remains deferred.** There is still no eager rewrite of every saved snapshot, no schema
+version stamped onto historical snapshots or exports, and no way to mutate files outside Selara.
+Those are broad migration tools. They are not needed to prevent loss during live use because the
+idempotent boundary lift handles a snapshot or workbook when it is restored or imported. Entity
+values win over legacy row values, and removed legacy cost properties durably mark completion.
 
-**The specific failure mode of deferring, which is not "nothing happens":**
+**Rejected alternatives:** narrowing ADR-0013 and contract 14 to say only ordinary mount load was
+covered would make the records less false but leave plausible restore-then-Generate loss in place;
+adding the lift to cross-tab sync was rejected because the writer has already performed and saved
+it; eagerly rewriting the versions store was rejected because lifting the restored copy preserves
+snapshot immutability while covering the moment the old shape can affect a filing.
 
-IndexedDB is schemaless within a store, so dropping the fields from the TypeScript type does
-**not** delete them — existing `lkptiDetails` keep carrying `platform`, `systemOwner` and the
-rest as orphaned properties that nothing reads. They survive a normal save, and today they even
-survive a regenerate, because `generateLkptiDetails` spreads the existing row
-(`{ ...existing, ...cascadedFields }`, `lkpti.ts:112`).
+### Q5 and Q6 — SUPERSEDED, see below (2026-09-18)
 
-That changes the moment `LkptiDetail` becomes a pure projection. Generation would then build
-fresh row objects from the `Deliverable` rather than spreading what was there, so **the first
-press of Generate destroys the orphaned values permanently.** Until that press they are
-recoverable, and a migration tool written later can still find them.
-
-**Therefore, when this is implemented:** either the eight fields must be lifted before
-generation is allowed to replace rows, or the release must be explicit that pressing Generate
-on a pre-change workspace discards the imported return. The second is defensible for a pre-1.0
-local-first tool; it is not defensible silently.
-
+> **Superseded the same day by the decision recorded under "Q5/Q6 revised".** Left in place
+> because the reasoning still explains why the smaller step was attempted first.
 ### Q5 and Q6 — the Data Manager tabs stay exactly as they are (2026-09-18)
 
 **Decided: no change to either tab in this work.** Both keep their rows, stay editable, and
@@ -332,14 +564,53 @@ Two consequences stopped it being a small change, and both should be carried for
    record as what was actually submitted — which also makes the filing record the natural owner
    of the report year.
 
+### Q5/Q6 revised — the report tabs become read-only, and generation moves to Reports (2026-09-18) — **IMPLEMENTED** (ADR-0013)
+
+**Decided, superseding the above.** Both Data Manager report tabs become **read-only**, and will
+be removed once the destination is reached. Generation moves to the Reports tab, where the
+preparer states the year period and the return is shown.
+
+**Why the earlier answer did not hold.** Leaving the tabs editable created a screen whose edits
+would have no effect on the filing — reviewed by Codex, who put it plainly: a preparer could
+reasonably assume that editing a Data Manager report row changes the result generated from
+Reports. The proposed mitigation was a warning. Read-only removes the confusion at its source
+instead of labelling it, and it is the honest description of what those rows now are: a
+projection, not an input.
+
+It also settles a question the mandatory as-at date had opened. `generateLkptiDetails` has exactly
+one production caller, `DataManager.tsx:251` — the tab's Generate button — which has no year
+prompt. Options were to add a prompt there, to pass today's date (reintroducing the very defect
+the as-at rule fixes), or to move generation out. This decision takes the third, and the button
+leaves Data Manager with it.
+
+**Consequences, all of which the spec and task list must now carry:**
+
+- `FR-021` inverts: the tabs remain present and populated but are **not** editable, and their
+  generate actions move to Reports.
+- **Seven data-health findings point at these tabs** as the place to fix something, across eleven
+  check kinds (`rpti-target`, `rpti-incomplete`, `lkpti-incomplete`, `lkpti-golive-future`,
+  `lkpti-too-long` and others). Every one now sends the preparer to a screen where nothing can be
+  fixed. They must be repointed at the entity that owns the value — a significant expansion of
+  T028, and the part of this decision most likely to be missed.
+- **The unresolved imported row is repaired differently.** Today the preparer sets its Target in
+  the RPTI tab. With the tab read-only, the repair is on the source side: create or rename the
+  application the filed plan refers to, and the next generation reproduces the row. That is what
+  FR-025 always intended — repair the workspace, not the row — but the data-health message must
+  say so, because "points at a deliverable that no longer exists" does not.
+- **Seven e2e specs** touch these tabs and will need revisiting.
+
+**Not changed:** the rows remain stored and exported as they are today. This decision is about
+who may write them, not about removing them — that is still the deferred step.
+
 ## Carried into the Spec Kit spec
 
 No questions remain open. Three things were decided *not* to be solved here and must be
 carried forward, since each is load-bearing for the destination:
 
-1. **Migration (Q4)** — deferred. When the projection step is taken, the eight fields must be
-   lifted before generation is allowed to replace rows, or the release must say plainly that
-   pressing Generate on a pre-change workspace discards the imported return.
+1. **Migration (Q4)** — broad in-place rewriting remains deferred, but the shipped idempotent lift
+   covers every reachable entry into live state: ordinary load, shared-workspace load, generic
+   workbook import and version restore. Files outside Selara are lifted when re-imported; cross-tab
+   sync reads the writing tab's already-lifted persisted result.
 2. **Filed rows with no derivation source** — the unresolved upgrade from #38 cannot be
    generated, so a projection model needs a home for it.
 3. **Snapshot at filing time** — generation rules change, so a past filing must be frozen
@@ -362,3 +633,154 @@ carried forward, since each is load-bearing for the destination:
 - `requirement-specs/lkpti-integration.md` §3 — why LKPTI generation is not year-scoped
 - `requirement-specs/it-planning-flow.md` — step 2/3 of the cycle this document reconciles
 - ADR-0010 — merge-preserving LKPTI generation, which exists precisely because these fields cannot be regenerated
+
+## Q10 — Existing initiatives without a declared RPTI target (decided 2026-09-18) — **IMPLEMENTED** (ADR-0013)
+
+Coordinator-approved compatibility rule: an explicit `Initiative.deliverableId` wins.
+Otherwise infer a target only when all the initiative's lifecycle segments name exactly
+one existing Deliverable, including infrastructure. Inference considers all years because
+FR-029 makes the target a property of the initiative, not the filing year. Generation
+uses only qualifying segments on that resolved target for the selected year.
+
+An initiative with qualifying segments but no resolvable target gets a data-health error
+and blocks RPTI export, with instructions to select/repair the target or split ambiguous
+work. Multiple segment targets are an error only without an explicit target; other
+segments on an explicitly targeted initiative remain timeline history. This supersedes
+FR-030's broad multiple-application check: the declared-target generator emits one budget
+once, so its old double-counting justification no longer applies to declared targets.
+
+Rejected: silently skipping undeclared targets loses existing template/hand-built work;
+requiring manual re-keying for an unambiguous target creates unnecessary migration work;
+year-dependent inference lets one initiative change targets between filings; blocking all
+multi-deliverable history falsely rejects an explicitly declared, unambiguous target.
+
+Acceptance: regression tests cover the shipped demo, unambiguous application/infrastructure
+inference, ambiguous and missing targets, explicit target precedence, and the pre-export
+repair gate. Stored rows remain readable in Data Manager; report edits belong on entities.
+
+## Q11 — The Reports path is a pure projection; stored rows are reconciliation evidence (decided 2026-09-18) — **IMPLEMENTED** (ADR-0013)
+
+**Decided: option 3 + option 1 of `specs/002-report-year-field-ownership/merge-path-options.md`.**
+`generateRptiDetails(input, reportYear)` — which accepted an optional `existingDetails` and ran
+`mergeWithExisting` over its result — is removed. In its place:
+
+- **`projectRptiReturn(input, reportYear)`** — the projection, whose input type
+  (`ProjectRptiInput`) has no `existingDetails` key. Reports calls this. Handing stored
+  rows to the projection is a **compile error**, asserted by a `@ts-expect-error` test in
+  `src/lib/rpti.test.ts`, so the fix cannot be bypassed by convenience at a call site.
+- **`reconcileRptiReturn(input)`** — the gate's other half. It compares stored rows against
+  the source model and returns **findings** (typed `RptiReconciliationFinding`, reason codes
+  `asset-target | missing-initiative | missing-target | unanchored`, each naming a source-side
+  repair), never rows. The gate may display `finding.row` as evidence; the row enters neither
+  the return nor the export.
+
+**The defect this closes (#40):** `ReportsView.tsx` passed stored `rptiDetails` as
+`existingDetails`, so `mergeWithExisting` carried every unmatched stored row into the selected-year
+return — measured: a workspace whose only segments sit in 2027, generated for 2026, returned a row
+`rpti-gen-i1-d1-2027`. A 2027 plan line inside a 2026 filing was contract 2 (`generation.md`)
+broken in the shipped path.
+
+**The rule the reconciler encodes — the two axes are independent.** Selected-year membership and
+reproducibility are different questions: a valid 2027 row absent from a 2026 projection is
+*correct* and produces no finding; an asset-target, dangling-reference, or permanently-unanchored
+row is unreproducible *in any year* and blocks until repaired. Derivability is therefore tested
+across all years (resolve the initiative's Q10 target; require one qualifying-status segment on
+that (initiative, target) pair), never against the selected year's output.
+
+**The merge is deleted, not renamed.** `regenerateStoredRptiRows` (the analysis's name for a
+preserved merge API) has no caller to preserve it for: DataManager's Generate buttons left in
+the read-only revision (Q5/Q6), Reports was the only production caller, and Reports must not
+merge. The v2 safety net the merge provided — unreproduced rows surviving with filed values —
+is replaced by the gate: the row stays visible in Data Manager, and its absence from the return
+is now *loud* (FR-024) instead of papered over by carrying it.
+
+**The accepted honesty limit.** `RptiDetail` carries no report year and one cannot be inferred: a
+quarter is not a year, generated-id suffixes are not a contract, and `deliverableSegmentId` is
+absent in exactly the unresolved cases that matter. So findings are global — an unreproducible
+row blocks *every* year's export until repaired — and messages say "no filing year can reproduce"
+rather than naming a year the data cannot support. Precise selected-year attribution is the job of
+the deferred option 5 (a year-bearing unreconciled-row ledger at import time); it is explicitly
+not built here.
+
+**Verified, not assumed — LKPTI has no equivalent hazard.** `generateLkptiDetails` does take
+`existingDetails`, but its row membership is purely derived: a deliverable live as at the as-at
+date is in, everything else is out "even if an existing row was present for it" (pinned by a unit
+test in `src/lib/lkpti.test.ts`). `existingDetails` there only refreshes values *on a row whose
+membership already holds* (its id and pre-lift manual attributes) — a cascade, per ADR-0010, not a
+carry. No foreign row can enter an LKPTI return, so no projection-only API is imposed on it.
+
+**Rejected (full analysis in `merge-path-options.md`):**
+- **Option 2, year-scoped preservation merge** — requires authoritative year provenance the type
+  does not have; the metadata-free version (guess the year from segment, id suffix, or quarter) is
+  the same inference this decision rules out, and it keeps the return a union rather than a
+  projection.
+- **Option 4, filing/import snapshots** — the right long-term shape for reconciling a whole prior
+  filing, but a new persisted concept with baseline-selection UX; heavier than this defect needs.
+- **Option 5, unreconciled-row ledger** — deferred, not refused: it is what later fixes exact
+  year attribution and import-time completeness. Building ledger + gate now would design the gate
+  twice.
+- **Leaving `existingDetails` optional on `projectRptiReturn` "for now"** — the analysis's trap
+  warning: an `Omit` wrapper over an API that still accepts stored rows is cosmetic. The whole
+  point of option 3 is that the projection's input *cannot* carry them.
+- **Branding projected vs stored row types** (the analysis's "stronger variant") — deferred;
+  `RptiDetail` flows through DataManager, diff, excel and the exporter, and the input-type split
+  already makes the observed defect uncompilable. Revisit if a caller ever constructs stored rows
+  from projection output.
+
+**Consequences:** contract 2 of `generation.md` is restored and restated with explicit
+reconciliation contracts (22–25); the pre-export gate in `ReportsView.tsx` is
+source diagnostics + `reconcileRptiReturn` findings, never merge residue; `rpti-auto-generation.md`
+records the merge as v2, superseded.
+
+## Q12 — Repair stale row identities by canonical correspondence, never by editing evidence (decided 2026-09-19)
+
+**Decided:** stored report rows remain immutable evidence. A source-side repair clears an RPTI
+finding when the stored row corresponds one-to-one with a current canonical row by the surviving
+filing identity: the same Initiative identifies a replacement target, or the same target identifies
+a replacement Initiative. A bare-Asset row therefore becomes repairable when its Initiative is
+pointed at a generatable Deliverable under that Asset. Cardinality is part of identity: two stored
+rows cannot both be accounted for by one canonical row.
+
+This deliberately does **not** compare filed contents. Development type, quarter, category,
+provider, locations, related-party answer and remarks remain outside the reconciliation policy
+by the product decision recorded in Q13. The gate says only whether each stored row has exactly
+one current canonical counterpart and each counterpart accounts for at most one stored row.
+
+LKPTI has an important asymmetric case. `LkptiDetail` historically stored only `targetId` plus
+report contents; the filing identity — the application name — was resolved from the Deliverable.
+Once that Deliverable is gone, an already-orphaned row contains no identity from which a newly
+created application can be recognised. For those rows the honest repair is to re-import the
+filing, and `lkpti-target` must say why. Newly imported LKPTI rows retain the application name as
+identity evidence so a future orphan can be matched to exactly one same-named Deliverable. There
+is no inference-based backfill or migration of already-orphaned rows.
+
+**Rejected — an identity-remap editor in Data Health.** It would make stored rows editable again
+one screen removed from the report tabs, recreating the split-brain authorship that Q5/Q6 removed.
+
+**Rejected — exact-one-by-elimination for LKPTI.** One orphan plus one new application does not
+prove they are the same application. A wrong automatic attachment would be silent regulatory
+misclassification precisely when the workspace is least trustworthy.
+
+**Rejected — matching by report contents.** Identity repair must not invent equality rules for
+filed values; Q13 records the now-settled field-fidelity policy explicitly.
+
+## Q13 — Reconciliation matches filing identity, not field contents (decided 2026-09-19) — **IMPLEMENTED**
+
+**Decided:** once a stored RPTI row has one unambiguous canonical counterpart, field-level drift
+between the filed evidence and today's regeneration is deliberately not reported. This includes
+`developmentType`, quarter, `categoryCode`, developer, locations, related-party answer and remarks.
+`reconcileRptiReturn` matches identity and cardinality only; `rpti.test.ts` pins the case where an
+old filed quarter and remarks differ from the current projection but produce no finding.
+
+The portfolio is expected to evolve after a filing. A stored row is evidence of what was filed,
+not an assertion that its contents should override or condemn a correct regeneration from today's
+canonical entities. Re-flagging every detectable drift would train preparers to ignore the gate,
+while offering no different repair from accepting the current, correctly derived return. The gate
+therefore stays focused on the actionable failure FR-024 names: a filed row that cannot be
+reproduced at all, or cannot be matched one-to-one to a canonical row.
+
+**Rejected — warn only for fields that appear to change filing meaning.** The considered subset
+was category, development type and developer, while remaining silent on quarter and remarks. It
+was rejected because a warning with no action distinct from correct regeneration is still noise;
+splitting fields into more- and less-important drift would make the gate look authoritative about
+content fidelity while stored evidence intentionally does not govern current generation.

@@ -50,6 +50,17 @@ test.describe('Data Health report', () => {
     await expect(page.getByTestId('data-manager')).toBeVisible();
     await expect(page.getByTestId('data-manager-tab-deliverables')).toHaveAttribute('aria-pressed', 'true');
     await expect(page.getByTestId('search-input')).toHaveValue(deliverableName);
+
+    const filterIndicator = page.getByTestId('data-manager-filter-indicator');
+    await expect(filterIndicator).toContainText(`Filtered by “${deliverableName}”`);
+    await expect(filterIndicator.getByRole('button', { name: 'Clear global search' })).toBeVisible();
+
+    const filteredRowCount = await page.locator('tbody tr[data-real="true"]').count();
+    await filterIndicator.getByRole('button', { name: 'Clear global search' }).click();
+
+    await expect(page.getByTestId('search-input')).toHaveValue('');
+    await expect(filterIndicator).not.toBeVisible();
+    await expect.poll(() => page.locator('tbody tr[data-real="true"]').count()).toBeGreaterThan(filteredRowCount);
   });
 
   test('severity filter buttons narrow the issue list', async ({ page }) => {

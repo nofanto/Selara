@@ -41,6 +41,7 @@ import { buildRestoredWorkspace, isWorkspaceEmpty } from './lib/workspaceState';
 import { HealthIssueLocation, DataManagerTab } from './lib/dataHealth';
 import { SYNC_CHANNEL_NAME, generateTabId, isRemoteSaveMessage, notifyDataSaved } from './lib/tabSync';
 import { mergeDeliverableStatuses } from './lib/deliverableStatusDefaults';
+import { liftReportRowAttributes } from './lib/attributeLift';
 
 // Lazy load modals and heavy components for code splitting
 const FeaturesModal = lazy(() => import('./components/FeaturesModal').then(m => ({ default: m.FeaturesModal })));
@@ -70,6 +71,22 @@ type AppState = {
   lkptiDetails: LkptiDetail[];
   versions?: Version[];
 };
+
+/** Lift old report-row-owned fields at every boundary that admits data to live state. */
+function liftWorkspaceReportAttributes(data: AppState): AppState {
+  const lifted = liftReportRowAttributes({
+    deliverables: data.deliverables || [],
+    initiatives: data.initiatives || [],
+    lkptiDetails: data.lkptiDetails || [],
+    rptiDetails: data.rptiDetails || [],
+  });
+  return {
+    ...data,
+    deliverables: lifted.deliverables,
+    initiatives: lifted.initiatives,
+    rptiDetails: lifted.rptiDetails,
+  };
+}
 
 function isValidSharedAppState(data: unknown): data is AppState {
   if (!data || typeof data !== 'object') return false;
@@ -218,32 +235,35 @@ export default function App() {
               setIsImportingShare(false);
               // Continue to normal load path without importing.
             } else {
-              const sharedData = importedData as AppState;
-            await saveAppData(sharedData);
-            // Clear the URL params without refreshing
-            window.history.replaceState({}, document.title, window.location.pathname);
-            
-            // Re-load the data from DB to ensure it's properly initialized
-            const dbData = await getAppData();
-            setAssets(dbData.assets);
-            setDeliverables(dbData.deliverables || []);
-            setDeliverableSegments((dbData as any).deliverableSegments || []);
-            setInitiatives(dbData.initiatives.map(i => ({ ...i, capex: Number(i.capex) || 0, opex: Number(i.opex) || 0 })));
-            setMilestones(dbData.milestones);
-            setProgrammes(dbData.programmes);
-            setStrategies(dbData.strategies || []);
-            setDependencies(dbData.dependencies || []);
-            setAssetCategories(dbData.assetCategories || []);
-            setResources(dbData.resources || []);
-            setDeliverableStatuses((dbData as any).deliverableStatuses || []);
-            setDecisions((dbData as any).decisions || []);
-            setRptiDetails((dbData as any).rptiDetails || []);
-            setLkptiDetails((dbData as any).lkptiDetails || []);
-            setTimelineSettings(sanitizeTimelineSettings({ ...defaultTimelineSettings, ...(dbData.timelineSettings || {}) }));
-            setVersions(await getAllVersions());
-            setIsImportingShare(false);
-            setIsLoading(false);
-            return;
+              // A share can have been created before ADR-0013. Lift before the
+              // imported workspace reaches live state, and persist the lifted form
+              // in the same write that accepts the share.
+              const sharedData = liftWorkspaceReportAttributes(importedData as AppState);
+              await saveAppData(sharedData);
+              // Clear the URL params without refreshing
+              window.history.replaceState({}, document.title, window.location.pathname);
+
+              // Re-load the data from DB to ensure it's properly initialized
+              const dbData = await getAppData();
+              setAssets(dbData.assets);
+              setDeliverables(dbData.deliverables || []);
+              setDeliverableSegments((dbData as any).deliverableSegments || []);
+              setInitiatives(dbData.initiatives.map(i => ({ ...i, capex: Number(i.capex) || 0, opex: Number(i.opex) || 0 })));
+              setMilestones(dbData.milestones);
+              setProgrammes(dbData.programmes);
+              setStrategies(dbData.strategies || []);
+              setDependencies(dbData.dependencies || []);
+              setAssetCategories(dbData.assetCategories || []);
+              setResources(dbData.resources || []);
+              setDeliverableStatuses((dbData as any).deliverableStatuses || []);
+              setDecisions((dbData as any).decisions || []);
+              setRptiDetails((dbData as any).rptiDetails || []);
+              setLkptiDetails((dbData as any).lkptiDetails || []);
+              setTimelineSettings(sanitizeTimelineSettings({ ...defaultTimelineSettings, ...(dbData.timelineSettings || {}) }));
+              setVersions(await getAllVersions());
+              setIsImportingShare(false);
+              setIsLoading(false);
+              return;
             }
           } catch (error) {
             console.error('Failed to import shared workspace:', error);
@@ -300,10 +320,39 @@ export default function App() {
             setShowTemplatePicker(true);
           }
         } else {
+          // A workspace saved before ADR-0013 holds the eight application attributes on
+          // its LKPTI rows and `remarks` on its RPTI rows, where nothing now reads them.
+          // IndexedDB keeps them (it is schemaless within a store), so they are still
+          // recoverable — but only until the first press of Generate rebuilds the rows
+          // from the deliverable and discards them for good. Lift on load, ahead of that.
+          // See requirement-specs/report-rows-as-projections.md Q4 and FR-019.
+          const lifted = liftReportRowAttributes({
+            deliverables: dbData.deliverables || [],
+            initiatives: dbData.initiatives || [],
+            lkptiDetails: (dbData as any).lkptiDetails || [],
+            rptiDetails: (dbData as any).rptiDetails || [],
+          });
+          const liftedInitiatives = lifted.initiatives.map(i => ({
+            ...i, capex: Number(i.capex) || 0, opex: Number(i.opex) || 0,
+          }));
+
+          // Persist the lift immediately. In particular, removing legacy cost
+          // properties is the one-time migration marker: without this save a later
+          // reload could treat the same stale row as authoritative again and undo a
+          // preparer's newer Initiative edit (F3 / design Q7).
+          if (lifted.changed) {
+            await saveAppData({
+              ...dbData,
+              deliverables: lifted.deliverables,
+              initiatives: liftedInitiatives,
+              rptiDetails: lifted.rptiDetails,
+            });
+          }
+
           setAssets(dbData.assets);
-          setDeliverables(dbData.deliverables || []);
+          setDeliverables(lifted.deliverables);
           setDeliverableSegments((dbData as any).deliverableSegments || []);
-          setInitiatives(dbData.initiatives.map(i => ({ ...i, capex: Number(i.capex) || 0, opex: Number(i.opex) || 0 })));
+          setInitiatives(liftedInitiatives);
           setMilestones(dbData.milestones);
           setProgrammes(dbData.programmes);
           setStrategies(dbData.strategies || []);
@@ -312,7 +361,7 @@ export default function App() {
           setResources(dbData.resources || []);
           setDeliverableStatuses((dbData as any).deliverableStatuses || []);
           setDecisions((dbData as any).decisions || []);
-          setRptiDetails((dbData as any).rptiDetails || []);
+          setRptiDetails(lifted.rptiDetails);
           setLkptiDetails((dbData as any).lkptiDetails || []);
           const rawSettings = dbData.timelineSettings || {};
           // Migration: if we have legacy startYear but no startDate, convert it
@@ -402,7 +451,7 @@ export default function App() {
       }
 
       const blank = getTemplateData('viewer', false);
-      const data: AppState = {
+      const importedData: AppState = {
         assetCategories: imported.assetCategories ?? blank.assetCategories,
         assets: imported.assets ?? blank.assets,
         initiatives: imported.initiatives ?? blank.initiatives,
@@ -420,6 +469,9 @@ export default function App() {
         timelineSettings: { ...blank.timelineSettings, ...(imported.timelineSettings ?? {}) },
         versions: imported.versions ?? [],
       };
+      // Exported workbooks cannot be migrated while they remain on someone else's
+      // disk; importing one is the boundary where its old row shape becomes reachable.
+      const data = liftWorkspaceReportAttributes(importedData);
       await saveAppData(data);
       setAssets(data.assets);
       setDeliverables(data.deliverables);
@@ -470,7 +522,7 @@ export default function App() {
         ? `No rows could be imported — every row had a problem (e.g. row ${lk.skipped[0].rowNumber}: ${lk.skipped[0].reason}).`
         : 'No data rows found in this LKPTI file.');
     }
-    const lkDerived = deriveWorkspaceFromLkptiImport(lk.rows);
+    const lkDerived = deriveWorkspaceFromLkptiImport(lk.rows, request.lkptiYear);
 
     let rpDerived: ReturnType<typeof deriveWorkspaceFromRptiImport> | null = null;
     let rpSkipped: { rowNumber: number; reason: string }[] = [];
@@ -495,13 +547,29 @@ export default function App() {
       ...blank,
       assetCategories: [...lkDerived.assetCategories, ...(rpDerived?.assetCategories ?? [])],
       assets: [...lkDerived.assets, ...(rpDerived?.assets ?? [])],
-      deliverables: [...lkDerived.deliverables, ...(rpDerived?.deliverables ?? [])],
+      // The RPTI can answer the related-party question for an application the LKPTI
+      // created, so its patches to existing deliverables are merged in by id. Without
+      // this the filed answer is lost on every upgrade that matched (ADR-0013).
+      deliverables: [
+        ...lkDerived.deliverables.map(d => rpDerived?.updatedDeliverables.find(u => u.id === d.id) ?? d),
+        ...(rpDerived?.deliverables ?? []),
+      ],
       deliverableSegments: [...lkDerived.deliverableSegments, ...(rpDerived?.deliverableSegments ?? [])],
       deliverableStatuses: mergeDeliverableStatuses(lkDerived.deliverableStatuses, rpDerived?.deliverableStatuses),
       initiatives: rpDerived?.initiatives ?? [],
       programmes: rpDerived?.programmes ?? [],
       rptiDetails: rpDerived?.rptiDetails ?? [],
       lkptiDetails: lkDerived.lkptiDetails,
+      // Keep the years the preparer stated, so Reports can offer them back rather than
+      // reaching for the clock (T031/FR-009). Until now they positioned the imported
+      // segments and then survived only as banner text. They go into `data` rather than
+      // into a later setState because `saveAppData(data)` below is what persists them —
+      // set afterwards, they would live until the next reload and no longer.
+      timelineSettings: {
+        ...blank.timelineSettings,
+        onboardingLkptiYear: request.lkptiYear,
+        ...(request.rptiYear ? { onboardingRptiYear: request.rptiYear } : {}),
+      },
       versions: [],
     };
 
@@ -722,7 +790,13 @@ export default function App() {
   const handleRestoreVersion = useCallback((version: import('./types').Version) => {
     // Restoring rolls back plan data within the same workspace, so the decision
     // log survives it — see buildRestoredWorkspace and ADR-0011.
-    handleUpdate(buildRestoredWorkspace(version, decisions));
+    // A pre-ADR-0013 snapshot can reintroduce legacy row properties after the live
+    // workspace was already migrated. Lift before it becomes live: restore followed
+    // immediately by Generate must file the lifted values, without relying on reload.
+    // handleUpdate persists the cleaned rows in the same write, making the removed
+    // legacy cost properties the durable one-time migration marker (F3/Q7).
+    const data = liftWorkspaceReportAttributes(buildRestoredWorkspace(version, decisions));
+    handleUpdate(data);
   }, [handleUpdate, decisions]);
 
   const handleSaveDeliverableSegment = useCallback((seg: import('./types').DeliverableSegment) => {
@@ -1228,6 +1302,24 @@ export default function App() {
                         </div>
                       ))}
                       <div className="flex items-center justify-between gap-3 pt-1 border-t border-slate-100">
+                        <label htmlFor="defaultCurrency" className="text-xs text-slate-600 whitespace-nowrap">Currency</label>
+                        <input
+                          id="defaultCurrency"
+                          data-testid="default-currency-input"
+                          type="text"
+                          value={timelineSettings.defaultCurrency || ''}
+                          onChange={(e) => {
+                            handleUpdate({
+                              assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories,
+                              timelineSettings: { ...timelineSettings, defaultCurrency: e.target.value || undefined },
+                              resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails,
+                            });
+                          }}
+                          placeholder="e.g. IDR"
+                          className="px-1.5 py-1 bg-slate-50 border border-slate-200 rounded text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 w-16"
+                        />
+                      </div>
+                      <div className="flex items-center justify-between gap-3 pt-1 border-t border-slate-100">
                         <label htmlFor="clusterName" className="text-xs text-slate-600 whitespace-nowrap">Cluster</label>
                         <input
                           id="clusterName"
@@ -1644,6 +1736,7 @@ export default function App() {
               onUpdate={handleUpdate}
               onOpenTemplatePicker={() => { setTemplatePickerIsReset(true); setShowTemplatePicker(true); }}
               searchQuery={searchQuery}
+              onClearSearch={() => setSearchQuery('')}
               initialTab={dataManagerInitialTab}
             />
           </Suspense>

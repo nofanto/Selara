@@ -1,3 +1,4 @@
+import { seedReportRecords, reportFixture, generateReport } from './report-fixtures';
 import { test, expect } from '@playwright/test';
 
 test.describe('RPTI Report (IT Development Plan Report)', () => {
@@ -11,43 +12,19 @@ test.describe('RPTI Report (IT Development Plan Report)', () => {
     await page.waitForSelector('[data-testid="asset-row-content"]', { timeout: 20000 });
   });
 
-  async function openRptiReport(page: import('@playwright/test').Page) {
-    await page.getByTestId('nav-reports').click();
-    await page.getByTestId('report-card-rpti').click();
-    await expect(page.getByTestId('rpti-report-view')).toBeVisible();
-  }
-
-  // Adds one RPTI row via the Data Manager tab (the only place rows can be
-  // created now) and returns to the RPTI report screen.
-  async function addRptiRowViaDataManager(page: import('@playwright/test').Page, categoryCode: string) {
-    await page.getByTestId('nav-data-manager').click();
-    await page.getByTestId('data-manager-tab-rpti').click();
-    await page.getByTestId('add-row-btn-rpti').click();
-    const row = page.locator('[data-testid="data-manager"] tbody tr[data-real="true"]').last();
-    await row.locator('td[data-key="initiativeId"] select').selectOption({ index: 1 });
-    await row.locator('td[data-key="targetId"] select').selectOption({ index: 1 });
-    await row.locator('td[data-key="categoryCode"] select').selectOption(categoryCode);
-    await row.locator('td[data-key="developmentType"] select').selectOption('new');
-    await row.locator('td[data-key="developer"] select').selectOption('inhouse');
-    await row.locator('td[data-key="ppjtiRelatedParty"] select').selectOption('n/a');
-    await row.locator('td[data-key="ppjtiRelatedParty"] select').press('Tab');
-    await page.waitForTimeout(300);
-    await openRptiReport(page);
-  }
-
-  test('RPTI Report card appears in Reports and opens to a read-only empty state', async ({ page }) => {
-    await openRptiReport(page);
+  test('RPTI Report asks for a year then shows an empty filing when nothing overlaps', async ({ page }) => {
+    await seedReportRecords(page, {}, ['rptiDetails']);
+    await generateReport(page, 'rpti', '1900');
     await expect(page.getByText(/no rpti/i)).toBeVisible();
-    await expect(page.getByText(/managed in.*data manager/i)).toBeVisible();
+    await expect(page.getByTestId('rpti-report-export-btn')).toHaveCount(0);
   });
 
-  test('Exports the RPTI report to Excel with the Format 3.1 columns', async ({ page }) => {
-    await addRptiRowViaDataManager(page, '54');
-    await expect(page.getByTestId('rpti-detail-table')).toBeVisible();
-
+  test('exports generated RPTI rows to Excel with Format 3.1 columns', async ({ page }) => {
+    await seedReportRecords(page, reportFixture, ['initiatives', 'deliverableSegments', 'rptiDetails']);
+    await generateReport(page, 'rpti');
+    await expect(page.getByTestId('rpti-detail-table')).toContainText('Filing Application');
     const [download] = await Promise.all([
-      page.waitForEvent('download'),
-      page.getByTestId('rpti-report-export-btn').click(),
+      page.waitForEvent('download'), page.getByTestId('rpti-report-export-btn').click(),
     ]);
     expect(download.suggestedFilename()).toMatch(/rpti/i);
   });

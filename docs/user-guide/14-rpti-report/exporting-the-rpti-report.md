@@ -1,24 +1,14 @@
 # Exporting the RPTI Report
 
-The **Planned Implementation Time** column in RPTI reports which quarter a development is expected to go live. If you leave the **Quarter** column blank for an application-target row in Data Manager, Selara fills it in automatically at export time, based on the application's lifecycle segments.
+Open **Reports → RPTI Report**, enter the filing year, and click **Generate RPTI**. Review the generated application and infrastructure rows, then click **Export to Excel** to download `rpti-report-<year>.xlsx`. Its **Report Metadata** worksheet states the selected year; the **RPTI Format 3.1** worksheet keeps the regulatory columns.
 
-## How the export-time quarter fallback works
+The quarter is derived from qualifying lifecycle segments linked to the initiative and its target. Maintain those dates and links on the timeline. Infrastructure work uses Deliverable lifecycle segments too.
 
-An application's lifecycle is tracked through **Lifecycle Segments** (see [Lifecycle Segments](../05-applications/lifecycle-segments.md)) — phases like Planned, Funded, In Production, and Sunset. When a segment is linked to the same initiative as an RPTI row and its status represents "live" (In Production by default, or any status your workspace has marked as the live status), that segment's start date is used as the row's quarter wherever the row's own **Quarter** column is empty — both on the read-only RPTI Report screen and in the Excel export.
+If generation cannot resolve an initiative’s target, the report names the problem and repair and withholds export. A complete source repair may span three places: create or correct the item on **Data Manager → Deliverables**, choose it in the **Deliverable** column on **Data Manager → Initiatives**, and add a qualifying lifecycle segment linking that Initiative and Deliverable on the **Visualiser timeline**. Existing unsupported Asset-target rows require the same migration. If the Deliverable and target are already in place, the gate names only the remaining timeline segment; for an ambiguous target, select the intended Deliverable or split the work into one initiative per target.
 
-To make a segment eligible:
+The generated filing contains only the rows derived for your selected year — previously stored rows never join it silently. A stored row that belongs to another year is correctly absent with no warning. A stale row blocks only when it has no unique current canonical counterpart: repair the source Initiative or Deliverable named by the gate, then generate again. If multiple stored rows would claim the same generated plan line, the gate stays closed rather than silently dropping one.
 
-1. Open the application's lifecycle segment (double-click its swimlane, or click an existing segment bar).
-2. Set its **Initiative** field to the initiative driving that phase.
-3. Save.
-
-Asset/infrastructure rows don't have a lifecycle segment concept, so their quarter always needs to be entered directly in the **Quarter** column in Data Manager.
-
-## Exporting to Excel
-
-Go to **Reports → RPTI Report** and click **Export to Excel** to download a spreadsheet matching the exact Format 3.1 layout — one row per RPTI record, with all 11 required columns. This is separate from the general workspace Excel export (which includes a raw backup copy of your RPTI data alongside every other entity type, for full round-trip import/export).
-
----
+Stored rows remain visible in the read-only **Data Manager → RPTI** tab. The general workspace export includes those stored records for backup; the Reports export is the filing generated for your selected year.
 
 - Previous: [Recording an RPTI Row](recording-an-rpti-row.md)
 - Next: [Recording LKPTI Rows](../15-lkpti-report/recording-lkpti-rows.md)

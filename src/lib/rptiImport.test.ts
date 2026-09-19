@@ -8,7 +8,7 @@ import {
   RPTI_IMPORT_PRELAUNCH_STATUS_ID,
   RPTI_IMPORT_LIVE_STATUS_ID,
 } from './rptiImport';
-import { RPTI_CATEGORY_LABELS, generateRptiDetails } from './rpti';
+import { RPTI_CATEGORY_LABELS, projectRptiReturn } from './rpti';
 import type { Asset, AssetCategory, Deliverable, DeliverableSegment } from '../types';
 import { SEEDED_DELIVERABLE_STATUSES } from './deliverableStatusDefaults';
 
@@ -183,7 +183,7 @@ describe('deriveWorkspaceFromRptiImport — placement', () => {
     for (const { label, ex } of cases) {
       const out = deriveWorkspaceFromRptiImport(parse({ jenis: 'upgrade', quarter: 'Q3' }), 2027, ex);
       const segments = [...(ex.deliverableSegments ?? []), ...out.deliverableSegments];
-      const regen = generateRptiDetails({
+      const regen = projectRptiReturn({
         deliverableSegments: segments, deliverableStatuses: SEEDED_DELIVERABLE_STATUSES,
         initiatives: out.initiatives, deliverables: inventory.deliverables,
         assets: inventory.assets, assetCategories: inventory.assetCategories,
@@ -381,7 +381,7 @@ describe('an upgrade to infrastructure the LKPTI cannot contain', () => {
 
   it('gives it the prior-live segment, so it stays an upgrade when regenerated', () => {
     const out = deriveWorkspaceFromRptiImport(infraUpgrade(), 2027, EMPTY);
-    const regen = generateRptiDetails({
+    const regen = projectRptiReturn({
       deliverableSegments: out.deliverableSegments, deliverableStatuses: out.deliverableStatuses,
       initiatives: out.initiatives, deliverables: out.deliverables,
       assets: out.assets, assetCategories: out.assetCategories,
@@ -468,5 +468,44 @@ describe('an imported initiative names the deliverable it works on', () => {
     for (const i of out.initiatives) {
       if (i.deliverableId) expect(ids.has(i.deliverableId), i.name).toBe(true);
     }
+  });
+});
+
+describe('the importer records row fields on the entities they describe', () => {
+  /**
+   * ADR-0013. `Keterangan` is commentary on the work, so it belongs to the Initiative
+   * — the RPTI's other free-text column, `Deskripsi`, already comes from there. The
+   * related-party answer is a fact about the application's supplier, so it belongs to
+   * the Deliverable. Neither can be derived, so before this both were lost on
+   * regeneration.
+   */
+  const parseOne = (over = {}) => parseRptiImportWorkbook(wb([row(over)])).rows;
+
+  it('writes Keterangan onto the Initiative as rptiRemarks', () => {
+    const out = deriveWorkspaceFromRptiImport(parseOne({ remarks: 'Regulatory deadline driven.' }), 2027, EMPTY);
+    expect(out.initiatives[0].rptiRemarks).toBe('Regulatory deadline driven.');
+  });
+
+  it('writes the related-party answer onto the Deliverable', () => {
+    const out = deriveWorkspaceFromRptiImport(parseOne({ pengembang: 'PPJTI', ppjti: 'yes' }), 2027, EMPTY);
+    expect(out.deliverables[0].ppjtiRelatedParty).toBe('yes');
+  });
+
+  it('leaves both unset when the return did not supply them', () => {
+    const out = deriveWorkspaceFromRptiImport(parseOne({ remarks: '', ppjti: '' }), 2027, EMPTY);
+    expect(out.initiatives[0].rptiRemarks).toBeUndefined();
+    expect(out.deliverables[0].ppjtiRelatedParty).toBeUndefined();
+  });
+
+  it('records the related party against the matched deliverable on an upgrade', () => {
+    const inventory = {
+      deliverables: [{ id: 'd-1', assetId: 'a-1', name: 'Core Banking GL', type: 'application', categoryCode: '04' } as Deliverable],
+      assets: [{ id: 'a-1', name: 'Core Banking GL', categoryId: 'c-1' } as Asset],
+      assetCategories: [{ id: 'c-1', name: 'Area', categoryCode: '04' } as AssetCategory],
+    };
+    const out = deriveWorkspaceFromRptiImport(parseOne({ jenis: 'upgrade', pengembang: 'PPJTI', ppjti: 'no' }), 2027, inventory);
+    expect(out.unresolved).toEqual([]); // guard
+    // It attached rather than creating, so the answer must reach the existing entry.
+    expect(out.updatedDeliverables?.find(d => d.id === 'd-1')?.ppjtiRelatedParty).toBe('no');
   });
 });

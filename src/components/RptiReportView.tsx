@@ -11,9 +11,11 @@ interface RptiReportViewProps {
   deliverableSegments: DeliverableSegment[];
   deliverableStatuses: DeliverableStatus[];
   defaultCurrency?: string;
+  reportYear?: number;
+  blockingIssues?: string[];
 }
 
-export function RptiReportView({ rptiDetails, initiatives, deliverables, assets, deliverableSegments, deliverableStatuses, defaultCurrency = 'USD' }: RptiReportViewProps) {
+export function RptiReportView({ rptiDetails, initiatives, deliverables, assets, deliverableSegments, deliverableStatuses, defaultCurrency = 'USD', reportYear, blockingIssues = [] }: RptiReportViewProps) {
   const targetName = (detail: RptiDetail): string => {
     if (detail.targetType === 'deliverable') return deliverables.find(a => a.id === detail.targetId)?.name ?? '—';
     return assets.find(a => a.id === detail.targetId)?.name ?? '—';
@@ -23,12 +25,12 @@ export function RptiReportView({ rptiDetails, initiatives, deliverables, assets,
     <div data-testid="rpti-report-view" className="space-y-4">
       <div className="flex items-center gap-2">
         <p className="text-sm text-slate-500">
-          RPTI rows are managed in <span className="font-medium text-slate-700">Data Manager → RPTI</span>. This screen is a read-only summary and export.
+          {reportYear ? `RPTI filing for ${reportYear}.` : 'Choose a report year to generate an RPTI filing.'}
         </p>
         <div className="flex-1" />
-        {rptiDetails.length > 0 && (
+        {rptiDetails.length > 0 && blockingIssues.length === 0 && (
           <button
-            onClick={() => exportRptiReportToExcel(rptiDetails, initiatives, deliverables, assets, deliverableSegments, deliverableStatuses)}
+            onClick={() => exportRptiReportToExcel(rptiDetails, initiatives, deliverables, assets, reportYear!, deliverableSegments, deliverableStatuses)}
             data-testid="rpti-report-export-btn"
             className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors text-sm font-medium"
           >
@@ -37,6 +39,13 @@ export function RptiReportView({ rptiDetails, initiatives, deliverables, assets,
           </button>
         )}
       </div>
+
+      {blockingIssues.length > 0 && (
+        <div data-testid="rpti-pre-export-gate" role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+          <p className="font-medium">Resolve these issues before exporting the RPTI filing:</p>
+          <ul className="mt-1 list-disc pl-5">{blockingIssues.map(issue => <li key={issue}>{issue}</li>)}</ul>
+        </div>
+      )}
 
       {rptiDetails.length === 0 ? (
         <div className="text-center py-16 text-slate-400">

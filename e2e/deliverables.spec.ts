@@ -32,7 +32,7 @@ test.describe('Deliverables — Data Manager tab', () => {
   test('Deliverables tab shows RPTI auto-fill override columns (categoryCode, developer, DC/DR location)', async ({ page }) => {
     await page.getByTestId('data-manager-tab-deliverables').click();
     const headerText = (await page.locator('[data-testid="data-manager"] thead').innerText()).toLowerCase();
-    for (const label of ['RPTI Category Override', 'Developer', 'DC City Override', 'DC Country Override', 'DR City Override', 'DR Country Override']) {
+    for (const label of ['Category Code Override', 'Developer', 'DC City Override', 'DC Country Override', 'DR City Override', 'DR Country Override']) {
       expect(headerText).toContain(label.toLowerCase());
     }
   });

@@ -8,7 +8,7 @@
  * Each area is backed by a real AssetCategory (see `rptiCatalogueAssetCategories`)
  * whose `categoryCode` matches the area, so a Deliverable added under a
  * catalogue-added Asset auto-classifies for RPTI reporting via the same
- * AssetCategory default-inheritance `generateRptiDetails()` already implements —
+ * AssetCategory default-inheritance `projectRptiReturn()` already implements —
  * no separate classification field or lookup needed.
  */
 

@@ -44,3 +44,4 @@ An ADR is never edited to reverse its outcome — if circumstances change, write
 | [0010](0010-lkpti-import-onboarding.md) | Import an existing LKPTI report as a workspace template, and make LKPTI generation merge-preserving | Accepted |
 | [0011](0011-history-tab-decisions-as-audit-trail.md) | The decision log is an audit trail, not workspace state | Accepted |
 | [0012](0012-deliverable-segment-title.md) | Give `DeliverableSegment` an optional title, over deriving every label | Accepted |
+| [0013](0013-report-rows-as-projections.md) | Report rows describe the entities they belong to, and a return is generated for a stated year | Accepted |

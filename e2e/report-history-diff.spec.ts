@@ -1,3 +1,4 @@
+import { seedReportRecords, reportFixture } from './report-fixtures';
 import { test, expect } from '@playwright/test';
 
 async function loadRptiTemplate(page: import('@playwright/test').Page) {
@@ -203,13 +204,10 @@ test.describe('History Differences report — full entity coverage', () => {
   test('an added LKPTI row reaches the report', async ({ page }) => {
     await saveBaseline(page, 'LKPTI Baseline');
 
-    await page.getByTestId('nav-data-manager').click();
-    await page.getByTestId('data-manager-tab-lkpti').click();
-    const targetSelect = page.getByTestId('ghost-select-targetId').first();
-    await targetSelect.waitFor({ timeout: 10000 });
-    const deliverableName = (await targetSelect.locator('option').nth(1).textContent())?.trim() ?? '';
-    expect(deliverableName).not.toBe('');
-    await targetSelect.selectOption({ index: 1 });
+    await seedReportRecords(page, { deliverables: reportFixture.deliverables, lkptiDetails: [{
+      id: 'diff-added-lkpti', targetId: 'filing-deliverable', platform: 'Linux',
+    }] });
+    const deliverableName = 'Filing Application';
 
     const diffResult = await runDiff(page, 'LKPTI Baseline');
     await expect(diffResult).toContainText('LKPTI');

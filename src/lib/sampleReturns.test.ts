@@ -3,7 +3,7 @@ import * as XLSX from 'xlsx';
 import { readFileSync } from 'node:fs';
 import { parseLkptiImportWorkbook, deriveWorkspaceFromLkptiImport } from './lkptiImport';
 import { parseRptiImportWorkbook, deriveWorkspaceFromRptiImport } from './rptiImport';
-import { generateRptiDetails } from './rpti';
+import { projectRptiReturn, reconcileRptiReturn } from './rpti';
 import { mergeDeliverableStatuses } from './deliverableStatusDefaults';
 
 const load = (n: string) => XLSX.read(readFileSync(new URL(`../../docs/sample-data/${n}`, import.meta.url)), { type: 'buffer' });
@@ -29,7 +29,7 @@ describe('the published sample returns', () => {
   });
 
   it('RPTI carries both applications and infrastructure', () => {
-    const inv = deriveWorkspaceFromLkptiImport(parseLkptiImportWorkbook(load('sample-lkpti-2026.xlsx')).rows);
+    const inv = deriveWorkspaceFromLkptiImport(parseLkptiImportWorkbook(load('sample-lkpti-2026.xlsx')).rows, 2026);
     const { rows } = parseRptiImportWorkbook(load('sample-rpti-2027.xlsx'));
     const out = deriveWorkspaceFromRptiImport(rows, 2027, {
       deliverables: inv.deliverables, assets: inv.assets, assetCategories: inv.assetCategories,
@@ -40,7 +40,7 @@ describe('the published sample returns', () => {
   });
 
   it('the four upgrade rows attach to the 2026 inventory, and exactly one cannot', () => {
-    const inv = deriveWorkspaceFromLkptiImport(parseLkptiImportWorkbook(load('sample-lkpti-2026.xlsx')).rows);
+    const inv = deriveWorkspaceFromLkptiImport(parseLkptiImportWorkbook(load('sample-lkpti-2026.xlsx')).rows, 2026);
     const { rows } = parseRptiImportWorkbook(load('sample-rpti-2027.xlsx'));
     const out = deriveWorkspaceFromRptiImport(rows, 2027, {
       deliverables: inv.deliverables, assets: inv.assets, assetCategories: inv.assetCategories,
@@ -54,6 +54,85 @@ describe('the published sample returns', () => {
     expect(attached).toHaveLength(4);
     expect(out.rptiDetails.filter(r => r.targetId.startsWith('rpti-import-unresolved-'))).toHaveLength(1);
   });
+
+  /**
+   * T012 / FR-024 + FR-025, on the sample the product actually ships.
+   *
+   * The filed plan upgrades "Legacy Teller Application", which the 2026 inventory does
+   * not contain, so nothing can derive that row. Under Q11 the projection no longer
+   * carries it — which is only acceptable because the preparer is *told*. These two
+   * cases are the promise: named before a file is produced, and reproduced once the
+   * named repair is made, with no re-keying of what the return already supplied.
+   */
+  it('names the row nothing can derive, rather than letting it leave the filing quietly', () => {
+    const inv = deriveWorkspaceFromLkptiImport(parseLkptiImportWorkbook(load('sample-lkpti-2026.xlsx')).rows, 2026);
+    const { rows } = parseRptiImportWorkbook(load('sample-rpti-2027.xlsx'));
+    const out = deriveWorkspaceFromRptiImport(rows, 2027, {
+      deliverables: inv.deliverables, assets: inv.assets, assetCategories: inv.assetCategories,
+    });
+    const workspace = {
+      initiatives: out.initiatives,
+      deliverables: [...inv.deliverables, ...out.deliverables],
+      deliverableSegments: out.deliverableSegments,
+      deliverableStatuses: mergeDeliverableStatuses(out.deliverableStatuses ?? []),
+    };
+
+    const findings = reconcileRptiReturn({ ...workspace, storedDetails: out.rptiDetails });
+    const unresolvedRow = out.rptiDetails.find(r => r.targetId.startsWith('rpti-import-unresolved-'))!;
+    const named = findings.filter(f => f.rowId === unresolvedRow.id);
+
+    expect(named, 'the one underivable row must raise exactly one finding').toHaveLength(1);
+    expect(named[0].message, 'the finding must name the repair, not just the symptom')
+      .toMatch(/Deliverable|application/i);
+
+    // Guard against a gate that simply shouts at everything: the twelve rows that
+    // *can* be derived must stay silent, or the preparer learns to ignore it.
+    expect(findings.filter(f => f.rowId !== unresolvedRow.id)).toEqual([]);
+  });
+
+  it('reproduces that row once the application it refers to exists', () => {
+    const inv = deriveWorkspaceFromLkptiImport(parseLkptiImportWorkbook(load('sample-lkpti-2026.xlsx')).rows, 2026);
+    const { rows } = parseRptiImportWorkbook(load('sample-rpti-2027.xlsx'));
+    const out = deriveWorkspaceFromRptiImport(rows, 2027, {
+      deliverables: inv.deliverables, assets: inv.assets, assetCategories: inv.assetCategories,
+    });
+    const unresolvedRow = out.rptiDetails.find(r => r.targetId.startsWith('rpti-import-unresolved-'))!;
+    const statuses = mergeDeliverableStatuses(out.deliverableStatuses ?? []);
+    const deliverables = [...inv.deliverables, ...out.deliverables];
+
+    // The repair FR-025 describes: create the application the filed plan refers to
+    // and point the Initiative at it. A real UI-created Deliverable receives a new id;
+    // reconciliation must use the surviving Initiative identity, not require the
+    // impossible act of recreating the importer's synthetic placeholder id.
+    const replacementTargetId = 'repair-deliv';
+    const repaired = {
+      initiatives: out.initiatives.map(i => i.id === unresolvedRow.initiativeId
+        ? { ...i, deliverableId: replacementTargetId }
+        : i),
+      deliverables: [...deliverables, {
+        id: replacementTargetId, assetId: inv.assets[0].id, name: 'Legacy Teller Application',
+      }],
+      // The segment is the whole repair. Selecting the initiative's Deliverable would not
+      // be enough on its own — generation derives a row from a lifecycle segment, so a
+      // target with no segment stays underivable. The finding says exactly that.
+      deliverableSegments: [...out.deliverableSegments, {
+        id: 'repair-seg', deliverableId: replacementTargetId,
+        initiativeId: unresolvedRow.initiativeId,
+        status: statuses.find(st => st.isLiveStatus)!.id,
+        startDate: '2027-04-01', endDate: '2027-12-31',
+      }],
+      deliverableStatuses: statuses,
+    };
+
+    expect(reconcileRptiReturn({ ...repaired, storedDetails: [unresolvedRow] }),
+      'repairing the source must clear the finding — FR-025').toEqual([]);
+
+    const regenerated = projectRptiReturn({
+      ...repaired, assets: inv.assets, assetCategories: inv.assetCategories,
+    } as never, 2027);
+    expect(regenerated.some(r => r.targetId === replacementTargetId),
+      'and the next generation must actually produce the row').toBe(true);
+  });
 });
 
 describe('a planned enhancement to an application the bank already runs', () => {
@@ -66,7 +145,7 @@ describe('a planned enhancement to an application the bank already runs', () => 
    * rule was corrected: a brand-new payment gateway declared to OJK.
    */
   const merged = () => {
-    const inv = deriveWorkspaceFromLkptiImport(parseLkptiImportWorkbook(load('sample-lkpti-2026.xlsx')).rows);
+    const inv = deriveWorkspaceFromLkptiImport(parseLkptiImportWorkbook(load('sample-lkpti-2026.xlsx')).rows, 2026);
     const { rows } = parseRptiImportWorkbook(load('sample-rpti-2027.xlsx'));
     const out = deriveWorkspaceFromRptiImport(rows, 2027, {
       deliverables: inv.deliverables, assets: inv.assets, assetCategories: inv.assetCategories,
@@ -93,7 +172,7 @@ describe('a planned enhancement to an application the bank already runs', () => 
 
     expect(w.out.rptiDetails.find(r => r.targetId === pg.id)?.developmentType).toBe('upgrade');
 
-    const regen = generateRptiDetails({
+    const regen = projectRptiReturn({
       deliverableSegments: w.deliverableSegments, deliverableStatuses: w.deliverableStatuses,
       initiatives: w.out.initiatives, deliverables: w.deliverables,
       assets: w.assets, assetCategories: w.assetCategories,
@@ -107,7 +186,7 @@ describe('a planned enhancement to an application the bank already runs', () => 
 
   it('keeps the three new applications classified as new', () => {
     const w = merged();
-    const regen = generateRptiDetails({
+    const regen = projectRptiReturn({
       deliverableSegments: w.deliverableSegments, deliverableStatuses: w.deliverableStatuses,
       initiatives: w.out.initiatives, deliverables: w.deliverables,
       assets: w.assets, assetCategories: w.assetCategories,
@@ -129,7 +208,7 @@ describe('an imported workspace has one vocabulary, not two', () => {
    * correct and only the user ever saw the problem.
    */
   const statuses = () => {
-    const inv = deriveWorkspaceFromLkptiImport(parseLkptiImportWorkbook(load('sample-lkpti-2026.xlsx')).rows);
+    const inv = deriveWorkspaceFromLkptiImport(parseLkptiImportWorkbook(load('sample-lkpti-2026.xlsx')).rows, 2026);
     const out = deriveWorkspaceFromRptiImport(parseRptiImportWorkbook(load('sample-rpti-2027.xlsx')).rows, 2027, {
       deliverables: inv.deliverables, assets: inv.assets, assetCategories: inv.assetCategories,
     });
@@ -163,7 +242,7 @@ describe('the sample plan upgrades infrastructure the LKPTI cannot hold', () => 
   // Primary Data Center Jakarta is filed as an upgrade but appears in no LKPTI,
   // because LKPTI is applications only. It must be created rather than stranded.
   it('creates it, and leaves only the application mismatch unresolved', () => {
-    const inv = deriveWorkspaceFromLkptiImport(parseLkptiImportWorkbook(load('sample-lkpti-2026.xlsx')).rows);
+    const inv = deriveWorkspaceFromLkptiImport(parseLkptiImportWorkbook(load('sample-lkpti-2026.xlsx')).rows, 2026);
     const out = deriveWorkspaceFromRptiImport(parseRptiImportWorkbook(load('sample-rpti-2027.xlsx')).rows, 2027, {
       deliverables: inv.deliverables, assets: inv.assets, assetCategories: inv.assetCategories,
     });
@@ -173,7 +252,7 @@ describe('the sample plan upgrades infrastructure the LKPTI cannot hold', () => 
     const dc = out.deliverables.find(d => d.name === 'Primary Data Center Jakarta');
     expect(dc?.type).toBe('infrastructure');
 
-    const regen = generateRptiDetails({
+    const regen = projectRptiReturn({
       deliverableSegments: [...inv.deliverableSegments, ...out.deliverableSegments],
       deliverableStatuses: mergeDeliverableStatuses(inv.deliverableStatuses, out.deliverableStatuses),
       initiatives: out.initiatives,
@@ -190,13 +269,13 @@ describe('every imported deliverable states its type', () => {
   // `d.type ?? 'application'`. The gap was only visible in the Deliverables tab,
   // as an empty Type select on all 13 LKPTI rows.
   it('LKPTI gives every row an explicit application type', () => {
-    const inv = deriveWorkspaceFromLkptiImport(parseLkptiImportWorkbook(load('sample-lkpti-2026.xlsx')).rows);
+    const inv = deriveWorkspaceFromLkptiImport(parseLkptiImportWorkbook(load('sample-lkpti-2026.xlsx')).rows, 2026);
     expect(inv.deliverables).toHaveLength(13);
     expect(inv.deliverables.every(d => d.type === 'application')).toBe(true);
   });
 
   it('no deliverable from either importer is left without a type', () => {
-    const inv = deriveWorkspaceFromLkptiImport(parseLkptiImportWorkbook(load('sample-lkpti-2026.xlsx')).rows);
+    const inv = deriveWorkspaceFromLkptiImport(parseLkptiImportWorkbook(load('sample-lkpti-2026.xlsx')).rows, 2026);
     const out = deriveWorkspaceFromRptiImport(parseRptiImportWorkbook(load('sample-rpti-2027.xlsx')).rows, 2027, {
       deliverables: inv.deliverables, assets: inv.assets, assetCategories: inv.assetCategories,
     });

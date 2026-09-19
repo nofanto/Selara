@@ -3,7 +3,7 @@ import {
   Initiative, Milestone, Dependency, Decision, Resource, Programme, Strategy,
   RptiDetail, LkptiDetail, TimelineSettings,
 } from '../types';
-import { isLiveStatusId, isPreLaunchStatusId, resolveAssetCategory } from './rpti';
+import { isLiveStatusId, isPreLaunchStatusId, reconcileRptiReturn, resolveAssetCategory, resolveRptiTarget } from './rpti';
 
 // Tabs of src/components/DataManager.tsx's own `Tab` union — defined here (the pure
 // lib layer) as the source of truth so DataManager can import it instead of the other
@@ -194,6 +194,48 @@ export function computeDataHealth(input: DataHealthInput): HealthIssue[] {
         });
       }
     }
+
+    const initiativeSegments = deliverableSegments.filter(segment => segment.initiativeId === i.id);
+    const reportTargets = new Set(initiativeSegments.map(segment => segment.deliverableId));
+    if (!i.isPlaceholder && !i.deliverableId && reportTargets.size > 1) {
+      issues.push({
+        id: `initiative-rpti-multi-target:${i.id}`, severity: 'error', entityType: 'Initiative', entityId: i.id,
+        entityName: i.name,
+        message: `"${i.name}" has no declared RPTI target and lifecycle segments on multiple deliverables. Select its intended Deliverable on Initiatives, or split it into one initiative per RPTI target before generating the filing.`,
+        location: tab('initiatives'),
+      });
+    } else if (!i.isPlaceholder && initiativeSegments.some(segment =>
+      isLiveStatusId(segment.status, deliverableStatuses) || isPreLaunchStatusId(segment.status, deliverableStatuses)
+    ) && !deliverableIds.has(resolveRptiTarget(i, deliverableSegments, deliverables) ?? '')) {
+      issues.push({
+        id: `initiative-rpti-no-target:${i.id}`, severity: 'error', entityType: 'Initiative', entityId: i.id,
+        entityName: i.name,
+        message: `"${i.name}" has qualifying lifecycle segments but no resolvable RPTI target. Create or repair the Deliverable and select that Deliverable on Initiatives before generating the filing.`,
+        location: tab('initiatives'),
+      });
+    } else if (!i.isPlaceholder && i.deliverableId && deliverableIds.has(i.deliverableId)) {
+      // Q10 made a declared target win over timeline history, and the multi-target error
+      // above is suppressed once one is declared. But "the target exists" is not "the
+      // target is generatable": generation needs a qualifying segment on the declared
+      // pair, so an initiative declaring D1 while all its work sits on D2 files nothing
+      // and — with no stored row for reconciliation to inspect — explains nothing (F6).
+      // This is where intent is least safely inferred, so it is reported rather than
+      // guessed: the only qualifying work points somewhere other than the filing target.
+      const qualifying = initiativeSegments.filter(segment =>
+        isLiveStatusId(segment.status, deliverableStatuses) || isPreLaunchStatusId(segment.status, deliverableStatuses));
+      const onDeclared = qualifying.some(segment => segment.deliverableId === i.deliverableId);
+      if (qualifying.length > 0 && !onDeclared) {
+        const declaredName = deliverableById.get(i.deliverableId)?.name ?? i.deliverableId;
+        const elsewhere = [...new Set(qualifying.map(segment =>
+          deliverableById.get(segment.deliverableId)?.name ?? segment.deliverableId))];
+        issues.push({
+          id: `initiative-rpti-unanchored-target:${i.id}`, severity: 'error', entityType: 'Initiative', entityId: i.id,
+          entityName: i.name,
+          message: `"${i.name}" names "${declaredName}" as its Deliverable, but its lifecycle work sits on ${elsewhere.map(n => `"${n}"`).join(', ')}. Generation has nothing to derive on the named Deliverable, so this initiative files no plan line. Either select the Deliverable the work is on, or add a lifecycle segment for this initiative on "${declaredName}".`,
+          location: tab('initiatives'),
+        });
+      }
+    }
   }
 
   for (const m of milestones) {
@@ -246,37 +288,72 @@ export function computeDataHealth(input: DataHealthInput): HealthIssue[] {
     }
   }
 
+  const rptiReconciliationByRow = new Map(reconcileRptiReturn({
+    storedDetails: rptiDetails,
+    initiatives,
+    deliverables,
+    deliverableSegments,
+    deliverableStatuses,
+  }).map(finding => [finding.rowId, finding]));
+
   for (const r of rptiDetails) {
+    const reconciliation = rptiReconciliationByRow.get(r.id);
+    // A stale stored id is not itself a defect once the row has one unambiguous
+    // current canonical counterpart (Q12). The evidence remains immutable; the
+    // source-side repair is what clears both Data Health and the export gate.
+    if (!reconciliation) continue;
     const initiative = initiativeById.get(r.initiativeId);
     const label = initiative?.name ?? r.id;
+    if (reconciliation.reason === 'identity-conflict') {
+      issues.push({
+        id: `rpti-identity-conflict:${r.id}`, severity: 'error', entityType: 'RptiDetail', entityId: r.id,
+        entityName: label, message: reconciliation.message, location: tab('initiatives'),
+      });
+      continue;
+    }
     if (!initiativeIds.has(r.initiativeId)) {
       issues.push({
         id: `rpti-initiative:${r.id}`, severity: 'error', entityType: 'RptiDetail', entityId: r.id,
-        entityName: label, message: `An RPTI row points at an Initiative that no longer exists.`, location: tab('rpti'),
+        entityName: label, message: reconciliation.message, location: tab('initiatives'),
+      });
+    }
+    if (r.targetType === 'asset') {
+      issues.push({
+        id: `rpti-asset-target:${r.id}`, severity: 'error', entityType: 'RptiDetail', entityId: r.id,
+        entityName: label,
+        message: reconciliation.message,
+        location: tab('deliverables'),
       });
     }
     const targetExists = r.targetType === 'deliverable' ? deliverableIds.has(r.targetId) : assetIds.has(r.targetId);
     if (!targetExists) {
       issues.push({
         id: `rpti-target:${r.id}`, severity: 'error', entityType: 'RptiDetail', entityId: r.id,
-        entityName: label, message: `An RPTI row for "${label}" points at a ${r.targetType} that no longer exists.`, location: tab('rpti'),
+        entityName: label, message: reconciliation.message, location: tab('deliverables'),
       });
     }
     if (r.deliverableSegmentId && !segmentIds.has(r.deliverableSegmentId)) {
       issues.push({
         id: `rpti-segment:${r.id}`, severity: 'error', entityType: 'RptiDetail', entityId: r.id,
-        entityName: label, message: `An RPTI row for "${label}" points at a lifecycle segment that no longer exists.`, location: tab('rpti'),
+        entityName: label, message: `The filed RPTI row for "${label}" refers to a lifecycle segment that no longer exists. Restore that work on the timeline — generation derives the row's quarter from it.`, location: tab('deliverables'),
       });
     }
   }
 
   for (const l of lkptiDetails) {
     const deliverable = deliverableById.get(l.targetId);
-    const label = deliverable?.name ?? l.id;
+    const label = deliverable?.name ?? l.targetName ?? l.id;
     if (!deliverableIds.has(l.targetId)) {
+      const sameName = l.targetName
+        ? deliverables.filter(d => d.name.trim().toLocaleLowerCase() === l.targetName!.trim().toLocaleLowerCase())
+        : [];
+      if (sameName.length === 1) continue;
+      const message = l.targetName
+        ? `The filed LKPTI row for "${l.targetName}" no longer resolves to its original application. ${sameName.length > 1 ? 'More than one current Deliverable has that filing name; rename or remove duplicates so exactly one identifies the application.' : 'Create or correct exactly one application with that filing name on the Deliverables tab.'}`
+        : `A filed LKPTI row refers to an application that is not recorded, and its application name was not recorded on the old row. Re-import the filing to restore that identity; creating an application cannot safely attach this already-orphaned row.`;
       issues.push({
         id: `lkpti-target:${l.id}`, severity: 'error', entityType: 'LkptiDetail', entityId: l.id,
-        entityName: label, message: `An LKPTI row points at a Deliverable that no longer exists.`, location: tab('lkpti'),
+        entityName: label, message, location: tab('deliverables'),
       });
     }
   }
@@ -377,7 +454,7 @@ export function computeDataHealth(input: DataHealthInput): HealthIssue[] {
     if (missing.length > 0) {
       issues.push({
         id: `lkpti-incomplete:${l.id}`, severity: 'warning', entityType: 'LkptiDetail', entityId: l.id,
-        entityName: label, message: `The LKPTI row for "${label}" is missing: ${missing.join(', ')}.`, location: tab('lkpti'),
+        entityName: label, message: `"${label}" is missing: ${missing.join(', ')}. These are recorded on the application itself (ADR-0013), on the Deliverables tab.`, location: tab('deliverables'),
       });
     }
   }
@@ -385,7 +462,7 @@ export function computeDataHealth(input: DataHealthInput): HealthIssue[] {
   const RPTI_MANUAL_ONLY_FIELDS: { key: keyof RptiDetail; label: string }[] = [
     { key: 'categoryCode', label: 'Category' },
     { key: 'developer', label: 'Developer' },
-    { key: 'ppjtiRelatedParty', label: 'PPJTI Related Party' },
+    { key: 'ppjtiRelatedParty', label: 'Provider Related Party' },
   ];
   for (const r of rptiDetails) {
     const initiative = initiativeById.get(r.initiativeId);
@@ -394,7 +471,7 @@ export function computeDataHealth(input: DataHealthInput): HealthIssue[] {
     if (missing.length > 0) {
       issues.push({
         id: `rpti-incomplete:${r.id}`, severity: 'warning', entityType: 'RptiDetail', entityId: r.id,
-        entityName: label, message: `The RPTI row for "${label}" is missing: ${missing.join(', ')}.`, location: tab('rpti'),
+        entityName: label, message: `The plan line for "${label}" is missing: ${missing.join(', ')}. These are recorded on the application it targets (ADR-0013), on the Deliverables tab.`, location: tab('deliverables'),
       });
     }
   }
@@ -442,9 +519,11 @@ export function computeDataHealth(input: DataHealthInput): HealthIssue[] {
     const applicationName = deliverable?.name;
     const label = deliverable?.name ?? l.id;
     const entityName = label;
-    // The name is edited on the Deliverables tab; every other column on the LKPTI tab.
+    // Both now land on the Deliverables tab: since ADR-0013 the application owns these
+    // values, and since Q5/Q6's read-only revision the LKPTI tab cannot be edited at all,
+    // so sending anyone there would name the problem without naming a repair (FR-021a).
     const NAME_TAB = tab('deliverables');
-    const ROW_TAB = tab('lkpti');
+    const ROW_TAB = tab('deliverables');
 
     if (l.goLiveDate) {
       const parsed = parseDdMmYyyy(l.goLiveDate);
@@ -553,8 +632,8 @@ export function computeDataHealth(input: DataHealthInput): HealthIssue[] {
     validityIssues.push({
       id: 'workspace-currency-not-idr', severity: 'warning', entityType: 'Workspace', entityId: 'workspace',
       entityName: 'Workspace settings',
-      message: `The workspace currency is ${currency}. RPTI requires IDR-equivalent amounts, and this app reports in a single currency with no per-row conversion, so the export cannot be schema-compliant until the workspace reports in IDR.`,
-      location: tab('rpti'),
+      message: `The workspace currency is ${currency}. RPTI requires IDR-equivalent amounts, and this app reports in a single currency with no per-row conversion, so the export cannot be schema-compliant until the workspace reports in IDR. Change it in the visualiser's display settings.`,
+      location: tab('initiatives'),
     });
   }
 
@@ -582,7 +661,11 @@ export function computeDataHealth(input: DataHealthInput): HealthIssue[] {
  */
 const REPORTS_BY_CHECK: Record<string, HealthReport[]> = {
   // Rows of a return, and the things that stop one being generated at all.
+  'initiative-rpti-multi-target': ['rpti'],
+  'initiative-rpti-no-target': ['rpti'],
+  'rpti-asset-target': ['rpti'],
   'rpti-incomplete': ['rpti'],
+  'rpti-identity-conflict': ['rpti'],
   'rpti-initiative': ['rpti'],
   'rpti-segment': ['rpti'],
   'rpti-target': ['rpti'],

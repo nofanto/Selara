@@ -16,7 +16,7 @@ const statuses: DeliverableStatus[] = [
 
 function makeSegment(overrides: Partial<DeliverableSegment> = {}): DeliverableSegment {
   return {
-    id: 'seg-1', deliverableId: 'deliv-1', startDate: '2026-02-01', endDate: '2026-03-01',
+    id: 'seg-1', deliverableId: 'deliv-1', startDate: '2026-02-01', endDate: '2099-12-31',
     status: 'appstatus-planned',
     ...overrides,
   };
@@ -36,6 +36,7 @@ function makeAssetCategory(overrides: Partial<AssetCategory> = {}): AssetCategor
 
 function makeContext(overrides: Partial<GenerateLkptiDetailsInput> = {}): GenerateLkptiDetailsInput {
   return {
+    asAtDate: '2026-12-31',
     deliverableSegments: [],
     deliverableStatuses: statuses,
     deliverables: [makeDeliverable()],
@@ -47,6 +48,38 @@ function makeContext(overrides: Partial<GenerateLkptiDetailsInput> = {}): Genera
 }
 
 describe('generateLkptiDetails', () => {
+  describe('as-at membership', () => {
+    it('includes an application during its live span and excludes it after that span ends', () => {
+      const segments = [makeSegment({
+        status: 'appstatus-in-production', startDate: '2021-06-01', endDate: '2025-06-30',
+      })];
+
+      expect(generateLkptiDetails(makeContext({
+        deliverableSegments: segments, asAtDate: '2024-12-31',
+      } as never))).toHaveLength(1);
+      expect(generateLkptiDetails(makeContext({
+        deliverableSegments: segments, asAtDate: '2026-12-31',
+      } as never))).toHaveLength(0);
+    });
+
+    it('excludes an application that has not yet gone live as at the requested date', () => {
+      const segments = [makeSegment({
+        status: 'appstatus-in-production', startDate: '2025-01-01', endDate: '2028-12-31',
+      })];
+
+      expect(generateLkptiDetails(makeContext({
+        deliverableSegments: segments, asAtDate: '2024-12-31',
+      } as never))).toHaveLength(0);
+    });
+
+    it('requires an explicit as-at date', () => {
+      const segments = [makeSegment({ status: 'appstatus-in-production' })];
+      expect(() => generateLkptiDetails({
+        ...makeContext({ deliverableSegments: segments }), asAtDate: undefined,
+      } as never)).toThrow(/as-at/i);
+    });
+  });
+
   it('generates a row for a deliverable with a live (in-production) segment', () => {
     const segments = [makeSegment({ status: 'appstatus-in-production' })];
     const rows = generateLkptiDetails(makeContext({ deliverableSegments: segments }));
@@ -114,6 +147,22 @@ describe('generateLkptiDetails', () => {
     expect(rows[0].developer).toBeUndefined();
   });
 
+  it('emits a service provider name verbatim — the widened developer field is what LKPTI files', () => {
+    const deliverables = [makeDeliverable({ developer: 'PT Sigma Cipta Caraka' })];
+    const segments = [makeSegment({ status: 'appstatus-in-production' })];
+    const rows = generateLkptiDetails(makeContext({ deliverables, deliverableSegments: segments }));
+
+    expect(rows[0].developer).toBe('PT Sigma Cipta Caraka');
+  });
+
+  it('leaves developer blank when the Deliverable has none, rather than inventing one', () => {
+    const deliverables = [makeDeliverable({ developer: undefined })];
+    const segments = [makeSegment({ status: 'appstatus-in-production' })];
+    const rows = generateLkptiDetails(makeContext({ deliverables, deliverableSegments: segments }));
+
+    expect(rows[0].developer).toBeUndefined();
+  });
+
   it('ignores an infrastructure-only categoryCode (51-54, 99) inherited via cascade — LKPTI 3.2.6 only accepts 01-12/49', () => {
     const assetCategories = [makeAssetCategory({ categoryCode: '52' })];
     const segments = [makeSegment({ status: 'appstatus-in-production' })];
@@ -175,19 +224,14 @@ describe('generateLkptiDetails', () => {
     expect(rows).toHaveLength(1);
   });
 
-  // "Has gone live", not "is live right now": an application whose in-production phase
-  // has ended is still something the bank ran and must report. Dropping it would
-  // under-report to the regulator, and would silently discard the row's manual-only
-  // fields on the next generate.
-  it('includes a deliverable that has gone live even though its live segment has since ended', () => {
+  it('excludes a deliverable whose in-production segment has ended before the as-at date', () => {
     const segments = [
       makeSegment({ id: 'seg-prod', status: 'appstatus-in-production', startDate: '2020-01-01', endDate: '2021-06-30' }),
       makeSegment({ id: 'seg-sunset', status: 'appstatus-sunset', startDate: '2021-07-01', endDate: '2099-12-31' }),
     ];
     const rows = generateLkptiDetails(makeContext({ deliverableSegments: segments }));
 
-    expect(rows).toHaveLength(1);
-    expect(rows[0].goLiveDate).toBe('01-01-2020');
+    expect(rows).toHaveLength(0);
   });
 
   it('never suggests a future goLiveDate when an earlier live segment has started', () => {
@@ -287,5 +331,55 @@ describe('lkptiCascadeOnDeliverableDelete', () => {
     ] as any;
     const result = lkptiCascadeOnDeliverableDelete(details, 'deliv-1');
     expect(result).toEqual([{ id: 'a2', targetId: 'deliv-2' }]);
+  });
+});
+
+/**
+ * F4, from the final adversarial review. Q11 established that an existing row cannot make
+ * a non-live application *join* the inventory — membership is computed from segment spans
+ * against the as-at date. That is true, and it is only about membership. The row's own
+ * `goLiveDate` was still spread through untouched, so a filing could state a go-live
+ * *after* the as-at date it claims to describe.
+ *
+ * That is a wrong-period filing, not a cosmetic carry-over: LKPTI 3.2.6 asks what was live
+ * as at 31 December of the report year, and a date later than that answers a different
+ * question. ADR-0013 called this residual; it was not.
+ */
+describe('a generated LKPTI never states a go-live after its own as-at date (F4)', () => {
+  const deliverables = [makeDeliverable()];
+  const segments = [makeSegment({
+    status: 'appstatus-in-production', startDate: '2020-01-01', endDate: '2030-12-31',
+  })];
+
+  it('does not carry a stored go-live that post-dates the as-at date', () => {
+    const rows = generateLkptiDetails(makeContext({
+      deliverables, deliverableSegments: segments, asAtDate: '2027-12-31',
+      // A stored row from an earlier filing, or hand-entered: live from 2028.
+      existingDetails: [{ id: 'l1', targetId: 'deliv-1', goLiveDate: '01-01-2028' }],
+    } as never));
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].goLiveDate,
+      'a 2027 inventory cannot state a 2028 go-live').not.toBe('01-01-2028');
+  });
+
+  it('falls back to the live segment the membership test actually used', () => {
+    const rows = generateLkptiDetails(makeContext({
+      deliverables, deliverableSegments: segments, asAtDate: '2027-12-31',
+      existingDetails: [{ id: 'l1', targetId: 'deliv-1', goLiveDate: '01-01-2028' }],
+    } as never));
+
+    expect(rows[0].goLiveDate).toBe('01-01-2020');
+  });
+
+  it('keeps a stored go-live that is consistent with the as-at date', () => {
+    const rows = generateLkptiDetails(makeContext({
+      deliverables, deliverableSegments: segments, asAtDate: '2027-12-31',
+      // The filed value, more precise than the segment start — it must survive (FR-017).
+      existingDetails: [{ id: 'l1', targetId: 'deliv-1', goLiveDate: '15-03-2021' }],
+    } as never));
+
+    expect(rows[0].goLiveDate,
+      'a filed date the as-at supports is not ours to discard').toBe('15-03-2021');
   });
 });

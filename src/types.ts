@@ -73,6 +73,14 @@ export interface Initiative {
   capex: number;     // Capital expenditure
   opex: number;      // Operational expenditure
   description?: string;
+  /**
+   * RPTI `Keterangan` — commentary on this piece of work.
+   *
+   * Distinct from `description`, which supplies the RPTI's *other* free-text column,
+   * `Deskripsi`. Description says what the initiative is; this says what should be
+   * noted about it in the plan. Both end up in the same return, in different columns.
+   */
+  rptiRemarks?: string;
   isPlaceholder?: boolean;
   status?: 'planned' | 'active' | 'done' | 'cancelled';
   ragStatus?: 'green' | 'amber' | 'red';
@@ -160,11 +168,43 @@ export interface Deliverable {
   type?: DeliverableType; // Undefined is treated as 'application' (legacy records predate this field)
   description?: string; // What this deliverable does — no category-level default; cascades into LkptiDetail.functionDescription
   categoryCode?: RptiCategoryCode; // Overrides the parent AssetCategory's default RPTI category when set
-  developer?: RptiDeveloper; // No category-level default — varies too much within one architectural category to make one trustworthy
+  /**
+   * 'inhouse', or the name of the IT service provider that built it.
+   *
+   * Widened from the two-value RptiDeveloper enum so one field serves both returns:
+   * RPTI's `Pengembang` column wants the classification and derives 'PPJTI' from
+   * "a name that is not inhouse", while LKPTI's `Pengembang Aplikasi` wants the name
+   * itself. Previously the name lived on LkptiDetail and the classification here,
+   * which is why a regenerated LKPTI lost the provider on 9 of 13 rows.
+   *
+   * No category-level default — it varies too much within one architectural category
+   * for one to be trustworthy.
+   */
+  developer?: RptiDeveloper | string;
   dcCity?: string;   // Overrides the parent AssetCategory's default RPTI data center location when set, per field
   dcCountry?: string;
   drCity?: string;   // Overrides the parent AssetCategory's default RPTI disaster recovery center location when set, per field
   drCountry?: string;
+
+  // ── Attributes of the thing itself, not of any report row ─────────────────
+  // These describe the deliverable whether or not a return is being prepared, and
+  // are held here rather than on LkptiDetail so a regenerated return can read them.
+  // See requirement-specs/report-rows-as-projections.md Q1/Q3, and ADR-0013.
+  platform?: string;        // LKPTI `Platform`
+  database?: string;        // LKPTI `Pangkalan Data`
+  dcProvider?: string;      // LKPTI `Penyelenggara DC` — a company name, or 'self'
+  drcProvider?: string;     // LKPTI `Penyelenggara DRC`
+  backupStrategy?: LkptiBackupStrategy; // LKPTI `Strategi Backup`
+  systemOwner?: string;     // LKPTI `System Owner` — the person accountable
+  ownership?: LkptiOwnership;           // LKPTI `Kepemilikan` — lease or outright purchase
+  /**
+   * RPTI `PPJTI Pihak Terkait` — is the service provider a related party?
+   *
+   * Held per application, matching how the bank holds it. Known simplification: the
+   * same vendor can be answered inconsistently across applications and nothing will
+   * catch it. Modelling suppliers properly is separate work (Q3).
+   */
+  ppjtiRelatedParty?: RptiRelatedParty;
 }
 
 /**
@@ -195,28 +235,25 @@ export type RptiCategoryCode =
 
 /**
  * One row of the RPTI (IT Development Plan Report) regulatory report — an
- * Initiative's planned development activity on a specific Deliverable or
- * Asset. One Initiative may back multiple RptiDetail rows, one per affected
- * target, without changing Initiative's own single-asset targeting.
+ * Initiative's planned development activity on its linked Deliverable. It is a
+ * generated projection; the Initiative owns the filed cost.
  */
 export interface RptiDetail {
   id: string;
   initiativeId: string;
   targetType: RptiTargetType;
-  targetId: string; // Deliverable.id or Asset.id, per targetType
-  categoryCode?: RptiCategoryCode; // Regulatory classification — no auto-fill source, always set manually
+  targetId: string; // Deliverable.id for generated rows; legacy Asset targets are a data-health error
+  categoryCode?: RptiCategoryCode; // Cascades from Deliverable.categoryCode ?? AssetCategory.categoryCode
   developmentType: RptiDevelopmentType;
-  developer?: RptiDeveloper; // No auto-fill source, always set manually
-  ppjtiRelatedParty?: RptiRelatedParty; // No auto-fill source, always set manually
+  developer?: RptiDeveloper; // Derived from Deliverable.developer: 'inhouse', else 'PPJTI' for any named provider (ADR-0013)
+  ppjtiRelatedParty?: RptiRelatedParty; // Projection of Deliverable.ppjtiRelatedParty (ADR-0013); derived as 'n/a' when the developer is not PPJTI
   dcCity?: string;
   dcCountry?: string;
   drCity?: string;
   drCountry?: string;
-  capexAmount?: number; // Defaults to the linked Initiative's capex when unset. Always in TimelineSettings.defaultCurrency — this app reports in a single workspace-wide currency, no per-row conversion.
-  opexAmount?: number; // Defaults to the linked Initiative's opex when unset. Always in TimelineSettings.defaultCurrency, same as capexAmount.
   plannedImplementationQuarter?: RptiQuarter;
   deliverableSegmentId?: string; // Set when the quarter is auto-derived (targetType 'deliverable' only)
-  remarks?: string;
+  remarks?: string; // Projection of Initiative.rptiRemarks (ADR-0013) — the RPTI `Keterangan` column
 }
 
 // LKPTI 3.2.6's own category_code enum excludes RPTI's infrastructure-only codes
@@ -234,13 +271,30 @@ export type LkptiOwnership = 'LEASE' | 'OUTRIGHT_PURCHASE';
 export interface LkptiDetail {
   id: string;
   targetId: string; // Deliverable.id — LKPTI 3.2.6 is scoped to applications only, unlike RptiDetail which also targets bare Assets
+  /**
+   * Application name retained as identity evidence for a filed row. The exported
+   * name is normally resolved through targetId; keeping this snapshot lets data
+   * health recognise a uniquely recreated application if that id later goes stale.
+   */
+  targetName?: string;
   categoryCode?: LkptiCategoryCode; // Cascades: this row's value ?? Deliverable.categoryCode ?? AssetCategory.categoryCode, narrowed to application-eligible codes
   developer?: string; // 'inhouse', or the IT service provider's name — free text per the LKPTI form (unlike RptiDetail.developer's two-value enum, which only marks *that* it's third-party, not who). Auto-suggested as 'inhouse' when Deliverable.developer === 'inhouse'; left blank for manual entry (the provider name) otherwise.
   dcCity?: string;   // Cascades: this row's value ?? Deliverable.dcCity ?? AssetCategory.dcCity
   dcCountry?: string;
   drCity?: string;   // Cascades: this row's value ?? Deliverable.drCity ?? AssetCategory.drCity
   drCountry?: string;
-  // No auto-fill source — always manual entry:
+  /**
+   * Below here: the row's projection of attributes that live on the Deliverable.
+   *
+   * These were once authored here, because `LkptiDetail` was the only record able to
+   * hold them — which is why regenerating a return used to lose all seven. Since
+   * ADR-0013 the `Deliverable` is the source of truth and `generateLkptiDetails` fills
+   * these from it. They remain on the row because the row *is* the exported line of
+   * the return, and `exportLkptiReportToExcel` reads its columns from here.
+   *
+   * Edit them on the Deliverable. A value written directly onto a row is overwritten
+   * by the next generation.
+   */
   platform?: string;
   database?: string;
   dcProvider?: string;  // company name, or 'self'
@@ -282,13 +336,22 @@ export interface TimelineSettings {
   mobileBucketMode?: 'timeline' | 'quarter' | 'year' | 'programme' | 'strategy';
   criticalPath?: 'on' | 'off';
   groupBy?: 'asset' | 'programme' | 'strategy';
+  /**
+   * The years the preparer stated at onboarding, kept so Reports can offer them back
+   * as defaults (FR-009). Before this they positioned the imported segments and then
+   * survived only as banner text, which is why "Generate" had nothing to use but the
+   * clock — the defect [#40](https://github.com/nofanto/Selara/issues/40) was raised for.
+   * Offered, never assumed: the preparer still sees and confirms the year.
+   */
+  onboardingLkptiYear?: number;
+  onboardingRptiYear?: number;
   colorBy?: 'programme' | 'strategy' | 'status' | 'rag';
   showResources?: 'on' | 'off';
   display?: 'both' | 'initiatives' | 'deliverables';
   templateId?: string;           // Which workspace template was selected on first load
   showRptiCatalogue?: boolean;   // When false, the RPTI asset catalogue section is hidden (default: true)
   clusterName?: string;          // Agency cluster name — shown in the timeline header
-  defaultCurrency?: string;      // Single workspace-wide currency for RptiDetail.capexAmount/opexAmount, e.g. 'USD', 'IDR'
+  defaultCurrency?: string;      // Single workspace-wide currency for Initiative CapEx/OpEx, e.g. 'USD', 'IDR'
 }
 
 /**

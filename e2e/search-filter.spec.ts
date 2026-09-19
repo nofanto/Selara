@@ -90,6 +90,7 @@ test.describe('Search — Data Manager filtering', () => {
 
   test('name search filters the initiatives table', async ({ page }) => {
     await search(page, 'SSO');
+    await expect(page.getByTestId('data-manager-filter-indicator')).toContainText('Filtered by “SSO”');
     const rows = page.locator('tbody tr');
     await expect(rows).toHaveCount(2); // 1 real + 1 ghost
     await expect(rows.first().locator('input[type="text"]').first()).toHaveValue('SSO Consolidation');
