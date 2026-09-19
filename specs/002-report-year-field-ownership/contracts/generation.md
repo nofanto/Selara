@@ -45,8 +45,12 @@ Gains a parameter. This is the behavioural change of the feature.
 
 ## Attribute lift (deferred-migration safety)
 
-14. **A workspace whose attributes sit on stored rows has them lifted onto deliverables on load**,
-    before any generation can replace those rows.
+14. **A workspace whose attributes sit on stored rows has them lifted before entering live state**
+    through ordinary IndexedDB load, shared-workspace load, generic workbook import, or version
+    restore, before any generation can replace those rows. Each entry path persists the lifted
+    form immediately, folding it into an existing save where one already occurs. Cross-tab sync
+    does not repeat the lift: it reads IndexedDB only after the writing tab has lifted and saved.
+    An exported workbook beyond Selara's reach is lifted when it is re-imported.
 15. **The lift is idempotent.** Running it twice changes nothing after the first.
 16. **The lift never overwrites a value already on the deliverable.** Where both hold a value, the
     deliverable wins — it is the newer home and the one the preparer edits.

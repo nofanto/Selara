@@ -1,8 +1,9 @@
 # Report Rows as Projections, Not Storage — Design Notes
 
-> **Status:** Q1-Q3 and Q5-Q11 implemented and shipped on branch `002-report-year-field-ownership`
-> (see [ADR-0013](../docs/adr/0013-report-rows-as-projections.md)). Q4 — migration tooling for
-> existing exports, shares and saved versions — remains deliberately deferred. Raised jointly with
+> **Status:** Q1-Q13 implemented and shipped on branch `002-report-year-field-ownership`
+> (see [ADR-0013](../docs/adr/0013-report-rows-as-projections.md)). Q4's broad in-place migration
+> remains deferred, but its boundary-lift design now covers ordinary load, shared-workspace load,
+> generic workbook import and version restore. Raised jointly with
 > [#40](https://github.com/nofanto/Selara/issues/40) — see "Why this cannot ship before #40".
 >
 > **Read the title as the destination, not a claim that stored rows disappear now.** Attributes
@@ -178,6 +179,47 @@ segment wins, and the answer would change silently as the timeline is edited. Th
 Keterangan values describe the work, not a phase: *"Phase 2 of the digital channel roadmap"*,
 *"Regulatory deadline driven"*. `Initiative` is the right home, as Q2 decided.
 
+**The model, in the product owner's words (2026-09-19):** *"RPTI is a plan for development of
+application/infra; the Initiative is the trigger of the development; the segment is the link of
+the application/infra with the Initiative."*
+
+That framing is better than the one this note started with, and it is worth following through
+because it looks at first like an argument for the segment.
+
+An RPTI row **is the link**, not the trigger — a row says *this application is being developed,
+triggered by this initiative*, which is a pair. But **a segment is not the link; it is one
+time-slice of it.** The same link is normally expressed by several segments, a planned phase and
+then a live one, which is exactly why three collapse into one row above. So "the row is the link"
+argues for hosting remarks on the *pair*, and the segment is not the pair.
+
+**What closes it is Q7.** The owner chose option (c) there: cost belongs to the initiative, and an
+initiative has at most one RPTI target. FR-029 made that binding and Q10 followed by grouping
+generation on the initiative — so `(initiative, deliverable)` and `(initiative)` are now the *same
+grain*. The link has no separate identity because it was deliberately collapsed onto the trigger.
+Remarks on `Initiative` therefore **are** remarks on the link; the link simply happens to be
+spelled "initiative" since Q7.
+
+Worth recording the counterfactual, because it shows the reasoning is not circular: had Q7 gone
+the other way — a cost per `(initiative, target)`, many targets per initiative — the link would be
+a distinct thing needing its own entity, and remarks would belong **there**. Not on the initiative,
+and still not on the segment.
+
+**The rest of the cons stand on their own**, and were measured or read from the code rather than
+argued:
+
+- The anchor moves. `rpti.ts:209-211` picks the last live segment, or the last new one when none
+  are live, among those qualifying *for the selected year*. Change a status, add a phase, or shift
+  a date across a year boundary and a different segment becomes the anchor — so filed commentary
+  would change on its own. For a value a regulator reads, that is the worst property on the list.
+- Deleting a segment would delete filed commentary. Segments are redrawn as ordinary timeline
+  work; initiatives are not.
+- There is no editing surface. Segments have no Data Manager tab, so writing a `Keterangan` would
+  mean finding the right segment on the timeline — worse than a column on Initiatives, and the
+  same friction that made repairing an unresolved row a three-screen job ([#51](https://github.com/nofanto/Selara/issues/51)).
+- It would split the pair. `Deskripsi` comes from `Initiative.description`; sourcing `Keterangan`
+  from a segment would put two adjacent filed columns at two different grains, and they could never
+  be shown side by side in any one table.
+
 **The real finding is the gap.** Segments decide which *years* a row appears in; the initiative
 decides what the row *is*. An initiative filing in both 2027 and 2028 carries identical remarks in
 both, with no way to say "phase 1" in one and "phase 2" in the other — and Keterangan is exactly
@@ -303,10 +345,11 @@ initiative).
 
 **One-time lift completion (2026-09-19).** Legacy `capexAmount`/`opexAmount` properties are removed
 from stored rows immediately after their values are lifted and the cleaned rows are persisted on
-normal workspace load. This is the durable completion signal. Leaving those two properties as
-orphaned evidence was rejected because every later load would treat them as authoritative again
-and overwrite a newer Initiative edit. This exception applies only to costs; the other deferred-
-migration properties remain non-destructive evidence as Q4 records.
+the live-state boundary: ordinary load, shared-workspace load, workbook import, or version restore.
+This is the durable completion signal. Leaving those two properties as orphaned evidence was
+rejected because every later entry would treat them as authoritative again and overwrite a newer
+Initiative edit. This exception applies only to costs; the other legacy properties remain
+non-destructive evidence as Q4 records.
 
 **Rejected:** a cost on `DeliverableSegment` (the segment is a time slice, so an initiative with
 three phases on one application would need a summing rule that the filing never asks for); a new
@@ -349,7 +392,8 @@ round-trip is free, `db.ts` needs nothing because IndexedDB is schemaless within
   widths work since [#44](https://github.com/nofanto/Selara/issues/44), but it is a lot of columns.
 - Per [#42](https://github.com/nofanto/Selara/issues/42), each new field must be named
   explicitly in `diff.ts` or version history will not see it — silently.
-- Migration would be required, and is deliberately deferred — see Q4.
+- Broad in-place migration remains deferred, while the idempotent entry-boundary lift prevents
+  legacy row values from being lost during live use — see Q4.
 
 **Left open by this decision:** `AssetCategory` already supplies category-level defaults for
 `categoryCode` and the four locations. Several of the new fields — `dcProvider`, `drcProvider`,
@@ -429,55 +473,48 @@ its own piece of work and should be its own decision rather than smuggled in her
 **With this and Q2 settled, `RptiDetail` has no field left without a derivation source** — the
 condition the whole change depends on.
 
-### Q4 — migration is deferred, not designed (2026-09-18)
+### Q4 — broad migration remains deferred; the existing lift covers live-state entry (2026-09-18, revised 2026-09-19)
 
-**Decided: do not solve migration as part of this work.** This is a major overhaul of how
-report rows relate to the entities behind them; migration tooling will be provided if and when
-there is demand for it. Selara is pre-1.0 and local-first, and the population of workspaces
-carrying pre-change data is currently small and known.
+**Original decision (2026-09-18): do not build broad migration tooling as part of this work.**
+This is a major overhaul of how report rows relate to the entities behind them; Selara is pre-1.0
+and local-first, and the population of workspaces carrying pre-change data is small and known.
+At the time, covering live IndexedDB, version snapshots, exported workbooks and shared files was
+framed as one four-surface migration project to undertake only if demand appeared.
 
-Recorded so the consequences are a decision rather than an oversight.
+**Revised decision (2026-09-19): widen the lift across the entry boundaries that already exist.**
+That earlier framing was overtaken when `liftReportRowAttributes` shipped as a pure, idempotent
+function. The choice is no longer whether to build migration machinery for four surfaces; it is
+whether to call an already-tested function at three additional sites. Old-shaped data is now
+lifted and persisted before it enters live state through:
 
-**Four surfaces would have needed handling, and only the first is routine:**
+1. **Ordinary IndexedDB load.** The original lift site. A changed result is saved immediately.
+2. **Shared-workspace load.** The lifted data is folded into the existing write that accepts the
+   shared workspace.
+3. **Generic workbook/viewer import.** An exported `.xlsx` on someone else's disk remains beyond
+   Selara's reach, but the existing import path now lifts it as soon as it becomes reachable and
+   saves only the lifted form.
+4. **Version restore.** Snapshots remain immutable in the versions store; their restored copy is
+   lifted before `handleUpdate` admits it to live state, and `handleUpdate` persists the result.
+   This matters even though a version is Selara's own data: restoring a pre-ADR-0013 snapshot
+   reintroduces legacy cost properties whose removal is the one-time migration marker. Restore
+   followed immediately by Generate must file the lifted values without relying on a reload to
+   self-heal first.
 
-1. **Live IndexedDB stores.** A solved pattern — `v18` already reads every `rptiDetail` inside
-   `upgrade` and rewrites it (`db.ts:208-220`), and the upgrade transaction spans all stores,
-   so reading `lkptiDetails` and writing `deliverables` atomically is available.
-2. **Version snapshots.** `Version.data.lkptiDetails` holds a full copy of the old shape, and
-   **no migration has ever touched the `versions` store** — it is only created and cleared.
-   There is a precedent for the alternative: `Version.data.decisions` is marked
-   `@deprecated — never read`, kept purely so old snapshots still parse, with
-   `buildRestoredWorkspace` deciding what restore actually does (ADR-0011).
-3. **Exported `.xlsx` files.** Cannot be migrated — they are on someone's disk. `parseWorkbook`
-   is generic, so an old export re-imported later lands the eight values on `lkptiDetails`
-   where nothing reads them.
-4. **Shared files.** Surface (3) through a different door.
+**Cross-tab sync is deliberately excluded.** `applyRemoteSync` reads IndexedDB after the writing
+tab has already lifted and persisted the data. Repeating the lift there guards no real ingress and
+would blur the active/passive rule that the receiving tab never re-saves a remote update.
 
-**The approach that was designed and not taken**, recorded because it stays cheap to add later:
-one *lift* function applied at every boundary where old-shaped data enters — restore, `.xlsx`
-import, shared file — moving the eight values onto their deliverable. It keeps snapshots
-immutable, is testable in isolation, and is the only approach that reaches files already
-distributed. Detecting old-shaped data has no clean signal today (`"this lkptiDetail has a
-platform field"` is presence-based, not version-based), which argues for stamping a schema
-version onto snapshots and exports whenever this is picked up.
+**What remains deferred.** There is still no eager rewrite of every saved snapshot, no schema
+version stamped onto historical snapshots or exports, and no way to mutate files outside Selara.
+Those are broad migration tools. They are not needed to prevent loss during live use because the
+idempotent boundary lift handles a snapshot or workbook when it is restored or imported. Entity
+values win over legacy row values, and removed legacy cost properties durably mark completion.
 
-**The specific failure mode of deferring, which is not "nothing happens":**
-
-IndexedDB is schemaless within a store, so dropping the fields from the TypeScript type does
-**not** delete them — existing `lkptiDetails` keep carrying `platform`, `systemOwner` and the
-rest as orphaned properties that nothing reads. They survive a normal save, and today they even
-survive a regenerate, because `generateLkptiDetails` spreads the existing row
-(`{ ...existing, ...cascadedFields }`, `lkpti.ts:112`).
-
-That changes the moment `LkptiDetail` becomes a pure projection. Generation would then build
-fresh row objects from the `Deliverable` rather than spreading what was there, so **the first
-press of Generate destroys the orphaned values permanently.** Until that press they are
-recoverable, and a migration tool written later can still find them.
-
-**Therefore, when this is implemented:** either the eight fields must be lifted before
-generation is allowed to replace rows, or the release must be explicit that pressing Generate
-on a pre-change workspace discards the imported return. The second is defensible for a pre-1.0
-local-first tool; it is not defensible silently.
+**Rejected alternatives:** narrowing ADR-0013 and contract 14 to say only ordinary mount load was
+covered would make the records less false but leave plausible restore-then-Generate loss in place;
+adding the lift to cross-tab sync was rejected because the writer has already performed and saved
+it; eagerly rewriting the versions store was rejected because lifting the restored copy preserves
+snapshot immutability while covering the moment the old shape can affect a filing.
 
 ### Q5 and Q6 — SUPERSEDED, see below (2026-09-18)
 
@@ -570,9 +607,10 @@ who may write them, not about removing them — that is still the deferred step.
 No questions remain open. Three things were decided *not* to be solved here and must be
 carried forward, since each is load-bearing for the destination:
 
-1. **Migration (Q4)** — deferred. When the projection step is taken, the eight fields must be
-   lifted before generation is allowed to replace rows, or the release must say plainly that
-   pressing Generate on a pre-change workspace discards the imported return.
+1. **Migration (Q4)** — broad in-place rewriting remains deferred, but the shipped idempotent lift
+   covers every reachable entry into live state: ordinary load, shared-workspace load, generic
+   workbook import and version restore. Files outside Selara are lifted when re-imported; cross-tab
+   sync reads the writing tab's already-lifted persisted result.
 2. **Filed rows with no derivation source** — the unresolved upgrade from #38 cannot be
    generated, so a projection model needs a home for it.
 3. **Snapshot at filing time** — generation rules change, so a past filing must be frozen
@@ -705,9 +743,8 @@ rows cannot both be accounted for by one canonical row.
 
 This deliberately does **not** compare filed contents. Development type, quarter, category,
 provider, locations, related-party answer and remarks remain outside the reconciliation policy
-until the product owner decides what a faithful reproduction means field by field. The gate says
-only whether each stored row has exactly one current canonical counterpart and each counterpart
-accounts for at most one stored row.
+by the product decision recorded in Q13. The gate says only whether each stored row has exactly
+one current canonical counterpart and each counterpart accounts for at most one stored row.
 
 LKPTI has an important asymmetric case. `LkptiDetail` historically stored only `targetId` plus
 report contents; the filing identity — the application name — was resolved from the Deliverable.
@@ -724,5 +761,26 @@ one screen removed from the report tabs, recreating the split-brain authorship t
 prove they are the same application. A wrong automatic attachment would be silent regulatory
 misclassification precisely when the workspace is least trustworthy.
 
-**Rejected — matching by report contents.** That would settle the still-open field-fidelity
-policy by accident. Identity repair must not invent equality rules for filed values.
+**Rejected — matching by report contents.** Identity repair must not invent equality rules for
+filed values; Q13 records the now-settled field-fidelity policy explicitly.
+
+## Q13 — Reconciliation matches filing identity, not field contents (decided 2026-09-19) — **IMPLEMENTED**
+
+**Decided:** once a stored RPTI row has one unambiguous canonical counterpart, field-level drift
+between the filed evidence and today's regeneration is deliberately not reported. This includes
+`developmentType`, quarter, `categoryCode`, developer, locations, related-party answer and remarks.
+`reconcileRptiReturn` matches identity and cardinality only; `rpti.test.ts` pins the case where an
+old filed quarter and remarks differ from the current projection but produce no finding.
+
+The portfolio is expected to evolve after a filing. A stored row is evidence of what was filed,
+not an assertion that its contents should override or condemn a correct regeneration from today's
+canonical entities. Re-flagging every detectable drift would train preparers to ignore the gate,
+while offering no different repair from accepting the current, correctly derived return. The gate
+therefore stays focused on the actionable failure FR-024 names: a filed row that cannot be
+reproduced at all, or cannot be matched one-to-one to a canonical row.
+
+**Rejected — warn only for fields that appear to change filing meaning.** The considered subset
+was category, development type and developer, while remaining silent on quarter and remarks. It
+was rejected because a warning with no action distinct from correct regeneration is still noise;
+splitting fields into more- and less-important drift would make the gate look authoritative about
+content fidelity while stored evidence intentionally does not govern current generation.

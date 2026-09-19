@@ -5,12 +5,11 @@ import type { Deliverable, Initiative } from '../types';
 /**
  * Contracts 14-17 of specs/002-report-year-field-ownership/contracts/generation.md.
  *
- * Migration tooling is deliberately out of scope (design notes Q4), but deferring it
- * is only safe while the orphaned values survive. IndexedDB is schemaless within a
- * store, so they persist untouched after the type drops them — right up until the
- * first press of Generate rebuilds the rows from the deliverable and discards them
- * permanently. This lift runs before that can happen. Legacy cost properties are
- * removed after lifting so their absence durably marks that one-time migration done.
+ * Broad in-place migration tooling remains out of scope (design notes Q4), but the
+ * idempotent boundary lift covers every reachable path into live state. IndexedDB is
+ * schemaless within a store, so old workspaces, snapshots and workbooks retain their
+ * orphaned values until a boundary can lift them. Legacy cost properties are removed
+ * after lifting so their absence durably marks that one-time migration done.
  */
 const deliverable = (over: Partial<Deliverable> = {}): Deliverable =>
   ({ id: 'd-1', assetId: 'a-1', name: 'Core Banking GL', type: 'application', ...over } as Deliverable);

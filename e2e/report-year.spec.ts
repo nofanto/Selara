@@ -119,6 +119,80 @@ test.describe('Report year', () => {
     await expect(reloaded.getByTestId('real-input-capex')).toHaveValue('900');
   });
 
+  test('restoring a pre-ADR-0013 version lifts its rows before generating either filing', async ({ page }) => {
+    await seedReportRecords(page, reportFixture, [
+      'assets', 'assetCategories', 'programmes', 'initiatives', 'deliverables',
+      'deliverableSegments', 'rptiDetails', 'lkptiDetails',
+    ]);
+
+    await page.getByTestId('nav-history').click();
+    await page.getByRole('button', { name: 'Save Current State' }).click();
+    await page.fill('input[placeholder="e.g., March 2026 Snapshot"]', 'Pre-ADR-0013');
+    await page.getByRole('button', { name: 'Save Version' }).click();
+
+    // Turn the saved snapshot into the shape Selara wrote before ADR-0013: the
+    // filing values live only on report rows, not on the entities generation reads.
+    await page.evaluate(() => new Promise<void>((resolve, reject) => {
+      const request = indexedDB.open('it-initiative-visualiser');
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => {
+        const db = request.result;
+        const tx = db.transaction('versions', 'readwrite');
+        const store = tx.objectStore('versions');
+        const all = store.getAll();
+        all.onsuccess = () => {
+          const saved = all.result.find(version => version.name === 'Pre-ADR-0013');
+          if (!saved) {
+            reject(new Error('Saved version not found'));
+            return;
+          }
+          saved.data.initiatives[0] = {
+            ...saved.data.initiatives[0], capex: 100, opex: 10, rptiRemarks: undefined,
+          };
+          saved.data.deliverables[0] = {
+            ...saved.data.deliverables[0], platform: undefined, database: undefined,
+          };
+          saved.data.rptiDetails = [{
+            id: 'legacy-rpti', initiativeId: 'filing-initiative', targetType: 'deliverable',
+            targetId: 'filing-deliverable', developmentType: 'upgrade',
+            capexAmount: 777777, opexAmount: 88888, remarks: 'Restored legacy filing note',
+          }];
+          saved.data.lkptiDetails = [{
+            id: 'legacy-lkpti', targetId: 'filing-deliverable',
+            platform: 'Restored legacy platform', database: 'Restored legacy database',
+          }];
+          store.put(saved);
+        };
+        tx.oncomplete = () => { db.close(); resolve(); };
+        tx.onerror = () => { db.close(); reject(tx.error); };
+      };
+    }));
+
+    // Reload only to make the altered snapshot visible in History. After Restore,
+    // generate immediately: this is the sequence that used to file un-lifted data.
+    await page.reload();
+    await page.getByTestId('nav-history').click();
+    await page.getByText('Pre-ADR-0013').click();
+    await page.getByRole('button', { name: 'Restore to Current' }).click();
+    await page.getByTestId('confirm-modal-confirm').click();
+
+    await generateReport(page, 'rpti', '2026');
+    const rpti = page.getByTestId('rpti-detail-table');
+    await expect(rpti).toContainText('777,777');
+    await expect(rpti).toContainText('88,888');
+    await expect(rpti).toContainText('Restored legacy filing note');
+
+    await generateReport(page, 'lkpti', '2026');
+    const lkpti = page.getByTestId('lkpti-detail-table');
+    await expect(lkpti).toContainText('Restored legacy platform');
+    await expect(lkpti).toContainText('Restored legacy database');
+
+    // Restore persists the one-time migration marker in its existing handleUpdate
+    // write, so a later reload cannot reapply the stale cost overrides.
+    await expect.poll(async () => (await readStore(page, 'rptiDetails'))[0]?.capexAmount).toBeUndefined();
+    await expect.poll(async () => (await readStore(page, 'initiatives'))[0]?.capex).toBe(777777);
+  });
+
   test('blocks an ambiguous initiative before export and permits filing after target repair', async ({ page }) => {
     await seedReportRecords(page, { ...reportFixture,
       deliverables: [...reportFixture.deliverables, { ...reportFixture.deliverables[0], id: 'second-target', name: 'Second Application' }],

@@ -74,8 +74,8 @@ system owner leaves no trace in an audit trail that ADR-0011 established for reg
 
 ## R5 — The hazard of deferring migration
 
-**Decision**: No migration tooling (Q4 of the design notes). Handle only the one path where
-deferral destroys data.
+**Decision**: No broad in-place migration tooling (Q4 of the design notes). Use the existing pure,
+idempotent lift at every boundary where old-shaped data can enter live state.
 
 **Rationale**: IndexedDB is schemaless within a store, so removing the eight fields from the
 TypeScript type does **not** delete them — existing rows keep them as orphaned properties, and
@@ -86,11 +86,14 @@ That protection disappears the moment rows are rebuilt from the application rath
 The first press of Generate would then discard them permanently. Until that press they are
 recoverable and a later migration tool can still find them.
 
-**Approach**: lift the values onto the `Deliverable` on normal workspace load, before any generation
-can replace the rows that hold them, and persist the lifted state immediately. Non-cost orphaned
-properties remain for future tooling. Legacy RPTI cost properties are the exception: remove them
-after lifting, because their absence is the durable completion signal that prevents a later load
-from overwriting a newer Initiative cost.
+**Approach**: lift the values onto the `Deliverable` before ordinary IndexedDB load,
+shared-workspace load, generic workbook import, or version restore admits the data to live state,
+and persist the lifted state immediately through that path's existing write. Cross-tab sync reads
+the writing tab's already-lifted save and therefore does not repeat it. Files outside Selara remain
+unreachable until re-import, when the workbook boundary lifts them. Non-cost orphaned properties
+remain for future tooling. Legacy RPTI cost properties are the exception: remove them after lifting,
+because their absence is the durable completion signal that prevents a later entry from overwriting
+a newer Initiative cost.
 
 **Alternative rejected**: warn the preparer that Generate will discard the imported return.
 Defensible for a pre-1.0 local-first tool and explicitly allowed by FR-019, but a warning that

@@ -37,8 +37,9 @@ for the Reports-menu year prompt
 responsiveness of generating one today (SC-008)
 
 **Constraints**: Report generation has one user-facing path: Reports asks for the year, derives a
-transient return, and gates unreproducible rows before export. No migration tooling (Q4), but no
-silent loss either (FR-019). Offline throughout.
+transient return, and gates unreproducible rows before export. No broad in-place migration tooling
+(Q4); the idempotent boundary lift prevents silent loss at every live-state entry (FR-019). Offline
+throughout.
 
 **Scale/Scope**: Hundreds of applications. Two entities gain fields; RPTI cost overrides move to
 the Initiative and legacy differing values are lifted before removal; two generation functions gain

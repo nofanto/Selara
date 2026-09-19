@@ -9,15 +9,16 @@ import type { Deliverable, Initiative, LkptiDetail, RptiDetail } from '../types'
  * held them by default rather than by design. They now live on `Deliverable`
  * (ADR-0013), and `RptiDetail.remarks` lives on `Initiative` as `rptiRemarks`.
  *
- * Migration tooling is deliberately out of scope — see
- * `requirement-specs/report-rows-as-projections.md` Q4. Deferring it is safe only
- * because IndexedDB is schemaless within a store: dropping the fields from the
- * TypeScript type does not delete them, so a workspace imported before the change
- * still carries them as properties nothing reads.
+ * Broad in-place migration tooling remains out of scope — see
+ * `requirement-specs/report-rows-as-projections.md` Q4. Instead, this idempotent lift
+ * runs at each boundary where old-shaped data can enter live state. IndexedDB is
+ * schemaless within a store, so dropping the fields from the TypeScript type does not
+ * delete them; old workspaces, snapshots and workbooks still carry recoverable
+ * properties until that boundary is crossed.
  *
  * That safety ends at the first press of Generate, which rebuilds rows from the
- * deliverable and would discard them permanently. This runs on load, before any
- * generation can, and is the whole of FR-019.
+ * deliverable and would discard them permanently. Callers run this before the data
+ * becomes live and persist its result before any generation can run (FR-019).
  *
  * Pure, and non-destructive except for the legacy cost completion marker:
  *   - a value already on the entity always wins — it is the newer home and the one

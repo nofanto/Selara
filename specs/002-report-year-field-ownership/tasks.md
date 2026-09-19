@@ -42,7 +42,7 @@ it, and US3 adds the surface for maintaining them.
 - [x] T004 Widen `Deliverable.developer` to carry a provider name as well as the two-value classification, in `src/types.ts`. Record how each return reads it: RPTI derives `'PPJTI'` from "a name that is not `inhouse`", LKPTI emits the name.
 - [x] T005 Write failing tests for the attribute lift in `src/lib/attributeLift.test.ts`, covering contracts 14–17: values move onto the deliverable, running twice changes nothing, an existing value on the deliverable is never overwritten, non-cost orphaned properties remain, and lifted legacy cost properties are removed as the completion signal.
 - [x] T006 Implement `src/lib/attributeLift.ts` as a pure function taking deliverables plus stored LKPTI/RPTI rows and returning updated deliverables, initiatives, and cost-cleaned RPTI rows.
-- [x] T007 Run the lift on workspace load in `src/App.tsx`, before any generation can replace the rows holding the values (FR-019, research.md R5).
+- [x] T007 Run the lift before old-shaped data enters live state through ordinary load, shared-workspace load, generic workbook import, or version restore in `src/App.tsx`; persist the lifted form immediately through each path's existing write, before any generation can replace the rows holding the values (FR-019, research.md R5). Cross-tab sync is excluded because it reads the writing tab's already-lifted persisted state.
 
 **Checkpoint**: Fields exist in their new homes; a pre-change workspace is safe from the first press of Generate.
 

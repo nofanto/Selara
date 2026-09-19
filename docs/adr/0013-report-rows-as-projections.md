@@ -124,12 +124,14 @@ without saying so is worse than one that does not change at all.
 - **No IndexedDB version bump is needed.** Stores are schemaless within a store and `flatten()` is
   generic, so `db.ts` and `excel.ts` need nothing for new fields on an existing entity. Verified
   rather than assumed — the workspace export/import round trip is asserted field by field.
-- **The orphaned-property hazard is handled, not ignored.** A workspace imported before this change
-  holds the values on its rows and not yet on its entities, so `liftReportRowAttributes` runs on
-  load, before any generation can replace a row. Legacy cost overrides are removed after the lift
-  and the cleaned rows are persisted immediately; their absence is the durable marker that stops a
-  later reload from undoing a newer Initiative edit. Other migration tooling for exports, shares
-  and saved versions is deliberately deferred (Q4).
+- **The orphaned-property hazard is handled at every reachable live-state boundary.** A workspace
+  created before this change holds the values on its rows and not yet on its entities, so
+  `liftReportRowAttributes` runs before ordinary IndexedDB load, shared-workspace load, generic
+  workbook import, or version restore can expose the data to generation. Each path persists the
+  lifted form immediately in its existing save. Legacy cost overrides are removed after the lift;
+  their absence is the durable marker that stops a later load from undoing a newer Initiative edit.
+  An exported workbook on someone else's disk is necessarily unreachable until it is imported,
+  at which point the workbook-import boundary performs the lift (Q4).
 - **Data-health findings were repointed and identity repairs are source-side.** RPTI evidence maps
   to a current canonical row through the surviving Initiative or target, one-to-one. Newly imported
   LKPTI evidence retains the filed application name; an older orphan without that name instructs
