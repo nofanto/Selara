@@ -124,6 +124,72 @@ model has no way to hold 2027 and 2028 rows at once — filing next year's plan 
 destroy this year's record of what was filed. Doing this first would make #40 harder, not
 easier.
 
+## Open questions
+
+### Q13 — repairing an unresolved imported row is a three-screen manual job (raised 2026-09-19)
+
+**Deferred to its own Spec Kit feature — filed as [#51](https://github.com/nofanto/Selara/issues/51).**
+Raised by the product owner after repairing the sample's unresolved row by hand.
+
+An RPTI row needs three things before generation can reproduce it: the Deliverable, the
+Initiative's selection of it, and a qualifying lifecycle segment linking the two. Those live on
+three different screens — Deliverables tab, Initiatives tab, Visualiser timeline — so clearing
+one finding is a three-step journey the preparer has to assemble themselves.
+
+**The importer already holds everything needed to do it.** It knows the application name, the
+category code, the development type and the planned quarter, because the filed row said so. It
+declines to act on them deliberately (`rptiImport.ts:286-300`): FR-019 holds an unmatched
+*application* back "because the two returns are known to disagree on naming, so a non-match is a
+judgement call for a person." An unmatched *infrastructure* item is auto-created (FR-019a),
+precisely because LKPTI never lists infrastructure, so there is no judgement to defer.
+
+That reasoning is sound and must survive. The risk it guards against is real: the RPTI's
+"Legacy Teller Application" may be the same system the LKPTI already lists under a slightly
+different name, and auto-creating it would put a **duplicate application into the filed LKPTI** —
+worse than the friction it saves.
+
+**But the current design conflates two things.** Making the judgement needs a person; *recording*
+it needs nobody. Today the preparer decides in their head, then performs three manual steps to
+write down what they decided.
+
+**Shape to explore, not yet decided:** the finding offers two one-click, source-side resolutions —
+*"this is the same as &lt;existing application&gt;"* (link the initiative, anchor the segment) or
+*"this is a new application"* (create the Deliverable and its segment from what the filed row
+already says). Both leave the stored row untouched, so this is compatible with Q12 and the
+option-A decision, unlike the identity-remap rejected there. Open within it: whether the
+"new application" path should warn on a near-match to an existing name, which is exactly the case
+FR-019 worries about.
+
+### Q14 — remarks cannot vary by filing year (raised 2026-09-19)
+
+Raised by the product owner asking whether `rptiRemarks` belongs on `DeliverableSegment` rather
+than `Initiative`, since RPTI rows come from segments.
+
+**Measured, and it answers the placement but exposes a gap.** One initiative with three segments
+spanning two years generates **one row in 2027 and one in 2028**:
+
+```
+3 segments  ->  rows2027 = 1 (rpti-gen-i1-d1-2027),  rows2028 = 1 (rpti-gen-i1-d1-2028)
+```
+
+So a row is **not** 1:1 with a segment — several collapse into one — and since Q10 generation
+groups by initiative. Putting remarks on the segment would need an arbitrary rule for which
+segment wins, and the answer would change silently as the timeline is edited. The sample's
+Keterangan values describe the work, not a phase: *"Phase 2 of the digital channel roadmap"*,
+*"Regulatory deadline driven"*. `Initiative` is the right home, as Q2 decided.
+
+**The real finding is the gap.** Segments decide which *years* a row appears in; the initiative
+decides what the row *is*. An initiative filing in both 2027 and 2028 carries identical remarks in
+both, with no way to say "phase 1" in one and "phase 2" in the other — and Keterangan is exactly
+the column where a preparer would want that.
+
+Per-year remarks need a per-(initiative, year) home, which nothing in the model provides. That is
+the **third** thing now pointing at the deferred option-5 ledger (`merge-path-options.md`):
+F4 needs a year anchor, F5 needs per-year reconciliation precision, and this needs per-year
+remarks. Worth weighing when that work is scheduled.
+
+---
+
 ## Decided
 
 ### Q9 — post-feature filing correctness outranks byte identity (2026-09-18)
