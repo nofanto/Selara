@@ -292,14 +292,14 @@ export function computeDataHealth(input: DataHealthInput): HealthIssue[] {
     if (!initiativeIds.has(r.initiativeId)) {
       issues.push({
         id: `rpti-initiative:${r.id}`, severity: 'error', entityType: 'RptiDetail', entityId: r.id,
-        entityName: label, message: `A filed RPTI row refers to an Initiative that no longer exists, so nothing can derive it. Recreate that initiative — or re-import the return it came from — on the Initiatives tab.`, location: tab('initiatives'),
+        entityName: label, message: reconciliation.message, location: tab('initiatives'),
       });
     }
     if (r.targetType === 'asset') {
       issues.push({
         id: `rpti-asset-target:${r.id}`, severity: 'error', entityType: 'RptiDetail', entityId: r.id,
         entityName: label,
-        message: `The RPTI row for "${label}" targets an Asset. Create a Deliverable under that Asset and point the Initiative at that Deliverable before generating the filing.`,
+        message: reconciliation.message,
         location: tab('deliverables'),
       });
     }
@@ -307,7 +307,7 @@ export function computeDataHealth(input: DataHealthInput): HealthIssue[] {
     if (!targetExists) {
       issues.push({
         id: `rpti-target:${r.id}`, severity: 'error', entityType: 'RptiDetail', entityId: r.id,
-        entityName: label, message: `The filed RPTI row for "${label}" refers to an application that is not recorded. Create or correct it on the Deliverables tab and point its initiative at it, so the next generation reproduces the row.`, location: tab('deliverables'),
+        entityName: label, message: reconciliation.message, location: tab('deliverables'),
       });
     }
     if (r.deliverableSegmentId && !segmentIds.has(r.deliverableSegmentId)) {

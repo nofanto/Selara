@@ -45,6 +45,7 @@ test.describe('Report year', () => {
   test('following the named asset-target repair clears the finding and enables export', async ({ page }) => {
     await seedReportRecords(page, {
       ...reportFixture,
+      deliverableSegments: [],
       rptiDetails: [{
         id: 'legacy-asset-target', initiativeId: 'filing-initiative',
         targetType: 'asset', targetId: 'filing-asset', developmentType: 'new',
@@ -52,15 +53,38 @@ test.describe('Report year', () => {
     }, ['assets', 'assetCategories', 'programmes', 'initiatives', 'deliverables', 'deliverableSegments', 'rptiDetails']);
 
     await generateReport(page, 'rpti', '2026');
-    await expect(page.getByTestId('rpti-pre-export-gate')).toContainText(/create.*deliverable/i);
+    await expect(page.getByTestId('rpti-pre-export-gate')).toContainText(/Initiatives tab.*timeline/i);
     await expect(page.getByTestId('rpti-report-export-btn')).toHaveCount(0);
 
-    // Follow the repair the gate names: the Deliverable already exists under the
-    // Asset, so point the Initiative at it on the owning source entity.
+    // Follow every outstanding step the gate names. The Deliverable already exists
+    // under the Asset, so select it as the Initiative's target first.
     await page.getByTestId('nav-data-manager').click();
     await page.getByTestId('data-manager-tab-initiatives').click();
     const row = page.locator('tbody tr[data-real="true"]').filter({ has: page.locator('input[value="Filing Initiative"]') });
     await row.locator('td[data-key="deliverableId"] select').selectOption('filing-deliverable');
+
+    // Target selection alone must not clear the finding: the canonical pair still
+    // has no qualifying lifecycle segment. The progressive message names only the
+    // remaining timeline step rather than repeating completed work.
+    await generateReport(page, 'rpti', '2026');
+    await expect(page.getByTestId('rpti-pre-export-gate')).toContainText(/remaining step.*timeline.*lifecycle segment/i);
+    await expect(page.getByTestId('rpti-report-export-btn')).toHaveCount(0);
+
+    await page.getByTestId('nav-visualiser').click();
+    await page.getByTestId('timeline-start-input').fill('2026-01-01');
+    await page.getByTestId('timeline-start-input').press('Enter');
+    const swimlane = page.getByTestId('deliverable-row-content');
+    await expect(swimlane).toBeVisible();
+    await swimlane.dblclick({ position: { x: 200, y: 20 } });
+    const panel = page.getByTestId('segment-panel');
+    await expect(panel).toBeVisible();
+    await panel.getByTestId('segment-deliverable').selectOption('filing-deliverable');
+    await panel.getByTestId('segment-status').selectOption('appstatus-in-production');
+    await panel.getByTestId('segment-initiative').selectOption('filing-initiative');
+    await panel.getByTestId('segment-start-date').fill('2026-03-15');
+    await panel.getByTestId('segment-end-date').fill('2026-12-31');
+    await panel.getByRole('button', { name: 'Add Segment' }).click();
+    await expect(panel).toBeHidden();
 
     await generateReport(page, 'rpti', '2026');
     await expect(page.getByTestId('rpti-pre-export-gate')).toHaveCount(0);
@@ -158,14 +182,14 @@ test.describe('Report year', () => {
     await expect(page.getByTestId('rpti-detail-table')).toHaveCount(0);
     await expect(page.getByText(/no rpti rows recorded yet/i)).toBeVisible();
     // The unreproducible row is reconciliation evidence, surfaced as a named repair...
-    await expect(page.getByTestId('rpti-pre-export-gate')).toContainText(/no longer exists/i);
+    await expect(page.getByTestId('rpti-pre-export-gate')).toContainText(/both.*missing.*re-import/i);
     await expect(page.getByTestId('rpti-report-export-btn')).toHaveCount(0);
 
     // ...and generating its own year shows the 2027 line with no finding about it.
     await generateReport(page, 'rpti', '2027');
     await expect(page.getByTestId('rpti-detail-table')).toContainText('Filing Application');
     // The ghost row's repair still blocks: option 1's gate is global, not selected-year.
-    await expect(page.getByTestId('rpti-pre-export-gate')).toContainText(/no longer exists/i);
+    await expect(page.getByTestId('rpti-pre-export-gate')).toContainText(/both.*missing.*re-import/i);
   });
 
   // Contract 3 / FR-021. The whole model rests on Reports deriving a transient result:

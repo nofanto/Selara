@@ -4,11 +4,11 @@ RPTI Format 3.1 records planned application and infrastructure work. Generate th
 
 ## Target and cost
 
-Each initiative contributes at most one generated target and uses its own CapEx and OpEx. In **Data Manager → Initiatives**, select **RPTI Target** to declare its Deliverable. Infrastructure is also a Deliverable under an Asset; a bare Asset is not a supported filing target.
+Each initiative contributes at most one generated target and uses its own CapEx and OpEx. In **Data Manager → Initiatives**, use the **Deliverable** column to declare it. Infrastructure is also a Deliverable under an Asset; a bare Asset is not a supported filing target.
 
 If the target is blank, Selara can infer it when all lifecycle segments linked to the initiative point at one existing Deliverable. This considers all years, so the same initiative cannot silently change targets between filings. A declared target takes precedence over other timeline history.
 
-If an undeclared initiative spans several deliverables, Data Health asks you to select the intended target or split the work into separate initiatives. If its target is missing, create or repair the Deliverable and select it. These errors are shown before export, even when there is no stored RPTI row.
+If an undeclared initiative spans several deliverables, Data Health asks you to select the intended target or split the work into separate initiatives. If a stored row's target is missing, create or repair the Deliverable on **Data Manager → Deliverables**, select it in the Initiative's **Deliverable** column on **Data Manager → Initiatives**, and add a qualifying segment linking the pair on the **Visualiser timeline**. These errors are shown before export, even when there is no stored RPTI row.
 
 ## Generated values
 

@@ -87,7 +87,7 @@
 - Assets with no maturity level set are shown in a neutral default colour
 
 
-## US-RP-08: Repair a Missing or Ambiguous RPTI Target
+## US-RP-08: Repair a Missing or Ambiguous Deliverable
 
 **As a** filing preparer,
 **I want** generation to retain unambiguous existing work and tell me how to repair unresolved targets,
@@ -96,9 +96,9 @@
 **Acceptance Criteria:**
 
 - Existing initiatives with one segment target generate without requiring a new target declaration.
-- A declared RPTI Target takes precedence over other timeline history; inference considers all years.
+- A Deliverable selected on the Initiative takes precedence over other timeline history; inference considers all years.
 - Qualifying work without a resolvable target is named before export, with instructions to select or repair its Deliverable; ambiguous work can also be split.
-- Data Manager → Initiatives offers the RPTI Target selector, and repairing it allows the next generation to be exported.
+- Data Manager → Initiatives offers the **Deliverable** selector, and repairing it allows the next generation to be exported.
 - Read-only RPTI/LKPTI tabs show the full stored report fields, including unresolved imported values, and offer no row editors.
 
 Verified by `e2e/report-year.spec.ts` and the report-tab E2E specs; rule details are in Q10 of `requirement-specs/report-rows-as-projections.md`.

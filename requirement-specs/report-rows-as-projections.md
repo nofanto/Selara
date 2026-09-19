@@ -151,7 +151,7 @@ than implied by what the importer happens to do.
 
 Raised by Codex against the read-only decision. My first answer — "the importer does not create
 them" — was not an argument: it describes one producer, when the question is what a workspace can
-contain. The row is two clicks away. `DataManager.tsx:208-210` builds the RPTI Target dropdown from
+contain. The row is two clicks away. `DataManager.tsx:208-210` builds the Initiative Deliverable dropdown from
 deliverables **and** assets, and `deriveRptiTargetTypes` sets `targetType: 'asset'` from whichever
 list the chosen id is found in. `generateRptiDetails` emits only deliverable-target rows, so once
 the tab is read-only and Reports is the filing path, such a row would leave the filing in silence.
@@ -168,10 +168,13 @@ anywhere in the importer. The bare-asset target is an affordance that predates t
 
 **Consequences:**
 
-- An existing asset-target row gets a **pre-export data-health error** naming the repair: record
-  the infrastructure item as a Deliverable under its Asset, and point the initiative at it. Error,
-  not warning — the row is otherwise dropped from a filing without a word.
-- The Target dropdown stops offering assets. T026a does this anyway by making the tab read-only.
+- An existing asset-target row gets a **pre-export data-health error** naming the complete repair:
+  record the infrastructure item as a Deliverable under its Asset on the Deliverables tab,
+  select it in the initiative's Deliverable column on the Initiatives tab, and add a qualifying lifecycle segment
+  for that pair on the Visualiser timeline. Error, not warning — the row is otherwise dropped from
+  a filing without a word. Repair copy is progressive: after the Deliverable and target are in
+  place, it names only the remaining timeline segment rather than repeating completed work.
+- The Deliverable dropdown stops offering assets. T026a does this anyway by making the tab read-only.
 - A **constructed** test proves such a row cannot vanish silently from a Reports-generated filing.
   The sample cannot carry this: it holds only deliverable targets and would pass either way.
 

@@ -508,11 +508,11 @@ describe('reconcileRptiReturn — stored rows are reconciliation evidence, never
     },
     {
       name: 'unsupported asset target before the named repair', stored: [storedRow({ targetType: 'asset', targetId: 'asset-1' })], segments: [], expectFinding: true,
-      pattern: /create a deliverable under that asset/i,
+      pattern: /Deliverables tab.*Initiatives tab.*timeline/i,
     },
     {
       name: 'dangling target before the named repair', stored: [storedRow({ targetId: 'deliv-gone' })], segments: [], expectFinding: true,
-      pattern: /no longer exists|segment/i,
+      pattern: /Deliverables tab.*Initiatives tab.*timeline/i,
     },
   ];
   for (const c of cases) {
@@ -528,31 +528,55 @@ describe('reconcileRptiReturn — stored rows are reconciliation evidence, never
     });
   }
 
-  it('names a row whose initiative and target are both gone', () => {
-    const findings = reconcileRptiReturn(ctx([storedRow({ initiativeId: 'init-gone', targetId: 'deliv-gone' })], [segment()]));
+  it('names every source step when the initiative is gone but its target survives', () => {
+    const findings = reconcileRptiReturn(ctx([storedRow({ initiativeId: 'init-gone' })], []));
     expect(findings).toHaveLength(1);
     expect(findings[0].reason).toBe('missing-initiative');
-    expect(findings[0].message).toMatch(/Initiative that no longer exists/i);
+    expect(findings[0].message).toMatch(/Initiatives tab.*Deliverable column.*timeline.*lifecycle segment/i);
   });
 
-  it('clears an asset-target finding after the named source repair creates a canonical counterpart', () => {
+  it('directs re-import when both identity anchors are gone', () => {
+    const findings = reconcileRptiReturn(ctx([storedRow({ initiativeId: 'init-gone', targetId: 'deliv-gone' })], []));
+    expect(findings).toHaveLength(1);
+    expect(findings[0].reason).toBe('missing-initiative');
+    expect(findings[0].message).toMatch(/both.*missing.*re-import/i);
+  });
+
+  it('keeps an asset-target finding until the named source repair also adds its segment', () => {
     const row = storedRow({ targetType: 'asset', targetId: 'asset-1' });
-    const repaired = ctx([row], [segment()]);
+    const repaired = ctx([row], []);
     repaired.initiatives = [makeInitiative({ deliverableId: 'deliv-1' })];
+    const partial = reconcileRptiReturn(repaired);
+    expect(partial).toHaveLength(1);
+    expect(partial[0].reason).toBe('asset-target');
+    expect(partial[0].message).toMatch(/remaining step.*timeline.*lifecycle segment/i);
+
+    repaired.deliverableSegments = [segment()];
     expect(reconcileRptiReturn(repaired)).toEqual([]);
   });
 
-  it('clears a missing-target finding when the same initiative explicitly points at its replacement', () => {
-    const repaired = ctx([storedRow({ targetId: 'deliv-gone' })], [segment()]);
+  it('keeps a missing-target finding until its replacement also has the named segment', () => {
+    const repaired = ctx([storedRow({ targetId: 'deliv-gone' })], []);
     repaired.initiatives = [makeInitiative({ deliverableId: 'deliv-1' })];
+    const partial = reconcileRptiReturn(repaired);
+    expect(partial).toHaveLength(1);
+    expect(partial[0].reason).toBe('missing-target');
+    expect(partial[0].message).toMatch(/remaining step.*timeline.*lifecycle segment/i);
+
+    repaired.deliverableSegments = [segment()];
     expect(reconcileRptiReturn(repaired)).toEqual([]);
   });
 
-  it('clears a missing-initiative finding when exactly one canonical row has the same target', () => {
-    expect(reconcileRptiReturn(ctx(
-      [storedRow({ initiativeId: 'init-gone' })],
-      [segment()],
-    ))).toEqual([]);
+  it('keeps a missing-initiative finding until its replacement also has the named segment', () => {
+    const repaired = ctx([storedRow({ initiativeId: 'init-gone' })], []);
+    repaired.initiatives = [makeInitiative({ deliverableId: 'deliv-1' })];
+    const partial = reconcileRptiReturn(repaired);
+    expect(partial).toHaveLength(1);
+    expect(partial[0].reason).toBe('missing-initiative');
+    expect(partial[0].message).toMatch(/remaining step.*timeline.*lifecycle segment/i);
+
+    repaired.deliverableSegments = [segment()];
+    expect(reconcileRptiReturn(repaired)).toEqual([]);
   });
 
   it('does not let two stored rows claim the same canonical row', () => {

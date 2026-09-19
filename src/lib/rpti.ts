@@ -357,6 +357,17 @@ export function reconcileRptiReturn(input: ReconcileRptiInput): RptiReconciliati
     claimCount.set(match.candidate.key, (claimCount.get(match.candidate.key) ?? 0) + 1);
   }
 
+  // Reconciliation deliberately requires a qualifying segment before a canonical
+  // identity exists. These helpers only make the repair copy reflect how far the
+  // preparer has already progressed; they do not relax that anchored rule.
+  const hasQualifyingSegment = (initiativeId: string, targetId: string) =>
+    deliverableSegments.some(seg =>
+      seg.initiativeId === initiativeId
+      && seg.deliverableId === targetId
+      && classifySegmentKind(seg.status, deliverableStatuses) !== 'excluded');
+  const remainingSegmentMessage = (initiativeName: string, targetName: string) =>
+    `The Deliverable and the Initiative's Deliverable selection for "${initiativeName}" are already in place. The remaining step is on the Visualiser timeline: add a qualifying lifecycle segment that links this Initiative to "${targetName}"; selecting the Deliverable alone does not give generation a row to derive.`;
+
   for (const match of matches) {
     const { row } = match;
     const initiative = initiativeById.get(row.initiativeId);
@@ -376,15 +387,46 @@ export function reconcileRptiReturn(input: ReconcileRptiInput): RptiReconciliati
     }
 
     if (row.targetType === 'asset') {
-      add('asset-target', `The stored RPTI row for "${label}" targets an Asset directly, which no filing year can reproduce. Create a Deliverable under that Asset and point the Initiative at that Deliverable before generating the filing.`);
+      const selectedReplacement = initiative?.deliverableId
+        ? deliverableById.get(initiative.deliverableId)
+        : undefined;
+      if (initiative?.isPlaceholder !== true
+        && selectedReplacement?.assetId === row.targetId
+        && !hasQualifyingSegment(initiative.id, selectedReplacement.id)) {
+        add('asset-target', remainingSegmentMessage(initiative.name, selectedReplacement.name));
+      } else {
+        add('asset-target', `The stored RPTI row for "${label}" targets an Asset directly, which no filing year can reproduce. On the Deliverables tab, create the application or infrastructure item as a Deliverable under that Asset. On the Initiatives tab, select it in this Initiative's Deliverable column. Then, on the Visualiser timeline, add a qualifying lifecycle segment linking the Initiative to the Deliverable.`);
+      }
       continue;
     }
     if (!initiative) {
-      add('missing-initiative', `The stored RPTI row "${row.id}" points at an Initiative that no longer exists, so no filing year can reproduce it. Recreate the initiative — or re-import the filing it came from — before generating.`);
+      const target = deliverableById.get(row.targetId);
+      const replacements = target
+        ? initiatives.filter(candidate =>
+            candidate.isPlaceholder !== true
+            && candidate.deliverableId === target.id)
+        : [];
+      if (target && replacements.length === 1
+        && !hasQualifyingSegment(replacements[0].id, target.id)) {
+        add('missing-initiative', remainingSegmentMessage(replacements[0].name, target.name));
+      } else if (target) {
+        add('missing-initiative', `The stored RPTI row "${row.id}" points at an Initiative that no longer exists, so no filing year can reproduce it. On the Initiatives tab, recreate the Initiative and select "${target.name}" in its Deliverable column. Then, on the Visualiser timeline, add a qualifying lifecycle segment linking that Initiative to the Deliverable. If the intended Initiative cannot be identified safely, re-import the filing instead.`);
+      } else {
+        add('missing-initiative', `The stored RPTI row "${row.id}" has both its Initiative and Deliverable missing, so no current source pair can identify it safely. Re-import the filing it came from before generating.`);
+      }
       continue;
     }
     if (row.targetType === 'deliverable' && !deliverables.some(d => d.id === row.targetId)) {
-      add('missing-target', `The stored RPTI row for "${label}" points at a Deliverable that no longer exists. Create or correct the application the filed plan refers to on the Deliverables tab, so the next generation reproduces the row.`);
+      const selectedReplacement = initiative.deliverableId
+        ? deliverableById.get(initiative.deliverableId)
+        : undefined;
+      if (selectedReplacement
+        && initiative.isPlaceholder !== true
+        && !hasQualifyingSegment(initiative.id, selectedReplacement.id)) {
+        add('missing-target', remainingSegmentMessage(initiative.name, selectedReplacement.name));
+      } else {
+        add('missing-target', `The stored RPTI row for "${label}" points at a Deliverable that no longer exists. On the Deliverables tab, create or correct the application the filed plan refers to. On the Initiatives tab, select it in this Initiative's Deliverable column. Then, on the Visualiser timeline, add a qualifying lifecycle segment linking the Initiative to the Deliverable, so generation has a row to derive.`);
+      }
       continue;
     }
     // Reproducible in *some* year: the initiative resolves to this row's target
@@ -400,7 +442,7 @@ export function reconcileRptiReturn(input: ReconcileRptiInput): RptiReconciliati
         classifySegmentKind(seg.status, deliverableStatuses) !== 'excluded');
     if (!derivable) {
       const targetName = deliverables.find(d => d.id === row.targetId)?.name ?? row.targetId;
-      add('unanchored', `The stored RPTI row for "${label}" has no lifecycle segment on "${targetName}" that generation could reproduce in any filing year. Add that segment to the timeline for this initiative — naming the Deliverable as the initiative's RPTI Target does not on its own give generation anything to derive.`);
+      add('unanchored', `The stored RPTI row for "${label}" has no lifecycle segment on "${targetName}" that generation could reproduce in any filing year. Add that segment to the Visualiser timeline for this Initiative — selecting the Deliverable on the Initiatives tab does not on its own give generation anything to derive.`);
     }
   }
 

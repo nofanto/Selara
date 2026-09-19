@@ -112,7 +112,7 @@ describe('the published sample returns', () => {
       deliverables: [...deliverables, {
         id: replacementTargetId, assetId: inv.assets[0].id, name: 'Legacy Teller Application',
       }],
-      // The segment is the whole repair. Naming the initiative's RPTI Target would not
+      // The segment is the whole repair. Selecting the initiative's Deliverable would not
       // be enough on its own — generation derives a row from a lifecycle segment, so a
       // target with no segment stays underivable. The finding says exactly that.
       deliverableSegments: [...out.deliverableSegments, {

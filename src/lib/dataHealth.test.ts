@@ -163,7 +163,7 @@ describe('computeDataHealth — hard checks (dangling references)', () => {
     const issue = findIssue(computeDataHealth(baseInput({ assets: [asset], initiatives: [init], rptiDetails: [row] })), `rpti-asset-target:${row.id}`);
 
     expect(issue).toMatchObject({ severity: 'error', location: { view: 'data', tab: 'deliverables' } });
-    expect(issue?.message).toMatch(/create.*deliverable/i);
+    expect(issue?.message).toMatch(/Deliverables tab.*Initiatives tab.*timeline/i);
   });
 
   it('flags an LkptiDetail with a dangling targetId', () => {

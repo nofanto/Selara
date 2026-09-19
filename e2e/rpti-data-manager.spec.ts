@@ -21,6 +21,13 @@ test.describe('RPTI stored rows and canonical sources', () => {
     await expect(page.getByTestId('rpti-generate-btn')).toHaveCount(0);
   });
 
+  test('Initiatives uses the established Deliverable label for the declared filing target', async ({ page }) => {
+    await page.getByTestId('data-manager-tab-initiatives').click();
+    const headers = page.locator('[data-testid="data-manager"] thead');
+    await expect(headers.getByText('Deliverable', { exact: true })).toBeVisible();
+    await expect(headers.getByText('RPTI Target', { exact: true })).toHaveCount(0);
+  });
+
   test('global search filters stored rows by their displayed target name', async ({ page }) => {
     const search = page.getByTestId('search-input');
     const table = page.getByTestId('rpti-readonly-table');
