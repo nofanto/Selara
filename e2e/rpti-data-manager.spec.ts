@@ -21,6 +21,20 @@ test.describe('RPTI stored rows and canonical sources', () => {
     await expect(page.getByTestId('rpti-generate-btn')).toHaveCount(0);
   });
 
+  test('global search filters stored rows by their displayed target name', async ({ page }) => {
+    const search = page.getByTestId('search-input');
+    const table = page.getByTestId('rpti-readonly-table');
+
+    await search.fill('not-a-filing-row');
+    await expect(page.getByTestId('data-manager-filter-indicator')).toContainText('Filtered by “not-a-filing-row”');
+    await expect(table.locator('tbody tr')).toHaveCount(0);
+    await expect(table).toContainText('No report rows match the global search.');
+
+    await search.fill('Filing Application');
+    await expect(table.locator('tbody tr')).toHaveCount(1);
+    await expect(table).toContainText('Stored filing remark');
+  });
+
   test('stored filing values persist after reload', async ({ page }) => {
     await page.reload();
     await page.getByTestId('nav-data-manager').click();

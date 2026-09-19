@@ -26,6 +26,19 @@ test.describe('LKPTI stored rows and Reports', () => {
     await expect(page.getByTestId('lkpti-readonly-table')).toContainText('Stored owner');
   });
 
+  test('global search filters stored rows by their stored values', async ({ page }) => {
+    await page.getByTestId('nav-data-manager').click();
+    await page.getByTestId('data-manager-tab-lkpti').click();
+    const table = page.getByTestId('lkpti-readonly-table');
+
+    await page.getByTestId('search-input').fill('Stored platform');
+    await expect(table.locator('tbody tr')).toHaveCount(1);
+
+    await page.getByTestId('search-input').fill('not-an-lkpti-row');
+    await expect(table.locator('tbody tr')).toHaveCount(0);
+    await expect(table).toContainText('No report rows match the global search.');
+  });
+
   test('deleting a linked Deliverable cascades to its stored LKPTI row', async ({ page }) => {
     await page.getByTestId('nav-data-manager').click();
     await page.getByTestId('data-manager-tab-deliverables').click();

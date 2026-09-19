@@ -1708,6 +1708,7 @@ export default function App() {
               onUpdate={handleUpdate}
               onOpenTemplatePicker={() => { setTemplatePickerIsReset(true); setShowTemplatePicker(true); }}
               searchQuery={searchQuery}
+              onClearSearch={() => setSearchQuery('')}
               initialTab={dataManagerInitialTab}
             />
           </Suspense>

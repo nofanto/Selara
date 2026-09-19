@@ -3,7 +3,7 @@ import { decisionsStrandedBy, LinkedEntityRef } from '../lib/decisionLinks';
 import { Asset, Deliverable, DeliverableSegment, DeliverableStatus, DeliverableType, Decision, RptiDetail, LkptiDetail, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource } from '../types';
 import { EditableTable, Column } from './EditableTable';
 import { cn } from '../lib/utils';
-import { Database, Layers, Calendar, Flag, Target, Link2, FolderTree, LayoutTemplate, Users, Box, ClipboardList, ListChecks } from 'lucide-react';
+import { Database, Layers, Calendar, Flag, Target, Link2, FolderTree, LayoutTemplate, Users, Box, ClipboardList, ListChecks, Filter, X } from 'lucide-react';
 import { ConfirmModal } from './ConfirmModal';
 import { clearDeliverablesAndSegments, removeDeliverableAndSegments } from '../lib/deliverableCascade';
 import { rptiCascadeOnInitiativeDelete, rptiCascadeOnDeliverableDelete, rptiCascadeOnAssetDelete, RPTI_CATEGORY_LABELS } from '../lib/rpti';
@@ -47,6 +47,7 @@ interface DataManagerProps {
   }) => void;
   onOpenTemplatePicker: () => void;
   searchQuery?: string;
+  onClearSearch: () => void;
   // Set by a caller that wants to land on a specific tab on mount (e.g. the Data
   // Completeness report's "jump to this record" links) — read once, not controlled,
   // since DataManager unmounts/remounts whenever `view` in App.tsx leaves and returns
@@ -56,12 +57,13 @@ interface DataManagerProps {
 
 type Tab = DataManagerTab;
 
-function ReadonlyReportRows({ testId, rows, initiatives, deliverables, assets }: {
+function ReadonlyReportRows({ testId, rows, initiatives, deliverables, assets, searchQuery }: {
   testId: string;
   rows: Array<Record<string, unknown>>;
   initiatives: Initiative[];
   deliverables: Deliverable[];
   assets: Asset[];
+  searchQuery?: string;
 }) {
   const labels: Record<string, string> = {
     categoryCode: 'Category', developmentType: 'Dev Type', developer: 'Developer',
@@ -74,17 +76,34 @@ function ReadonlyReportRows({ testId, rows, initiatives, deliverables, assets }:
   // Keep every stored value visible, including fields only an unresolved import owns.
   const columns = [...new Set(rows.flatMap(row => Object.keys(row)))].filter(key =>
     !['id', 'targetId', 'targetType', 'initiativeId', 'deliverableSegmentId'].includes(key));
+  const normalizedSearch = searchQuery?.trim().toLowerCase();
+  const visibleRows = normalizedSearch
+    ? rows.filter(row => {
+      const targetName = deliverables.find(item => item.id === row.targetId)?.name
+        ?? assets.find(item => item.id === row.targetId)?.name;
+      const initiativeName = initiatives.find(item => item.id === row.initiativeId)?.name;
+      return [...Object.values(row), targetName, initiativeName].some(value => {
+        if (value === null || value === undefined) return false;
+        const text = typeof value === 'object' ? JSON.stringify(value) : String(value);
+        return text.toLowerCase().includes(normalizedSearch);
+      });
+    })
+    : rows;
   return (
     <div data-testid={testId} className="overflow-auto rounded-lg border border-slate-200 bg-white">
-      {rows.length === 0 ? (
-        <p className="p-4 text-sm text-slate-500">No stored rows. Generate a filing from Reports.</p>
+      {visibleRows.length === 0 ? (
+        <p className="p-4 text-sm text-slate-500">
+          {normalizedSearch && rows.length > 0
+            ? 'No report rows match the global search.'
+            : 'No stored rows. Generate a filing from Reports.'}
+        </p>
       ) : (
         <table className="min-w-full text-sm">
           <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
             <tr><th className="px-3 py-2">Row</th><th className="px-3 py-2">Target</th><th className="px-3 py-2">Initiative</th>{columns.map(key => <th key={key} className="px-3 py-2">{labels[key] ?? key}</th>)}</tr>
           </thead>
           <tbody>
-            {rows.map((row, index) => (
+            {visibleRows.map((row, index) => (
               <tr key={String(row.id ?? index)} className="border-t border-slate-100">
                 <td className="px-3 py-2">{index + 1}</td>
                 <td className="px-3 py-2">{deliverables.find(item => item.id === row.targetId)?.name ?? assets.find(item => item.id === row.targetId)?.name ?? 'Missing target'}</td>
@@ -99,9 +118,10 @@ function ReadonlyReportRows({ testId, rows, initiatives, deliverables, assets }:
   );
 }
 
-export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery, initialTab }: DataManagerProps) {
+export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery, onClearSearch, initialTab }: DataManagerProps) {
   const [activeTab, setActiveTab] = useState<Tab>(initialTab ?? 'initiatives');
   const [pendingConfirm, setPendingConfirm] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
+  const activeSearchQuery = searchQuery?.trim() ?? '';
 
   const confirm = (title: string, message: string, action: () => void) => {
     setPendingConfirm({ title, message, onConfirm: () => { setPendingConfirm(null); action(); } });
@@ -525,6 +545,26 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery,
         ))}
       </div>
 
+      {activeSearchQuery && (
+        <div
+          data-testid="data-manager-filter-indicator"
+          className="mx-6 mt-4 flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800"
+        >
+          <Filter size={15} aria-hidden="true" />
+          <span className="flex-1">
+            Filtered by <strong className="font-semibold">“{activeSearchQuery}”</strong>
+          </span>
+          <button
+            type="button"
+            onClick={onClearSearch}
+            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <X size={14} aria-hidden="true" />
+            Clear global search
+          </button>
+        </div>
+      )}
+
       <div className="flex-1 p-6 overflow-hidden">
         {activeTab === 'initiatives' && (
           <EditableTable
@@ -533,7 +573,7 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery,
             onUpdate={(newData) => updateData('initiatives', newData)}
             onDelete={handleDeleteInitiative}
             idField="id"
-            searchQuery={searchQuery}
+            searchQuery={activeSearchQuery}
             tableId="initiatives"
             onColumnResize={(key, width) => handleColumnResize('initiatives', key, width)}
           />
@@ -544,7 +584,7 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery,
             columns={getColumnsWithWidths('dependencies', dependencyColumns)}
             onUpdate={(newData) => updateData('dependencies', newData)}
             idField="id"
-            searchQuery={searchQuery}
+            searchQuery={activeSearchQuery}
             tableId="dependencies"
             onColumnResize={(key, width) => handleColumnResize('dependencies', key, width)}
           />
@@ -556,7 +596,7 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery,
             onUpdate={(newData) => updateData('assets', newData)}
             onDelete={handleDeleteAsset}
             idField="id"
-            searchQuery={searchQuery}
+            searchQuery={activeSearchQuery}
             tableId="assets"
             onColumnResize={(key, width) => handleColumnResize('assets', key, width)}
           />
@@ -568,7 +608,7 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery,
             onUpdate={(newData) => updateData('assetCategories', newData)}
             onDelete={handleDeleteCategory}
             idField="id"
-            searchQuery={searchQuery}
+            searchQuery={activeSearchQuery}
             tableId="assetCategories"
             onColumnResize={(key, width) => handleColumnResize('assetCategories', key, width)}
           />
@@ -580,7 +620,7 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery,
             onUpdate={(newData) => updateData('programmes', newData)}
             onDelete={handleDeleteProgramme}
             idField="id"
-            searchQuery={searchQuery}
+            searchQuery={activeSearchQuery}
             tableId="programmes"
             onColumnResize={(key, width) => handleColumnResize('programmes', key, width)}
           />
@@ -592,7 +632,7 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery,
             onUpdate={(newData) => updateData('strategies', newData)}
             onDelete={handleDeleteStrategy}
             idField="id"
-            searchQuery={searchQuery}
+            searchQuery={activeSearchQuery}
             tableId="strategies"
             onColumnResize={(key, width) => handleColumnResize('strategies', key, width)}
           />
@@ -603,7 +643,7 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery,
             columns={getColumnsWithWidths('milestones', milestoneColumns)}
             onUpdate={(newData) => updateData('milestones', newData)}
             idField="id"
-            searchQuery={searchQuery}
+            searchQuery={activeSearchQuery}
             tableId="milestones"
             onColumnResize={(key, width) => handleColumnResize('milestones', key, width)}
           />
@@ -614,7 +654,7 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery,
             columns={getColumnsWithWidths('resources', resourceColumns)}
             onUpdate={(newData) => updateData('resources', newData)}
             idField="id"
-            searchQuery={searchQuery}
+            searchQuery={activeSearchQuery}
             tableId="resources"
             onColumnResize={(key, width) => handleColumnResize('resources', key, width)}
           />
@@ -627,7 +667,7 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery,
             onDelete={handleDeleteDeliverable}
             onClearAll={handleClearDeliverables}
             idField="id"
-            searchQuery={searchQuery}
+            searchQuery={activeSearchQuery}
             tableId="deliverables"
             onColumnResize={(key, width) => handleColumnResize('deliverables', key, width)}
           />
@@ -639,6 +679,7 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery,
             onUpdate={(newData) => updateData('deliverableStatuses', newData)}
             onDelete={(status) => { updateData('deliverableStatuses', (data.deliverableStatuses || []).filter(s => s.id !== status.id)); return true; }}
             idField="id"
+            searchQuery={activeSearchQuery}
             tableId="deliverableStatuses"
             onColumnResize={(col, w) => handleColumnResize('deliverableStatuses', col, w)}
           />
@@ -650,7 +691,7 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery,
                 Stored RPTI rows are read-only. Choose a year and generate the filing from Reports.
               </p>
             </div>
-            <ReadonlyReportRows testId="rpti-readonly-table" rows={data.rptiDetails as unknown as Array<Record<string, unknown>>} initiatives={data.initiatives} deliverables={data.deliverables} assets={data.assets} />
+            <ReadonlyReportRows testId="rpti-readonly-table" rows={data.rptiDetails as unknown as Array<Record<string, unknown>>} initiatives={data.initiatives} deliverables={data.deliverables} assets={data.assets} searchQuery={activeSearchQuery} />
           </div>
         )}
         {activeTab === 'lkpti' && (
@@ -660,7 +701,7 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery,
                 Stored LKPTI rows are read-only. Choose an as-at year and generate the filing from Reports.
               </p>
             </div>
-            <ReadonlyReportRows testId="lkpti-readonly-table" rows={data.lkptiDetails as unknown as Array<Record<string, unknown>>} initiatives={data.initiatives} deliverables={data.deliverables} assets={data.assets} />
+            <ReadonlyReportRows testId="lkpti-readonly-table" rows={data.lkptiDetails as unknown as Array<Record<string, unknown>>} initiatives={data.initiatives} deliverables={data.deliverables} assets={data.assets} searchQuery={activeSearchQuery} />
           </div>
         )}
       </div>

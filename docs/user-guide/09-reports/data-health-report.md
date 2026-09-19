@@ -38,7 +38,7 @@ Two filter groups sit above the list and **combine**: **All / Errors / Warnings*
 
 Click any issue to jump straight to where it can be fixed:
 
-- Most issues open **Data Manager**, on the tab that owns the record, with the record's name already typed into the search box at the top — so the row you need is the one already showing.
+- Most issues open **Data Manager**, on the tab that owns the record, with the record's name already typed into the search box at the top — so the row you need is the one already showing. A blue indicator above the table names that active filter; select **Clear global search** there to restore every row.
 - An issue on a portfolio **Decision** opens the **Decisions** view instead, since decisions aren't managed in Data Manager.
 - The application-name checks open the **Deliverables** tab, because that's where the name is edited, even though the problem shows up in the LKPTI export.
 - A newly imported LKPTI row retains its filed application name, so creating exactly one same-name
