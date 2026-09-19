@@ -686,3 +686,52 @@ describe('no data-health finding sends the preparer to a read-only report tab (F
     expect(stranded, 'these findings point at a tab the preparer cannot edit').toEqual([]);
   });
 });
+
+/**
+ * F6, from the final adversarial review. Q10 made an explicit RPTI target win over
+ * timeline history, and the multi-target error is correctly suppressed when one is
+ * declared. But "the target exists" was then treated as "the target is generatable":
+ * an initiative declaring D1 while all its work sits on D2 produces no plan line at
+ * all, and — with no stored row for reconciliation to inspect — no explanation either.
+ *
+ * A silently absent filing row is the failure this feature exists to remove, and this
+ * is the case where preparer intent is least safely inferred: the only qualifying work
+ * points somewhere other than the declared filing target.
+ */
+describe('an explicit RPTI target with no qualifying work on it is reported (F6)', () => {
+  const second = { id: 'deliv-2', assetId: 'asset-1', name: 'App Two', type: 'application' as const };
+  const declaringD1WorkingOnD2 = () => baseInput({
+    assetCategories: [cat], assets: [asset], deliverables: [deliverable, second], programmes: [programme],
+    initiatives: [{ id: 'init-1', name: 'Misaimed Initiative', programmeId: 'prog-1', assetId: 'asset-1',
+      deliverableId: 'deliv-1', startDate: '2027-01-01', endDate: '2027-12-31', capex: 0, opex: 0 }],
+    deliverableSegments: [{ id: 'seg-1', deliverableId: 'deliv-2', initiativeId: 'init-1',
+      status: 'appstatus-in-production', startDate: '2027-02-01', endDate: '2027-12-31' }],
+  });
+
+  it('raises an error naming the declared target and where the work actually is', () => {
+    const issue = findIssue(computeDataHealth(declaringD1WorkingOnD2()), 'initiative-rpti-unanchored-target:init-1');
+
+    expect(issue, 'nothing explains why this initiative files no row').toBeDefined();
+    expect(issue?.severity).toBe('error');
+    expect(issue?.message).toContain('App One');
+    expect(issue?.message, 'the preparer needs to know where the work actually sits').toContain('App Two');
+    expect(issue?.location).toEqual({ view: 'data', tab: 'initiatives' });
+  });
+
+  it('stays silent once the declared target carries qualifying work', () => {
+    const input = declaringD1WorkingOnD2();
+    input.deliverableSegments = [{ id: 'seg-1', deliverableId: 'deliv-1', initiativeId: 'init-1',
+      status: 'appstatus-in-production', startDate: '2027-02-01', endDate: '2027-12-31' }];
+
+    expect(findIssue(computeDataHealth(input), 'initiative-rpti-unanchored-target:init-1')).toBeUndefined();
+  });
+
+  it('does not fire for an initiative with no qualifying segments at all', () => {
+    const input = declaringD1WorkingOnD2();
+    input.deliverableSegments = [];
+
+    // Nothing is being filed, so there is no absent row to explain. Reporting here
+    // would flag every initiative that has not been scheduled yet.
+    expect(findIssue(computeDataHealth(input), 'initiative-rpti-unanchored-target:init-1')).toBeUndefined();
+  });
+});

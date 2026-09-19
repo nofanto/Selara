@@ -213,6 +213,28 @@ export function computeDataHealth(input: DataHealthInput): HealthIssue[] {
         message: `"${i.name}" has qualifying lifecycle segments but no resolvable RPTI target. Create or repair the Deliverable and select that Deliverable on Initiatives before generating the filing.`,
         location: tab('initiatives'),
       });
+    } else if (!i.isPlaceholder && i.deliverableId && deliverableIds.has(i.deliverableId)) {
+      // Q10 made a declared target win over timeline history, and the multi-target error
+      // above is suppressed once one is declared. But "the target exists" is not "the
+      // target is generatable": generation needs a qualifying segment on the declared
+      // pair, so an initiative declaring D1 while all its work sits on D2 files nothing
+      // and — with no stored row for reconciliation to inspect — explains nothing (F6).
+      // This is where intent is least safely inferred, so it is reported rather than
+      // guessed: the only qualifying work points somewhere other than the filing target.
+      const qualifying = initiativeSegments.filter(segment =>
+        isLiveStatusId(segment.status, deliverableStatuses) || isPreLaunchStatusId(segment.status, deliverableStatuses));
+      const onDeclared = qualifying.some(segment => segment.deliverableId === i.deliverableId);
+      if (qualifying.length > 0 && !onDeclared) {
+        const declaredName = deliverableById.get(i.deliverableId)?.name ?? i.deliverableId;
+        const elsewhere = [...new Set(qualifying.map(segment =>
+          deliverableById.get(segment.deliverableId)?.name ?? segment.deliverableId))];
+        issues.push({
+          id: `initiative-rpti-unanchored-target:${i.id}`, severity: 'error', entityType: 'Initiative', entityId: i.id,
+          entityName: i.name,
+          message: `"${i.name}" names "${declaredName}" as its Deliverable, but its lifecycle work sits on ${elsewhere.map(n => `"${n}"`).join(', ')}. Generation has nothing to derive on the named Deliverable, so this initiative files no plan line. Either select the Deliverable the work is on, or add a lifecycle segment for this initiative on "${declaredName}".`,
+          location: tab('initiatives'),
+        });
+      }
     }
   }
 
