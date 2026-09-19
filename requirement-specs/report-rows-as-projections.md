@@ -127,6 +127,50 @@ easier.
 
 ## Open questions
 
+### Q15 — an RPTI row's grain is one planned implementation, not one initiative (raised 2026-09-19)
+
+**Deferred to its own Spec Kit feature — filed as [#52](https://github.com/nofanto/Selara/issues/52).**
+Raised by the product owner: *"RPTI is the plan, the plan segment should generate the RPTI row."*
+
+**Measured** on `221d546`. One initiative, one application, two qualifying live segments in 2027
+starting in Q2 and Q4:
+
+```
+projectRptiReturn(workspace, 2027)  ->  rows = 1, quarters = Q4
+```
+
+The Q2 implementation is silently absent — reachable through ordinary timeline work.
+
+**The filed format is the argument.** An RPTI row carries column 9 `Waktu Rencana Implementasi`,
+a single planned implementation time, and columns 10-11, a single CapEx/OpEx estimate. An
+application with two go-lives in a year genuinely has two implementation times and two estimates,
+which the format expresses as two rows and the current model cannot express at all. So the row's
+grain is the *implementation*, which is what a `DeliverableSegment` is; an `Initiative` is the
+trigger, and can trigger several.
+
+**This reopens decisions rather than extending them**, which is why it is its own feature:
+
+- **FR-029 / Q10** — the target stays single; the number of *rows* becomes many.
+- **Q12** — canonical identity for reconciliation is `(initiative, target)` today and would become
+  per-implementation, changing `identity-conflict` and the one-to-one accounting.
+- **Q7** — initiative-level cost was chosen partly because a per-pair cost had no home. The format
+  puts one CapEx per *row*, so per-implementation cost is the natural grain. That decision was
+  taken against a different model of what a row is.
+- **Q14** — `rptiRemarks` sits on `Initiative` because a row is not 1:1 with a segment *under the
+  current grouping*. If a row becomes an implementation, the segment is the right home and
+  per-year remarks fall out for free rather than needing the deferred ledger. The owner's original
+  instinct was right; the analysis in Q14 reasoned from the grouping rather than from the format.
+
+**Shipped now, deliberately not prejudging any of that:** a `initiative-rpti-multi-implementation`
+warning when an initiative has qualifying implementations in more than one quarter of a year,
+naming the quarters and which one generation would file. It changes nothing about what is filed.
+It stays silent when two segments share a quarter, since one implementation time loses nothing.
+
+Unlike the other open model questions here, this one rests on the filed format rather than on
+internal consistency.
+
+---
+
 ### Q13 — repairing an unresolved imported row is a three-screen manual job (raised 2026-09-19)
 
 **Deferred to its own Spec Kit feature — filed as [#51](https://github.com/nofanto/Selara/issues/51).**

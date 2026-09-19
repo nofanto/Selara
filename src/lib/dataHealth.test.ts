@@ -735,3 +735,47 @@ describe('an explicit RPTI target with no qualifying work on it is reported (F6)
     expect(findIssue(computeDataHealth(input), 'initiative-rpti-unanchored-target:init-1')).toBeUndefined();
   });
 });
+
+/**
+ * Interim detection for [#52](https://github.com/nofanto/Selara/issues/52). An RPTI row
+ * carries one `Waktu Rencana Implementasi` and one cost estimate, so its grain is a single
+ * planned implementation — but generation groups by initiative and files the anchor segment
+ * only. An application with two go-lives in one filing year therefore loses one of them,
+ * silently, through ordinary timeline work.
+ *
+ * Changing the grain is #52's own feature. Until then the drop is announced rather than
+ * hidden, which is the standard the rest of this feature is held to.
+ */
+describe('a second planned implementation in one filing year is reported, not dropped (#52)', () => {
+  const twoGoLivesIn = (...starts: string[]) => baseInput({
+    assetCategories: [cat], assets: [asset], deliverables: [deliverable], programmes: [programme],
+    initiatives: [{ id: 'init-1', name: 'Mobile 2027', programmeId: 'prog-1', assetId: 'asset-1',
+      deliverableId: 'deliv-1', startDate: '2027-01-01', endDate: '2027-12-31', capex: 0, opex: 0 }],
+    deliverableSegments: starts.map((startDate, n) => ({
+      id: `seg-${n}`, deliverableId: 'deliv-1', initiativeId: 'init-1',
+      status: 'appstatus-in-production', startDate, endDate: '2027-12-31',
+    })),
+  });
+
+  it('names the implementations and which one generation will file', () => {
+    const issue = findIssue(computeDataHealth(twoGoLivesIn('2027-04-01', '2027-10-01')),
+      'initiative-rpti-multi-implementation:init-1');
+
+    expect(issue, 'a dropped implementation must not be silent').toBeDefined();
+    expect(issue?.severity).toBe('warning');
+    expect(issue?.message).toContain('Q2');
+    expect(issue?.message, 'the preparer needs to know which one survives').toContain('Q4');
+  });
+
+  it('stays silent for a single implementation', () => {
+    expect(findIssue(computeDataHealth(twoGoLivesIn('2027-04-01')),
+      'initiative-rpti-multi-implementation:init-1')).toBeUndefined();
+  });
+
+  it('stays silent when two segments share one quarter', () => {
+    // One planned implementation time, so one row loses nothing. Reporting here would
+    // flag a phase split that the filing cannot express a difference between anyway.
+    expect(findIssue(computeDataHealth(twoGoLivesIn('2027-04-01', '2027-05-15')),
+      'initiative-rpti-multi-implementation:init-1')).toBeUndefined();
+  });
+});
