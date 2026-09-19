@@ -440,7 +440,7 @@ export function computeDataHealth(input: DataHealthInput): HealthIssue[] {
   const RPTI_MANUAL_ONLY_FIELDS: { key: keyof RptiDetail; label: string }[] = [
     { key: 'categoryCode', label: 'Category' },
     { key: 'developer', label: 'Developer' },
-    { key: 'ppjtiRelatedParty', label: 'PPJTI Related Party' },
+    { key: 'ppjtiRelatedParty', label: 'Provider Related Party' },
   ];
   for (const r of rptiDetails) {
     const initiative = initiativeById.get(r.initiativeId);

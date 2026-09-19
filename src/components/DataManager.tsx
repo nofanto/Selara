@@ -316,7 +316,7 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery,
     { key: 'name', label: 'Category Name', type: 'text', width: '340px' },
     { key: 'order', label: 'Sort Order', type: 'number', width: '100px' },
     {
-      key: 'categoryCode', label: 'Default RPTI Category', type: 'select', width: '200px',
+      key: 'categoryCode', label: 'Default Category Code', type: 'select', width: '200px',
       options: [
         { value: '', label: '— Not set —' },
         ...(Object.keys(RPTI_CATEGORY_LABELS) as (keyof typeof RPTI_CATEGORY_LABELS)[])
@@ -408,7 +408,7 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery,
     },
     { key: 'description', label: 'Description', type: 'textarea', width: '260px' },
     {
-      key: 'categoryCode', label: 'RPTI Category Override', type: 'select', width: '200px',
+      key: 'categoryCode', label: 'Category Code Override', type: 'select', width: '200px',
       options: [
         { value: '', label: '— Use category default —' },
         ...(Object.keys(RPTI_CATEGORY_LABELS) as (keyof typeof RPTI_CATEGORY_LABELS)[])
@@ -421,7 +421,7 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery,
     // returns and the name is never lost.
     { key: 'developer', label: 'Developer', type: 'text', width: '200px', placeholder: "'inhouse' or provider name" },
     {
-      key: 'ppjtiRelatedParty', label: 'PPJTI Related Party', type: 'select', width: '150px',
+      key: 'ppjtiRelatedParty', label: 'Provider Related Party', type: 'select', width: '150px',
       options: [
         { value: '', label: '— Not set —' },
         { value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }, { value: 'n/a', label: 'N/A' },

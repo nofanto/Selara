@@ -263,7 +263,7 @@ describe('computeDataHealth — soft checks (report-generation gaps)', () => {
     const issue = findIssue(issues, `rpti-incomplete:${r.id}`);
     expect(issue?.severity).toBe('warning');
     expect(issue?.message).toContain('Category');
-    expect(issue?.message).toContain('PPJTI Related Party');
+    expect(issue?.message).toContain('Provider Related Party');
   });
 
   it('flags an Initiative with no owner and no legacy owner string', () => {
