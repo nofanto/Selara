@@ -62,7 +62,7 @@ implementation time.
 ### Implementation
 
 - [ ] T013 [US1] Replace the overlap membership test at `src/lib/rpti.ts:151` with **start-within-year** on the implementation (contract 2). This single change resolves all three symptoms in research.md R1.
-- [ ] T014 [US1] Project one row per implementation in `src/lib/rpti.ts`, replacing the group-by-initiative pass. Row id must be stable and derived from the implementation, not from `(initiative, deliverable, year)`.
+- [ ] T014 [US1] Project one row per implementation in `src/lib/rpti.ts`, replacing the group-by-initiative pass (contract 1, FR-001). Row id must be stable and derived from the implementation, not from `(initiative, deliverable, year)`.
 - [ ] T015 [US1] Give the projection a deterministic order for implementations sharing a start date (contract 8), so a regenerated return does not reshuffle.
 - [ ] T016 [US1] Remove the `initiative-rpti-multi-implementation` warning from `src/lib/dataHealth.ts` and its tests, **in the same commit as T013/T014** (contract 20). It warns that a second implementation will be dropped; once filed, it is false, and a stale warning teaches preparers to ignore findings.
 
@@ -123,7 +123,7 @@ each.
 ### Implementation
 
 - [ ] T034 [US3] Write cost and remarks to the created or matched implementation in `src/lib/rptiImport.ts`, **and continue seeding the initiative's own budget from the same row** (FR-009b, contract 12). Both start equal; divergence is the preparer's to create. Stop setting `Initiative.deliverableId` at `:421` (T004). Depends on T004 if the importer still sets `Initiative.deliverableId`.
-- [ ] T035 [US3] Confirm zero losses on the extended fixture, and that the existing 13-row sample is unaffected.
+- [ ] T035 [US3] Confirm zero losses on the extended fixture, and that the existing 13-row sample is unaffected (contract 24, SC-002).
 - [ ] T035a [US3] Assert FR-015 as part of T035's verification: after migration, no filed value must be re-entered by hand for the round trip to reproduce.
 
 **Checkpoint**: the property the previous feature established still holds at the new grain, measured
@@ -144,16 +144,17 @@ row is matched or named.
 - [ ] T037 [P] [US4] Failing test: two stored rows matching one implementation, and one stored row matching several, both raise `identity-conflict` (contract 16).
 - [ ] T038 [P] [US4] Failing test: a stored row matching no current implementation is named before export, with a repair (contract 17, FR-013).
 - [ ] T039 [P] [US4] Failing test asserting reconciliation still matches by **identity, never contents** — a stored row whose quarter or remarks differ from the projection raises nothing (contract 15). Restated because a grain change is exactly where content comparison would creep in.
+- [ ] T039a [P] [US4] Failing test asserting `reconcileRptiReturn` returns **findings, never rows**, and does not mutate its inputs — pass frozen arrays and assert no throw (contract 18). Marked unchanged by this feature, which is precisely why it needs an assertion: a grain change is where a mutation would be introduced without anyone noticing.
 
 ### Implementation
 
 - [ ] T040 [US4] Move canonical identity to the implementation in `reconcileRptiReturn` (`src/lib/rpti.ts`), using `RptiDetail.deliverableSegmentId` as the anchor where present (contract 14).
 - [ ] T041 [US4] Preserve one-to-one accounting and `identity-conflict` at the new grain (contract 16).
 - [ ] T042 [US4] Remove the `initiative-rpti-multi-target` error from `src/lib/dataHealth.ts` and its tests (contract 19, FR-008a). It forbids an arrangement that is now legal.
-- [ ] T043 [US4] Delete `resolveRptiTarget` from `src/lib/rpti.ts` and every filing-path caller (`:97`, `:338`, `:391`, `:420`). A segment names its own application, so nothing infers a target any more.
-- [ ] T043a [US4] Remove the `initiative-rpti-unanchored-target` check from `src/lib/dataHealth.ts` (`:249-261`) and its tests. It exists precisely because a *declared* target might carry no work; with no declared target the situation cannot arise. A whole finding goes, not just a field.
-- [ ] T043b [US4] **Rebuild the F2 repair path around the segment before removing the field.** Today a stored row whose deliverable was deleted is repaired by selecting the replacement on the initiative, which `rpti.ts:338` then matches on. Under the new model the repair is to correct the **segment's** `deliverableId`. `candidateFor` must match on that, and every repair message must name the segment panel rather than the Initiatives tab — an instruction naming a control that no longer exists is the FR-025 defect repeated.
-- [ ] T043c [US4] Remove `deliverableId` from `Initiative` in `src/types.ts:70`, the select at `src/components/InitiativePanel.tsx:112,132-133`, the `Deliverable` column at `src/components/DataManager.tsx:273`, the dangling check at `src/lib/dataHealth.ts:177` and its tests, and the assignment at `src/lib/rptiImport.ts:421`. Do this **after** T043b, so the repair path is never absent.
+- [ ] T043 [US4] Delete `resolveRptiTarget` from `src/lib/rpti.ts` and every filing-path caller (`:97`, `:338`, `:391`, `:420`). A segment names its own application, so nothing infers a target any more (FR-008b).
+- [ ] T043a [US4] Remove the `initiative-rpti-unanchored-target` check from `src/lib/dataHealth.ts` (`:249-261`) and its tests. It exists precisely because a *declared* target might carry no work; with no declared target the situation cannot arise (FR-008d). A whole finding goes, not just a field.
+- [ ] T043b [US4] **Rebuild the F2 repair path around the segment before removing the field.** Today a stored row whose deliverable was deleted is repaired by selecting the replacement on the initiative, which `rpti.ts:338` then matches on. Under the new model the repair is to correct the **segment's** `deliverableId`. `candidateFor` must match on that, and every repair message must name the segment panel rather than the Initiatives tab — an instruction naming a control that no longer exists is the FR-025 defect repeated (FR-008c).
+- [ ] T043c [US4] Remove `deliverableId` from `Initiative` in `src/types.ts:70`, the select at `src/components/InitiativePanel.tsx:112,132-133`, the `Deliverable` column at `src/components/DataManager.tsx:273`, the dangling check at `src/lib/dataHealth.ts:177` and its tests, and the assignment at `src/lib/rptiImport.ts:421`. Do this **after** T043b, so the repair path is never absent (FR-008b, FR-008c).
 
 **Checkpoint**: all four stories complete; the filing guarantee holds across the model change.
 
@@ -161,7 +162,7 @@ row is matched or named.
 
 ## Phase 7: Polish & Cross-Cutting
 
-- [ ] T044 [P] Add `capexAmount`, `opexAmount`, `rptiRemarks` **and `initiativeId`** to the `DeliverableSegment` comparator in `src/lib/diff.ts:294-313`, with a test that each appears in the difference report. `initiativeId` is a pre-existing gap — re-attributing a segment changes the filing today with no history entry ([#42](https://github.com/nofanto/Selara/issues/42)).
+- [ ] T044 [P] Add `capexAmount`, `opexAmount`, `rptiRemarks` **and `initiativeId`** to the `DeliverableSegment` comparator in `src/lib/diff.ts:294-313`, with a test that each appears in the difference report (contract 25, FR-017). `initiativeId` is a pre-existing gap — re-attributing a segment changes the filing today with no history entry ([#42](https://github.com/nofanto/Selara/issues/42)).
 - [ ] T045 [P] **No cost migration** (T003). Confirm by test that an existing workspace keeps its initiative budgets untouched and simply has no implementation figures until a preparer enters them — and that the new divergence warning fires for exactly that state, so it is announced rather than discovered.
 - [ ] T046 [P] Extend `src/lib/scale.test.ts` to several implementations per application at 300 applications (contract 26). The current fixture builds one segment per deliverable and will not exercise the increased row count; reconciliation is the part to watch, since both sides grow.
 - [ ] T047 [P] Write an ADR in `docs/adr/` recording the grain change, the reversal of Q7 and Q10 with the principle that survived both, the rejected alternatives, and why no IndexedDB version bump is needed. Add it to the ADR index.

@@ -47,7 +47,7 @@ attributed to an initiative is not an implementation at all and these fields are
 | `capex` | Stored, editable, **filed** | Stored, editable, **not filed** — a portfolio figure driving the timeline and budget report. |
 | `opex` | Stored, editable, **filed** | Same. Seeded from the filed row on import; may then diverge. |
 | `rptiRemarks` | Stored, filed as `Keterangan` | **Removed** — moves to the implementation. |
-| `deliverableId` | The single RPTI target | **No filing role.** Survival is an open question (plan.md, Complexity Tracking). |
+| `deliverableId` | The single RPTI target | **Removed** (Q18). Every use was a filing use; the segment names its own application. Its repair path moves to the segment first — see FR-008c. |
 | `description` | Filed as `Deskripsi` | Unchanged. Still describes the work, still filed. |
 
 **Why kept rather than derived or deleted** *(revised 2026-09-22)*: these are not two copies of one

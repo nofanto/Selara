@@ -168,10 +168,20 @@ each stored row is either matched or named.
 - **FR-008a**: The data-health error raised for an initiative whose work spans several applications
   MUST be removed. It forbids an arrangement that is now legal; leaving it would report a defect
   where none exists, which is how preparers learn to ignore findings.
-- **FR-008b**: Target inference — deriving an initiative's filing target from its segments where
-  none is declared — MUST be reconsidered. A segment names its own application, so the inference
-  has no remaining purpose for the RPTI. Whether `Initiative.deliverableId` survives for other uses
-  is a planning question, not a filing one.
+- **FR-008b** *(decided 2026-09-22, Q18)*: Target inference MUST be removed, and
+  `Initiative.deliverableId` MUST be removed with it — from the type, the initiative panel, the
+  Initiatives tab, its dangling-reference check and the importer. A segment names its own
+  application, so nothing infers a filing target; every remaining use of the field was a filing use
+  and dies with the single-target rule.
+- **FR-008c**: The repair path that currently runs through `Initiative.deliverableId` MUST be
+  rebuilt around the segment's own application **before** the field is removed. A stored row whose
+  deliverable was deleted is repaired today by selecting the replacement on the initiative;
+  afterwards it is repaired by correcting the segment. Removing the field first would delete a
+  repair route before its replacement exists, and every message naming that route MUST be corrected
+  with it (FR-025's standard).
+- **FR-008d**: The data-health finding that reports a declared target carrying no qualifying work
+  MUST be removed. With no declared target the situation cannot arise, and a check for an impossible
+  state is noise.
 - **FR-009** *(reverses FR-028 / Q7)*: The filed cost MUST belong to the implementation, not to the
   initiative. Q7's principle — *"if one piece of work needs two budgets, it is two pieces of
   work"* — is **preserved and its conclusion reversed**: the piece of work the filing asks about is
