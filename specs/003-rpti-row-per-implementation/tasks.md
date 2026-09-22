@@ -83,11 +83,19 @@ unchanged.
 
 ## Phase 4: User Story 2 — Each implementation carries its own filed values (P1)
 
-**Goal**: two implementations file different costs and different commentary; the initiative shows a
-total it does not own.
+**Goal**: two implementations file different costs and different commentary, and the initiative's
+own budget stays a separate, editable portfolio figure that the filing never reads.
+
+*(Corrected 2026-09-23: this goal previously read "the initiative shows a total it does not own",
+and the independent test asserted the initiative's displayed figure was the sum of its
+implementations. That is the derived-total model the two-figures decision replaced — see R3, Q17
+and T027, which keep `Initiative.capex`/`opex` stored and editable. Implementing the stale wording
+would have rebuilt the very derivation the decision rejected, and with it the empty-initiative and
+migration problems that decision dissolved.)*
 
 **Independent test**: give two implementations different CapEx and different remarks; generate;
-confirm each row carries its own and the initiative's displayed total is their sum.
+confirm each row carries its own, the initiative's own figure is untouched by generation, and data
+health raises a divergence **warning** naming both figures without blocking export.
 
 ### Tests (write first, observe failing)
 
@@ -110,6 +118,7 @@ confirm each row carries its own and the initiative's displayed total is their s
 - [ ] T026 [US2] Add cost and remarks entry to `src/components/DeliverableSegmentPanel.tsx`, which today edits deliverable, title, status, initiative and dates.
 - [ ] T027 [US2] **Leave** `Initiative.capex`/`opex` editable in `src/components/InitiativePanel.tsx` and the Initiatives tab — they remain a portfolio figure (FR-009a, revised). Verify no task elsewhere made them read-only. Label both so a preparer can tell which figure is filed and which is the initiative's own.
 - [ ] T028 [US2] **Extend** the negative-cost rule in `src/lib/validation.ts:36` to the implementation's figures. The initiative's rule stays — that field is still editable (FR-009a, revised).
+- [ ] T028a [US2] **Move the importer's cost and remarks onto the implementation, in this phase.** Split out of T034 on 2026-09-23 because of an ordering hazard nobody had named: T023 removes the initiative fallback from `resolveCost`, but `rptiImport.ts` writes the filed CapEx/OpEx and Keterangan only to the `Initiative`. Land T023 without this and every imported row files zero — `src/lib/roundTrip.test.ts` goes from zero losses to **24** — measured by stubbing `resolveCost` to zero — breaking SC-002. Write cost and remarks to the created or matched implementation **and keep seeding the initiative's own budget from the same row** (FR-009b, contract 12); both start equal, and divergence is the preparer's to create. `Initiative.deliverableId` is *not* part of this task — that half of T034 stays in its own phase.
 - [ ] T029 [US2] Find and correct any data-health message naming the Initiatives tab as the place to fix a cost (contract 21). Cost entry has moved; a message naming the wrong screen is the FR-025 failure in miniature.
 
 **Checkpoint**: a filed line's values belong to the line, and there is exactly one place to enter
@@ -132,7 +141,7 @@ each.
 
 ### Implementation
 
-- [ ] T034 [US3] Write cost and remarks to the created or matched implementation in `src/lib/rptiImport.ts`, **and continue seeding the initiative's own budget from the same row** (FR-009b, contract 12). Both start equal; divergence is the preparer's to create. Stop setting `Initiative.deliverableId` at `:421` (T004). Depends on T004 if the importer still sets `Initiative.deliverableId`. T013e already changed imported filed rows to live anchors; preserve those anchors and the unlinked prior-live evidence while moving cost and remarks.
+- [ ] T034 [US3] Stop setting `Initiative.deliverableId` at `src/lib/rptiImport.ts:421` (T004). Depends on T004. *(The cost-and-remarks half moved to T028a on 2026-09-23 — it has to land with T023, not after it. T013e's live anchors and unlinked prior-live evidence are T028a's to preserve.)*
 - [ ] T035 [US3] Confirm zero losses on the extended fixture, and that the existing 13-row sample is unaffected (contract 24, SC-002).
 - [ ] T035a [US3] Assert FR-015 as part of T035's verification: after migration, no filed value must be re-entered by hand for the round trip to reproduce.
 
