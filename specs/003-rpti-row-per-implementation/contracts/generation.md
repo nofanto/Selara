@@ -21,11 +21,24 @@ below supersedes one explicitly.
    belongs to that later year's return (spec Q2 and Q3, both option A). Filing it in both would put
    one go-live on two returns, and the earlier row would state a planned implementation time outside
    its own filing period.
-2b. **`new` versus `upgrade` is decided by the deliverable's history, not by the presence of a
-   pre-launch phase.** A row is `new` when the deliverable has no live phase beginning before the
-   filed year, and `upgrade` otherwise. The previous rule keyed off pre-launch segments among the
-   qualifying set; with only live starts qualifying that set is always empty, which would type every
-   row — including a genuine first build — as `upgrade`.
+2b. **`new` versus `upgrade` is decided by the deliverable's history before *this implementation*,
+   not by the presence of a pre-launch phase and not by the filed year's boundary.** A row is `new`
+   when the deliverable has no live phase beginning before that row's own go-live, and `upgrade`
+   otherwise. Two implementations sharing a start date are both `new` — neither precedes the other,
+   and they state the same quarter.
+
+   The first rule keyed off pre-launch segments among the qualifying set; with only live starts
+   qualifying that set is always empty, which would type every row — including a genuine first build
+   — as `upgrade`. The second keyed off the start of the filed year, which typed both go-lives of a
+   brand-new application as `new`, stating in one return that the same application was built from
+   nothing twice. *(Corrected 2026-09-23.)*
+
+2c. **An imported filed row anchors on an open-ended live phase** starting at its filed quarter, for
+   `new` and `upgrade` alike. A quarter-bounded anchor made the application live for three months
+   and then absent from the timeline, and made its presence in the year-end LKPTI depend on which
+   quarter was filed: measured on the published sample, a Q4 build joined the 2027 inventory and the
+   Q1–Q3 builds did not. Both importers now use one horizon — an LKPTI entry and a filed go-live are
+   the same claim, *this is live from that date*.
 3. **One go-live files exactly once, in one year.** A segment starting in 2027 and running to 2031
    produces a row in 2027 and in no other year. Today it produces one every year until the segment
    ends — the second of the three symptoms in research.md R1.

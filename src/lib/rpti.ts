@@ -58,6 +58,24 @@ export function periodForQuarter(quarter: RptiQuarter, year: number): { startDat
   return { startDate: `${year}-${start}`, endDate: `${year}-${end}` };
 }
 
+// A freshly-imported "live" segment has no known end — DeliverableSegment.endDate is a
+// required field, so we anchor it several years out, matching how demo data represents
+// an ongoing live segment (see src/demoData.ts) rather than inventing a null-endDate concept.
+const OPEN_ENDED_YEARS_OUT = 5;
+
+/**
+ * Anchored to the year the preparer stated the return covers, never to the clock.
+ * Reading `new Date()` here meant the same filed return imported in 2026 and in 2030
+ * produced different workspaces from identical input (lkptiImport T032).
+ *
+ * Shared by both importers: an LKPTI entry and an RPTI filed go-live are the same
+ * claim — this is live from that date — and an end date that differs between them
+ * makes year-end inventory membership depend on which return happened to supply it.
+ */
+export function openEndedDate(fromYear: number): string {
+  return `${fromYear + OPEN_ENDED_YEARS_OUT}-12-31`;
+}
+
 export function isLiveStatusId(statusId: string, deliverableStatuses: DeliverableStatus[]): boolean {
   const status = deliverableStatuses.find(s => s.id === statusId);
   if (status) return !!status.isLiveStatus || (!deliverableStatuses.some(s => s.isLiveStatus) && (statusId === LIVE_STATUS_FALLBACK_ID || LIVE_STATUS_FALLBACK_PATTERN.test(status.name)));
@@ -151,8 +169,8 @@ export function projectRptiReturn(
   // Placeholder initiatives (empty markers, not real work) are excluded the same way.
   const initiativeIds = new Set(initiatives.filter(i => i.isPlaceholder !== true).map(i => i.id));
 
-  // A deliverable that was already live before the report year already exists — a
-  // go-live this year is an upgrade to it, not a first-ever "new" build,
+  // A deliverable that was already live before this go-live already exists — this
+  // go-live is an upgrade to it, not a first-ever "new" build,
   // regardless of which initiative is now touching it.
   // Deliberately deliverable-wide (not filtered by initiativeId): "has this ever
   // gone live" is a fact about the deliverable, not about who's working on it now.
@@ -164,10 +182,17 @@ export function projectRptiReturn(
   // every ongoing application's enhancement as a brand-new build, which is
   // precisely the misclassification this product exists to avoid. A genuine new
   // build is still 'new': none of its live segments start before the year.
-  const hasPriorLiveSegment = (deliverableId: string): boolean =>
+  //
+  // Measured against *this implementation's* own start, not against the start of the
+  // filing year. Two go-lives on a brand-new application in one year would otherwise
+  // both be 'new', stating in a single return that the same application was built
+  // from nothing twice; the second is an enhancement to what the first delivered.
+  // Segments sharing a start date are both 'new' — neither precedes the other, and
+  // they state the same quarter anyway.
+  const wasLiveBefore = (deliverableId: string, startDate: string): boolean =>
     deliverableSegments.some(seg =>
       seg.deliverableId === deliverableId &&
-      seg.startDate < yearStart &&
+      seg.startDate < startDate &&
       isLiveStatusId(seg.status, deliverableStatuses)
     );
 
@@ -197,7 +222,7 @@ export function projectRptiReturn(
       if (groupInitiativeId !== initiativeId) continue;
       items.sort(byStartDateAsc).forEach(segment => rowsForInitiative.push({
         anchor: segment, deliverableId,
-        developmentType: hasPriorLiveSegment(deliverableId) ? 'upgrade' : 'new',
+        developmentType: wasLiveBefore(deliverableId, segment.startDate) ? 'upgrade' : 'new',
       }));
     }
     rowsForInitiative.sort((a, b) =>

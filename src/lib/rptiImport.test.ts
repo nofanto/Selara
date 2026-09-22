@@ -7,7 +7,7 @@ import {
   deriveWorkspaceFromRptiImport,
   RPTI_IMPORT_LIVE_STATUS_ID,
 } from './rptiImport';
-import { RPTI_CATEGORY_LABELS, projectRptiReturn } from './rpti';
+import { RPTI_CATEGORY_LABELS, projectRptiReturn, openEndedDate } from './rpti';
 import type { Asset, AssetCategory, Deliverable, DeliverableSegment } from '../types';
 import { SEEDED_DELIVERABLE_STATUSES } from './deliverableStatusDefaults';
 
@@ -116,14 +116,16 @@ describe('deriveWorkspaceFromRptiImport — placement', () => {
     assetCategories: [{ id: 'c-1', name: 'Area', categoryCode: '04' } as AssetCategory],
   };
 
-  it('gives a newly created build one live start in the filed quarter', () => {
-    // The filed implementation is a transition into production; the segment
-    // records its planned date so regeneration files that same quarter.
+  it('gives a newly created build one open-ended live start at the filed quarter', () => {
+    // The filed implementation is a transition into production; the segment starts
+    // on its planned date so regeneration files that same quarter, and runs
+    // open-ended because a thing that goes live stays live until something ends it.
     const out = deriveWorkspaceFromRptiImport(parse({ jenis: 'new', quarter: 'Q3' }), 2027, EMPTY);
     expect(out.deliverableSegments).toHaveLength(1);
     expect(out.deliverableSegments[0]).toMatchObject({
-      startDate: '2027-07-01', endDate: '2027-09-30', status: RPTI_IMPORT_LIVE_STATUS_ID,
+      startDate: '2027-07-01', endDate: openEndedDate(2027), status: RPTI_IMPORT_LIVE_STATUS_ID,
     });
+    expect(out.deliverableSegments[0].endDate > '2027-12-31').toBe(true);
   });
 
   it('gives a newly created upgrade a prior live phase and filed live start', () => {
@@ -137,7 +139,7 @@ describe('deriveWorkspaceFromRptiImport — placement', () => {
       startDate: '2026-01-01', endDate: '2026-12-31', status: RPTI_IMPORT_LIVE_STATUS_ID,
     });
     expect(out.deliverableSegments[1]).toMatchObject({
-      startDate: '2027-07-01', endDate: '2027-09-30', status: RPTI_IMPORT_LIVE_STATUS_ID,
+      startDate: '2027-07-01', endDate: openEndedDate(2027), status: RPTI_IMPORT_LIVE_STATUS_ID,
     });
   });
 
@@ -185,7 +187,7 @@ describe('deriveWorkspaceFromRptiImport — placement', () => {
     expect(out.unresolved).toHaveLength(0);
     expect(out.deliverableSegments).toHaveLength(1);
     expect(out.deliverableSegments[0]).toMatchObject({
-      startDate: '2027-07-01', endDate: '2027-09-30', status: RPTI_IMPORT_LIVE_STATUS_ID,
+      startDate: '2027-07-01', endDate: openEndedDate(2027), status: RPTI_IMPORT_LIVE_STATUS_ID,
     });
   });
 

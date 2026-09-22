@@ -329,7 +329,25 @@ describe('RPTI implementation-grain filing (003, Phase 3)', () => {
         goLive('first-live', '2027-04-01'), goLive('second-live', '2027-10-01'),
       ] }), 2027);
     expect(rows.map(row => [row.deliverableSegmentId, row.developmentType, row.plannedImplementationQuarter]))
-      .toEqual([['first-live', 'new', 'Q2'], ['second-live', 'new', 'Q4']]);
+      .toEqual([['first-live', 'new', 'Q2'], ['second-live', 'upgrade', 'Q4']]);
+  });
+
+  // new/upgrade is decided against everything live before *this* implementation, not
+  // before the filing year. Deciding it per year would state that the same application
+  // was built from nothing twice in one return — the Q4 line is an enhancement to what
+  // the Q2 line delivered, and the deliverable-wide reading of "has this ever been
+  // live" is the same one hasPriorLiveSegment always applied across years.
+  it('types the second go-live of a brand-new application as an upgrade', () => {
+    const rows = projectRptiReturn(makeContext({ deliverables: [makeDeliverable()],
+      deliverableSegments: [goLive('first', '2027-04-01'), goLive('second', '2027-10-01')] }), 2027);
+    expect(rows.map(row => [row.deliverableSegmentId, row.developmentType]))
+      .toEqual([['first', 'new'], ['second', 'upgrade']]);
+  });
+
+  it('types a go-live new when an earlier live phase starts on the same day', () => {
+    const rows = projectRptiReturn(makeContext({ deliverables: [makeDeliverable()],
+      deliverableSegments: [goLive('a-same-day', '2027-04-01'), goLive('z-same-day', '2027-04-01')] }), 2027);
+    expect(rows.map(row => row.developmentType)).toEqual(['new', 'new']);
   });
 
   it('files both applications of a multi-application initiative (T010)', () => {

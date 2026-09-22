@@ -4,7 +4,7 @@ import {
   Initiative, Programme, RptiCategoryCode, RptiDetail, RptiDeveloper, RptiDevelopmentType,
   RptiQuarter, RptiRelatedParty,
 } from '../types';
-import { RPTI_CATEGORY_LABELS, periodForQuarter, isLiveStatusId } from './rpti';
+import { RPTI_CATEGORY_LABELS, periodForQuarter, isLiveStatusId, openEndedDate } from './rpti';
 import { IN_PRODUCTION_STATUS, SEEDED_DELIVERABLE_STATUSES } from './deliverableStatusDefaults';
 
 /**
@@ -356,7 +356,12 @@ export function deriveWorkspaceFromRptiImport(
       anchorSegmentId = `rpti-import-seg-${n}`;
       deliverableSegments.push({
         id: anchorSegmentId, deliverableId: targetId,
-        startDate: qStart, endDate: qEnd,
+        // Open-ended from the filed quarter, not bounded by it. The row states a
+        // go-live, and a thing that goes live stays live until something ends it;
+        // ending the segment at the quarter made the application live for three
+        // months and then absent, and made its presence in the year-end LKPTI
+        // depend on whether the filed quarter happened to be Q4.
+        startDate: qStart, endDate: openEndedDate(reportYear),
         status: RPTI_IMPORT_LIVE_STATUS_ID,
         initiativeId,
       });
@@ -385,7 +390,7 @@ export function deriveWorkspaceFromRptiImport(
       anchorSegmentId = `rpti-import-seg-${n}`;
       deliverableSegments.push({
         id: anchorSegmentId, deliverableId: targetId,
-        startDate: qStart, endDate: qEnd,
+        startDate: qStart, endDate: openEndedDate(reportYear),
         status: RPTI_IMPORT_LIVE_STATUS_ID, initiativeId,
       });
     }

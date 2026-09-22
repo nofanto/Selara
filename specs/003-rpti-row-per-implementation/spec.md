@@ -144,9 +144,15 @@ each stored row is either matched or named.
   phase. A pre-launch phase is the run-up to an implementation, not one itself, so a build whose
   go-live falls in a later year MUST file nothing in the earlier one (Q2 and Q3, both option A).
 - **FR-001b**: `new` versus `upgrade` MUST be decided by whether the deliverable has a live phase
-  beginning before the filed year, not by the presence of a pre-launch phase among the qualifying
-  segments. With only live starts qualifying, that set is always empty, and keying off it would type
-  every row — including a genuine first build — as `upgrade`.
+  beginning before **that row's own go-live**, not by the presence of a pre-launch phase among the
+  qualifying segments and not by the start of the filed year. With only live starts qualifying, the
+  pre-launch set is always empty, and keying off it would type every row — including a genuine first
+  build — as `upgrade`; keying off the year boundary would type both go-lives of a brand-new
+  application as `new`, stating in one return that the same application was built from nothing twice.
+- **FR-001c**: An imported filed row MUST anchor on an **open-ended** live phase starting at its
+  filed quarter, for `new` and `upgrade` alike. A quarter-bounded anchor makes year-end LKPTI
+  membership depend on which quarter was filed — a Q4 build joins that year's inventory and a Q1–Q3
+  build does not — and draws a three-month lifespan on the timeline for work that is ongoing.
 - **FR-002**: Each row MUST state the implementation time of its own implementation. No
   implementation belonging to the report year may be absent from the generated return.
 - **FR-003**: An initiative with exactly one implementation in the report year MUST continue to

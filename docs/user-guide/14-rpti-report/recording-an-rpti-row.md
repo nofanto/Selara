@@ -12,7 +12,7 @@ If a stored row's target is missing, create or repair the Deliverable on **Data 
 
 ## Generated values
 
-Each live lifecycle segment linked to a real initiative files one row in the year its live phase starts. Planned and funded phases are run-up only: if go-live is next year, the current year files no row. The row's planned implementation quarter comes from the live start date. It is **new** if the Deliverable had no live phase starting before the filing year, and an **upgrade** otherwise. Category and DC/DR locations come from the Deliverable, falling back to its Asset Category. Developer and related-party attributes come from the Deliverable; remarks come from the Initiative. Imported attributes are retained on those entities.
+Each live lifecycle segment linked to a real initiative files one row in the year its live phase starts. Planned and funded phases are run-up only: if go-live is next year, the current year files no row. The row's planned implementation quarter comes from the live start date. It is **new** if the Deliverable had no live phase starting before that go-live, and an **upgrade** otherwise — so where one application goes live twice in a year, the first row is **new** and the second is an **upgrade** to it. Category and DC/DR locations come from the Deliverable, falling back to its Asset Category. Developer and related-party attributes come from the Deliverable; remarks come from the Initiative. Imported attributes are retained on those entities.
 
 **Data Manager → RPTI** displays stored rows and their fields for reference, including unresolved imports. It has no row editing or generation controls. Generating a report does not overwrite those stored rows.
 
