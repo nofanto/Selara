@@ -278,6 +278,52 @@ remarks. Worth weighing when that work is scheduled.
 
 ## Decided
 
+### Q19 — the legacy remarks lift follows the field; the legacy cost lift does not (2026-09-23)
+
+**Raised by the implementer during Phase 4**, not by the task list, which is the reason it is
+recorded here: `attributeLift.ts` reads `Initiative.rptiRemarks`, and T024a removes that field. A
+removed field whose readers survive is the orphan T024a exists to prevent, one level up.
+
+`attributeLift` is the idempotent lift that rescues attributes from pre-ADR-0013 stored rows at
+each boundary where old-shaped data enters live state (Q4). It does two things to an RPTI row:
+carries `remarks` onto the initiative, and carries legacy `capexAmount`/`opexAmount` onto the
+initiative's budget, deleting the cost properties afterwards as a durable completion marker (F3).
+
+**Decided — the two halves part company, because only one destination is being removed.**
+
+1. **The cost lift is unchanged.** `Initiative.capex`/`opex` survive Q17 as a portfolio figure, so
+   the lift still has a real home and still preserves the value. That it is no longer the *filed*
+   figure is the decision, not a defect: T045 records that nothing migrates, an existing workspace
+   keeps its budgets, and the divergence warning announces the absence of implementation figures
+   rather than letting it surface at filing time.
+
+2. **The remarks lift moves to the implementation named by the row's `deliverableSegmentId`**, with
+   the same precedence as before — a value already on the segment wins, because it is the newer home
+   and the one the preparer edits, and old evidence must never overwrite a deliberate edit.
+
+3. **A row naming no segment, or a segment that no longer exists, keeps its property where it is.**
+   Not deleted, not dropped on the nearest segment of the same initiative, not invented a home for.
+   This is the file's existing non-destructive rule: an unplaceable property stays put so a later
+   migration tool can still find it, and it stays readable on the read-only RPTI tab meanwhile.
+   Cost is the sole exception, and only because leaving it would make every later load overwrite a
+   newer edit. **A value that cannot be placed is a value that must not be deleted.**
+
+**Rejected — infer the segment from the initiative when the row names none.** It guesses at which
+implementation a filed comment belonged to, and with several implementations per initiative now
+legal, guessing wrong attaches a filed remark to the wrong plan line. Silence plus a recoverable
+orphan is the honest state.
+
+**Rejected — drop the remarks lift entirely and let preparers re-enter them.** It discards a filed
+value that the workspace can still place unambiguously whenever `deliverableSegmentId` is set,
+which is the silent-loss failure this whole line of work exists to end.
+
+**Consequence**: `AttributeLiftInput` gains `deliverableSegments`, and all three callers in
+`App.tsx` — share load, workbook import, version restore — must persist what the lift returns. A
+lift whose result is discarded is a defect this project has already shipped once, so it is asserted
+by test rather than by inspection.
+
+---
+
 ### Q18 — `Initiative.deliverableId` is removed with its UI (2026-09-22)
 
 **Decided** during planning for [#52](https://github.com/nofanto/Selara/issues/52). The field exists
