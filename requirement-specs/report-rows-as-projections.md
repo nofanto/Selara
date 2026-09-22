@@ -278,6 +278,142 @@ remarks. Worth weighing when that work is scheduled.
 
 ## Decided
 
+### Q18 — `Initiative.deliverableId` is removed with its UI (2026-09-22)
+
+**Decided** during planning for [#52](https://github.com/nofanto/Selara/issues/52). The field exists
+only to serve Q10's single-target rule, which Q17 withdrew. Every logic use is a filing use —
+`rpti.ts:97, 338, 391, 420`, `dataHealth.ts:233, 249-261`, `rptiImport.ts:421` — and all of them die
+with that rule. What remains is an editable control on two screens that nothing reads, plus a
+dangling-reference check on it.
+
+The grouping the product owner described — *"the user can group many deliverables into one
+initiative"* — runs entirely through segments' `initiativeId`. This field plays no part in it.
+
+**Rejected: keep it, deprecated in the type comment.** Nobody reads type comments. A visible control
+that silently does nothing is worse than either removing it or giving it a real job, because a
+preparer will set it and expect the filing to follow — which is exactly what it used to do.
+
+**Rejected: repurpose it as a default application for new segments.** A genuine convenience, but it
+is a new feature wearing an old field's name, and a control identical to today's would reasonably be
+expected to behave as today's does.
+
+**Two consequences, neither visible from the field itself:**
+
+1. **A whole data-health finding goes with it.** `initiative-rpti-unanchored-target` — added days
+   earlier as F6 — exists precisely because a *declared* target might carry no work. With no
+   declared target the situation cannot arise.
+2. **It is load-bearing for the F2 repair path.** A stored row whose deliverable was deleted is
+   repaired today by selecting the replacement on the Initiative, which `rpti.ts:338` then matches
+   on. Under the implementation grain the repair is to correct the **segment's** own
+   `deliverableId`, which is more direct — but the matching and every repair message must be
+   rebuilt around it **before** the field is removed. Removing it first would delete a repair route
+   before its replacement exists, which is the shape of a defect this project has already shipped
+   once (the FR-025 round: three messages naming repairs that could not clear their findings).
+
+
+### Q17 — the plan line lives on the implementation; Q7 and Q10 are reversed (2026-09-22)
+
+**Decided.** The RPTI is a plan for *development*, and a plan line is a *development*. So the line
+lives on the implementation — the lifecycle segment — which names its own application, its own
+time, its own type, its own cost and its own commentary. The initiative becomes the **trigger**:
+why the work exists, who owns it, which programme it belongs to.
+
+Product owner: *"RPTI is only for development plan, then it should be on the segment"*, and,
+confirmed explicitly, *"one initiative can file for several applications."*
+
+**Two recorded decisions are reversed, and both keep their reasoning.**
+
+**Q7 — cost belongs to the initiative.** Reversed. The principle behind it was *"if one piece of
+work needs two budgets, it is two pieces of work."* That principle survives untouched; what changed
+is the identification of the piece of work. The filing asks about an implementation, carries one
+`Estimasi Biaya CapEx` per row, and an initiative-level figure would be repeated across every row —
+filing the same budget two or three times. So the budget belongs to the implementation.
+
+`Initiative.capex`/`opex` are **kept as derived totals**, not deleted: thirteen files read them for
+the timeline, the budget visualisation and validation. Derived rather than stored, so there is one
+source of truth. The alternative — an initiative figure used as a default when an implementation
+states none — was rejected for creating two independently-editable values for one thing, which is
+precisely the shape of the silent-overwrite defect found in the previous feature, where a stored
+figure beat a newer canonical edit on every reload.
+
+**Q10 — an initiative has at most one RPTI target.** Reversed. A programme of work spanning three
+systems is ordinary planning, and once each line names its own application the restriction buys
+nothing. Verified before reversing (2026-09-22): an initiative with live segments on two
+applications currently files **zero rows** and raises `initiative-rpti-multi-target`; declaring one
+target files **one row** and the other application's work becomes silently absent with no finding.
+That silent absence is the strongest argument against keeping the rule — it is the one place the
+model deliberately drops filed-relevant work rather than reporting it.
+
+**Consequences, to be carried by [#52](https://github.com/nofanto/Selara/issues/52)'s feature:**
+
+- The `initiative-rpti-multi-target` error must be **removed**. It forbids what is now legal.
+- Target inference (`resolveRptiTarget`, Q10's machinery) loses its purpose for the RPTI, because a
+  segment names its own application. Whether `Initiative.deliverableId` survives for other uses is a
+  planning question rather than a filing one.
+- Reconciliation's canonical identity (Q11/Q12) moves to the implementation.
+- `rptiRemarks` moves to the implementation (Q14), which the owner's original instinct proposed and
+  which Q14 recorded as correct-but-blocked by the old grouping. Per-year remarks fall out for free,
+  removing two of the four justifications for the deferred option-5 ledger.
+
+**What is not reversed.** An implementation still means a transition *into* production (Q2 of the
+003 spec, settled by Q16), a retirement still leaves through the LKPTI rather than the RPTI (Q16),
+and a row still belongs to the year its implementation happens (Q3 of the 003 spec).
+
+
+### Q16 — retirement leaves through the LKPTI, never through the RPTI (2026-09-22)
+
+**Decided.** Decommissioning an application is **not** an RPTI event. The RPTI is a plan for
+*developing* applications and infrastructure; a retirement is recorded by ending the application's
+live phase, after which it simply falls out of the LKPTI at the next as-at date. Nothing about the
+retirement appears in the development plan.
+
+Raised while enumerating what makes a lifecycle segment produce an RPTI row. The product owner
+first proposed that an implementation meant any change of live state, *including* sunset, then
+corrected it: *"rpti doesn't include the sunset or decommission, for sunset/decommission,
+application will be taken out from lkpti."* The correction is recorded because the first reading
+was reasonable and someone will arrive at it again.
+
+**The format agrees, which is why this is worth pinning.** `Jenis Pengembangan` is an enum of
+`new | upgrade` only (`requirement-specs/rpti-schema.md:15`, enforced at `rptiImport.ts:127`).
+There is no value that could express a decommission, so a retirement has nowhere to go in an RPTI
+row. Had the first reading stood, either the schema was incomplete — which would have entangled
+this with [#47](https://github.com/nofanto/Selara/issues/47)'s unverified input contract — or a
+retirement would have had to file as `upgrade`, putting "upgrade" in front of a regulator for a
+system being switched off. Both were avoided by asking rather than encoding a guess.
+
+**Verified against the implementation** (2026-09-22). An application live from 2020, its live phase
+ended 30 June 2027 and followed by a sunset phase:
+
+| | Result | |
+|---|---|---|
+| LKPTI as at 31 Dec 2026 | 1 row | still running |
+| LKPTI as at 31 Dec 2027 | **0 rows** | retired, correctly absent |
+| RPTI 2027 | **0 rows** | retirement is not development |
+
+So the behaviour already matches the ruling, and the `sunset` status carrying neither
+`isLiveStatus` nor `isPreLaunchStatus` is **correct** rather than an oversight. It had been flagged
+as a possible gap; it is not one.
+
+**One trap this exposed, which is not about retirement.** If the preparer also attaches the
+*pre-existing live segment* to the retirement initiative, RPTI 2027 does file a row — typed
+`upgrade`, with implementation quarter `Q1` derived from the segment's **2020** start date. A
+retirement filed as a development, dated seven years before the return it appears in.
+
+That is not a flaw in this ruling. It is the segment-overlap membership rule
+(`rpti.ts:151`, `startDate <= yearEnd && endDate >= yearStart`) reaching a date far outside the
+filed year, and it is the third symptom of the same cause as
+[#52](https://github.com/nofanto/Selara/issues/52) — generation reads a segment's *state* where the
+filing asks about an *event*. Recorded here so the three symptoms are known to share a root:
+
+1. a second go-live in one year is dropped (#52);
+2. one go-live re-files every year until its open-ended live segment expires;
+3. a retirement can file as an upgrade dated from the original go-live.
+
+**Consequence for [#52](https://github.com/nofanto/Selara/issues/52)'s spec:** its Q2 — what counts
+as one implementation — resolves to *a transition into production*. The owner's correction removes
+the "any live-state change" reading that would have required a third branch for sunset.
+
+
 ### Q9 — post-feature filing correctness outranks byte identity (2026-09-18)
 
 **Decided:** a generated post-feature return must state the year the preparer selected and retain
