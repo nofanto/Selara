@@ -1,5 +1,11 @@
 # RPTI Row Auto-Generation (Design Notes)
 
+> **Superseded generation rule:** The row membership, row grain, and development-type rules below
+> describe the earlier generator. For current filing behavior, use
+> [`specs/003-rpti-row-per-implementation/contracts/generation.md`](../specs/003-rpti-row-per-implementation/contracts/generation.md),
+> contracts 1–8: each live phase start files once in its start year; pre-launch alone files nothing;
+> and prior-year live history determines `new` versus `upgrade`.
+
 > **Status:** Implemented — see `generateRptiDetails` in `src/lib/rpti.ts`, wired to the **Generate `<year>` RPTI Rows** button in Data Manager → RPTI (`src/components/DataManager.tsx`). Rows remain user-editable after generation; nothing here is enforced beyond generation time.
 > **Context:** `RptiDetail` rows in Data Manager → RPTI are generated from `Initiative`/`DeliverableSegment` data one report-year at a time (see `docs/adr/0003-rpti-report-and-application-type.md` for the underlying data model). This doc captures the agreed generation rule, plus what's still open.
 

@@ -26,8 +26,8 @@ The **Status** dropdown is populated from the **Deliverable Statuses** tab in th
 
 Two flags on a status matter beyond colour:
 
-- **Live status** marks a status as "in production", which is how the [RPTI Report](../14-rpti-report/recording-an-rpti-row.md) derives a planned implementation quarter.
-- **Pre-launch status** marks planned or funded work, which is RPTI generation's allow-list.
+- **Live status** marks a status as "in production". Each live phase start linked to an initiative is an [RPTI Report](../14-rpti-report/recording-an-rpti-row.md) implementation, filed in the year it starts.
+- **Pre-launch status** marks planned or funded run-up work. It does not create an RPTI row before go-live.
 
 ## Status colours and patterns
 

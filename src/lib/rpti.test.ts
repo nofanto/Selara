@@ -1,6 +1,6 @@
 import { demoInitiatives, demoDeliverables, demoDeliverableSegments, demoDeliverableStatuses, demoAssets, demoAssetCategories } from '../demoData';
 import { describe, expect, it } from 'vitest';
-import { projectRptiReturn, reconcileRptiReturn, ProjectRptiInput, periodForQuarter, deriveQuarterFromDate } from './rpti';
+import { projectRptiReturn, reconcileRptiReturn, ProjectRptiInput, periodForQuarter, deriveQuarterFromDate, resolveCost } from './rpti';
 import type { AssetCategory, Asset, Deliverable, DeliverableSegment, DeliverableStatus, Initiative, RptiDetail } from '../types';
 
 const statuses: DeliverableStatus[] = [
@@ -23,7 +23,7 @@ function makeInitiative(overrides: Partial<Initiative> = {}): Initiative {
 function makeSegment(overrides: Partial<DeliverableSegment> = {}): DeliverableSegment {
   return {
     id: 'seg-1', deliverableId: 'deliv-1', startDate: '2026-02-01', endDate: '2026-03-01',
-    status: 'appstatus-planned', initiativeId: 'init-1',
+    status: 'appstatus-in-production', initiativeId: 'init-1',
     ...overrides,
   };
 }
@@ -53,11 +53,16 @@ function makeContext(overrides: Partial<ProjectRptiInput> = {}): ProjectRptiInpu
 }
 
 describe('projectRptiReturn', () => {
-  it('generates the shipped demo without requiring newly declared targets', () => {
-    const rows = projectRptiReturn({ initiatives: demoInitiatives, deliverables: demoDeliverables,
+  it('files the shipped demo only in each go-live year', () => {
+    const context = { initiatives: demoInitiatives, deliverables: demoDeliverables,
       deliverableSegments: demoDeliverableSegments, deliverableStatuses: demoDeliverableStatuses,
-      assets: demoAssets, assetCategories: demoAssetCategories }, new Date().getFullYear());
-    expect(rows).toHaveLength(7);
+      assets: demoAssets, assetCategories: demoAssetCategories };
+    const demoYear = new Date().getFullYear();
+    const years = [demoYear - 1, demoYear, demoYear + 1, demoYear + 2];
+    expect(years.map(year => projectRptiReturn(context, year).length)).toEqual([1, 0, 1, 0]);
+    const rows = projectRptiReturn(context, demoYear + 1);
+    expect(rows.map(row => row.targetId)).toEqual(['app-rn']);
+    expect(rows[0]).toMatchObject({ developmentType: 'new', plannedImplementationQuarter: 'Q2' });
     expect(new Set(rows.map(row => row.initiativeId)).size).toBe(rows.length);
   });
 
@@ -68,54 +73,41 @@ describe('projectRptiReturn', () => {
     expect(rows[0].targetId).toBe('deliv-1');
   });
 
-  it('does not infer a different target in each year for ambiguous work', () => {
+  it('files each segment target in its own implementation year', () => {
     const context = makeContext({ initiatives: [makeInitiative({ deliverableId: undefined })],
       deliverables: [makeDeliverable(), makeDeliverable({ id: 'deliv-2' })],
       deliverableSegments: [makeSegment(), makeSegment({ id: 'later', deliverableId: 'deliv-2', startDate: '2027-01-01', endDate: '2027-12-31' })] });
-    expect(projectRptiReturn(context, 2026)).toEqual([]);
-    expect(projectRptiReturn(context, 2027)).toEqual([]);
+    expect(projectRptiReturn(context, 2026).map(row => row.targetId)).toEqual(['deliv-1']);
+    expect(projectRptiReturn(context, 2027).map(row => row.targetId)).toEqual(['deliv-2']);
   });
 
-  it('generates a "new" row for a planned segment in the report year', () => {
+  it('files nothing for a planned segment without a go-live in the report year', () => {
     const segments = [makeSegment({ id: 'seg-planned', status: 'appstatus-planned', startDate: '2026-02-01' })];
     const rows = projectRptiReturn(makeContext({ deliverableSegments: segments }), 2026);
 
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({
-      initiativeId: 'init-1',
-      targetType: 'deliverable',
-      targetId: 'deliv-1',
-      developmentType: 'new',
-      plannedImplementationQuarter: 'Q1',
-      deliverableSegmentId: 'seg-planned',
-    });
+    expect(rows).toEqual([]);
   });
 
-  it('generates an "upgrade" row for an in-production segment with no planning segment that year', () => {
+  it('generates a "new" row for a first in-production segment without planning that year', () => {
     const segments = [makeSegment({ id: 'seg-prod', status: 'appstatus-in-production', startDate: '2026-08-01' })];
     const rows = projectRptiReturn(makeContext({ deliverableSegments: segments }), 2026);
 
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
-      developmentType: 'upgrade',
+      developmentType: 'new',
       plannedImplementationQuarter: 'Q3',
       deliverableSegmentId: 'seg-prod',
     });
   });
 
-  it('collapses planned+funded into one "new" row, anchored on the latest (funded)', () => {
+  it('files nothing for planned and funded phases without a go-live', () => {
     const segments = [
       makeSegment({ id: 'seg-planned', status: 'appstatus-planned', startDate: '2026-01-15' }),
       makeSegment({ id: 'seg-funded', status: 'appstatus-funded', startDate: '2026-04-15' }),
     ];
     const rows = projectRptiReturn(makeContext({ deliverableSegments: segments }), 2026);
 
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({
-      developmentType: 'new',
-      plannedImplementationQuarter: 'Q2', // from funded (April), not planned (January)
-      deliverableSegmentId: 'seg-funded',
-    });
+    expect(rows).toEqual([]);
   });
 
   it('collapses planned + in-production in the same year into one "new" row, quarter from in-production', () => {
@@ -133,7 +125,7 @@ describe('projectRptiReturn', () => {
     });
   });
 
-  it('does not look back across years — in-production alone this year is "upgrade" even if planning was last year', () => {
+  it('does not treat last year’s planning as a prior go-live', () => {
     const segments = [
       makeSegment({ id: 'seg-planned', status: 'appstatus-planned', startDate: '2025-01-15', endDate: '2025-02-15' }),
       makeSegment({ id: 'seg-prod', status: 'appstatus-in-production', startDate: '2026-09-01' }),
@@ -141,24 +133,23 @@ describe('projectRptiReturn', () => {
     const rows = projectRptiReturn(makeContext({ deliverableSegments: segments }), 2026);
 
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ developmentType: 'upgrade', deliverableSegmentId: 'seg-prod' });
+    expect(rows[0]).toMatchObject({ developmentType: 'new', deliverableSegmentId: 'seg-prod' });
   });
 
-  it('classifies as "upgrade" when the deliverable already went live in a prior year, even with only a planned segment this year', () => {
+  it('does not file planned work on a deliverable already live in a prior year', () => {
     const segments = [
       makeSegment({ id: 'seg-went-live-2025', status: 'appstatus-in-production', startDate: '2025-01-01', endDate: '2025-06-01' }),
       makeSegment({ id: 'seg-planned-2026', status: 'appstatus-planned', startDate: '2026-02-01', endDate: '2026-03-01' }),
     ];
     const rows = projectRptiReturn(makeContext({ deliverableSegments: segments }), 2026);
 
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ developmentType: 'upgrade', deliverableSegmentId: 'seg-planned-2026' });
+    expect(rows).toEqual([]);
   });
 
   it('checks prior-live history deliverable-wide, regardless of which initiative drove the earlier go-live', () => {
     const segments = [
       makeSegment({ id: 'seg-went-live-2025', initiativeId: 'init-2', status: 'appstatus-in-production', startDate: '2025-01-01', endDate: '2025-06-01' }),
-      makeSegment({ id: 'seg-planned-2026', initiativeId: 'init-1', status: 'appstatus-planned', startDate: '2026-02-01', endDate: '2026-03-01' }),
+      makeSegment({ id: 'seg-live-2026', initiativeId: 'init-1', status: 'appstatus-in-production', startDate: '2026-02-01', endDate: '2026-03-01' }),
     ];
     const initiatives = [makeInitiative({ id: 'init-1' }), makeInitiative({ id: 'init-2' })];
     const rows = projectRptiReturn(makeContext({ deliverableSegments: segments, initiatives }), 2026);
@@ -193,7 +184,7 @@ describe('projectRptiReturn', () => {
     expect(rows).toHaveLength(0);
   });
 
-  it('trusts an explicit isPreLaunchStatus flag over the default id/name fallback', () => {
+  it('does not file an explicitly flagged pre-launch phase', () => {
     const customStatuses = [
       { id: 'appstatus-in-production', name: 'In Production', color: 'green', isLiveStatus: true },
       { id: 'status-custom-approved', name: 'Budget Approved', color: 'blue', isPreLaunchStatus: true },
@@ -201,7 +192,7 @@ describe('projectRptiReturn', () => {
     const segments = [makeSegment({ status: 'status-custom-approved' })];
     const rows = projectRptiReturn(makeContext({ deliverableSegments: segments, deliverableStatuses: customStatuses }), 2026);
 
-    expect(rows).toHaveLength(1);
+    expect(rows).toEqual([]);
   });
 
   it('stops guessing from id/name once any status has isPreLaunchStatus explicitly set', () => {
@@ -212,8 +203,7 @@ describe('projectRptiReturn', () => {
     const segments = [makeSegment({ status: 'appstatus-planned' })];
     const rows = projectRptiReturn(makeContext({ deliverableSegments: segments, deliverableStatuses: customStatuses }), 2026);
 
-    // Once the workspace has opted in explicitly anywhere, the unflagged "Planned" id no
-    // longer qualifies via fallback guessing.
+    // An unflagged Planned status also cannot start an implementation.
     expect(rows).toHaveLength(0);
   });
 
@@ -232,12 +222,11 @@ describe('projectRptiReturn', () => {
     expect(rows).toHaveLength(0);
   });
 
-  it('includes a segment that started before the report year but overlaps into it', () => {
+  it('does not refile a segment that started before the report year', () => {
     const segments = [makeSegment({ id: 'seg-straddle', startDate: '2025-11-01', endDate: '2026-02-01' })];
     const rows = projectRptiReturn(makeContext({ deliverableSegments: segments }), 2026);
 
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ deliverableSegmentId: 'seg-straddle' });
+    expect(rows).toEqual([]);
   });
 
   it('includes a segment that starts in the report year and ends after it', () => {
@@ -248,11 +237,11 @@ describe('projectRptiReturn', () => {
     expect(rows[0]).toMatchObject({ deliverableSegmentId: 'seg-tail' });
   });
 
-  it('uses each initiative’s declared deliverable rather than every segment target', () => {
+  it('files every implementation target, including one beyond the initiative’s old declared target', () => {
     const segments = [
-      makeSegment({ id: 'seg-a', deliverableId: 'deliv-a', initiativeId: 'init-1', status: 'appstatus-planned' }),
-      makeSegment({ id: 'seg-b', deliverableId: 'deliv-b', initiativeId: 'init-1', status: 'appstatus-planned' }),
-      makeSegment({ id: 'seg-c', deliverableId: 'deliv-a', initiativeId: 'init-2', status: 'appstatus-planned' }),
+      makeSegment({ id: 'seg-a', deliverableId: 'deliv-a', initiativeId: 'init-1' }),
+      makeSegment({ id: 'seg-b', deliverableId: 'deliv-b', initiativeId: 'init-1' }),
+      makeSegment({ id: 'seg-c', deliverableId: 'deliv-a', initiativeId: 'init-2' }),
     ];
     const initiatives = [
       makeInitiative({ id: 'init-1', deliverableId: 'deliv-a' }),
@@ -260,8 +249,8 @@ describe('projectRptiReturn', () => {
     ];
     const rows = projectRptiReturn(makeContext({ deliverableSegments: segments, initiatives }), 2026);
 
-    expect(rows).toHaveLength(2);
-    expect(rows.map(row => row.targetId)).toEqual(['deliv-a', 'deliv-a']);
+    expect(rows).toHaveLength(3);
+    expect(rows.map(row => row.targetId)).toEqual(['deliv-a', 'deliv-b', 'deliv-a']);
   });
 
   it('produces no rows when there is no qualifying segment data', () => {
@@ -269,8 +258,153 @@ describe('projectRptiReturn', () => {
   });
 });
 
+describe('RPTI implementation-grain filing (003, Phase 3)', () => {
+  const goLive = (id: string, startDate: string, deliverableId = 'deliv-1') =>
+    makeSegment({ id, startDate, endDate: '2031-12-31', deliverableId, status: 'appstatus-in-production' });
+
+  it('files a cross-year run-up only when its go-live starts (T013b)', () => {
+    const context = makeContext({ deliverables: [makeDeliverable()], deliverableSegments: [
+      makeSegment({ id: 'run-up', startDate: '2026-07-01', endDate: '2027-03-31', status: 'appstatus-planned' }),
+      goLive('go-live', '2027-04-01'),
+    ] });
+    expect(projectRptiReturn(context, 2026)).toEqual([]);
+    expect(projectRptiReturn(context, 2027)).toMatchObject([
+      { deliverableSegmentId: 'go-live', developmentType: 'new', plannedImplementationQuarter: 'Q2' },
+    ]);
+  });
+
+  it('types a first go-live new and a later-year go-live upgrade from deliverable history (T013c)', () => {
+    const context = makeContext({ deliverables: [makeDeliverable()], deliverableSegments: [
+      goLive('first-live', '2026-07-01'), goLive('later-live', '2027-04-01'),
+    ] });
+    expect(projectRptiReturn(context, 2026)).toMatchObject([
+      { deliverableSegmentId: 'first-live', developmentType: 'new' },
+    ]);
+    expect(projectRptiReturn(context, 2027)).toMatchObject([
+      { deliverableSegmentId: 'later-live', developmentType: 'upgrade' },
+    ]);
+  });
+
+  it('files both Q2 and Q4 go-lives of one application (T007)', () => {
+    const rows = projectRptiReturn(makeContext({
+      deliverables: [makeDeliverable()],
+      deliverableSegments: [goLive('q2', '2027-04-01'), goLive('q4', '2027-10-01')],
+    }), 2027);
+    expect(rows.map(row => [row.deliverableSegmentId, row.plannedImplementationQuarter]))
+      .toEqual([['q2', 'Q2'], ['q4', 'Q4']]);
+    expect(new Set(rows.map(row => row.id)).size).toBe(2);
+  });
+
+  it('files an open-ended go-live only in its start year (T008)', () => {
+    const context = makeContext({ deliverables: [makeDeliverable()],
+      deliverableSegments: [goLive('go-live', '2027-04-01')] });
+    expect([2027, 2028, 2029, 2030, 2031].map(year => projectRptiReturn(context, year).length))
+      .toEqual([1, 0, 0, 0, 0]);
+  });
+
+  it('does not file an old live phase again during its retirement year (R1)', () => {
+    const rows = projectRptiReturn(makeContext({ deliverables: [makeDeliverable()],
+      deliverableSegments: [makeSegment({ id: 'old-live', startDate: '2020-01-01',
+        endDate: '2031-12-31', status: 'appstatus-in-production' }),
+        makeSegment({ id: 'retirement', startDate: '2027-07-01', endDate: '2027-12-31',
+          status: 'appstatus-retired' })] }), 2027);
+    expect(rows).toEqual([]);
+  });
+
+  it('omits an other-year implementation without a reconciliation finding (T008a)', () => {
+    const segment = makeSegment({ id: 'prior-year', startDate: '2026-04-01', endDate: '2028-12-31',
+      status: 'appstatus-in-production' });
+    const context = makeContext({ deliverables: [makeDeliverable()], deliverableSegments: [segment] });
+    expect(projectRptiReturn(context, 2027)).toEqual([]);
+    expect(reconcileRptiReturn({ ...context, storedDetails: [{
+      id: 'filed-2026', initiativeId: 'init-1', targetType: 'deliverable',
+      targetId: 'deliv-1', developmentType: 'upgrade', deliverableSegmentId: segment.id,
+    }] })).toEqual([]);
+  });
+
+  it('files each go-live separately and ignores the run-up (T009)', () => {
+    const rows = projectRptiReturn(makeContext({ deliverables: [makeDeliverable()],
+      deliverableSegments: [
+        makeSegment({ id: 'run-up', startDate: '2027-02-01', status: 'appstatus-planned' }),
+        goLive('first-live', '2027-04-01'), goLive('second-live', '2027-10-01'),
+      ] }), 2027);
+    expect(rows.map(row => [row.deliverableSegmentId, row.developmentType, row.plannedImplementationQuarter]))
+      .toEqual([['first-live', 'new', 'Q2'], ['second-live', 'new', 'Q4']]);
+  });
+
+  it('files both applications of a multi-application initiative (T010)', () => {
+    const rows = projectRptiReturn(makeContext({
+      deliverables: [makeDeliverable(), makeDeliverable({ id: 'deliv-2', name: 'Second App' })],
+      deliverableSegments: [goLive('first', '2027-04-01'), goLive('second', '2027-10-01', 'deliv-2')],
+    }), 2027);
+    expect(rows.map(row => row.targetId)).toEqual(['deliv-1', 'deliv-2']);
+  });
+
+  it('carries the same application-level filing values on both implementations (T010a)', () => {
+    const deliverable = makeDeliverable({ categoryCode: '06', developer: 'Vendor', ppjtiRelatedParty: 'yes',
+      dcCity: 'Jakarta', dcCountry: 'Indonesia', drCity: 'Surabaya', drCountry: 'Indonesia', platform: 'Linux' });
+    const rows = projectRptiReturn(makeContext({ deliverables: [deliverable],
+      deliverableSegments: [goLive('q2', '2027-04-01'), goLive('q4', '2027-10-01')] }), 2027);
+    expect(rows).toHaveLength(2);
+    expect(rows.map(({ categoryCode, developer, ppjtiRelatedParty, dcCity, dcCountry, drCity, drCountry }) =>
+      ({ categoryCode, developer, ppjtiRelatedParty, dcCity, dcCountry, drCity, drCountry })))
+      .toEqual(Array(2).fill({ categoryCode: '06', developer: 'PPJTI', ppjtiRelatedParty: 'yes',
+        dcCity: 'Jakarta', dcCountry: 'Indonesia', drCity: 'Surabaya', drCountry: 'Indonesia' }));
+    expect(deliverable.platform).toBe('Linux');
+  });
+
+  it('orders same-date implementations by stable segment identity regardless of input order (T015)', () => {
+    const first = goLive('a-segment', '2027-04-01');
+    const last = goLive('z-segment', '2027-04-01');
+    const context = makeContext({ deliverables: [makeDeliverable()], deliverableSegments: [last, first] });
+    const reversed = { ...context, deliverableSegments: [first, last] };
+    const rows = projectRptiReturn(context, 2027);
+    expect(rows.map(row => row.deliverableSegmentId)).toEqual(['a-segment', 'z-segment']);
+    expect(projectRptiReturn(reversed, 2027)).toEqual(rows);
+  });
+
+  it('preserves every filed value and row order for ordinary single-implementation initiatives (T011)', () => {
+    const initiatives = [
+      makeInitiative({ id: 'init-b', deliverableId: 'deliv-b', description: 'Build B', capex: 202, opex: 22 }),
+      makeInitiative({ id: 'init-a', deliverableId: 'deliv-a', description: 'Build A', capex: 101, opex: 11,
+        rptiRemarks: 'A remark' }),
+    ];
+    const deliverables = [
+      makeDeliverable({ id: 'deliv-b', name: 'Application B', categoryCode: '05', developer: 'Vendor B',
+        ppjtiRelatedParty: 'no', dcCity: 'Jakarta', dcCountry: 'Indonesia', drCity: 'Batam', drCountry: 'Indonesia' }),
+      makeDeliverable({ id: 'deliv-a', name: 'Application A', categoryCode: '06', developer: 'inhouse',
+        dcCity: 'Bandung', dcCountry: 'Indonesia' }),
+    ];
+    const segments = [
+      makeSegment({ id: 'b-run-up', initiativeId: 'init-b', deliverableId: 'deliv-b',
+        startDate: '2027-01-01', endDate: '2027-03-31', status: 'appstatus-planned' }),
+      makeSegment({ id: 'b-live', initiativeId: 'init-b', deliverableId: 'deliv-b',
+        startDate: '2027-05-01', endDate: '2031-12-31', status: 'appstatus-in-production' }),
+      makeSegment({ id: 'a-live', initiativeId: 'init-a', deliverableId: 'deliv-a',
+        startDate: '2027-11-01', endDate: '2031-12-31', status: 'appstatus-in-production' }),
+    ];
+    const rows = projectRptiReturn(makeContext({ initiatives, deliverables, deliverableSegments: segments }), 2027);
+    // These are the workbook's filed values in its row order. Internal row and segment IDs
+    // are excluded: neither appears in the export, and IDs now belong to implementations.
+    const filed = rows.map((row, index) => {
+      const initiative = initiatives.find(i => i.id === row.initiativeId);
+      const deliverable = deliverables.find(d => d.id === row.targetId);
+      return [index + 1, deliverable?.name, initiative?.description, row.categoryCode,
+        row.developmentType, row.developer, row.ppjtiRelatedParty,
+        row.dcCity, row.dcCountry, row.drCity, row.drCountry,
+        row.plannedImplementationQuarter, ...Object.values(resolveCost(row, initiative)), row.remarks];
+    });
+    expect(filed).toEqual([
+      [1, 'Application B', 'Build B', '05', 'new', 'PPJTI', 'no',
+        'Jakarta', 'Indonesia', 'Batam', 'Indonesia', 'Q2', 202, 22, undefined],
+      [2, 'Application A', 'Build A', '06', 'new', 'inhouse', 'n/a',
+        'Bandung', 'Indonesia', undefined, undefined, 'Q4', 101, 11, 'A remark'],
+    ]);
+  });
+});
+
 describe('projectRptiReturn — categoryCode auto-fill', () => {
-  const segments = [makeSegment({ id: 'seg-planned', status: 'appstatus-planned', startDate: '2026-02-01' })];
+  const segments = [makeSegment({ id: 'seg-live', startDate: '2026-02-01' })];
 
   it('uses the Deliverable.categoryCode when set', () => {
     const deliverables = [makeDeliverable({ categoryCode: '06' })];
@@ -308,7 +442,7 @@ describe('projectRptiReturn — categoryCode auto-fill', () => {
 });
 
 describe('projectRptiReturn — developer / ppjtiRelatedParty auto-fill', () => {
-  const segments = [makeSegment({ id: 'seg-planned', status: 'appstatus-planned', startDate: '2026-02-01' })];
+  const segments = [makeSegment({ id: 'seg-live', startDate: '2026-02-01' })];
 
   it('uses Deliverable.developer, and auto-fills ppjtiRelatedParty to "n/a" for in-house', () => {
     const deliverables = [makeDeliverable({ developer: 'inhouse' })];
@@ -336,7 +470,7 @@ describe('projectRptiReturn — developer / ppjtiRelatedParty auto-fill', () => 
 });
 
 describe('projectRptiReturn — DC/DR location auto-fill', () => {
-  const segments = [makeSegment({ id: 'seg-planned', status: 'appstatus-planned', startDate: '2026-02-01' })];
+  const segments = [makeSegment({ id: 'seg-live', startDate: '2026-02-01' })];
 
   it('uses the Deliverable location fields when set', () => {
     const deliverables = [makeDeliverable({ dcCity: 'Jakarta', dcCountry: 'Indonesia', drCity: 'Surabaya', drCountry: 'Indonesia' })];
@@ -422,7 +556,7 @@ describe('an application that is continuously live counts as pre-existing', () =
     startDate: '2021-08-17', endDate: '2031-12-31', initiativeId: undefined,
   });
 
-  it('classifies planned work on a continuously live application as "upgrade"', () => {
+  it('does not file planned work on a continuously live application', () => {
     const rows = projectRptiReturn(makeContext({
       deliverableSegments: [
         stillLive(),
@@ -431,8 +565,7 @@ describe('an application that is continuously live counts as pre-existing', () =
       initiatives: [makeInitiative({ startDate: '2027-01-01', endDate: '2027-03-31' })],
     }), 2027);
 
-    expect(rows).toHaveLength(1);
-    expect(rows[0].developmentType).toBe('upgrade');
+    expect(rows).toEqual([]);
   });
 
   it('still calls a first-ever build "new" — nothing of it was live before the year', () => {

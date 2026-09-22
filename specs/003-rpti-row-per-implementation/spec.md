@@ -140,6 +140,13 @@ each stored row is either matched or named.
 
 - **FR-001**: An RPTI row MUST correspond to one planned implementation, not to one initiative. An
   initiative with several implementations in a report year MUST produce one row per implementation.
+- **FR-001a**: An implementation MUST mean a **transition into production** — the start of a live
+  phase. A pre-launch phase is the run-up to an implementation, not one itself, so a build whose
+  go-live falls in a later year MUST file nothing in the earlier one (Q2 and Q3, both option A).
+- **FR-001b**: `new` versus `upgrade` MUST be decided by whether the deliverable has a live phase
+  beginning before the filed year, not by the presence of a pre-launch phase among the qualifying
+  segments. With only live starts qualifying, that set is always empty, and keying off it would type
+  every row — including a genuine first build — as `upgrade`.
 - **FR-002**: Each row MUST state the implementation time of its own implementation. No
   implementation belonging to the report year may be absent from the generated return.
 - **FR-003**: An initiative with exactly one implementation in the report year MUST continue to

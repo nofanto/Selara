@@ -54,8 +54,8 @@ export interface DeliverableStatus {
   id: string;
   name: string;
   color: string;
-  isLiveStatus?: boolean; // Marks this status as "live/in production" — used to auto-derive RPTI planned implementation quarter
-  isPreLaunchStatus?: boolean; // Marks this status as "planned/funded" pre-launch work — RPTI generation's allow-list, see requirement-specs/rpti-auto-generation.md
+  isLiveStatus?: boolean; // Marks a production phase; its start can anchor an RPTI implementation and quarter
+  isPreLaunchStatus?: boolean; // Marks planned/funded run-up work; it does not create an RPTI row
 }
 
 /**
@@ -220,6 +220,9 @@ export interface DeliverableSegment {
   endDate: string;   // ISO format: YYYY-MM-DD
   status: string;
   initiativeId?: string; // Optionally attributes this lifecycle phase to the Initiative driving it
+  capexAmount?: number; // Estimasi Biaya CapEx for this implementation; see Q17 in report-rows-as-projections.md
+  opexAmount?: number; // Estimasi Biaya OpEx for this implementation; see Q17 in report-rows-as-projections.md
+  rptiRemarks?: string; // Keterangan for this implementation; see Q17 in report-rows-as-projections.md
   row?: number;      // Which row within the swimlane (0-indexed). Auto-assigned if absent.
   rowSpan?: number;  // How many rows tall this segment is (default 1). Controlled by bottom-edge drag.
 }
@@ -234,9 +237,10 @@ export type RptiCategoryCode =
   | '49' | '51' | '52' | '53' | '54' | '99';
 
 /**
- * One row of the RPTI (IT Development Plan Report) regulatory report — an
- * Initiative's planned development activity on its linked Deliverable. It is a
- * generated projection; the Initiative owns the filed cost.
+ * One row of the RPTI (IT Development Plan Report) regulatory report — one
+ * planned implementation on a Deliverable. It is a generated projection. At
+ * the Phase 3 checkpoint, the Initiative still supplies the filed cost;
+ * implementation cost and commentary move in Phase 4.
  */
 export interface RptiDetail {
   id: string;

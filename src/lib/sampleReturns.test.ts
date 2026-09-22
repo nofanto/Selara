@@ -184,6 +184,23 @@ describe('a planned enhancement to an application the bank already runs', () => 
     expect(forPg[0].plannedImplementationQuarter).toBe('Q1');
   });
 
+  it('regenerates the sample’s imported new and upgrade types from live history', () => {
+    const w = merged();
+    const regen = projectRptiReturn({
+      deliverableSegments: w.deliverableSegments, deliverableStatuses: w.deliverableStatuses,
+      initiatives: w.out.initiatives, deliverables: w.deliverables,
+      assets: w.assets, assetCategories: w.assetCategories,
+    }, 2027);
+    for (const [name, type] of [
+      ['Open API Banking Platform', 'new'], ['Payment Gateway', 'upgrade'],
+    ] as const) {
+      const target = w.deliverables.find(deliverable => deliverable.name === name)!;
+      expect(w.out.rptiDetails.find(row => row.targetId === target.id)?.developmentType).toBe(type);
+      expect(regen.filter(row => row.targetId === target.id).map(row => row.developmentType), name)
+        .toEqual([type]);
+    }
+  });
+
   it('keeps the three new applications classified as new', () => {
     const w = merged();
     const regen = projectRptiReturn({

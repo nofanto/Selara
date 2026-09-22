@@ -75,7 +75,7 @@ test.describe('RPTI stored rows and canonical sources', () => {
   test('Reports generates the inferred live target with its quarter and initiative cost', async ({ page }) => {
     await generateReport(page, 'rpti');
     const row = page.getByTestId('rpti-detail-table').locator('tbody tr').filter({ hasText: 'Filing Application' });
-    await expect(row).toContainText('upgrade');
+    await expect(row).toContainText('new');
     await expect(row).toContainText('Q1');
     await expect(row).toContainText('100');
   });

@@ -3,7 +3,7 @@ import {
   Initiative, Milestone, Dependency, Decision, Resource, Programme, Strategy,
   RptiDetail, LkptiDetail, TimelineSettings,
 } from '../types';
-import { deriveQuarterFromDate, isLiveStatusId, isPreLaunchStatusId, reconcileRptiReturn, resolveAssetCategory, resolveRptiTarget } from './rpti';
+import { isLiveStatusId, isPreLaunchStatusId, reconcileRptiReturn, resolveAssetCategory, resolveRptiTarget } from './rpti';
 
 // Tabs of src/components/DataManager.tsx's own `Tab` union — defined here (the pure
 // lib layer) as the source of truth so DataManager can import it instead of the other
@@ -197,38 +197,6 @@ export function computeDataHealth(input: DataHealthInput): HealthIssue[] {
 
     const initiativeSegments = deliverableSegments.filter(segment => segment.initiativeId === i.id);
 
-    // An RPTI row carries one `Waktu Rencana Implementasi` and one cost estimate, so its
-    // grain is a single planned implementation. Generation groups by initiative and files
-    // the anchor segment only, so a second go-live in the same year is dropped — reachable
-    // by ordinary timeline work, not by a broken workspace. Changing the grain is #52's own
-    // feature; until then the drop is announced rather than hidden.
-    if (!i.isPlaceholder) {
-      const target = resolveRptiTarget(i, deliverableSegments, deliverables);
-      const byYear = new Map<string, Set<string>>();
-      if (target) {
-        for (const segment of initiativeSegments) {
-          if (segment.deliverableId !== target) continue;
-          if (!isLiveStatusId(segment.status, deliverableStatuses)
-            && !isPreLaunchStatusId(segment.status, deliverableStatuses)) continue;
-          const year = segment.startDate.slice(0, 4);
-          if (!byYear.has(year)) byYear.set(year, new Set());
-          byYear.get(year)!.add(deriveQuarterFromDate(segment.startDate));
-        }
-      }
-      for (const [year, quarters] of [...byYear].sort()) {
-        if (quarters.size < 2) continue;
-        // Generation anchors on the latest qualifying segment, so the last quarter wins.
-        const ordered = [...quarters].sort();
-        const filed = ordered[ordered.length - 1];
-        issues.push({
-          id: `initiative-rpti-multi-implementation:${i.id}`, severity: 'warning',
-          entityType: 'Initiative', entityId: i.id, entityName: i.name,
-          message: `"${i.name}" has planned implementations in ${ordered.join(' and ')} of ${year}, but a filing row carries one implementation time — only ${filed} would be filed. Split it into one initiative per planned implementation, or accept that the others are not reported.`,
-          location: tab('initiatives'),
-        });
-        break;
-      }
-    }
     const reportTargets = new Set(initiativeSegments.map(segment => segment.deliverableId));
     if (!i.isPlaceholder && !i.deliverableId && reportTargets.size > 1) {
       issues.push({
@@ -695,7 +663,6 @@ export function computeDataHealth(input: DataHealthInput): HealthIssue[] {
 const REPORTS_BY_CHECK: Record<string, HealthReport[]> = {
   // Rows of a return, and the things that stop one being generated at all.
   'initiative-rpti-multi-target': ['rpti'],
-  'initiative-rpti-multi-implementation': ['rpti'],
   'initiative-rpti-no-target': ['rpti'],
   'rpti-asset-target': ['rpti'],
   'rpti-incomplete': ['rpti'],

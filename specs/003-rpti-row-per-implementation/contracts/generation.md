@@ -11,9 +11,21 @@ below supersedes one explicitly.
 1. **A row corresponds to one implementation.** An initiative with *n* implementations in the filed
    year produces *n* rows. **Supersedes contract 2's grouping**, not its purity: output remains a
    function of the canonical entities and the year alone.
-2. **An implementation is a segment whose `startDate` falls within the filed year**, attributed to a
-   real non-placeholder initiative, with a status flagged live or pre-launch. **Supersedes the
-   overlap test**; a segment merely in progress during the year is not an implementation.
+2. **An implementation is a transition into production**: a segment with a status flagged
+   `isLiveStatus` whose `startDate` falls within the filed year, attributed to a real
+   non-placeholder initiative. **Supersedes the overlap test**; a segment merely in progress during
+   the year is not an implementation. *(Corrected 2026-09-22 — this contract previously admitted
+   pre-launch statuses, contradicting the spec's Q2 answer. A pre-launch phase is the run-up to an
+   implementation, not one itself.)*
+2a. **A build only in its run-up files nothing that year.** Work whose go-live falls in a later year
+   belongs to that later year's return (spec Q2 and Q3, both option A). Filing it in both would put
+   one go-live on two returns, and the earlier row would state a planned implementation time outside
+   its own filing period.
+2b. **`new` versus `upgrade` is decided by the deliverable's history, not by the presence of a
+   pre-launch phase.** A row is `new` when the deliverable has no live phase beginning before the
+   filed year, and `upgrade` otherwise. The previous rule keyed off pre-launch segments among the
+   qualifying set; with only live starts qualifying that set is always empty, which would type every
+   row — including a genuine first build — as `upgrade`.
 3. **One go-live files exactly once, in one year.** A segment starting in 2027 and running to 2031
    produces a row in 2027 and in no other year. Today it produces one every year until the segment
    ends — the second of the three symptoms in research.md R1.

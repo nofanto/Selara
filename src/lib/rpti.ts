@@ -80,10 +80,8 @@ export function isPreLaunchStatusId(statusId: string, deliverableStatuses: Deliv
 
 type SegmentKind = 'new' | 'live' | 'excluded';
 
-// Classifies a segment's status for RPTI generation as an allow-list: only a status
-// recognized as live or pre-launch (planned/funded) qualifies — everything else,
-// including any custom status a workspace adds later (Cancelled, On Hold, ...), is
-// excluded by default. See requirement-specs/rpti-auto-generation.md rule 3 / ADR-0009.
+// The older status classification is still used by reconciliation. Projection
+// membership below is stricter: only a live start creates a filed row.
 function classifySegmentKind(statusId: string, deliverableStatuses: DeliverableStatus[]): SegmentKind {
   if (isLiveStatusId(statusId, deliverableStatuses)) return 'live';
   if (isPreLaunchStatusId(statusId, deliverableStatuses)) return 'new';
@@ -143,20 +141,19 @@ export function projectRptiReturn(
 ): RptiDetail[] {
   const { deliverableSegments, deliverableStatuses, initiatives, deliverables, assets, assetCategories } = input;
 
-  // Overlap, not "starts in": a segment qualifies if any part of its
-  // [startDate, endDate] range falls within the report year, even if it
-  // started in an earlier year or continues into the next one.
+  // A plan line belongs to the year its implementation starts, not every
+  // year an open-ended live phase happens to overlap.
   const yearStart = `${reportYear}-01-01`;
   const yearEnd = `${reportYear}-12-31`;
-  const overlapsReportYear = (seg: DeliverableSegment) => seg.startDate <= yearEnd && seg.endDate >= yearStart;
+  const startsInReportYear = (seg: DeliverableSegment) => seg.startDate >= yearStart && seg.startDate <= yearEnd;
   // Deleting an Initiative doesn't clean up DeliverableSegment.initiativeId, so a segment
   // can carry a dangling reference to an initiative that no longer exists — skip those.
   // Placeholder initiatives (empty markers, not real work) are excluded the same way.
   const initiativeIds = new Set(initiatives.filter(i => i.isPlaceholder !== true).map(i => i.id));
 
   // A deliverable that was already live before the report year already exists — a
-  // planned/funded segment this year is an upgrade to it, not a first-ever "new"
-  // build, regardless of which initiative is now touching it.
+  // go-live this year is an upgrade to it, not a first-ever "new" build,
+  // regardless of which initiative is now touching it.
   // Deliberately deliverable-wide (not filtered by initiativeId): "has this ever
   // gone live" is a fact about the deliverable, not about who's working on it now.
   //
@@ -171,81 +168,77 @@ export function projectRptiReturn(
     deliverableSegments.some(seg =>
       seg.deliverableId === deliverableId &&
       seg.startDate < yearStart &&
-      classifySegmentKind(seg.status, deliverableStatuses) === 'live'
+      isLiveStatusId(seg.status, deliverableStatuses)
     );
 
   const qualifying = deliverableSegments
-    .filter(seg => !!seg.initiativeId && initiativeIds.has(seg.initiativeId) && overlapsReportYear(seg))
-    .map(seg => ({ segment: seg, kind: classifySegmentKind(seg.status, deliverableStatuses) }))
-    .filter((s): s is { segment: DeliverableSegment; kind: 'new' | 'live' } => s.kind !== 'excluded');
+    .filter(seg => !!seg.initiativeId && initiativeIds.has(seg.initiativeId)
+      && startsInReportYear(seg) && isLiveStatusId(seg.status, deliverableStatuses));
 
-  const targets = new Map(initiatives.map(initiative => [initiative.id, resolveRptiTarget(initiative, deliverableSegments, deliverables)]));
-  const groups = new Map<string, { segment: DeliverableSegment; kind: 'new' | 'live' }[]>();
-  for (const item of qualifying) {
-    const initiative = initiatives.find(candidate => candidate.id === item.segment.initiativeId);
-    // The Initiative is the canonical RPTI plan line. Segments on another
-    // deliverable remain timeline history but are not a second filing target.
-    const target = initiative && targets.get(initiative.id);
-    // Unresolved/ambiguous targets are diagnosed by data health and gate export.
-    if (!initiative || !target || item.segment.deliverableId !== target) continue;
-    const key = initiative.id;
+  // Each live start is an implementation. The segment itself names the
+  // application; an initiative can trigger more than one application's go-live.
+  const groups = new Map<string, DeliverableSegment[]>();
+  for (const segment of qualifying) {
+    const key = `${segment.initiativeId}\u0000${segment.deliverableId}`;
     const group = groups.get(key);
-    if (group) group.push(item);
-    else groups.set(key, [item]);
+    if (group) group.push(segment);
+    else groups.set(key, [segment]);
   }
 
-  const byStartDateAsc = (a: { segment: DeliverableSegment }, b: { segment: DeliverableSegment }) =>
-    a.segment.startDate.localeCompare(b.segment.startDate);
+  const byStartDateAsc = (a: DeliverableSegment, b: DeliverableSegment) =>
+    a.startDate.localeCompare(b.startDate) || a.id.localeCompare(b.id);
 
   const results: RptiDetail[] = [];
-  for (const [initiativeId, items] of groups) {
-    const deliverableId = targets.get(initiativeId);
-    if (!deliverableId) continue;
-    const newItems = items.filter(i => i.kind === 'new').sort(byStartDateAsc);
-    const liveItems = items.filter(i => i.kind === 'live').sort(byStartDateAsc);
+  for (const initiative of initiatives) {
+    const initiativeId = initiative.id;
+    const rowsForInitiative: { anchor: DeliverableSegment; deliverableId: string; developmentType: RptiDetail['developmentType'] }[] = [];
+    for (const [key, items] of groups) {
+      const [groupInitiativeId, deliverableId] = key.split('\u0000');
+      if (groupInitiativeId !== initiativeId) continue;
+      items.sort(byStartDateAsc).forEach(segment => rowsForInitiative.push({
+        anchor: segment, deliverableId,
+        developmentType: hasPriorLiveSegment(deliverableId) ? 'upgrade' : 'new',
+      }));
+    }
+    rowsForInitiative.sort((a, b) =>
+      a.anchor.startDate.localeCompare(b.anchor.startDate) || a.anchor.id.localeCompare(b.anchor.id));
+    for (const { anchor, deliverableId, developmentType } of rowsForInitiative) {
+      const deliverable = deliverables.find(d => d.id === deliverableId);
+      const category = resolveAssetCategory(deliverable, assets, assetCategories);
+      // Deliverable.developer now carries either 'inhouse' or a provider's *name*
+      // (ADR-0013). The RPTI column wants the classification, so anything that is not
+      // 'inhouse' is PPJTI — a third party, whoever they are. LKPTI emits the name
+      // itself, which is why one field can serve both returns.
+      const rawDeveloper = deliverable?.developer;
+      const developer: RptiDeveloper | undefined =
+        rawDeveloper === undefined || rawDeveloper === ''
+          ? undefined
+          : rawDeveloper === 'inhouse' ? 'inhouse' : 'PPJTI';
 
-    const developmentType: RptiDetail['developmentType'] =
-      newItems.length > 0 && !hasPriorLiveSegment(deliverableId) ? 'new' : 'upgrade';
-    const anchor = newItems.length > 0
-      ? (liveItems.length > 0 ? liveItems[liveItems.length - 1] : newItems[newItems.length - 1])
-      : liveItems[liveItems.length - 1];
-
-    const deliverable = deliverables.find(d => d.id === deliverableId);
-    const initiative = initiatives.find(i => i.id === initiativeId);
-    const category = resolveAssetCategory(deliverable, assets, assetCategories);
-    // Deliverable.developer now carries either 'inhouse' or a provider's *name*
-    // (ADR-0013). The RPTI column wants the classification, so anything that is not
-    // 'inhouse' is PPJTI — a third party, whoever they are. LKPTI emits the name
-    // itself, which is why one field can serve both returns.
-    const rawDeveloper = deliverable?.developer;
-    const developer: RptiDeveloper | undefined =
-      rawDeveloper === undefined || rawDeveloper === ''
-        ? undefined
-        : rawDeveloper === 'inhouse' ? 'inhouse' : 'PPJTI';
-
-    results.push({
-      id: `rpti-gen-${initiativeId}-${deliverableId}-${reportYear}`,
-      initiativeId,
-      targetType: 'deliverable',
-      targetId: deliverableId,
-      categoryCode: deliverable?.categoryCode ?? category?.categoryCode,
-      developmentType,
-      developer,
-      // 'n/a' by definition whenever the resolved developer isn't PPJTI — there is no
-      // third party, so there is no relationship to disclose. When it *is* PPJTI the
-      // answer is a fact about the vendor that nothing can derive, so it is read from
-      // the deliverable, where the preparer records it (FR-014).
-      ppjtiRelatedParty: developer !== 'PPJTI' ? 'n/a' : deliverable?.ppjtiRelatedParty,
-      dcCity: deliverable?.dcCity ?? category?.dcCity,
-      dcCountry: deliverable?.dcCountry ?? category?.dcCountry,
-      drCity: deliverable?.drCity ?? category?.drCity,
-      drCountry: deliverable?.drCountry ?? category?.drCountry,
-      plannedImplementationQuarter: deriveQuarterFromDate(anchor.segment.startDate),
-      deliverableSegmentId: anchor.segment.id,
-      // Keterangan comes from the work it comments on, matching Deskripsi two columns
-      // earlier, which has always come from the initiative (ADR-0013).
-      remarks: initiative?.rptiRemarks,
-    });
+      results.push({
+        id: `rpti-gen-${anchor.id}-${reportYear}`,
+        initiativeId,
+        targetType: 'deliverable',
+        targetId: deliverableId,
+        categoryCode: deliverable?.categoryCode ?? category?.categoryCode,
+        developmentType,
+        developer,
+        // 'n/a' by definition whenever the resolved developer isn't PPJTI — there is no
+        // third party, so there is no relationship to disclose. When it *is* PPJTI the
+        // answer is a fact about the vendor that nothing can derive, so it is read from
+        // the deliverable, where the preparer records it (FR-014).
+        ppjtiRelatedParty: developer !== 'PPJTI' ? 'n/a' : deliverable?.ppjtiRelatedParty,
+        dcCity: deliverable?.dcCity ?? category?.dcCity,
+        dcCountry: deliverable?.dcCountry ?? category?.dcCountry,
+        drCity: deliverable?.drCity ?? category?.drCity,
+        drCountry: deliverable?.drCountry ?? category?.drCountry,
+        plannedImplementationQuarter: deriveQuarterFromDate(anchor.startDate),
+        deliverableSegmentId: anchor.id,
+        // Keterangan comes from the work it comments on, matching Deskripsi two columns
+        // earlier, which has always come from the initiative (ADR-0013).
+        remarks: initiative?.rptiRemarks,
+      });
+    }
   }
 
   return results;

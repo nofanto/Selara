@@ -160,14 +160,14 @@ export const demoDeliverables: Deliverable[] = [
 
 export const demoDeliverableSegments: DeliverableSegment[] = [
     // Okta — in production across the full visible range; linked to the Passkey Rollout
-    // initiative (RPTI generation treats this as an 'upgrade' — Okta's already live).
+    // initiative (its live start files once in that year; later overlap files nothing).
     { id: 'seg-okta-prod', deliverableId: 'app-okta', status: 'appstatus-in-production', startDate: relDate(-1, 1, 1), endDate: relDate(2, 12, 31), initiativeId: 'i-ciam-passkey' },
     // Azure AD B2C — in production, then sunset as CIAM migrates to Okta
     { id: 'seg-azuread-prod', deliverableId: 'app-azuread', status: 'appstatus-in-production', startDate: relDate(-1, 1, 1), endDate: relDate(0, 6, 30) },
     { id: 'seg-azuread-sunset', deliverableId: 'app-azuread', status: 'appstatus-sunset', startDate: relDate(0, 7, 1), endDate: relDate(1, 6, 30) },
     { id: 'seg-azuread-oos', deliverableId: 'app-azuread', status: 'appstatus-out-of-support', startDate: relDate(1, 7, 1), endDate: relDate(2, 6, 30) },
     // Keycloak — planned then funded as a potential alternative; linked to SSO Consolidation
-    // (RPTI generation treats this as 'new' — Keycloak has never gone live).
+    // (RPTI generation files nothing until Keycloak goes live).
     { id: 'seg-keycloak-planned', deliverableId: 'app-keycloak', status: 'appstatus-planned', startDate: relDate(0, 1, 1), endDate: relDate(0, 9, 30), initiativeId: 'i-ciam-sso' },
     { id: 'seg-keycloak-funded', deliverableId: 'app-keycloak', status: 'appstatus-funded', startDate: relDate(0, 10, 1), endDate: relDate(1, 12, 31), initiativeId: 'i-ciam-sso' },
     // Angular Frontend — long-running in production

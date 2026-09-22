@@ -188,7 +188,14 @@ export function ReportsView({ assets, initiatives, milestones, dependencies, cur
         ...computeDataHealth({
           assets, assetCategories, deliverables, deliverableSegments, deliverableStatuses,
           initiatives, milestones, dependencies, decisions: currentData.decisions ?? [], resources,
-          programmes, strategies, rptiDetails: generatedRptiDetails, lkptiDetails,
+          // Deliberately empty, not the projection. Data Health treats whatever it
+          // is handed here as *stored evidence* and reconciles it against canonical
+          // identities that are still (initiative, target) — so two implementation
+          // rows on one application would collide as an identity-conflict and block
+          // the export this feature exists to enable. Stored rows still reach the
+          // gate, through rptiReconciliationFindings below; what remains of this
+          // call is the source-side `initiative-rpti-*` diagnostics.
+          programmes, strategies, rptiDetails: [], lkptiDetails,
           timelineSettings: currentData.timelineSettings,
         }).filter(issue => issue.severity === 'error' && (issue.entityType === 'RptiDetail' || issue.id.startsWith('initiative-rpti-'))).map(issue => issue.message),
         ...rptiReconciliationFindings.map(finding => finding.message),

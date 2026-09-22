@@ -1,5 +1,7 @@
 import { seedReportRecords, reportFixture, generateReport, exportedReportText, readStore } from './report-fixtures';
 import { expect, test } from '@playwright/test';
+import * as fs from 'node:fs';
+import * as XLSX from 'xlsx';
 
 test.describe('Report year', () => {
   test.beforeEach(async ({ page }) => {
@@ -40,6 +42,34 @@ test.describe('Report year', () => {
 
     await generateReport(page, 'lkpti', '2026');
     expect(await exportedReportText(page, 'lkpti')).toContain('2026');
+  });
+
+  test('two 2027 go-lives appear as two report rows and two exported workbook rows (T012)', async ({ page }) => {
+    await seedReportRecords(page, { ...reportFixture,
+      initiatives: [{ ...reportFixture.initiatives[0], deliverableId: 'filing-deliverable',
+        startDate: '2027-01-01', endDate: '2027-12-31' }],
+      deliverableSegments: [
+        { ...reportFixture.deliverableSegments[0], id: 'q2-live', startDate: '2027-04-01', endDate: '2027-09-30' },
+        { ...reportFixture.deliverableSegments[0], id: 'q4-live', startDate: '2027-10-01', endDate: '2031-12-31' },
+      ],
+    }, ['assets', 'assetCategories', 'programmes', 'initiatives', 'deliverables', 'deliverableSegments', 'rptiDetails']);
+
+    await generateReport(page, 'rpti', '2027');
+    const visibleRows = page.getByTestId('rpti-detail-table').locator('tbody tr');
+    await expect(visibleRows).toHaveCount(2);
+    await expect(visibleRows.nth(0)).toContainText('Q2');
+    await expect(visibleRows.nth(1)).toContainText('Q4');
+
+    const [download] = await Promise.all([
+      page.waitForEvent('download'), page.getByTestId('rpti-report-export-btn').click(),
+    ]);
+    const path = await download.path();
+    if (!path) throw new Error('No downloaded workbook');
+    const workbook = XLSX.read(fs.readFileSync(path), { type: 'buffer' });
+    const exportedRows = XLSX.utils.sheet_to_json<unknown[]>(workbook.Sheets['RPTI Format 3.1'], { header: 1 });
+    expect(exportedRows.slice(1).map(row => [row[1], row[9]])).toEqual([
+      ['Filing Application', 'Q2'], ['Filing Application', 'Q4'],
+    ]);
   });
 
   test('following the named asset-target repair clears the finding and enables export', async ({ page }) => {
