@@ -92,6 +92,10 @@ year, compare field by field.
 
 **Expect zero losses.**
 
+Also open the RPTI and LKPTI tabs in Data Manager. **Expect read-only tables and no Add Row,
+Generate, inline-edit, or row-delete controls.** Filing generation belongs in Reports; stored rows
+remain evidence and must not change underneath the preparer.
+
 The published sample now holds 14 rows and includes two Open API Banking Platform implementations
 in 2027: a new Q1 build and a Q3 upgrade with different costs and commentary. Before Phase 5 it held
 13 rows across 13 initiatives and this level could report success while verifying nothing — the
@@ -119,8 +123,8 @@ entered — and the warning is what tells the preparer why, before they file rat
 
 ## Level 11 — Version history sees the new fields
 
-Change an implementation's cost, and separately re-attribute a segment to a different initiative.
-Save a version, run the difference report.
+Save a baseline version. Then change an implementation's cost and, separately, re-attribute a
+segment to a different initiative. Compare the live workspace with that saved baseline.
 
 **Both must appear.** `initiativeId` is a pre-existing gap — re-attribution changes the filing today
 with no history entry at all.

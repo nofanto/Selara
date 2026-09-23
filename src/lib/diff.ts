@@ -287,6 +287,13 @@ export function computeDiff(baseVersion: Version, currentData: Version['data']):
     || (baseVersion.data.deliverableStatuses ?? []).find(s => s.id === statusId)?.name
     || statusId;
 
+  const getSegmentInitiativeName = (initiativeId: string | undefined) => {
+    if (!initiativeId) return 'Unassigned';
+    return currentData.initiatives.find(i => i.id === initiativeId)?.name
+      || baseVersion.data.initiatives.find(i => i.id === initiativeId)?.name
+      || 'Unknown initiative';
+  };
+
   const deliverableSegments = compareEntities(
     baseVersion.data.deliverableSegments,
     currentData.deliverableSegments,
@@ -303,6 +310,15 @@ export function computeDiff(baseVersion: Version, currentData: Version['data']):
       if (b.endDate !== c.endDate) changes.push(`End date: ${b.endDate} → ${c.endDate}`);
       if (b.status !== c.status) changes.push(`Status: ${getSegmentStatusName(b.status)} → ${getSegmentStatusName(c.status)}`);
       if (b.deliverableId !== c.deliverableId) changes.push(`Moved to deliverable "${getSegmentDeliverableName(c.deliverableId)}"`);
+      if ((b.initiativeId ?? '') !== (c.initiativeId ?? '')) {
+        changes.push(`Initiative: ${getSegmentInitiativeName(b.initiativeId)} → ${getSegmentInitiativeName(c.initiativeId)}`);
+      }
+      if ((b.capexAmount ?? 0) !== (c.capexAmount ?? 0)) {
+        changes.push(`RPTI CapEx: ${currency} ${(b.capexAmount ?? 0).toLocaleString()} → ${currency} ${(c.capexAmount ?? 0).toLocaleString()}`);
+      }
+      if ((b.opexAmount ?? 0) !== (c.opexAmount ?? 0)) {
+        changes.push(`RPTI OpEx: ${currency} ${(b.opexAmount ?? 0).toLocaleString()} → ${currency} ${(c.opexAmount ?? 0).toLocaleString()}`);
+      }
       if ((b.rptiRemarks ?? '') !== (c.rptiRemarks ?? '')) {
         changes.push(`RPTI remarks: ${b.rptiRemarks || 'Unset'} → ${c.rptiRemarks || 'Unset'}`);
       }

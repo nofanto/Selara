@@ -205,7 +205,10 @@ option-A decision, unlike the identity-remap rejected there. Open within it: whe
 "new application" path should warn on a near-match to an existing name, which is exactly the case
 FR-019 worries about.
 
-### Q14 — remarks cannot vary by filing year (raised 2026-09-19)
+### Q14 — remarks cannot vary by filing year (raised 2026-09-19) — **REVISED by Q17 (2026-09-22)**
+
+This entry records the earlier initiative-grain decision unchanged. Q17 later made a row one
+implementation and moved RPTI remarks to that implementation; see Q17 for the current rule.
 
 Raised by the product owner asking whether `rptiRemarks` belongs on `DeliverableSegment` rather
 than `Initiative`, since RPTI rows come from segments.
@@ -423,12 +426,19 @@ is the identification of the piece of work. The filing asks about an implementat
 `Estimasi Biaya CapEx` per row, and an initiative-level figure would be repeated across every row —
 filing the same budget two or three times. So the budget belongs to the implementation.
 
-`Initiative.capex`/`opex` are **kept as derived totals**, not deleted: thirteen files read them for
-the timeline, the budget visualisation and validation. Derived rather than stored, so there is one
-source of truth. The alternative — an initiative figure used as a default when an implementation
-states none — was rejected for creating two independently-editable values for one thing, which is
-precisely the shape of the silent-overwrite defect found in the previous feature, where a stored
-figure beat a newer canonical edit on every reload.
+`Initiative.capex`/`opex` are **kept stored and editable**, not deleted or derived. They are
+portfolio figures used by the timeline, mobile cards and budget report; the implementation's
+`capexAmount`/`opexAmount` are separate filed figures. Neither derives from, defaults to, or
+overwrites the other. They may legally diverge, so Data Health names both values and both editing
+surfaces in a warning rather than blocking export.
+
+**Correction (2026-09-24).** This paragraph previously said the initiative values were derived
+totals and the single source of truth. That was the model rejected by the same-day two-figures
+decision recorded in research R3: deriving would zero a legitimate initiative budget when no
+implementation figures exist and would force a migration of every existing workspace. The
+initiative-as-default alternative remains rejected, but for a different reason: a fallback makes
+two editable values compete to represent one fact. The accepted model holds two different facts,
+and nothing falls back to anything.
 
 **Q10 — an initiative has at most one RPTI target.** Reversed. A programme of work spanning three
 systems is ordinary planning, and once each line names its own application the restriction buys
@@ -566,7 +576,10 @@ path would need a canonical source defined for each of the four before it could 
 more work than the rest of this feature, for a shape nothing in the product or the samples needs.
 
 
-### Q7 — cost belongs to the initiative, and an initiative has at most one RPTI target (2026-09-18) — **IMPLEMENTED** (ADR-0013)
+### Q7 — cost belongs to the initiative, and an initiative has at most one RPTI target (2026-09-18) — **REVISED by Q17 (2026-09-22)**
+
+This entry is retained as the historical decision and reasoning. Q17 reverses its cost placement
+and single-target outcome while preserving the principle that one piece of work has one budget.
 
 **Decided: option (c).** `RptiDetail.capexAmount` and `opexAmount` are removed. `Initiative.capex`
 and `Initiative.opex` are the filed figures, with no per-row override and no fallback chain.
@@ -908,7 +921,10 @@ carried forward, since each is load-bearing for the destination:
 - `requirement-specs/it-planning-flow.md` — step 2/3 of the cycle this document reconciles
 - ADR-0010 — merge-preserving LKPTI generation, which exists precisely because these fields cannot be regenerated
 
-## Q10 — Existing initiatives without a declared RPTI target (decided 2026-09-18) — **IMPLEMENTED** (ADR-0013)
+## Q10 — Existing initiatives without a declared RPTI target (decided 2026-09-18) — **REVISED by Q17 (2026-09-22)**
+
+This entry is retained as the historical compatibility rule. Q17 reverses the single-target
+model; Q18 removes `Initiative.deliverableId` and rebuilds repair around the segment's target.
 
 Coordinator-approved compatibility rule: an explicit `Initiative.deliverableId` wins.
 Otherwise infer a target only when all the initiative's lifecycle segments name exactly

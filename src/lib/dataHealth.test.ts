@@ -187,6 +187,25 @@ describe('computeDataHealth — hard checks (dangling references)', () => {
 });
 
 describe('computeDataHealth — soft checks (report-generation gaps)', () => {
+  it('keeps an existing initiative budget, leaves implementation figures absent, and warns about that divergence (T045)', () => {
+    const init = { id: 'init-legacy', name: 'Existing plan', programmeId: 'prog-1', assetId: asset.id,
+      startDate: '2026-01-01', endDate: '2027-12-31', capex: 1_250, opex: 275 };
+    const implementation = { id: 'seg-legacy', deliverableId: deliverable.id, initiativeId: init.id,
+      startDate: '2027-04-01', endDate: '2031-12-31', status: 'appstatus-in-production' };
+    const initiativeBefore = structuredClone(init);
+
+    const issue = findIssue(computeDataHealth(baseInput({ assets: [asset], deliverables: [deliverable],
+      programmes: [programme], initiatives: [init], deliverableSegments: [implementation] })),
+    `initiative-budget-divergence:${init.id}`);
+
+    expect(init, 'data health must not migrate or rewrite the portfolio budget').toEqual(initiativeBefore);
+    expect(implementation).not.toHaveProperty('capexAmount');
+    expect(implementation).not.toHaveProperty('opexAmount');
+    expect(issue).toMatchObject({ severity: 'warning', reports: ['rpti'] });
+    expect(issue?.message).toMatch(/initiative.*CapEx.*1,250.*OpEx.*275/i);
+    expect(issue?.message).toMatch(/implementation.*CapEx.*0.*OpEx.*0/i);
+  });
+
   it('warns when an initiative budget diverges from all of its implementations and names both repair surfaces (T021)', () => {
     const init = { id: 'init-1', name: 'Split plan', programmeId: 'prog-1', assetId: asset.id,
       startDate: '2026-01-01', endDate: '2026-12-31', capex: 1000, opex: 100 };

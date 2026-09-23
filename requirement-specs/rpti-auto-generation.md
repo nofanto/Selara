@@ -4,9 +4,12 @@
 > describe the earlier generator. For current filing behavior, use
 > [`specs/003-rpti-row-per-implementation/contracts/generation.md`](../specs/003-rpti-row-per-implementation/contracts/generation.md),
 > contracts 1–8: each live phase start files once in its start year; pre-launch alone files nothing;
-> and prior-year live history determines `new` versus `upgrade`.
+> and prior live history determines `new` versus `upgrade`. The current v4 projection and
+> reconciliation rules are summarised below; the earlier rules remain here as design history.
 
-> **Status:** Implemented — see `generateRptiDetails` in `src/lib/rpti.ts`, wired to the **Generate `<year>` RPTI Rows** button in Data Manager → RPTI (`src/components/DataManager.tsx`). Rows remain user-editable after generation; nothing here is enforced beyond generation time.
+> **Historical status:** The rules below describe the former Data Manager generator and editable
+> report rows. The current RPTI and LKPTI tabs are read-only evidence; filing projection and export
+> happen in Reports.
 > **Context:** `RptiDetail` rows in Data Manager → RPTI are generated from `Initiative`/`DeliverableSegment` data one report-year at a time (see `docs/adr/0003-rpti-report-and-application-type.md` for the underlying data model). This doc captures the agreed generation rule, plus what's still open.
 
 ## Column summary & auto-fill source
@@ -169,6 +172,22 @@ decision and the accepted no-year-attribution limit.
 
 **Closed by v3:** the year is asked of the preparer in Reports (the Data Manager button and its
 `new Date().getFullYear()` are gone), and generation no longer touches stored rows at all.
+
+**v4 (current): implementation-grained projection.** v3's projection/reconciliation separation
+survives, but its initiative-grained canonical row does not. Each live `DeliverableSegment` linked
+to a real initiative projects one row in the year that segment starts. The segment supplies its own
+Deliverable target, filed CapEx, filed OpEx, and RPTI remarks; planned/funded run-up phases file no
+row by themselves. Prior live history before that implementation decides `new` versus `upgrade`.
+
+`Initiative.capex` and `Initiative.opex` remain stored, editable portfolio figures and are never a
+filing fallback. Data Health warns when their values diverge from the sum of the initiative's live
+implementation figures, without blocking either legal state.
+
+Reconciliation now treats `RptiDetail.deliverableSegmentId` as the canonical identity. An anchored
+stored row must name an existing implementation. A legacy unanchored row is accepted only when it
+has exactly one implementation candidate; zero or several candidates are named before export, and
+stored evidence is still never injected into the selected-year projection. See ADR-0014 and spec
+003's generation contracts for the complete rule.
 
 ## Coupling worth knowing before changing rule 4's third bullet
 

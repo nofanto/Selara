@@ -216,7 +216,7 @@ erDiagram
         string templateId "optional; which workspace template was chosen"
         boolean showRptiCatalogue "optional, default true"
         string clusterName "optional"
-        string defaultCurrency "optional; single workspace-wide currency for the filed CapEx/OpEx figures on INITIATIVE"
+        string defaultCurrency "optional; single workspace-wide currency for monetary figures"
         int onboardingLkptiYear "optional; the as-at year stated at onboarding, offered back as the Reports default (ADR-0013)"
         int onboardingRptiYear "optional; the plan year stated at onboarding, offered back as the Reports default (ADR-0013)"
     }
@@ -231,7 +231,6 @@ erDiagram
     PROGRAMME ||--o{ INITIATIVE : "groups"
     STRATEGY |o--o{ INITIATIVE : "aligns (optional)"
     ASSET ||--o{ INITIATIVE : "targets"
-    DELIVERABLE |o--o{ INITIATIVE : "targets (optional)"
     RESOURCE |o--o{ INITIATIVE : "owns (optional)"
     RESOURCE }o--o{ INITIATIVE : "assigned to (many-to-many)"
 
@@ -247,7 +246,7 @@ erDiagram
     INITIATIVE ||--o{ RPTI_DETAIL : "backs (one initiative, many report rows)"
     DELIVERABLE }o--o| RPTI_DETAIL : "polymorphic target"
     ASSET }o--o| RPTI_DETAIL : "polymorphic target"
-    DELIVERABLE_SEGMENT |o..o{ RPTI_DETAIL : "auto-derives planned quarter (optional)"
+    DELIVERABLE_SEGMENT |o..o{ RPTI_DETAIL : "identifies filed implementation (optional)"
 
     DELIVERABLE ||--o{ LKPTI_DETAIL : "target"
     DELIVERABLE_SEGMENT |o..o{ LKPTI_DETAIL : "auto-derives go-live date (optional)"
@@ -289,6 +288,7 @@ Since IndexedDB has no native foreign-key enforcement, all relationships below a
 - `Asset.categoryId` → `AssetCategory.id`
 - `Deliverable.assetId` → `Asset.id`
 - `DeliverableSegment.deliverableId` → `Deliverable.id`
+- `DeliverableSegment.initiativeId` (optional) → `Initiative.id`
 - `DeliverableSegment.status` → conceptually maps to `DeliverableStatus.name`/`id`, but stored as a free string (not enforced)
 - `Initiative.programmeId` → `Programme.id`
 - `Initiative.strategyId` (optional) → `Strategy.id`
@@ -302,7 +302,7 @@ Since IndexedDB has no native foreign-key enforcement, all relationships below a
 - `Decision.versionId` (optional) → `Version.id` — the saved snapshot that enacted this decision. The link lives on `Decision` rather than as a `Version.decisionIds[]` array so that a `Version` stays immutable once taken (see [ADR-0011](adr/0011-history-tab-decisions-as-audit-trail.md)).
 - `RptiDetail.initiativeId` → `Initiative.id`
 - `RptiDetail.targetId` (with `targetType: 'deliverable' | 'asset'`) → polymorphic; resolved to `Deliverable.id` or `Asset.id`. In Data Manager, `targetType` is not directly editable — it's re-derived automatically from whichever list (`deliverables` or `assets`) the current `targetId` is found in, so the two fields can never fall out of sync via inline editing.
-- `RptiDetail.deliverableSegmentId` (optional) → `DeliverableSegment.id` — set when the row's quarter was auto-derived from a lifecycle segment at export time (see [ADR-0005](adr/0005-rpti-data-manager-tab.md)).
+- `RptiDetail.deliverableSegmentId` (optional) → `DeliverableSegment.id` — canonical identity of the implementation represented by the stored filing row (see [ADR-0014](adr/0014-rpti-rows-belong-to-implementations.md)).
 - `LkptiDetail.targetId` → `Deliverable.id` — application-scoped only, unlike `RptiDetail`'s polymorphic target.
 - `Version.data` embeds a denormalized, point-in-time snapshot of every other store (assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails) — this is how backup/restore and version history are implemented. `data.decisions` is still written on save but is **never read back**: restoring preserves the live decision log instead, because the log is an audit trail about the workspace rather than workspace state (see [ADR-0011](adr/0011-history-tab-decisions-as-audit-trail.md)). `dtsPhases` is not included — it was dropped from `Version.data` when DTS was removed (see Migration Notes). The `versions` store itself is not part of the regular `getAppData`/`saveAppData` load-save cycle; it's managed separately via `saveVersion`/`getAllVersions`/`deleteVersion`.
 
@@ -321,6 +321,7 @@ Schema evolution is handled in the `upgrade()` callback of `openDB<ITMapDB>()` i
 - **v19:** Added the `lkptiDetails` store (no seeding) to support the LKPTI Format 3.2.6 Report — additive, no data migration needed. See `requirement-specs/lkpti-integration.md`.
 - **No version bump:** `Deliverable` gained a new optional `description` field, cascading into `LkptiDetail.functionDescription` at generation time — additive field on an existing store, no schema/index change. See [ADR-0008](adr/0008-deliverable-description-field.md).
 - **No version bump:** `DeliverableStatus` gained a new optional `isPreLaunchStatus` field, flipping RPTI generation's status classification from a deny-list to an allow-list — additive field on an existing store, no schema/index change. See [ADR-0009](adr/0009-rpti-status-allow-list.md).
+- **No version bump:** `DeliverableSegment` gained optional `capexAmount`, `opexAmount`, and `rptiRemarks` fields for implementation-grained RPTI rows, while `Initiative.deliverableId` was removed from the TypeScript model. Existing stores are schemaless and no key path or index changed; legacy orphan properties are ignored and existing initiative budgets are not migrated. See [ADR-0014](adr/0014-rpti-rows-belong-to-implementations.md).
 
 ## Source of Truth
 

@@ -525,4 +525,59 @@ describe('the fields ADR-0013 moved are visible in version history (#42)', () =>
     expect(modified, 'DeliverableSegment.rptiRemarks changed but produced no diff entry').toHaveLength(1);
     expect(modified[0].changes.join(' | ')).toContain('Deferred to phase two');
   });
+
+  it('reports a change to DeliverableSegment.capexAmount (T044)', () => {
+    const base = makeVersion({
+      assets: [{ id: 'asset-1', name: 'Core', categoryId: 'cat-1' }],
+      deliverables: [{ id: 'deliv-1', assetId: 'asset-1', name: 'App' }],
+      deliverableSegments: [{ id: 'seg-1', deliverableId: 'deliv-1', startDate: '2027-01-01',
+        endDate: '2031-12-31', status: 'appstatus-in-production', capexAmount: 1_000 }],
+    });
+    const current = {
+      ...base.data,
+      deliverableSegments: [{ ...base.data.deliverableSegments[0], capexAmount: 2_000 }],
+    };
+
+    const modified = computeDiff(base, current).deliverableSegments.modified;
+    expect(modified, 'DeliverableSegment.capexAmount changed but produced no diff entry').toHaveLength(1);
+    expect(modified[0].changes).toContain('RPTI CapEx: USD 1,000 → USD 2,000');
+  });
+
+  it('reports a change to DeliverableSegment.opexAmount (T044)', () => {
+    const base = makeVersion({
+      assets: [{ id: 'asset-1', name: 'Core', categoryId: 'cat-1' }],
+      deliverables: [{ id: 'deliv-1', assetId: 'asset-1', name: 'App' }],
+      deliverableSegments: [{ id: 'seg-1', deliverableId: 'deliv-1', startDate: '2027-01-01',
+        endDate: '2031-12-31', status: 'appstatus-in-production', opexAmount: 100 }],
+    });
+    const current = {
+      ...base.data,
+      deliverableSegments: [{ ...base.data.deliverableSegments[0], opexAmount: 250 }],
+    };
+
+    const modified = computeDiff(base, current).deliverableSegments.modified;
+    expect(modified, 'DeliverableSegment.opexAmount changed but produced no diff entry').toHaveLength(1);
+    expect(modified[0].changes).toContain('RPTI OpEx: USD 100 → USD 250');
+  });
+
+  it('reports a change to DeliverableSegment.initiativeId (T044)', () => {
+    const base = makeVersion({
+      assets: [{ id: 'asset-1', name: 'Core', categoryId: 'cat-1' }],
+      deliverables: [{ id: 'deliv-1', assetId: 'asset-1', name: 'App' }],
+      initiatives: [
+        { id: 'init-1', assetId: 'asset-1', name: 'Original initiative', programmeId: 'prog-1', capex: 0, opex: 0, startDate: '2027-01-01', endDate: '2027-12-31' },
+        { id: 'init-2', assetId: 'asset-1', name: 'Replacement initiative', programmeId: 'prog-1', capex: 0, opex: 0, startDate: '2027-01-01', endDate: '2027-12-31' },
+      ],
+      deliverableSegments: [{ id: 'seg-1', deliverableId: 'deliv-1', initiativeId: 'init-1',
+        startDate: '2027-01-01', endDate: '2031-12-31', status: 'appstatus-in-production' }],
+    });
+    const current = {
+      ...base.data,
+      deliverableSegments: [{ ...base.data.deliverableSegments[0], initiativeId: 'init-2' }],
+    };
+
+    const modified = computeDiff(base, current).deliverableSegments.modified;
+    expect(modified, 'DeliverableSegment.initiativeId changed but produced no diff entry').toHaveLength(1);
+    expect(modified[0].changes).toContain('Initiative: Original initiative → Replacement initiative');
+  });
 });

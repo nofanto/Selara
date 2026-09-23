@@ -17,7 +17,6 @@ Every initiative has the following fields. All are available in both the edit pa
 | Initiative CapEx | Portfolio capital expenditure for this initiative; separate from implementation-filed CapEx | CapEx label on bar, Budget Summary report |
 | Initiative OpEx | Portfolio operational expenditure for this initiative; separate from implementation-filed OpEx | OpEx label on bar, Budget Summary report |
 | Description | Free-text notes | Tooltip, mobile card rows |
-| Deliverable | The deliverable within the asset this work relates to | Metadata only |
 | Placeholder? | Marks the row as a stand-in for work not yet scoped | Dashed red outline on the bar; excluded from RPTI generation |
 | Resources | Team members assigned to this initiative | Names on bar when "Show Resources" toggle is on |
 

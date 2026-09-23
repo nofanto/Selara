@@ -34,8 +34,9 @@
 **All three clarifications answered on 2026-09-22.** They were recorded in the spec rather than as
 inline markers, because each changes what gets filed:
 
-- **Q1 (cost grain)** — **answered: cost on the implementation**, with the initiative's figure
-  derived. It reversed Q7, and in doing so reversed Q10 as well: the product owner confirmed that
+- **Q1 (cost grain)** — **answered: cost on the implementation**, while the initiative's figure
+  remains its own stored, editable portfolio budget and is never derived or filed. It reversed Q7,
+  and in doing so reversed Q10 as well: the product owner confirmed that
   one initiative may file for several applications. Both reversals keep Q7's original principle —
   "one piece of work, one budget" — and change only what counts as the piece of work.
 - **Q2 (what counts as one implementation)** — **answered: A**, a transition into production.
