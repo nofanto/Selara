@@ -275,9 +275,12 @@ export function InitiativePanel({ initiative, assets, deliverables = [], program
                                 id="status"
                                 data-testid="initiative-status"
                                 className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm bg-white"
-                                value={formData.status || 'planned'}
-                                onChange={(e) => setFormData({ ...formData, status: e.target.value as Initiative['status'] })}
+                                value={formData.status || ''}
+                                onChange={(e) => setFormData({ ...formData, status: (e.target.value || undefined) as Initiative['status'] })}
                             >
+                                {/* Pre-selecting Planned made Save write a status the preparer
+                                    never chose, for any initiative that had none. */}
+                                <option value="">— Not set —</option>
                                 <option value="planned">Planned</option>
                                 <option value="active">Active</option>
                                 <option value="done">Done</option>

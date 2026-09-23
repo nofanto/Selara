@@ -59,10 +59,16 @@ const normalizeResourceIds = (value: unknown): string[] | undefined => {
   return undefined;
 };
 
+// Absent stays absent, and a malformed value becomes absent rather than 'planned'.
+// The hardening this was written for is satisfied either way — the bad value does not
+// survive — but discarding it does not license inventing a different one in its place,
+// and this function WRITES what it returns. Coercing here turned a display default into
+// stored data: every status-less initiative acquired a claim nobody made, indistinguishable
+// from one a preparer chose. See requirement-specs/initiative-status-unset.md.
 const normalizeInitiativeStatus = (value: unknown): Initiative['status'] => {
   return value === 'planned' || value === 'active' || value === 'done' || value === 'cancelled'
     ? value
-    : 'planned';
+    : undefined;
 };
 
 const normalizeImportedInitiative = (init: any): Initiative => ({

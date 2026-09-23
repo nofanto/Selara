@@ -131,6 +131,32 @@ describe('the fields ADR-0013 moved survive the workspace round trip (contract 2
     }
   });
 
+  /**
+   * `status` is optional and neither importer sets it, so an unset status is the
+   * ordinary state of an imported workspace, not an edge case. The coercion that
+   * hardened this field against malformed values turned absence into a stored
+   * 'planned' as well — so exporting a workspace and importing it back gave every
+   * status-less initiative a claim about the work that nobody made. See
+   * requirement-specs/initiative-status-unset.md.
+   */
+  it('leaves an initiative with no status unset across the round trip', () => {
+    const wb = buildWorkbook({ ...emptyWorkspace, initiatives: [initiative] } as never);
+    const [back] = parseWorkbook(wb).initiatives as unknown as Record<string, unknown>[];
+    expect(initiative, 'guard: the fixture must actually lack a status')
+      .not.toHaveProperty('status');
+    expect(back?.status, 'an unset status came back as a stored value').toBeUndefined();
+  });
+
+  it('imports a malformed status as unset rather than as "planned"', () => {
+    const wb = buildWorkbook({
+      ...emptyWorkspace, initiatives: [{ ...initiative, status: 'in-flight' }],
+    } as never);
+    const [back] = parseWorkbook(wb).initiatives as unknown as Record<string, unknown>[];
+    // The value still must not survive — that is what the hardening was for — but
+    // discarding it does not license inventing a different one in its place.
+    expect(back?.status).toBeUndefined();
+  });
+
   it('carries implementation rptiRemarks distinctly from the Initiative description', () => {
     const wb = buildWorkbook({ ...emptyWorkspace, initiatives: [initiative], deliverableSegments: [implementation] } as never);
     const [backInitiative] = parseWorkbook(wb).initiatives as unknown as Record<string, unknown>[];
