@@ -252,9 +252,13 @@ each stored row is either matched or named.
   into production, with its own time, cost and commentary. Newly the unit an RPTI row corresponds
   to. Already present in the model as a lifecycle segment; this feature gives it the values a filed
   line needs.
-- **Initiative** — the piece of work that triggers implementations. Retains its single RPTI target,
-  its description, and its role as the thing a preparer plans. Loses its status as the unit a row
-  corresponds to.
+- **Initiative** — the piece of work that triggers implementations. Retains its `description`, which
+  still supplies `Deskripsi`, its own stored and editable CapEx/OpEx as a portfolio figure, and its
+  role as the thing a preparer plans. Loses its status as the unit a row corresponds to, its
+  `rptiRemarks`, its filing role for cost, and — with Q10 reversed and Q18 decided — its single RPTI
+  target: `deliverableId` is removed with its UI, and one initiative may file for several
+  applications. *(Corrected 2026-09-23: this entry read "Retains its single RPTI target", written
+  before Q10 was reversed and directly contradicting FR-008b and FR-029 in the same document.)*
 - **Application (Deliverable)** — the thing being implemented. Unchanged: it holds what describes
   the application, which is identical across every row targeting it.
 - **RPTI row** — one line of the filed plan. Now a projection of an implementation rather than of an
