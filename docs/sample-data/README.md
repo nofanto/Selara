@@ -6,7 +6,7 @@ filing from a real bank.
 | File | Format | Rows |
 |---|---|---|
 | `sample-lkpti-2026.xlsx` | LKPTI Format 3.2.6 (*Daftar Aplikasi*) | 13 applications |
-| `sample-rpti-2027.xlsx` | RPTI Format 3.1 (*Rencana*) | 13 planned items |
+| `sample-rpti-2027.xlsx` | RPTI Format 3.1 (*Rencana*) | 14 planned implementations |
 
 **Bank Nusantara Sejahtera is fictional**, as is every application name, vendor,
 owner and rupiah figure in these files. They are not derived from any real bank's
@@ -27,10 +27,17 @@ asks for each one rather than guessing.
 
 ## What you should see
 
-> **Import complete** — LKPTI 2026: 13 row(s) · RPTI 2027: 13 row(s). No rows were
+> **Import complete** — LKPTI 2026: 13 row(s) · RPTI 2027: 14 row(s). No rows were
 > skipped. 1 planned upgrade(s) reference an application not in your inventory.
 
-Then the data-health review, with **1 error and 25 warnings**.
+Then the data-health review, with **exactly one error** — the unmatched *Legacy Teller
+Application* row, described below — alongside warnings of two kinds: applications with
+no planned 2027 work, and imported initiatives with no owner yet.
+
+*The warning total is deliberately not quoted here. It is a function of the fixture and
+nothing asserts it, so it rotted twice: this line said 25 and the one further down said
+21, while a measurement in September 2026 gave 23. The error count is the number that
+matters, and it is pinned by tests.*
 
 ## Why these rows
 
@@ -41,8 +48,13 @@ something different:
   Gateway, Core Banking General Ledger, AML Transaction Monitoring. Matching is exact
   on name *and* category code, so these attach to the 2026 application rather than
   creating a second copy of it.
-- **3 wholly new applications** — Open API Banking Platform, Digital Onboarding
-  (eKYC), Syariah Financing Module. No 2026 counterpart, so they are created fresh.
+- **3 applications first introduced by the plan** — Open API Banking Platform,
+  Digital Onboarding (eKYC), Syariah Financing Module. No 2026 counterpart, so
+  they are created fresh.
+- **1 second implementation of an application already introduced in this return** —
+  Open API Banking Platform has a new Q1 build and a Q3 upgrade, with different
+  CapEx, OpEx and commentary. The pair exercises same-file matching and proves
+  that round-trip verification operates at implementation grain rather than name grain.
 - **4 new infrastructure items** — DRC relocation, server refresh, SD-WAN,
   firewall/SIEM. These carry RPTI codes `51`–`54`, which LKPTI does not have at all.
   An LKPTI-only workspace structurally cannot reach them, and that is the reason the
@@ -65,10 +77,10 @@ Three things that look odd but are intended:
   does not belong in an LKPTI yet. Mark its segment **In Production** once it really
   ships and it joins the inventory.
 
-- Most of the 21 warnings read *"has lifecycle segments, but none linked to an
-  Initiative — it can never generate an RPTI row."* That is correct: 9 of the 13
-  applications have no planned work in 2027, so they belong in the LKPTI and not in
-  the RPTI.
+- Most warnings read *"has lifecycle segments, but none linked to an Initiative — it
+  can never generate an RPTI row."* That is correct: 9 of the 13 applications have no
+  planned work in 2027, so they belong in the LKPTI and not in the RPTI. The rest note
+  that imported initiatives have no owner yet.
 - The unmatched *Legacy Teller Application* initiative is parked on an arbitrary
   existing asset. Its report row is deliberately left unresolvable — that is the
   finding — but the initiative itself is given a real asset so it does not dangle

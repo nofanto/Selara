@@ -92,9 +92,10 @@ year, compare field by field.
 
 **Expect zero losses.**
 
-The published sample holds 13 rows across 13 initiatives with one implementation each, so it cannot
-exercise this feature. Without a new fixture case, this level reports success while verifying
-nothing — the failure mode that let several defects reach review in the previous feature.
+The published sample now holds 14 rows and includes two Open API Banking Platform implementations
+in 2027: a new Q1 build and a Q3 upgrade with different costs and commentary. Before Phase 5 it held
+13 rows across 13 initiatives and this level could report success while verifying nothing — the
+failure mode that let several defects reach review in the previous feature.
 
 ## Level 9 — Stored history survives the grain change
 

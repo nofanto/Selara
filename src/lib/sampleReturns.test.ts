@@ -6,6 +6,7 @@ import { parseRptiImportWorkbook, deriveWorkspaceFromRptiImport } from './rptiIm
 import { projectRptiReturn, reconcileRptiReturn } from './rpti';
 import { generateLkptiDetails } from './lkpti';
 import { mergeDeliverableStatuses } from './deliverableStatusDefaults';
+import { computeDataHealth } from './dataHealth';
 
 const load = (n: string) => XLSX.read(readFileSync(new URL(`../../docs/sample-data/${n}`, import.meta.url)), { type: 'buffer' });
 
@@ -26,7 +27,7 @@ describe('the published sample returns', () => {
   it('RPTI parses with nothing skipped', () => {
     const { rows, skipped } = parseRptiImportWorkbook(load('sample-rpti-2027.xlsx'));
     expect(skipped).toEqual([]);
-    expect(rows).toHaveLength(13);
+    expect(rows).toHaveLength(14);
   });
 
   it('RPTI carries both applications and infrastructure', () => {
@@ -134,6 +135,47 @@ describe('the published sample returns', () => {
     expect(regenerated.some(r => r.targetId === replacementTargetId),
       'and the next generation must actually produce the row').toBe(true);
   });
+
+  it('keeps reconciliation, target health and generated row counts stable for the extended import', () => {
+    const inv = deriveWorkspaceFromLkptiImport(parseLkptiImportWorkbook(load('sample-lkpti-2026.xlsx')).rows, 2026);
+    const out = deriveWorkspaceFromRptiImport(parseRptiImportWorkbook(load('sample-rpti-2027.xlsx')).rows, 2027, {
+      deliverables: inv.deliverables, assets: inv.assets, assetCategories: inv.assetCategories,
+      deliverableSegments: inv.deliverableSegments, deliverableStatuses: inv.deliverableStatuses,
+    });
+    const workspace = {
+      deliverables: [
+        ...inv.deliverables.map(d => out.updatedDeliverables.find(u => u.id === d.id) ?? d),
+        ...out.deliverables,
+      ],
+      assets: [...inv.assets, ...out.assets],
+      assetCategories: [...inv.assetCategories, ...out.assetCategories],
+      deliverableSegments: [...inv.deliverableSegments, ...out.deliverableSegments],
+      deliverableStatuses: mergeDeliverableStatuses(inv.deliverableStatuses, out.deliverableStatuses),
+      initiatives: out.initiatives,
+    };
+    const reconciliation = reconcileRptiReturn({ ...workspace, storedDetails: out.rptiDetails });
+    const health = computeDataHealth({
+      ...workspace,
+      programmes: out.programmes,
+      milestones: [], dependencies: [], decisions: [], resources: [], strategies: [],
+      rptiDetails: out.rptiDetails,
+      lkptiDetails: inv.lkptiDetails,
+      timelineSettings: { defaultCurrency: 'IDR' },
+    });
+    const metrics = {
+      reconciliationFindings: reconciliation.length,
+      multiTargetErrors: health.filter(issue => issue.id.startsWith('initiative-rpti-multi-target:')).length,
+      noTargetErrors: health.filter(issue => issue.id.startsWith('initiative-rpti-no-target:')).length,
+      generatedRows: projectRptiReturn(workspace, 2027).length,
+    };
+
+    expect(metrics).toEqual({
+      reconciliationFindings: 1,
+      multiTargetErrors: 0,
+      noTargetErrors: 0,
+      generatedRows: 13,
+    });
+  });
 });
 
 describe('a planned enhancement to an application the bank already runs', () => {
@@ -220,13 +262,14 @@ describe('a planned enhancement to an application the bank already runs', () => 
       initiatives: w.out.initiatives, deliverables: w.deliverables,
       assets: w.assets, assetCategories: w.assetCategories,
     }, 2027);
-    for (const [name, type] of [
-      ['Open API Banking Platform', 'new'], ['Payment Gateway', 'upgrade'],
+    for (const [name, types] of [
+      ['Open API Banking Platform', ['new', 'upgrade']], ['Payment Gateway', ['upgrade']],
     ] as const) {
       const target = w.deliverables.find(deliverable => deliverable.name === name)!;
-      expect(w.out.rptiDetails.find(row => row.targetId === target.id)?.developmentType).toBe(type);
+      expect(w.out.rptiDetails.filter(row => row.targetId === target.id).map(row => row.developmentType), name)
+        .toEqual(types);
       expect(regen.filter(row => row.targetId === target.id).map(row => row.developmentType), name)
-        .toEqual([type]);
+        .toEqual(types);
     }
   });
 

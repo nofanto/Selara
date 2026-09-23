@@ -55,9 +55,10 @@ must be removed, target inference loses its purpose, and reconciliation's canoni
 
 **Two risks worth carrying into planning**, both learned from the previous feature:
 
-1. **The published sample cannot exercise this feature** — 13 rows across 13 initiatives, one
-   implementation each. FR-018 exists because a fixture that pre-satisfies the condition under test
-   is how several defects reached review in 002.
+1. **The published sample could not exercise this feature before Phase 5** — it held 13 rows across
+   13 initiatives, one implementation each. It now holds 14 rows, including two implementations of
+   Open API Banking Platform. FR-018 exists because a fixture that pre-satisfies the condition under
+   test is how several defects reached review in 002.
 2. **Q1 option A reintroduces a two-source value**, which is the exact shape of the silent-overwrite
    defect found in 002 (a stored figure beating a newer canonical edit on every reload). If A is
    chosen, the precedence rule needs a test that fails when the precedence is reversed.

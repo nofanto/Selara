@@ -268,7 +268,12 @@ export function deriveWorkspaceFromRptiImport(
     let targetId: string | undefined;
     let initiativeAssetId = '';
     if (row.developmentType === 'upgrade') {
-      const matches = existing.deliverables.filter(
+      // A later row in this same return may upgrade an application an earlier
+      // row created. Identical name and category within one filed return are
+      // already explicit identity evidence; no cross-return naming judgement is
+      // involved. Only look backward through `deliverables`, which contains the
+      // entries created so far in this import.
+      const matches = [...existing.deliverables, ...deliverables].filter(
         d => d.name.trim().toLowerCase() === row.name.trim().toLowerCase()
           && d.categoryCode === row.categoryCode,
       );
@@ -370,17 +375,20 @@ export function deriveWorkspaceFromRptiImport(
       });
     } else if (hasEntry) {
       // A synthetic, unlinked prior-live segment is added only when the target has none of its
-      // own. It exists to keep the filed `upgrade` from regenerating as `new`, which
-      // hasPriorLiveSegment decides from a live segment starting before the report
-      // year. A target that came from an LKPTI import already has one, running from
-      // its go-live date, so no synthetic history is needed. The filed quarter
-      // itself is always a live start, for both new and upgrade rows.
-      const targetAlreadyLiveBeforeYear = (existing.deliverableSegments ?? []).some(seg =>
+      // own. It exists to keep the filed `upgrade` from regenerating as `new`.
+      // History includes both the incoming workspace and rows already processed in
+      // this import, and is compared with this implementation's date (contract 2b),
+      // not the report-year boundary. The filed quarter itself is always a live
+      // start, for both new and upgrade rows.
+      const targetAlreadyLiveBeforeImplementation = [
+        ...(existing.deliverableSegments ?? []),
+        ...deliverableSegments,
+      ].some(seg =>
         seg.deliverableId === targetId
-        && seg.startDate < `${reportYear}-01-01`
+        && seg.startDate < qStart
         && isLiveStatusId(seg.status, existing.deliverableStatuses ?? []),
       );
-      if (row.developmentType === 'upgrade' && !targetAlreadyLiveBeforeYear) {
+      if (row.developmentType === 'upgrade' && !targetAlreadyLiveBeforeImplementation) {
         deliverableSegments.push({
           id: `rpti-import-seg-prior-${n}`, deliverableId: targetId,
           // Ends in the prior year, not on 1 January of this one: it records that
@@ -410,16 +418,6 @@ export function deriveWorkspaceFromRptiImport(
       name: row.name,
       programmeId: RPTI_IMPORT_PROGRAMME_ID,
       assetId: initiativeAssetId,
-      // The importer knows exactly which deliverable this row is about — it either
-      // matched it or just created it — so the initiative records it rather than
-      // naming only the asset. It matters most for a matched upgrade, where the
-      // asset can hold several deliverables and the initiative works on one.
-      //
-      // Only when the row resolved. An unresolved row's targetId points at nothing,
-      // and computeDataHealth raises `initiative-deliverable` as an error for a
-      // deliverableId that does not resolve (dataHealth.ts:164) — that row already
-      // has its one finding, and this must not add a second for the same problem.
-      deliverableId: hasEntry ? targetId : undefined,
       startDate: `${reportYear}-01-01`,
       endDate: qEnd,
       capex: row.capexAmount ?? 0,

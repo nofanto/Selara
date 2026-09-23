@@ -79,6 +79,7 @@ const RPTI_ROWS = [
 
   // New applications — no 2026 counterpart, so these are created fresh.
   ['Open API Banking Platform', 'Developer portal and partner API gateway for embedded finance.', 'Digital services', 'new', 'inhouse', 'n/a', JKT, SBY, 'Q1', 8800000000, 1500000000, 'SNAP-compliant open banking initiative.'],
+  ['Open API Banking Platform', 'Scale partner API capacity and add consent-management controls.', 'Digital services', 'upgrade', 'inhouse', 'n/a', JKT, SBY, 'Q3', 3600000000, 720000000, 'Partner API phase 2 capacity upgrade.'],
   ['Digital Onboarding (eKYC)', 'Remote account opening with liveness and Dukcapil verification.', 'Customer management', 'new', 'PPJTI', 'no', JKT, SBY, 'Q2', 5400000000, 980000000, ''],
   ['Syariah Financing Module', 'Murabahah and musyarakah financing administration.', 'Credit / financing', 'new', 'PPJTI', 'no', JKT, SBY, 'Q4', 9700000000, 1100000000, 'Supports the planned syariah business unit.'],
 

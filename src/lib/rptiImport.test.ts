@@ -8,6 +8,7 @@ import {
   RPTI_IMPORT_LIVE_STATUS_ID,
 } from './rptiImport';
 import { RPTI_CATEGORY_LABELS, projectRptiReturn, openEndedDate } from './rpti';
+import { generateLkptiDetails } from './lkpti';
 import type { Asset, AssetCategory, Deliverable, DeliverableSegment } from '../types';
 import { SEEDED_DELIVERABLE_STATUSES } from './deliverableStatusDefaults';
 
@@ -220,6 +221,45 @@ describe('deriveWorkspaceFromRptiImport — placement', () => {
     expect(out.deliverableSegments.length).toBeGreaterThan(0); // guard against a vacuous every()
     expect(out.deliverableSegments.find(s => s.startDate.startsWith('2027'))?.initiativeId).toBe(out.initiatives[0].id);
     expect(out.deliverableSegments.find(s => s.startDate.startsWith('2026'))?.initiativeId).toBeUndefined();
+  });
+
+  it('matches an upgrade to the exact application created earlier in the same return', () => {
+    const { rows } = parseRptiImportWorkbook(wb([
+      row({ name: 'Open API Banking Platform', jenis: 'new', kategori: RPTI_CATEGORY_LABELS['06'], quarter: 'Q1' }),
+      row({ no: 2, name: 'Open API Banking Platform', jenis: 'upgrade', kategori: RPTI_CATEGORY_LABELS['06'], quarter: 'Q3' }),
+    ]));
+    const out = deriveWorkspaceFromRptiImport(rows, 2027, EMPTY);
+
+    expect(out.unresolved).toEqual([]);
+    expect(out.deliverables).toHaveLength(1);
+    expect(out.rptiDetails.map(detail => detail.targetId)).toEqual([
+      out.deliverables[0].id,
+      out.deliverables[0].id,
+    ]);
+  });
+
+  it('uses an earlier row in the same return as live history without inventing prior-year history', () => {
+    const { rows } = parseRptiImportWorkbook(wb([
+      row({ name: 'Open API Banking Platform', jenis: 'new', kategori: RPTI_CATEGORY_LABELS['06'], quarter: 'Q1' }),
+      row({ no: 2, name: 'Open API Banking Platform', jenis: 'upgrade', kategori: RPTI_CATEGORY_LABELS['06'], quarter: 'Q3' }),
+    ]));
+    const out = deriveWorkspaceFromRptiImport(rows, 2027, EMPTY);
+    const target = out.deliverables[0];
+    const context = {
+      initiatives: out.initiatives,
+      deliverables: out.deliverables,
+      assets: out.assets,
+      assetCategories: out.assetCategories,
+      deliverableSegments: out.deliverableSegments,
+      deliverableStatuses: out.deliverableStatuses,
+    };
+
+    expect(generateLkptiDetails({ ...context, asAtDate: '2026-12-31' } as never))
+      .toEqual([]);
+    expect(out.deliverableSegments.filter(segment => segment.deliverableId === target.id)
+      .map(segment => segment.startDate)).toEqual(['2027-01-01', '2027-07-01']);
+    expect(projectRptiReturn(context, 2027).map(detail => detail.developmentType))
+      .toEqual(['new', 'upgrade']);
   });
 
   it('seeds both the initiative budget and filed implementation with each row cost (T028a)', () => {
@@ -447,16 +487,13 @@ describe('an upgrade to infrastructure the LKPTI cannot contain', () => {
   });
 });
 
-describe('an imported initiative names the deliverable it works on', () => {
-  /**
-   * The initiative used to carry only an assetId, so opening it showed no
-   * deliverable even though the importer knew precisely which one the row matched
-   * or created. An asset can hold several deliverables, so naming the asset alone
-   * loses which one the plan is about.
-   */
+describe('an imported initiative leaves its legacy filing target unset', () => {
+  // A segment names the application its own implementation targets. The importer
+  // therefore preserves only the initiative's real asset relationship; it does not
+  // repopulate the legacy single-target field that Phase 6 removes.
   const parse = (over = {}) => parseRptiImportWorkbook(wb([row(over)])).rows;
 
-  it('links a matched upgrade to the deliverable it attached to', () => {
+  it('does not set the legacy target for a matched upgrade', () => {
     const inventory = {
       deliverables: [{ id: 'd-1', assetId: 'a-1', name: 'Core Banking GL', type: 'application', categoryCode: '04' } as Deliverable],
       assets: [{ id: 'a-1', name: 'Core Banking GL', categoryId: 'c-1' } as Asset],
@@ -464,13 +501,14 @@ describe('an imported initiative names the deliverable it works on', () => {
     };
     const out = deriveWorkspaceFromRptiImport(parse({ jenis: 'upgrade' }), 2027, inventory);
     expect(out.unresolved).toEqual([]); // guard
-    expect(out.initiatives[0].deliverableId).toBe('d-1');
+    expect(out.initiatives[0].deliverableId).toBeUndefined();
     expect(out.initiatives[0].assetId).toBe('a-1');
   });
 
-  it('links a created row to the deliverable it created', () => {
+  it('does not set the legacy target for a created row', () => {
     const out = deriveWorkspaceFromRptiImport(parse({ jenis: 'new' }), 2027, EMPTY);
-    expect(out.initiatives[0].deliverableId).toBe(out.deliverables[0].id);
+    expect(out.deliverables).toHaveLength(1); // guard: the row was created normally
+    expect(out.initiatives[0].deliverableId).toBeUndefined();
   });
 
   it('leaves it unset for an unresolved row, which has no deliverable to name', () => {
@@ -481,17 +519,14 @@ describe('an imported initiative names the deliverable it works on', () => {
     expect(out.initiatives[0].deliverableId).toBeUndefined();
   });
 
-  it('never points an initiative at a deliverable the result does not contain', () => {
+  it('leaves the legacy target unset across resolved and unresolved row shapes', () => {
     const { rows } = parseRptiImportWorkbook(wb([
       row({ name: 'A', jenis: 'new' }),
       row({ no: 2, name: 'B', jenis: 'upgrade' }),
       row({ no: 3, name: 'C', jenis: 'new', kategori: RPTI_CATEGORY_LABELS['52'] }),
     ]));
     const out = deriveWorkspaceFromRptiImport(rows, 2027, EMPTY);
-    const ids = new Set(out.deliverables.map(d => d.id));
-    for (const i of out.initiatives) {
-      if (i.deliverableId) expect(ids.has(i.deliverableId), i.name).toBe(true);
-    }
+    expect(out.initiatives.map(i => i.deliverableId)).toEqual([undefined, undefined, undefined]);
   });
 });
 

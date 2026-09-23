@@ -218,8 +218,11 @@ different initiative currently changes the filing invisibly.
 
 ## R10 — The fixture cannot exercise this feature
 
-**Measured**: the published sample RPTI holds 13 rows across 13 initiatives, one implementation
-each, and no duplicated application name.
+**Measured before Phase 5**: the published sample RPTI held 13 rows across 13 initiatives, one
+implementation each, and no duplicated application name.
+
+**Phase 5 result**: the published sample now holds 14 rows. Open API Banking Platform appears as
+a new Q1 implementation and a distinct Q3 upgrade, with different cost and commentary values.
 
 **Decision**: the round-trip fixture gains a multi-implementation case before implementation
 begins, not after.
