@@ -186,32 +186,12 @@ each stored row is either matched or named.
   Initiatives tab, its dangling-reference check and the importer. A segment names its own
   application, so nothing infers a filing target; every remaining use of the field was a filing use
   and dies with the single-target rule.
-- **FR-019b** *(added 2026-09-23, during Phase 5)*: An imported `upgrade` row whose application was
-  created by an **earlier row of the same return** MUST attach to it rather than be reported
-  unresolved. The match uses the existing rule unchanged — exact on name and exact on category — and
-  only widens **where** it looks, never **how** it compares; a row may attach only to something
-  created above it, never below.
-
-  FR-019 defers an unmatched upgrade because the two *returns* are known to disagree on naming, so a
-  non-match is a judgement a person should make. That argument does not reach inside a single file:
-  when one return uses the identical name and category in two of its own rows, the preparer has
-  already said they are the same application, and there is no judgement to surface. Deferring it
-  raises a false finding on a well-formed return and makes FR-002 and contract 23 — a return with
-  two rows for one application reproduces both — unsatisfiable by construction.
-
-  Cross-return matching is untouched: an upgrade naming an application absent from both the
-  inventory and the return itself stays unresolved.
-- **FR-019c** *(added 2026-09-23, during Phase 5)*: The synthetic prior-live phase that preserves an
-  imported `upgrade`'s development type MUST NOT be added when an earlier implementation **in the
-  same import** already precedes it. It exists to supply history the workspace lacks; where the
-  return itself supplies that history, adding it invents evidence and dates an application's
-  existence to before the year the plan says it is first built.
 - **FR-008c**: The repair path that currently runs through `Initiative.deliverableId` MUST be
   rebuilt around the segment's own application **before** the field is removed. A stored row whose
   deliverable was deleted is repaired today by selecting the replacement on the initiative;
   afterwards it is repaired by correcting the segment. Removing the field first would delete a
   repair route before its replacement exists, and every message naming that route MUST be corrected
-  with it (FR-025's standard).
+  with it (002's FR-025 standard).
 - **FR-008d**: The data-health finding that reports a declared target carrying no qualifying work
   MUST be removed. With no declared target the situation cannot arise, and a check for an impossible
   state is noise.
@@ -265,6 +245,32 @@ each stored row is either matched or named.
 - **FR-018**: The round-trip verification fixture MUST contain a multi-implementation case. The
   published sample holds one implementation per initiative and therefore cannot exercise this
   feature at all; without a new case the change ships unverified.
+- **FR-018a** *(added 2026-09-23 during Phase 5; renumbered 2026-09-24)*: An imported `upgrade` row
+  whose application was created by an **earlier row of the same return** MUST attach to it rather than be reported
+  unresolved. The match uses the existing rule unchanged — exact on name and exact on category — and
+  only widens **where** it looks, never **how** it compares; a row may attach only to something
+  created above it, never below.
+
+  **002's FR-019** defers an unmatched upgrade because the two *returns* are known to disagree on naming, so a
+  non-match is a judgement a person should make. That argument does not reach inside a single file:
+  when one return uses the identical name and category in two of its own rows, the preparer has
+  already said they are the same application, and there is no judgement to surface. Deferring it
+  raises a false finding on a well-formed return and makes FR-002 and contract 23 — a return with
+  two rows for one application reproduces both — unsatisfiable by construction.
+
+  Cross-return matching is untouched: an upgrade naming an application absent from both the
+  inventory and the return itself stays unresolved.
+- **FR-018b** *(added 2026-09-23 during Phase 5; renumbered 2026-09-24)*: The synthetic prior-live
+  phase that preserves an imported `upgrade`'s development type MUST NOT be added when an earlier implementation **in the
+  same import** already precedes it. It exists to supply history the workspace lacks; where the
+  return itself supplies that history, adding it invents evidence and dates an application's
+  existence to before the year the plan says it is first built.
+
+  *These were first written as FR-019b and FR-019c, sitting between FR-008b and FR-008c. Both halves
+  of that were wrong: the placement broke the sequence, and the parent FR-019 belongs to spec 002,
+  so a reader of this document could not find it. They narrow 002's rule from inside the import
+  cluster this spec already owns, which is where FR-018 sits.*
+
 
 ### Key Entities *(include if feature involves data)*
 

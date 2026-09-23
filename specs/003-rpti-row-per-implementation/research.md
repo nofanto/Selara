@@ -114,7 +114,7 @@ set changes grain while reconciliation matches at the old one, a stored row that
 would be reported as missing, and two stored rows for one application would stop conflicting when
 they should.
 
-**What does not change**: matching is by **identity, never by contents** (Q12, and FR-027 as
+**What does not change**: matching is by **identity, never by contents** (Q12, and 002's FR-027 as
 narrowed). Field drift between a stored row and its regeneration remains deliberately unreported.
 
 ---

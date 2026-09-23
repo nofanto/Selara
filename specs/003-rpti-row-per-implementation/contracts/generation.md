@@ -80,7 +80,7 @@ below supersedes one explicitly.
 14. **Canonical identity is the implementation.** Matching moves from `(initiative, target)` to the
     implementation. `RptiDetail.deliverableSegmentId` is the natural anchor where present.
 15. **Identity, never contents.** Field drift between a stored row and its regeneration remains
-    unreported (Q12, FR-027 as narrowed). Unchanged by this feature, and restated because a grain
+    unreported (Q12, 002's FR-027 as narrowed). Unchanged by this feature, and restated because a grain
     change is where it would be tempting to start comparing values.
 16. **One-to-one accounting holds at the new grain.** Two stored rows matching one implementation,
     or one stored row matching several, is an `identity-conflict`. **Supersedes contract 23's**
@@ -98,7 +98,7 @@ below supersedes one explicitly.
     false, in the same commit. It warns that a second implementation will be dropped; once filed,
     it is untrue.
 21. **A finding still names a repair that clears it**, and the screen the repair happens on. The
-    FR-025 standard is unchanged, and cost entry moving to the segment panel means messages naming
+    002's FR-025 standard is unchanged, and cost entry moving to the segment panel means messages naming
     the Initiatives tab for a cost must be found and corrected.
 
 ## Import and round trip
