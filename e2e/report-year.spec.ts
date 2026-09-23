@@ -75,6 +75,7 @@ test.describe('Report year', () => {
   test('following the named asset-target repair clears the finding and enables export', async ({ page }) => {
     await seedReportRecords(page, {
       ...reportFixture,
+      initiatives: [{ ...reportFixture.initiatives[0], deliverableId: undefined }],
       deliverableSegments: [],
       rptiDetails: [{
         id: 'legacy-asset-target', initiativeId: 'filing-initiative',
@@ -83,23 +84,12 @@ test.describe('Report year', () => {
     }, ['assets', 'assetCategories', 'programmes', 'initiatives', 'deliverables', 'deliverableSegments', 'rptiDetails']);
 
     await generateReport(page, 'rpti', '2026');
-    await expect(page.getByTestId('rpti-pre-export-gate')).toContainText(/Initiatives tab.*timeline/i);
+    await expect(page.getByTestId('rpti-pre-export-gate')).toContainText(/segment panel/i);
+    await expect(page.getByTestId('rpti-pre-export-gate')).toContainText(/timeline/i);
     await expect(page.getByTestId('rpti-report-export-btn')).toHaveCount(0);
 
-    // Follow every outstanding step the gate names. The Deliverable already exists
-    // under the Asset, so select it as the Initiative's target first.
-    await page.getByTestId('nav-data-manager').click();
-    await page.getByTestId('data-manager-tab-initiatives').click();
-    const row = page.locator('tbody tr[data-real="true"]').filter({ has: page.locator('input[value="Filing Initiative"]') });
-    await row.locator('td[data-key="deliverableId"] select').selectOption('filing-deliverable');
-
-    // Target selection alone must not clear the finding: the canonical pair still
-    // has no qualifying lifecycle segment. The progressive message names only the
-    // remaining timeline step rather than repeating completed work.
-    await generateReport(page, 'rpti', '2026');
-    await expect(page.getByTestId('rpti-pre-export-gate')).toContainText(/remaining step.*timeline.*lifecycle segment/i);
-    await expect(page.getByTestId('rpti-report-export-btn')).toHaveCount(0);
-
+    // The replacement route is now entirely on the lifecycle segment: the segment
+    // panel records both the application and the initiative it implements.
     await page.getByTestId('nav-visualiser').click();
     await page.getByTestId('timeline-start-input').fill('2026-01-01');
     await page.getByTestId('timeline-start-input').press('Enter');
@@ -236,31 +226,35 @@ test.describe('Report year', () => {
       .toBeUndefined();
   });
 
-  test('blocks an ambiguous initiative before export and permits filing after target repair', async ({ page }) => {
+  /**
+   * Restores the guarantee that "names a missing target even when no stored RPTI row
+   * exists" used to pin. That test was deleted with initiative-rpti-no-target in
+   * Phase 6, but the state it guarded did not go away: a live implementation whose
+   * application has been deleted still projects a row naming a Deliverable that is
+   * not there. Data Health reported it throughout as segment-deliverable; the gate
+   * could not see it, so the return was exportable. Detected is not blocked.
+   */
+  test('blocks export when a live implementation names a Deliverable that no longer exists', async ({ page }) => {
+    await seedReportRecords(page, { ...reportFixture, deliverables: [], rptiDetails: [] },
+      ['initiatives', 'deliverables', 'deliverableSegments', 'rptiDetails']);
+    await generateReport(page, 'rpti');
+    await expect(page.getByTestId('rpti-pre-export-gate')).toContainText(/no longer exists/i);
+    await expect(page.getByTestId('rpti-pre-export-gate')).toContainText(/segment panel|timeline/i);
+    await expect(page.getByTestId('rpti-report-export-btn')).toHaveCount(0);
+  });
+
+  test('allows one initiative to file several segment-owned targets', async ({ page }) => {
     await seedReportRecords(page, { ...reportFixture,
       deliverables: [...reportFixture.deliverables, { ...reportFixture.deliverables[0], id: 'second-target', name: 'Second Application' }],
       deliverableSegments: [...reportFixture.deliverableSegments, { ...reportFixture.deliverableSegments[0], id: 'second-segment', deliverableId: 'second-target' }],
-    }, ['initiatives', 'deliverableSegments', 'rptiDetails']);
-    await generateReport(page, 'rpti');
-    await expect(page.getByTestId('rpti-pre-export-gate')).toContainText('Filing Initiative');
-    await expect(page.getByTestId('rpti-pre-export-gate')).toContainText(/split/i);
-    await expect(page.getByTestId('rpti-report-export-btn')).toHaveCount(0);
-
-    await page.getByTestId('nav-data-manager').click();
-    await page.getByTestId('data-manager-tab-initiatives').click();
-    const row = page.locator('tbody tr[data-real="true"]').filter({ has: page.locator('input[value="Filing Initiative"]') });
-    await row.locator('td[data-key="deliverableId"] select').selectOption('filing-deliverable');
+    }, ['initiatives', 'deliverables', 'deliverableSegments', 'rptiDetails']);
     await generateReport(page, 'rpti');
     await expect(page.getByTestId('rpti-pre-export-gate')).toHaveCount(0);
-    await expect(page.getByTestId('rpti-detail-table')).toContainText('Filing Application');
+    const rows = page.getByTestId('rpti-detail-table').locator('tbody tr');
+    await expect(rows).toHaveCount(2);
+    await expect(rows.nth(0)).toContainText('Filing Application');
+    await expect(rows.nth(1)).toContainText('Second Application');
     await expect(page.getByTestId('rpti-report-export-btn')).toBeVisible();
-  });
-
-  test('names a missing target even when no stored RPTI row exists', async ({ page }) => {
-    await seedReportRecords(page, { ...reportFixture, deliverables: [] }, ['initiatives', 'deliverables', 'deliverableSegments', 'rptiDetails']);
-    await generateReport(page, 'rpti');
-    await expect(page.getByTestId('rpti-pre-export-gate')).toContainText(/select.*Deliverable/);
-    await expect(page.getByTestId('rpti-report-export-btn')).toHaveCount(0);
   });
 
   test('shows every stored field of an unresolved imported row', async ({ page }) => {

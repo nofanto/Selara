@@ -31,7 +31,7 @@ initiative Description still supplies RPTI `Deskripsi`.
 That is the only place to change them, and it is deliberate: a generated filing is built from your
 applications, initiatives, and lifecycle segments, so a value recorded there cannot be lost when a report is regenerated.
 
-The RPTI and LKPTI tabs are read-only views of stored report rows. They show target names and all stored report fields, including unresolved imports. Generate a filing for a selected year from **Reports**. Choose an initiative’s **Deliverable** on the Initiatives tab; leaving it blank allows inference only when all its lifecycle segments name one existing Deliverable.
+The RPTI and LKPTI tabs are read-only views of stored report rows. They show target names and all stored report fields, including unresolved imports. Generate a filing for a selected year from **Reports**. An RPTI implementation takes its Deliverable directly from its lifecycle segment; edit that association in the segment panel on the **Visualiser timeline**.
 
 Each tab shows a row count badge. All tabs are reachable without horizontal scrolling on tablet and narrow viewports.
 

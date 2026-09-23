@@ -8,9 +8,9 @@ Each live phase linked to an initiative contributes one generated row for its ow
 
 The initiative's CapEx and OpEx remain separate, editable portfolio figures used by the timeline, mobile cards, and Budget report. They do not feed the RPTI filing. Data Health shows a warning when the initiative budget and the total of its implementations differ; this is a review prompt, not an export blocker, because the two figures may legitimately diverge.
 
-The live segment supplies the row's target. The **Deliverable** column in **Data Manager → Initiatives** remains available for declaring the initiative's target where one is known.
+The live segment supplies the row's target. There is no initiative-level filing target: choose the Deliverable on each implementation's lifecycle segment instead.
 
-If a stored row's target is missing, create or repair the Deliverable on **Data Manager → Deliverables**, select it in the Initiative's **Deliverable** column on **Data Manager → Initiatives**, and add a live segment linking the pair on the **Visualiser timeline**. These errors are shown before export, even when there is no stored RPTI row.
+If a stored row's target is missing, create or repair the Deliverable on **Data Manager → Deliverables**, then open the implementation's lifecycle segment panel on the **Visualiser timeline** and select that Deliverable together with its Initiative. These errors are shown before export, even when there is no stored RPTI row.
 
 ## Generated values
 

@@ -14,10 +14,14 @@ const statuses: DeliverableStatus[] = [
 
 function makeInitiative(overrides: Partial<Initiative> = {}): Initiative {
   return {
-    id: 'init-1', name: 'Test Initiative', programmeId: 'prog-1', assetId: 'asset-1', deliverableId: 'deliv-1',
+    id: 'init-1', name: 'Test Initiative', programmeId: 'prog-1', assetId: 'asset-1',
     startDate: '2026-01-01', endDate: '2026-12-31', capex: 1000, opex: 100,
     ...overrides,
   };
+}
+
+function withLegacyDeclaredTarget(initiative: Initiative, deliverableId: string): Initiative {
+  return { ...initiative, deliverableId } as unknown as Initiative;
 }
 
 function makeSegment(overrides: Partial<DeliverableSegment> = {}): DeliverableSegment {
@@ -66,15 +70,15 @@ describe('projectRptiReturn', () => {
     expect(new Set(rows.map(row => row.initiativeId)).size).toBe(rows.length);
   });
 
-  it.each(['application', 'infrastructure'] as const)('infers an undeclared single %s target', type => {
-    const rows = projectRptiReturn(makeContext({ initiatives: [makeInitiative({ deliverableId: undefined })],
+  it.each(['application', 'infrastructure'] as const)('files a segment-owned single %s target', type => {
+    const rows = projectRptiReturn(makeContext({ initiatives: [makeInitiative()],
       deliverables: [makeDeliverable({ type })], deliverableSegments: [makeSegment()] }), 2026);
     expect(rows).toHaveLength(1);
     expect(rows[0].targetId).toBe('deliv-1');
   });
 
   it('files each segment target in its own implementation year', () => {
-    const context = makeContext({ initiatives: [makeInitiative({ deliverableId: undefined })],
+    const context = makeContext({ initiatives: [makeInitiative()],
       deliverables: [makeDeliverable(), makeDeliverable({ id: 'deliv-2' })],
       deliverableSegments: [makeSegment(), makeSegment({ id: 'later', deliverableId: 'deliv-2', startDate: '2027-01-01', endDate: '2027-12-31' })] });
     expect(projectRptiReturn(context, 2026).map(row => row.targetId)).toEqual(['deliv-1']);
@@ -244,8 +248,8 @@ describe('projectRptiReturn', () => {
       makeSegment({ id: 'seg-c', deliverableId: 'deliv-a', initiativeId: 'init-2' }),
     ];
     const initiatives = [
-      makeInitiative({ id: 'init-1', deliverableId: 'deliv-a' }),
-      makeInitiative({ id: 'init-2', deliverableId: 'deliv-a' }),
+      makeInitiative({ id: 'init-1' }),
+      makeInitiative({ id: 'init-2' }),
     ];
     const rows = projectRptiReturn(makeContext({ deliverableSegments: segments, initiatives }), 2026);
 
@@ -383,8 +387,8 @@ describe('RPTI implementation-grain filing (003, Phase 3)', () => {
 
   it('preserves every filed value and row order for ordinary single-implementation initiatives (T011)', () => {
     const initiatives = [
-      makeInitiative({ id: 'init-b', deliverableId: 'deliv-b', description: 'Build B', capex: 202, opex: 22 }),
-      makeInitiative({ id: 'init-a', deliverableId: 'deliv-a', description: 'Build A', capex: 101, opex: 11 }),
+      makeInitiative({ id: 'init-b', description: 'Build B', capex: 202, opex: 22 }),
+      makeInitiative({ id: 'init-a', description: 'Build A', capex: 101, opex: 11 }),
     ];
     const deliverables = [
       makeDeliverable({ id: 'deliv-b', name: 'Application B', categoryCode: '05', developer: 'Vendor B',
@@ -696,15 +700,81 @@ describe('reconcileRptiReturn — stored rows are reconciliation evidence, never
     developmentType: 'new', ...overrides,
   });
   const segment = (overrides: Partial<DeliverableSegment> = {}) => makeSegment({
-    id: 'seg-live-2027', status: 'appstatus-planned',
+    id: 'seg-live-2027', status: 'appstatus-in-production',
     startDate: '2027-02-01', endDate: '2027-03-31', ...overrides,
   });
   const ctx = (storedDetails: RptiDetail[], segments: DeliverableSegment[]) => ({
     storedDetails,
-    initiatives: [makeInitiative({ deliverableId: undefined })],
+    initiatives: [makeInitiative()],
     deliverables: [makeDeliverable()],
     deliverableSegments: segments,
     deliverableStatuses: statuses,
+  });
+
+  it('matches a stored row to its one anchored implementation even when the legacy declared target disagrees (T036)', () => {
+    const input = ctx([storedRow({ deliverableSegmentId: 'seg-live-2027' })], [segment()]);
+    input.initiatives = [withLegacyDeclaredTarget(makeInitiative(), 'legacy-declared-other')];
+
+    expect(reconcileRptiReturn(input)).toEqual([]);
+  });
+
+  it('reports both one implementation claimed twice and one legacy row matching several implementations (T037)', () => {
+    const oneImplementation = ctx([
+      storedRow({ deliverableSegmentId: 'seg-live-2027' }),
+      storedRow({ id: 'row-2', deliverableSegmentId: 'seg-live-2027' }),
+    ], [segment()]);
+    expect(reconcileRptiReturn(oneImplementation).map(finding => finding.reason))
+      .toEqual(['identity-conflict', 'identity-conflict']);
+
+    const severalImplementations = ctx([storedRow()], [
+      segment({ id: 'seg-live-2027-a' }),
+      segment({ id: 'seg-live-2027-b', startDate: '2027-08-01' }),
+    ]);
+    expect(reconcileRptiReturn(severalImplementations)).toMatchObject([
+      { rowId: 'row-1', reason: 'identity-conflict' },
+    ]);
+  });
+
+  it('names an anchored stored row whose implementation no longer exists and gives a segment repair (T038)', () => {
+    const findings = reconcileRptiReturn(ctx([
+      storedRow({ deliverableSegmentId: 'deleted-implementation' }),
+    ], [segment()]));
+
+    expect(findings).toMatchObject([{ rowId: 'row-1' }]);
+    expect(findings[0].message).toMatch(/segment panel/i);
+    expect(findings[0].message).toMatch(/timeline/i);
+  });
+
+  it('matches only by implementation identity when stored contents differ from projection (T039)', () => {
+    const input = ctx([storedRow({
+      deliverableSegmentId: 'seg-live-2027', plannedImplementationQuarter: 'Q4', remarks: 'filed wording',
+    })], [segment({ startDate: '2027-05-01', rptiRemarks: 'current wording' })]);
+    input.initiatives = [withLegacyDeclaredTarget(makeInitiative(), 'legacy-declared-other')];
+
+    expect(reconcileRptiReturn(input)).toEqual([]);
+  });
+
+  it('returns findings rather than rows and does not mutate frozen reconciliation inputs (T039a)', () => {
+    const storedDetails = Object.freeze([Object.freeze(storedRow())]);
+    const deliverableSegments = Object.freeze([
+      Object.freeze(segment({ id: 'seg-a' })),
+      Object.freeze(segment({ id: 'seg-b', startDate: '2027-08-01' })),
+    ]);
+    const initiatives = Object.freeze([Object.freeze(makeInitiative())]);
+    const deliverables = Object.freeze([Object.freeze(makeDeliverable())]);
+    const deliverableStatuses = Object.freeze(statuses.map(status => Object.freeze({ ...status })));
+
+    const run = () => reconcileRptiReturn({
+      storedDetails: storedDetails as RptiDetail[],
+      initiatives: initiatives as Initiative[],
+      deliverables: deliverables as Deliverable[],
+      deliverableSegments: deliverableSegments as DeliverableSegment[],
+      deliverableStatuses: deliverableStatuses as DeliverableStatus[],
+    });
+    expect(run).not.toThrow();
+    const findings = run();
+    expect(findings).toMatchObject([{ rowId: 'row-1', reason: 'identity-conflict' }]);
+    expect(findings[0]).not.toHaveProperty('targetType');
   });
   /** The four states the merge conflated, as a table. */
   const cases: { name: string; stored: RptiDetail[]; segments: DeliverableSegment[]; expectFinding: boolean; pattern?: RegExp }[] = [
@@ -716,11 +786,11 @@ describe('reconcileRptiReturn — stored rows are reconciliation evidence, never
     },
     {
       name: 'unsupported asset target before the named repair', stored: [storedRow({ targetType: 'asset', targetId: 'asset-1' })], segments: [], expectFinding: true,
-      pattern: /Deliverables tab.*Initiatives tab.*timeline/i,
+      pattern: /segment panel/i,
     },
     {
       name: 'dangling target before the named repair', stored: [storedRow({ targetId: 'deliv-gone' })], segments: [], expectFinding: true,
-      pattern: /Deliverables tab.*Initiatives tab.*timeline/i,
+      pattern: /segment panel/i,
     },
   ];
   for (const c of cases) {
@@ -740,7 +810,8 @@ describe('reconcileRptiReturn — stored rows are reconciliation evidence, never
     const findings = reconcileRptiReturn(ctx([storedRow({ initiativeId: 'init-gone' })], []));
     expect(findings).toHaveLength(1);
     expect(findings[0].reason).toBe('missing-initiative');
-    expect(findings[0].message).toMatch(/Initiatives tab.*Deliverable column.*timeline.*lifecycle segment/i);
+    expect(findings[0].message).toMatch(/segment panel/i);
+    expect(findings[0].message).toMatch(/timeline/i);
   });
 
   it('directs re-import when both identity anchors are gone', () => {
@@ -753,11 +824,11 @@ describe('reconcileRptiReturn — stored rows are reconciliation evidence, never
   it('keeps an asset-target finding until the named source repair also adds its segment', () => {
     const row = storedRow({ targetType: 'asset', targetId: 'asset-1' });
     const repaired = ctx([row], []);
-    repaired.initiatives = [makeInitiative({ deliverableId: 'deliv-1' })];
     const partial = reconcileRptiReturn(repaired);
     expect(partial).toHaveLength(1);
     expect(partial[0].reason).toBe('asset-target');
-    expect(partial[0].message).toMatch(/remaining step.*timeline.*lifecycle segment/i);
+    expect(partial[0].message).toMatch(/segment panel/i);
+    expect(partial[0].message).toMatch(/timeline/i);
 
     repaired.deliverableSegments = [segment()];
     expect(reconcileRptiReturn(repaired)).toEqual([]);
@@ -765,11 +836,11 @@ describe('reconcileRptiReturn — stored rows are reconciliation evidence, never
 
   it('keeps a missing-target finding until its replacement also has the named segment', () => {
     const repaired = ctx([storedRow({ targetId: 'deliv-gone' })], []);
-    repaired.initiatives = [makeInitiative({ deliverableId: 'deliv-1' })];
     const partial = reconcileRptiReturn(repaired);
     expect(partial).toHaveLength(1);
     expect(partial[0].reason).toBe('missing-target');
-    expect(partial[0].message).toMatch(/remaining step.*timeline.*lifecycle segment/i);
+    expect(partial[0].message).toMatch(/segment panel/i);
+    expect(partial[0].message).toMatch(/timeline/i);
 
     repaired.deliverableSegments = [segment()];
     expect(reconcileRptiReturn(repaired)).toEqual([]);
@@ -777,11 +848,12 @@ describe('reconcileRptiReturn — stored rows are reconciliation evidence, never
 
   it('keeps a missing-initiative finding until its replacement also has the named segment', () => {
     const repaired = ctx([storedRow({ initiativeId: 'init-gone' })], []);
-    repaired.initiatives = [makeInitiative({ deliverableId: 'deliv-1' })];
+    repaired.initiatives = [makeInitiative()];
     const partial = reconcileRptiReturn(repaired);
     expect(partial).toHaveLength(1);
     expect(partial[0].reason).toBe('missing-initiative');
-    expect(partial[0].message).toMatch(/remaining step.*timeline.*lifecycle segment/i);
+    expect(partial[0].message).toMatch(/segment panel/i);
+    expect(partial[0].message).toMatch(/timeline/i);
 
     repaired.deliverableSegments = [segment()];
     expect(reconcileRptiReturn(repaired)).toEqual([]);
@@ -803,7 +875,8 @@ describe('reconcileRptiReturn — stored rows are reconciliation evidence, never
     const findings = reconcileRptiReturn(ctx([storedRow()], []));
     expect(findings).toHaveLength(1);
     expect(findings[0].reason).toBe('unanchored');
-    expect(findings[0].message).toMatch(/segment/i);
+    expect(findings[0].message).toMatch(/segment panel/i);
+    expect(findings[0].message).toMatch(/timeline/i);
   });
 
   it('does not re-report a reproducible row that merely differs from the projection', () => {

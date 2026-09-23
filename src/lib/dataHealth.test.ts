@@ -82,19 +82,32 @@ describe('computeDataHealth — hard checks (dangling references)', () => {
     expect(findIssue(issues, `segment-status:${seg.id}`)?.severity).toBe('error');
   });
 
-  it('flags an Initiative with dangling programmeId/strategyId/assetId/deliverableId/ownerId/resourceIds', () => {
+  it('flags an Initiative with dangling programmeId/strategyId/assetId/ownerId/resourceIds', () => {
     const init = {
       id: 'init-1', name: 'Init One', programmeId: 'ghost', strategyId: 'ghost', assetId: 'ghost',
-      deliverableId: 'ghost', ownerId: 'ghost', resourceIds: ['ghost'],
+      ownerId: 'ghost', resourceIds: ['ghost'],
       startDate: '2026-01-01', endDate: '2026-02-01', capex: 0, opex: 0,
     };
     const issues = computeDataHealth(baseInput({ initiatives: [init] }));
     expect(findIssue(issues, `initiative-programme:${init.id}`)?.severity).toBe('error');
     expect(findIssue(issues, `initiative-strategy:${init.id}`)?.severity).toBe('error');
     expect(findIssue(issues, `initiative-asset:${init.id}`)?.severity).toBe('error');
-    expect(findIssue(issues, `initiative-deliverable:${init.id}`)?.severity).toBe('error');
     expect(findIssue(issues, `initiative-owner:${init.id}`)?.severity).toBe('error');
     expect(findIssue(issues, `initiative-resource:${init.id}:ghost`)?.severity).toBe('error');
+  });
+
+  it('leaves a schemaless orphaned Initiative.deliverableId untouched and does not report it (T043c)', () => {
+    const legacy = {
+      id: 'init-legacy', name: 'Legacy Init', programmeId: 'prog-1', assetId: 'asset-1',
+      deliverableId: 'deleted-deliverable', startDate: '2026-01-01', endDate: '2026-02-01',
+      capex: 0, opex: 0,
+    };
+    const issues = computeDataHealth(baseInput({
+      programmes: [programme], assets: [asset], initiatives: [legacy],
+    }));
+
+    expect(findIssue(issues, `initiative-deliverable:${legacy.id}`)).toBeUndefined();
+    expect(legacy.deliverableId).toBe('deleted-deliverable');
   });
 
   it('does not flag an Initiative whose references all resolve', () => {
@@ -109,7 +122,7 @@ describe('computeDataHealth — hard checks (dangling references)', () => {
     expect(issues.filter(i => i.entityId === init.id && i.severity === 'error')).toHaveLength(0);
   });
 
-  it('flags an initiative whose reportable segments name more than one deliverable', () => {
+  it('allows an initiative whose reportable segments name more than one deliverable (T042)', () => {
     const init = { id: 'init-1', name: 'Split plan', programmeId: 'prog-1', assetId: asset.id, startDate: '2026-01-01', endDate: '2026-12-31', capex: 0, opex: 0 };
     const second = { ...deliverable, id: 'deliv-2', name: 'App Two' };
     const segments = [
@@ -118,8 +131,7 @@ describe('computeDataHealth — hard checks (dangling references)', () => {
     ];
     const issue = findIssue(computeDataHealth(baseInput({ assets: [asset], deliverables: [deliverable, second], initiatives: [init], deliverableSegments: segments })), `initiative-rpti-multi-target:${init.id}`);
 
-    expect(issue).toMatchObject({ severity: 'error', location: { view: 'data', tab: 'initiatives' } });
-    expect(issue?.message).toMatch(/split/i);
+    expect(issue).toBeUndefined();
   });
 
   it('flags a Milestone pointing at a missing Asset', () => {
@@ -163,7 +175,8 @@ describe('computeDataHealth — hard checks (dangling references)', () => {
     const issue = findIssue(computeDataHealth(baseInput({ assets: [asset], initiatives: [init], rptiDetails: [row] })), `rpti-asset-target:${row.id}`);
 
     expect(issue).toMatchObject({ severity: 'error', location: { view: 'data', tab: 'deliverables' } });
-    expect(issue?.message).toMatch(/Deliverables tab.*Initiatives tab.*timeline/i);
+    expect(issue?.message).toMatch(/Deliverables tab.*segment panel/i);
+    expect(issue?.message).toMatch(/timeline/i);
   });
 
   it('flags an LkptiDetail with a dangling targetId', () => {
@@ -228,6 +241,48 @@ describe('computeDataHealth — soft checks (report-generation gaps)', () => {
     expect(findIssue(computeDataHealth(baseInput({ assets: [asset], deliverables: [deliverable],
       programmes: [programme], initiatives: [init], deliverableSegments: segments })),
       'initiative-orphaned-rpti-remarks:init-1')).toBeUndefined();
+  });
+
+  /**
+   * Phase 6 removed initiative-rpti-no-target along with resolveRptiTarget, and with it
+   * the only finding the RPTI pre-export gate could see for this state. The condition
+   * did not go away: a live segment attributed to a real initiative whose Deliverable
+   * has been deleted still projects a row, naming an application that does not exist
+   * and leaving its mandatory columns blank.
+   *
+   * segment-deliverable still reports it in Data Health, but the gate filters on
+   * RptiDetail rows and the initiative-rpti- prefix, so it never reached the export
+   * path. Detected is not the same as blocked.
+   */
+  it('blocks the filing when a live segment names a Deliverable that no longer exists', () => {
+    const init = { id: 'init-1', name: 'Filing Initiative', programmeId: 'prog-1', assetId: asset.id,
+      startDate: '2027-01-01', endDate: '2027-12-31', capex: 0, opex: 0 } as never;
+    const segments = [{ id: 'seg-1', deliverableId: 'ghost-deliverable', initiativeId: 'init-1',
+      startDate: '2027-04-01', endDate: '2031-12-31', status: 'appstatus-in-production' }];
+    const issues = computeDataHealth(baseInput({ assets: [asset], deliverables: [],
+      programmes: [programme], initiatives: [init], deliverableSegments: segments }));
+
+    const issue = findIssue(issues, 'initiative-rpti-missing-target:seg-1');
+    expect(issue).toMatchObject({ severity: 'error', reports: ['rpti'] });
+    expect(issue?.message).toMatch(/Filing Initiative/);
+    expect(issue?.message).toMatch(/segment panel|timeline/i);
+
+    // The gate reads exactly this filter, so the assertion is on reaching it, not
+    // merely on existing somewhere in Data Health.
+    expect(issues.some(i => i.severity === 'error'
+      && (i.entityType === 'RptiDetail' || i.id.startsWith('initiative-rpti-'))),
+      'the pre-export gate must see this').toBe(true);
+  });
+
+  it('does not block the filing for a dangling segment that files nothing', () => {
+    // No initiative, so it projects no row. Data Health still reports segment-deliverable;
+    // the RPTI gate must stay out of it, or unrelated timeline breakage blocks a filing.
+    const segments = [{ id: 'seg-orphan', deliverableId: 'ghost-deliverable',
+      startDate: '2027-04-01', endDate: '2031-12-31', status: 'appstatus-in-production' }];
+    const issues = computeDataHealth(baseInput({ assets: [asset], deliverables: [],
+      programmes: [programme], initiatives: [], deliverableSegments: segments }));
+    expect(findIssue(issues, 'initiative-rpti-missing-target:seg-orphan')).toBeUndefined();
+    expect(findIssue(issues, 'segment-deliverable:seg-orphan')?.severity).toBe('error');
   });
 
   it('flags a Deliverable with zero lifecycle segments', () => {
@@ -648,7 +703,7 @@ describe('every check declares which return it bears on', () => {
     // workspace-hygiene checks that genuinely affect no filing.
     const NON_FILING = new Set([
       'asset-category', 'deliverable-asset', 'segment-deliverable', 'segment-initiative',
-      'segment-status', 'initiative-asset', 'initiative-deliverable', 'initiative-programme',
+      'segment-status', 'initiative-asset', 'initiative-programme',
       'initiative-strategy', 'initiative-owner', 'initiative-resource', 'initiative-no-owner',
       'dependency-source', 'dependency-target', 'milestone-asset',
       'decision-linked', 'decision-superseded-by',
@@ -670,35 +725,26 @@ describe('every check declares which return it bears on', () => {
 });
 
 
-describe('RPTI target compatibility', () => {
+describe('RPTI targets belong to segments', () => {
   const init = { id: 'target-init', name: 'Target work', programmeId: programme.id, assetId: asset.id,
     startDate: '2026-01-01', endDate: '2026-12-31', capex: 1, opex: 0 };
   const segment = { id: 'target-seg', initiativeId: init.id, deliverableId: deliverable.id,
     status: 'appstatus-planned', startDate: '2026-01-01', endDate: '2026-12-31' };
-  it('names the repair when qualifying segments have no existing target', () => {
+  it('uses the segment dangling-reference check instead of inferring an initiative target', () => {
     const issues = computeDataHealth(baseInput({ initiatives: [init], deliverableSegments: [segment] }));
-    const issue = findIssue(issues, `initiative-rpti-no-target:${init.id}`);
-    expect(issue?.severity).toBe('error');
-    expect(issue?.message).toMatch(/select.*deliverable/i);
-    expect(issue?.reports).toContain('rpti');
+    expect(findIssue(issues, `initiative-rpti-no-target:${init.id}`)).toBeUndefined();
+    expect(findIssue(issues, `segment-deliverable:${segment.id}`)?.severity).toBe('error');
   });
-  it('does not flag a single inferred target', () => {
+  it('does not flag a segment whose Deliverable exists', () => {
     const issues = computeDataHealth(baseInput({ initiatives: [init], deliverables: [deliverable], deliverableSegments: [segment] }));
     expect(findIssue(issues, `initiative-rpti-no-target:${init.id}`)).toBeUndefined();
   });
-  it('accepts a declared target despite other timeline history', () => {
-    const issues = computeDataHealth(baseInput({ initiatives: [{ ...init, deliverableId: deliverable.id }],
-      deliverables: [deliverable, { ...deliverable, id: 'other' }],
-      deliverableSegments: [segment, { ...segment, id: 'other-seg', deliverableId: 'other' }] }));
-    expect(findIssue(issues, `initiative-rpti-multi-target:${init.id}`)).toBeUndefined();
-  });
-  it('flags ambiguous infrastructure targets as RPTI errors', () => {
+  it('allows infrastructure segments on several targets', () => {
     const issues = computeDataHealth(baseInput({ initiatives: [init],
       deliverables: [{ ...deliverable, type: 'infrastructure' }, { ...deliverable, id: 'other', type: 'infrastructure' }],
       deliverableSegments: [segment, { ...segment, id: 'other-seg', deliverableId: 'other' }] }));
     const issue = findIssue(issues, `initiative-rpti-multi-target:${init.id}`);
-    expect(issue?.severity).toBe('error');
-    expect(issue?.reports).toContain('rpti');
+    expect(issue).toBeUndefined();
   });
 });
 
@@ -743,52 +789,23 @@ describe('no data-health finding sends the preparer to a read-only report tab (F
   });
 });
 
-/**
- * F6, from the final adversarial review. Q10 made an explicit RPTI target win over
- * timeline history, and the multi-target error is correctly suppressed when one is
- * declared. But "the target exists" was then treated as "the target is generatable":
- * an initiative declaring D1 while all its work sits on D2 produces no plan line at
- * all, and — with no stored row for reconciliation to inspect — no explanation either.
- *
- * A silently absent filing row is the failure this feature exists to remove, and this
- * is the case where preparer intent is least safely inferred: the only qualifying work
- * points somewhere other than the declared filing target.
- */
-describe('an explicit RPTI target with no qualifying work on it is reported (F6)', () => {
+describe('a removed declared RPTI target has no filing effect', () => {
   const second = { id: 'deliv-2', assetId: 'asset-1', name: 'App Two', type: 'application' as const };
+  const legacyInitiative = {
+    id: 'init-1', name: 'Misaimed Initiative', programmeId: 'prog-1', assetId: 'asset-1',
+    deliverableId: 'deliv-1', startDate: '2027-01-01', endDate: '2027-12-31', capex: 0, opex: 0,
+  } as unknown as DataHealthInput['initiatives'][number];
   const declaringD1WorkingOnD2 = () => baseInput({
     assetCategories: [cat], assets: [asset], deliverables: [deliverable, second], programmes: [programme],
-    initiatives: [{ id: 'init-1', name: 'Misaimed Initiative', programmeId: 'prog-1', assetId: 'asset-1',
-      deliverableId: 'deliv-1', startDate: '2027-01-01', endDate: '2027-12-31', capex: 0, opex: 0 }],
+    initiatives: [legacyInitiative],
     deliverableSegments: [{ id: 'seg-1', deliverableId: 'deliv-2', initiativeId: 'init-1',
       status: 'appstatus-in-production', startDate: '2027-02-01', endDate: '2027-12-31' }],
   });
 
-  it('raises an error naming the declared target and where the work actually is', () => {
+  it('does not report a removed declared target that disagrees with segment-owned work (T043a)', () => {
     const issue = findIssue(computeDataHealth(declaringD1WorkingOnD2()), 'initiative-rpti-unanchored-target:init-1');
 
-    expect(issue, 'nothing explains why this initiative files no row').toBeDefined();
-    expect(issue?.severity).toBe('error');
-    expect(issue?.message).toContain('App One');
-    expect(issue?.message, 'the preparer needs to know where the work actually sits').toContain('App Two');
-    expect(issue?.location).toEqual({ view: 'data', tab: 'initiatives' });
-  });
-
-  it('stays silent once the declared target carries qualifying work', () => {
-    const input = declaringD1WorkingOnD2();
-    input.deliverableSegments = [{ id: 'seg-1', deliverableId: 'deliv-1', initiativeId: 'init-1',
-      status: 'appstatus-in-production', startDate: '2027-02-01', endDate: '2027-12-31' }];
-
-    expect(findIssue(computeDataHealth(input), 'initiative-rpti-unanchored-target:init-1')).toBeUndefined();
-  });
-
-  it('does not fire for an initiative with no qualifying segments at all', () => {
-    const input = declaringD1WorkingOnD2();
-    input.deliverableSegments = [];
-
-    // Nothing is being filed, so there is no absent row to explain. Reporting here
-    // would flag every initiative that has not been scheduled yet.
-    expect(findIssue(computeDataHealth(input), 'initiative-rpti-unanchored-target:init-1')).toBeUndefined();
+    expect(issue).toBeUndefined();
   });
 });
 
@@ -796,7 +813,7 @@ describe('a filed second implementation has no stale dropped-row warning (#52)',
   const twoGoLivesIn = (...starts: string[]) => baseInput({
     assetCategories: [cat], assets: [asset], deliverables: [deliverable], programmes: [programme],
     initiatives: [{ id: 'init-1', name: 'Mobile 2027', programmeId: 'prog-1', assetId: 'asset-1',
-      deliverableId: 'deliv-1', startDate: '2027-01-01', endDate: '2027-12-31', capex: 0, opex: 0 }],
+      startDate: '2027-01-01', endDate: '2027-12-31', capex: 0, opex: 0 }],
     deliverableSegments: starts.map((startDate, n) => ({
       id: `seg-${n}`, deliverableId: 'deliv-1', initiativeId: 'init-1',
       status: 'appstatus-in-production', startDate, endDate: '2027-12-31',

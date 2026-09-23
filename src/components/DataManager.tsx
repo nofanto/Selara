@@ -270,7 +270,6 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery,
   const initiativeColumns: Column<Initiative>[] = [
     { key: 'name', label: 'Initiative Name', type: 'text', width: '280px' },
     { key: 'assetId', label: 'Asset', type: 'select', options: assetOptions, width: '230px' },
-    { key: 'deliverableId', label: 'Deliverable', type: 'select', options: [{ value: '', label: '— Infer from lifecycle segments —' }, ...data.deliverables.map(deliverable => ({ value: deliverable.id, label: deliverable.name }))], width: '230px' },
     { key: 'programmeId', label: 'Programme', type: 'select', options: programmeOptions, width: '150px' },
     { key: 'strategyId', label: 'Strategy', type: 'select', options: strategyOptions, width: '150px' },
     { key: 'startDate', label: 'Start Date', type: 'date', width: '130px' },

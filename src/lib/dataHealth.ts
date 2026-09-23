@@ -3,7 +3,7 @@ import {
   Initiative, Milestone, Dependency, Decision, Resource, Programme, Strategy,
   RptiDetail, LkptiDetail, TimelineSettings,
 } from '../types';
-import { isLiveStatusId, isPreLaunchStatusId, reconcileRptiReturn, resolveAssetCategory, resolveRptiTarget } from './rpti';
+import { isLiveStatusId, isPreLaunchStatusId, reconcileRptiReturn, resolveAssetCategory } from './rpti';
 
 // Tabs of src/components/DataManager.tsx's own `Tab` union — defined here (the pure
 // lib layer) as the source of truth so DataManager can import it instead of the other
@@ -174,12 +174,6 @@ export function computeDataHealth(input: DataHealthInput): HealthIssue[] {
         entityName: i.name, message: `"${i.name}" points at an Asset that no longer exists.`, location: tab('initiatives'),
       });
     }
-    if (i.deliverableId && !deliverableIds.has(i.deliverableId)) {
-      issues.push({
-        id: `initiative-deliverable:${i.id}`, severity: 'error', entityType: 'Initiative', entityId: i.id,
-        entityName: i.name, message: `"${i.name}" points at a Deliverable that no longer exists.`, location: tab('initiatives'),
-      });
-    }
     if (i.ownerId && !resourceIds.has(i.ownerId)) {
       issues.push({
         id: `initiative-owner:${i.id}`, severity: 'error', entityType: 'Initiative', entityId: i.id,
@@ -211,6 +205,25 @@ export function computeDataHealth(input: DataHealthInput): HealthIssue[] {
       });
     }
 
+    // An implementation whose application has been deleted still projects a row —
+    // naming a Deliverable that does not exist, with its cascaded columns blank.
+    // segment-deliverable reports the dangling reference, but the pre-export gate
+    // reads RptiDetail rows and the initiative-rpti- prefix only, so before this
+    // check the return could be exported with that row in it. Scoped to segments
+    // that would actually file: an unattributed dangling segment is a timeline
+    // problem, not a filing one, and must not block an unrelated return.
+    if (!i.isPlaceholder) {
+      for (const segment of implementations) {
+        if (deliverableIds.has(segment.deliverableId)) continue;
+        issues.push({
+          id: `initiative-rpti-missing-target:${segment.id}`, severity: 'error',
+          entityType: 'DeliverableSegment', entityId: segment.id, entityName: i.name,
+          message: `"${i.name}" has a live implementation whose application no longer exists, so the filing would state a Deliverable that is not there. On the Deliverables tab, create or restore the application, then open that implementation's lifecycle segment panel on the Visualiser timeline and select it.`,
+          location: tab('deliverables'),
+        });
+      }
+    }
+
     const legacyRemarks = (i as unknown as Record<string, unknown>).rptiRemarks;
     const remarksImplementations = deliverableStatuses.length > 0 ? implementations : [];
     // The lift is non-destructive, so a remark it successfully placed stays on the
@@ -227,46 +240,6 @@ export function computeDataHealth(input: DataHealthInput): HealthIssue[] {
       });
     }
 
-    const reportTargets = new Set(initiativeSegments.map(segment => segment.deliverableId));
-    if (!i.isPlaceholder && !i.deliverableId && reportTargets.size > 1) {
-      issues.push({
-        id: `initiative-rpti-multi-target:${i.id}`, severity: 'error', entityType: 'Initiative', entityId: i.id,
-        entityName: i.name,
-        message: `"${i.name}" has no declared RPTI target and lifecycle segments on multiple deliverables. Select its intended Deliverable on Initiatives, or split it into one initiative per RPTI target before generating the filing.`,
-        location: tab('initiatives'),
-      });
-    } else if (!i.isPlaceholder && initiativeSegments.some(segment =>
-      isLiveStatusId(segment.status, deliverableStatuses) || isPreLaunchStatusId(segment.status, deliverableStatuses)
-    ) && !deliverableIds.has(resolveRptiTarget(i, deliverableSegments, deliverables) ?? '')) {
-      issues.push({
-        id: `initiative-rpti-no-target:${i.id}`, severity: 'error', entityType: 'Initiative', entityId: i.id,
-        entityName: i.name,
-        message: `"${i.name}" has qualifying lifecycle segments but no resolvable RPTI target. Create or repair the Deliverable and select that Deliverable on Initiatives before generating the filing.`,
-        location: tab('initiatives'),
-      });
-    } else if (!i.isPlaceholder && i.deliverableId && deliverableIds.has(i.deliverableId)) {
-      // Q10 made a declared target win over timeline history, and the multi-target error
-      // above is suppressed once one is declared. But "the target exists" is not "the
-      // target is generatable": generation needs a qualifying segment on the declared
-      // pair, so an initiative declaring D1 while all its work sits on D2 files nothing
-      // and — with no stored row for reconciliation to inspect — explains nothing (F6).
-      // This is where intent is least safely inferred, so it is reported rather than
-      // guessed: the only qualifying work points somewhere other than the filing target.
-      const qualifying = initiativeSegments.filter(segment =>
-        isLiveStatusId(segment.status, deliverableStatuses) || isPreLaunchStatusId(segment.status, deliverableStatuses));
-      const onDeclared = qualifying.some(segment => segment.deliverableId === i.deliverableId);
-      if (qualifying.length > 0 && !onDeclared) {
-        const declaredName = deliverableById.get(i.deliverableId)?.name ?? i.deliverableId;
-        const elsewhere = [...new Set(qualifying.map(segment =>
-          deliverableById.get(segment.deliverableId)?.name ?? segment.deliverableId))];
-        issues.push({
-          id: `initiative-rpti-unanchored-target:${i.id}`, severity: 'error', entityType: 'Initiative', entityId: i.id,
-          entityName: i.name,
-          message: `"${i.name}" names "${declaredName}" as its Deliverable, but its lifecycle work sits on ${elsewhere.map(n => `"${n}"`).join(', ')}. Generation has nothing to derive on the named Deliverable, so this initiative files no plan line. Either select the Deliverable the work is on, or add a lifecycle segment for this initiative on "${declaredName}".`,
-          location: tab('initiatives'),
-        });
-      }
-    }
   }
 
   for (const m of milestones) {
@@ -692,9 +665,8 @@ export function computeDataHealth(input: DataHealthInput): HealthIssue[] {
  */
 const REPORTS_BY_CHECK: Record<string, HealthReport[]> = {
   // Rows of a return, and the things that stop one being generated at all.
-  'initiative-rpti-multi-target': ['rpti'],
-  'initiative-rpti-no-target': ['rpti'],
   'initiative-budget-divergence': ['rpti'],
+  'initiative-rpti-missing-target': ['rpti'],
   'initiative-orphaned-rpti-remarks': ['rpti'],
   'rpti-asset-target': ['rpti'],
   'rpti-incomplete': ['rpti'],
@@ -729,7 +701,6 @@ const REPORTS_BY_CHECK: Record<string, HealthReport[]> = {
   'segment-initiative': [],
   'segment-status': [],
   'initiative-asset': [],
-  'initiative-deliverable': [],
   'initiative-programme': [],
   'initiative-strategy': [],
   'initiative-owner': [],

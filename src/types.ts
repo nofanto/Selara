@@ -67,7 +67,6 @@ export interface Initiative {
   programmeId: string;
   strategyId?: string;
   assetId: string;
-  deliverableId?: string; // Optional: links the initiative to a specific deliverable within the asset
   startDate: string; // ISO format: YYYY-MM-DD
   endDate: string;   // ISO format: YYYY-MM-DD
   capex: number;     // Capital expenditure

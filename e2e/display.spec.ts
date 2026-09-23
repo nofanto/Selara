@@ -260,6 +260,12 @@ test.describe('Colour by Status', () => {
     await expect(page.getByTestId('data-manager').getByRole('columnheader', { name: 'Status', exact: true })).toBeVisible();
   });
 
+  test('Initiatives table no longer offers a Deliverable column (T043c)', async ({ page }) => {
+    await page.getByTestId('nav-data-manager').click();
+    await page.getByTestId('data-manager').getByRole('button', { name: /Initiatives/ }).click();
+    await expect(page.getByTestId('data-manager').getByRole('columnheader', { name: 'Deliverable', exact: true })).toHaveCount(0);
+  });
+
   test('status change persists after reload', async ({ page }) => {
     await page.locator('[data-testid^="initiative-bar"]').first().click();
     await page.getByTestId('initiative-action-edit').click();

@@ -501,14 +501,14 @@ describe('an imported initiative leaves its legacy filing target unset', () => {
     };
     const out = deriveWorkspaceFromRptiImport(parse({ jenis: 'upgrade' }), 2027, inventory);
     expect(out.unresolved).toEqual([]); // guard
-    expect(out.initiatives[0].deliverableId).toBeUndefined();
+    expect(Object.hasOwn(out.initiatives[0], 'deliverableId')).toBe(false);
     expect(out.initiatives[0].assetId).toBe('a-1');
   });
 
   it('does not set the legacy target for a created row', () => {
     const out = deriveWorkspaceFromRptiImport(parse({ jenis: 'new' }), 2027, EMPTY);
     expect(out.deliverables).toHaveLength(1); // guard: the row was created normally
-    expect(out.initiatives[0].deliverableId).toBeUndefined();
+    expect(Object.hasOwn(out.initiatives[0], 'deliverableId')).toBe(false);
   });
 
   it('leaves it unset for an unresolved row, which has no deliverable to name', () => {
@@ -516,7 +516,7 @@ describe('an imported initiative leaves its legacy filing target unset', () => {
     // and computeDataHealth reports that as a second error for one problem.
     const out = deriveWorkspaceFromRptiImport(parse({ jenis: 'upgrade' }), 2027, EMPTY);
     expect(out.unresolved).toHaveLength(1); // guard
-    expect(out.initiatives[0].deliverableId).toBeUndefined();
+    expect(Object.hasOwn(out.initiatives[0], 'deliverableId')).toBe(false);
   });
 
   it('leaves the legacy target unset across resolved and unresolved row shapes', () => {
@@ -526,7 +526,7 @@ describe('an imported initiative leaves its legacy filing target unset', () => {
       row({ no: 3, name: 'C', jenis: 'new', kategori: RPTI_CATEGORY_LABELS['52'] }),
     ]));
     const out = deriveWorkspaceFromRptiImport(rows, 2027, EMPTY);
-    expect(out.initiatives.map(i => i.deliverableId)).toEqual([undefined, undefined, undefined]);
+    expect(out.initiatives.map(i => Object.hasOwn(i, 'deliverableId'))).toEqual([false, false, false]);
   });
 });
 

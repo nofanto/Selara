@@ -99,7 +99,6 @@ erDiagram
         string programmeId FK
         string strategyId FK
         string assetId FK
-        string deliverableId FK
         string ownerId FK
         string_array resourceIds FK
         date startDate
@@ -294,7 +293,6 @@ Since IndexedDB has no native foreign-key enforcement, all relationships below a
 - `Initiative.programmeId` → `Programme.id`
 - `Initiative.strategyId` (optional) → `Strategy.id`
 - `Initiative.assetId` → `Asset.id`
-- `Initiative.deliverableId` (optional) → `Deliverable.id`
 - `Initiative.ownerId` (optional) → `Resource.id`
 - `Initiative.resourceIds` (optional array) → `Resource.id[]` (many-to-many)
 - `Milestone.assetId` → `Asset.id`
