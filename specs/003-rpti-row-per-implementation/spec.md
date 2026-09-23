@@ -186,6 +186,26 @@ each stored row is either matched or named.
   Initiatives tab, its dangling-reference check and the importer. A segment names its own
   application, so nothing infers a filing target; every remaining use of the field was a filing use
   and dies with the single-target rule.
+- **FR-019b** *(added 2026-09-23, during Phase 5)*: An imported `upgrade` row whose application was
+  created by an **earlier row of the same return** MUST attach to it rather than be reported
+  unresolved. The match uses the existing rule unchanged — exact on name and exact on category — and
+  only widens **where** it looks, never **how** it compares; a row may attach only to something
+  created above it, never below.
+
+  FR-019 defers an unmatched upgrade because the two *returns* are known to disagree on naming, so a
+  non-match is a judgement a person should make. That argument does not reach inside a single file:
+  when one return uses the identical name and category in two of its own rows, the preparer has
+  already said they are the same application, and there is no judgement to surface. Deferring it
+  raises a false finding on a well-formed return and makes FR-002 and contract 23 — a return with
+  two rows for one application reproduces both — unsatisfiable by construction.
+
+  Cross-return matching is untouched: an upgrade naming an application absent from both the
+  inventory and the return itself stays unresolved.
+- **FR-019c** *(added 2026-09-23, during Phase 5)*: The synthetic prior-live phase that preserves an
+  imported `upgrade`'s development type MUST NOT be added when an earlier implementation **in the
+  same import** already precedes it. It exists to supply history the workspace lacks; where the
+  return itself supplies that history, adding it invents evidence and dates an application's
+  existence to before the year the plan says it is first built.
 - **FR-008c**: The repair path that currently runs through `Initiative.deliverableId` MUST be
   rebuilt around the segment's own application **before** the field is removed. A stored row whose
   deliverable was deleted is repaired today by selecting the replacement on the initiative;
