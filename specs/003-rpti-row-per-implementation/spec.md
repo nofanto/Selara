@@ -319,18 +319,25 @@ initiative's figure.
 | Custom | Provide your own answer | e.g. cost on the implementation only when it differs, with the initiative holding the total and a consistency check between them. |
 
 **Your choice**: **Cost belongs to the implementation**, decided 2026-09-22 — closest to option B,
-with the initiative's figure **derived** rather than removed.
+with the initiative's figure **kept, stored and editable** rather than removed.
 
 *The product owner's reasoning: "RPTI is only for development plan, then it should be on the
 segment." The plan line lives on the implementation, so everything the line states — the
 application, the time, the type, the cost, the commentary — belongs there. The initiative becomes
 the trigger: why the work exists, who owns it, which programme it serves.*
 
-*`Initiative.capex`/`opex` are kept as **derived** totals rather than deleted, because the timeline,
-budget visualisation and validation read them in thirteen files. Derived, not stored, so there is
-one source of truth — option A's "default when none is stated" was rejected for creating two
-independently-editable figures for one value, which is exactly the shape of the silent-overwrite
-defect found in the previous feature.*
+*`Initiative.capex`/`opex` are kept rather than deleted, because the timeline, budget visualisation
+and validation read them in thirteen files.*
+
+*This answer first said they were kept as **derived totals**, and that half was revised the same day
+— see FR-009a, research.md R3 and Q17, which this paragraph now follows. Deriving them would empty
+the cost of an initiative with no implementations, silently blanking it on the timeline, and would
+force a migration of every existing workspace. They are two **different** values rather than two
+copies of one: the initiative's is a portfolio figure, the implementation's is what the return
+states. Neither derives from the other and neither overwrites the other, so there is no precedence
+rule to get wrong — which is what rejected option A's "default when none is stated", the shape of
+the silent-overwrite defect found in the previous feature. The cost of keeping both is that they
+can drift, and FR-009c reports that as a warning naming both figures, never an error.*
 
 ### Q2 — What counts as one implementation?
 
