@@ -124,6 +124,8 @@ test.describe('Report year', () => {
   test('a lifted legacy cost cannot overwrite a newer Initiative edit on reload', async ({ page }) => {
     await seedReportRecords(page, {
       ...reportFixture,
+      initiatives: [{ ...reportFixture.initiatives[0], rptiRemarks: 'Current initiative remark' }],
+      deliverableSegments: [{ ...reportFixture.deliverableSegments[0], rptiRemarks: undefined }],
       rptiDetails: [{
         id: 'legacy-cost', initiativeId: 'filing-initiative', targetType: 'deliverable',
         targetId: 'filing-deliverable', developmentType: 'upgrade',
@@ -133,6 +135,8 @@ test.describe('Report year', () => {
 
     await expect.poll(async () => (await readStore(page, 'initiatives'))[0]?.capex).toBe(700);
     await expect.poll(async () => (await readStore(page, 'rptiDetails'))[0]?.capexAmount).toBeUndefined();
+    await expect.poll(async () => (await readStore(page, 'deliverableSegments'))[0]?.rptiRemarks)
+      .toBe('Current initiative remark');
 
     await page.getByTestId('nav-data-manager').click();
     await page.getByTestId('data-manager-tab-initiatives').click();
@@ -179,12 +183,17 @@ test.describe('Report year', () => {
           saved.data.initiatives[0] = {
             ...saved.data.initiatives[0], capex: 100, opex: 10, rptiRemarks: undefined,
           };
+          saved.data.deliverableSegments[0] = {
+            ...saved.data.deliverableSegments[0], capexAmount: undefined,
+            opexAmount: undefined, rptiRemarks: undefined,
+          };
           saved.data.deliverables[0] = {
             ...saved.data.deliverables[0], platform: undefined, database: undefined,
           };
           saved.data.rptiDetails = [{
             id: 'legacy-rpti', initiativeId: 'filing-initiative', targetType: 'deliverable',
             targetId: 'filing-deliverable', developmentType: 'upgrade',
+            deliverableSegmentId: 'filing-segment',
             capexAmount: 777777, opexAmount: 88888, remarks: 'Restored legacy filing note',
           }];
           saved.data.lkptiDetails = [{
@@ -208,8 +217,8 @@ test.describe('Report year', () => {
 
     await generateReport(page, 'rpti', '2026');
     const rpti = page.getByTestId('rpti-detail-table');
-    await expect(rpti).toContainText('777,777');
-    await expect(rpti).toContainText('88,888');
+    await expect(rpti).not.toContainText('777,777');
+    await expect(rpti).not.toContainText('88,888');
     await expect(rpti).toContainText('Restored legacy filing note');
 
     await generateReport(page, 'lkpti', '2026');
@@ -221,6 +230,10 @@ test.describe('Report year', () => {
     // write, so a later reload cannot reapply the stale cost overrides.
     await expect.poll(async () => (await readStore(page, 'rptiDetails'))[0]?.capexAmount).toBeUndefined();
     await expect.poll(async () => (await readStore(page, 'initiatives'))[0]?.capex).toBe(777777);
+    await expect.poll(async () => (await readStore(page, 'deliverableSegments'))[0]?.rptiRemarks)
+      .toBe('Restored legacy filing note');
+    await expect.poll(async () => (await readStore(page, 'deliverableSegments'))[0]?.capexAmount)
+      .toBeUndefined();
   });
 
   test('blocks an ambiguous initiative before export and permits filing after target repair', async ({ page }) => {

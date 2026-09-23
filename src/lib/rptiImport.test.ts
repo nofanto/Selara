@@ -222,11 +222,13 @@ describe('deriveWorkspaceFromRptiImport — placement', () => {
     expect(out.deliverableSegments.find(s => s.startDate.startsWith('2026'))?.initiativeId).toBeUndefined();
   });
 
-  it('creates one initiative per row carrying that row cost', () => {
+  it('seeds both the initiative budget and filed implementation with each row cost (T028a)', () => {
     const { rows } = parseRptiImportWorkbook(wb([row({ name: 'A', capex: 500, opex: 50 }), row({ no: 2, name: 'B', capex: 900, opex: 90 })]));
     const out = deriveWorkspaceFromRptiImport(rows, 2027, EMPTY);
     expect(out.initiatives).toHaveLength(2);
     expect(out.initiatives.map(i => i.capex).sort()).toEqual([500, 900]);
+    expect(out.deliverableSegments.map(s => [s.capexAmount, s.opexAmount]).sort((a, b) => Number(a[0]) - Number(b[0])))
+      .toEqual([[500, 50], [900, 90]]);
   });
 });
 
@@ -503,9 +505,9 @@ describe('the importer records row fields on the entities they describe', () => 
    */
   const parseOne = (over = {}) => parseRptiImportWorkbook(wb([row(over)])).rows;
 
-  it('writes Keterangan onto the Initiative as rptiRemarks', () => {
+  it('writes Keterangan onto the filed implementation as rptiRemarks', () => {
     const out = deriveWorkspaceFromRptiImport(parseOne({ remarks: 'Regulatory deadline driven.' }), 2027, EMPTY);
-    expect(out.initiatives[0].rptiRemarks).toBe('Regulatory deadline driven.');
+    expect(out.deliverableSegments[0].rptiRemarks).toBe('Regulatory deadline driven.');
   });
 
   it('writes the related-party answer onto the Deliverable', () => {
@@ -515,7 +517,7 @@ describe('the importer records row fields on the entities they describe', () => 
 
   it('leaves both unset when the return did not supply them', () => {
     const out = deriveWorkspaceFromRptiImport(parseOne({ remarks: '', ppjti: '' }), 2027, EMPTY);
-    expect(out.initiatives[0].rptiRemarks).toBeUndefined();
+    expect(out.deliverableSegments[0].rptiRemarks).toBeUndefined();
     expect(out.deliverables[0].ppjtiRelatedParty).toBeUndefined();
   });
 

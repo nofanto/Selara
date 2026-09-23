@@ -384,8 +384,7 @@ describe('RPTI implementation-grain filing (003, Phase 3)', () => {
   it('preserves every filed value and row order for ordinary single-implementation initiatives (T011)', () => {
     const initiatives = [
       makeInitiative({ id: 'init-b', deliverableId: 'deliv-b', description: 'Build B', capex: 202, opex: 22 }),
-      makeInitiative({ id: 'init-a', deliverableId: 'deliv-a', description: 'Build A', capex: 101, opex: 11,
-        rptiRemarks: 'A remark' }),
+      makeInitiative({ id: 'init-a', deliverableId: 'deliv-a', description: 'Build A', capex: 101, opex: 11 }),
     ];
     const deliverables = [
       makeDeliverable({ id: 'deliv-b', name: 'Application B', categoryCode: '05', developer: 'Vendor B',
@@ -397,9 +396,11 @@ describe('RPTI implementation-grain filing (003, Phase 3)', () => {
       makeSegment({ id: 'b-run-up', initiativeId: 'init-b', deliverableId: 'deliv-b',
         startDate: '2027-01-01', endDate: '2027-03-31', status: 'appstatus-planned' }),
       makeSegment({ id: 'b-live', initiativeId: 'init-b', deliverableId: 'deliv-b',
-        startDate: '2027-05-01', endDate: '2031-12-31', status: 'appstatus-in-production' }),
+        startDate: '2027-05-01', endDate: '2031-12-31', status: 'appstatus-in-production',
+        capexAmount: 202, opexAmount: 22 }),
       makeSegment({ id: 'a-live', initiativeId: 'init-a', deliverableId: 'deliv-a',
-        startDate: '2027-11-01', endDate: '2031-12-31', status: 'appstatus-in-production' }),
+        startDate: '2027-11-01', endDate: '2031-12-31', status: 'appstatus-in-production',
+        capexAmount: 101, opexAmount: 11, rptiRemarks: 'A remark' }),
     ];
     const rows = projectRptiReturn(makeContext({ initiatives, deliverables, deliverableSegments: segments }), 2027);
     // These are the workbook's filed values in its row order. Internal row and segment IDs
@@ -410,7 +411,7 @@ describe('RPTI implementation-grain filing (003, Phase 3)', () => {
       return [index + 1, deliverable?.name, initiative?.description, row.categoryCode,
         row.developmentType, row.developer, row.ppjtiRelatedParty,
         row.dcCity, row.dcCountry, row.drCity, row.drCountry,
-        row.plannedImplementationQuarter, ...Object.values(resolveCost(row, initiative)), row.remarks];
+        row.plannedImplementationQuarter, ...Object.values(resolveCost(row, segments)), row.remarks];
     });
     expect(filed).toEqual([
       [1, 'Application B', 'Build B', '05', 'new', 'PPJTI', 'no',
@@ -418,6 +419,62 @@ describe('RPTI implementation-grain filing (003, Phase 3)', () => {
       [2, 'Application A', 'Build A', '06', 'new', 'inhouse', 'n/a',
         'Bandung', 'Indonesia', undefined, undefined, 'Q4', 101, 11, 'A remark'],
     ]);
+  });
+});
+
+describe('RPTI implementation-owned filed values (003, Phase 4)', () => {
+  const implementation = (id: string, startDate: string, values: Partial<DeliverableSegment> = {}) =>
+    makeSegment({ id, startDate, endDate: '2031-12-31', ...values });
+
+  it('files each implementation\'s own CapEx and OpEx (T017)', () => {
+    const segments = [
+      implementation('phase-1', '2027-04-01', { capexAmount: 400, opexAmount: 40 }),
+      implementation('phase-2', '2027-10-01', { capexAmount: 600, opexAmount: 60 }),
+    ];
+    const rows = projectRptiReturn(makeContext({ deliverables: [makeDeliverable()], deliverableSegments: segments }), 2027);
+
+    expect(rows.map(row => resolveCost(row, segments))).toEqual([
+      { capexAmount: 400, opexAmount: 40 },
+      { capexAmount: 600, opexAmount: 60 },
+    ]);
+  });
+
+  it('keeps the filed total unchanged when one implementation is split in two (T017a, SC-005)', () => {
+    const total = (segments: DeliverableSegment[]) => projectRptiReturn(
+      makeContext({ deliverables: [makeDeliverable()], deliverableSegments: segments }), 2027,
+    ).reduce((sum, row) => sum + resolveCost(row, segments).capexAmount, 0);
+
+    expect(total([implementation('whole', '2027-04-01', { capexAmount: 1000 })])).toBe(1000);
+    expect(total([
+      implementation('part-1', '2027-04-01', { capexAmount: 400 }),
+      implementation('part-2', '2027-10-01', { capexAmount: 600 }),
+    ])).toBe(1000);
+  });
+
+  it('files each implementation\'s own Keterangan (T018)', () => {
+    const segments = [
+      implementation('phase-1', '2027-04-01', { rptiRemarks: 'Phase one' }),
+      implementation('phase-2', '2027-10-01', { rptiRemarks: 'Phase two' }),
+    ];
+    const rows = projectRptiReturn(makeContext({ deliverables: [makeDeliverable()], deliverableSegments: segments }), 2027);
+
+    expect(rows.map(row => row.remarks)).toEqual(['Phase one', 'Phase two']);
+  });
+
+  it('files zero without throwing when an implementation states no cost (T019)', () => {
+    const segments = [implementation('unstated', '2027-04-01')];
+    const rows = projectRptiReturn(makeContext({ deliverables: [makeDeliverable()], deliverableSegments: segments }), 2027);
+
+    expect(() => resolveCost(rows[0], segments)).not.toThrow();
+    expect(resolveCost(rows[0], segments)).toEqual({ capexAmount: 0, opexAmount: 0 });
+  });
+
+  it('never reads a divergent initiative budget as the filing source (T020)', () => {
+    const initiatives = [makeInitiative({ capex: 9999, opex: 999 })];
+    const segments = [implementation('filed', '2027-04-01', { capexAmount: 321, opexAmount: 32 })];
+    const [row] = projectRptiReturn(makeContext({ initiatives, deliverables: [makeDeliverable()], deliverableSegments: segments }), 2027);
+
+    expect(resolveCost(row, segments)).toEqual({ capexAmount: 321, opexAmount: 32 });
   });
 });
 

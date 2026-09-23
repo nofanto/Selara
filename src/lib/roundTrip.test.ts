@@ -119,7 +119,6 @@ describe('SC-001: a generated return reproduces the imported one', () => {
       if (unresolved.has(src.name)) continue;
       const got = byName.get(src.name);
       if (!got) { lost.push(`${src.name}: no row generated at all`); continue; }
-      const initiative = out.initiatives.find(i => i.id === got.initiativeId);
       const check = (field: string, expected: unknown, actual: unknown) => {
         if (expected === undefined || expected === '') return;
         if (actual !== expected) lost.push(`${src.name}.${field}: filed ${JSON.stringify(expected)}, regenerated ${JSON.stringify(actual)}`);
@@ -130,8 +129,8 @@ describe('SC-001: a generated return reproduces the imported one', () => {
       check('ppjtiRelatedParty', src.ppjtiRelatedParty, got.ppjtiRelatedParty);
       check('plannedImplementationQuarter', src.plannedQuarter, got.plannedImplementationQuarter);
       check('remarks', src.remarks, (got as unknown as Record<string, unknown>).remarks);
-      // Through resolveCost: the detail fields are overrides over the initiative's figures.
-      const cost = resolveCost(got, initiative);
+      // The generated row resolves its filed figures from its implementation.
+      const cost = resolveCost(got, out.deliverableSegments);
       check('capexAmount', src.capexAmount, cost.capexAmount);
       check('opexAmount', src.opexAmount, cost.opexAmount);
     }

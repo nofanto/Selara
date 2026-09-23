@@ -174,6 +174,62 @@ describe('computeDataHealth — hard checks (dangling references)', () => {
 });
 
 describe('computeDataHealth — soft checks (report-generation gaps)', () => {
+  it('warns when an initiative budget diverges from all of its implementations and names both repair surfaces (T021)', () => {
+    const init = { id: 'init-1', name: 'Split plan', programmeId: 'prog-1', assetId: asset.id,
+      startDate: '2026-01-01', endDate: '2026-12-31', capex: 1000, opex: 100 };
+    const segments = [
+      { id: 'seg-1', deliverableId: deliverable.id, initiativeId: init.id, startDate: '2026-01-01', endDate: '2026-03-31',
+        status: 'appstatus-in-production', capexAmount: 400, opexAmount: 40 },
+      { id: 'seg-2', deliverableId: deliverable.id, initiativeId: init.id, startDate: '2027-01-01', endDate: '2027-03-31',
+        status: 'appstatus-in-production', capexAmount: 500, opexAmount: 50 },
+    ];
+
+    const issue = findIssue(computeDataHealth(baseInput({ assets: [asset], deliverables: [deliverable],
+      programmes: [programme], initiatives: [init], deliverableSegments: segments })), `initiative-budget-divergence:${init.id}`);
+
+    expect(issue).toMatchObject({ severity: 'warning', reports: ['rpti'] });
+    expect(issue?.message).toMatch(/initiative.*CapEx.*1,000.*OpEx.*100/i);
+    expect(issue?.message).toMatch(/implementation.*CapEx.*900.*OpEx.*90/i);
+    expect(issue?.message).toMatch(/Initiatives tab.*lifecycle segment/i);
+  });
+
+  it('warns without deleting current Initiative.rptiRemarks when several implementations make placement ambiguous (Q20)', () => {
+    const init = { id: 'init-1', name: 'Multi-release plan', programmeId: 'prog-1', assetId: asset.id,
+      startDate: '2026-01-01', endDate: '2028-12-31', capex: 0, opex: 0,
+      rptiRemarks: 'Phase one only, pending board approval' } as never;
+    const segments = [
+      { id: 'seg-1', deliverableId: deliverable.id, initiativeId: 'init-1', startDate: '2026-01-01', endDate: '2031-12-31', status: 'appstatus-in-production' },
+      { id: 'seg-2', deliverableId: deliverable.id, initiativeId: 'init-1', startDate: '2027-01-01', endDate: '2032-12-31', status: 'appstatus-in-production' },
+    ];
+    const issue = findIssue(computeDataHealth(baseInput({ assets: [asset], deliverables: [deliverable],
+      programmes: [programme], initiatives: [init], deliverableSegments: segments })), 'initiative-orphaned-rpti-remarks:init-1');
+
+    expect((init as unknown as Record<string, unknown>).rptiRemarks).toBe('Phase one only, pending board approval');
+    expect(issue).toMatchObject({ severity: 'warning', reports: ['rpti'] });
+    expect(issue?.message).toContain('Phase one only, pending board approval');
+    expect(issue?.message).toMatch(/no longer filed.*more than one implementation.*segment panel/i);
+  });
+
+  /**
+   * The lift is non-destructive, so a successfully placed remark stays on the
+   * initiative too. Add a second go-live afterwards and the naive count sees "more
+   * than one implementation" and tells the preparer to enter a remark that is
+   * already on the first implementation and already filed. A warning about a
+   * non-problem is how the gate loses the credibility the export path depends on.
+   */
+  it('stays silent when an implementation already carries the orphaned remark (Q20)', () => {
+    const remark = 'Phase one only, pending board approval';
+    const init = { id: 'init-1', name: 'Multi-release plan', programmeId: 'prog-1', assetId: asset.id,
+      startDate: '2026-01-01', endDate: '2028-12-31', capex: 0, opex: 0, rptiRemarks: remark } as never;
+    const segments = [
+      { id: 'seg-1', deliverableId: deliverable.id, initiativeId: 'init-1', startDate: '2026-01-01', endDate: '2031-12-31', status: 'appstatus-in-production', rptiRemarks: remark },
+      { id: 'seg-2', deliverableId: deliverable.id, initiativeId: 'init-1', startDate: '2027-01-01', endDate: '2032-12-31', status: 'appstatus-in-production' },
+    ];
+    expect(findIssue(computeDataHealth(baseInput({ assets: [asset], deliverables: [deliverable],
+      programmes: [programme], initiatives: [init], deliverableSegments: segments })),
+      'initiative-orphaned-rpti-remarks:init-1')).toBeUndefined();
+  });
+
   it('flags a Deliverable with zero lifecycle segments', () => {
     const issues = computeDataHealth(baseInput({ assets: [asset], deliverables: [deliverable] }));
     expect(findIssue(issues, `deliverable-no-segments:${deliverable.id}`)?.severity).toBe('warning');

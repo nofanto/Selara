@@ -197,14 +197,10 @@ export function computeDiff(baseVersion: Version, currentData: Version['data']):
         const newAsset = currentData.assets.find(a => a.id === c.assetId)?.name || 'Unknown';
         changes.push(`Moved from Asset "${oldAsset}" to "${newAsset}"`);
       }
-      // Both RPTI free-text columns, named separately because they are separate columns
-      // in the filing: Deskripsi from `description`, Keterangan from `rptiRemarks`
-      // (ADR-0013). `description` was never compared either — the same #42 blind spot.
+      // Deskripsi is initiative-owned. Keterangan is compared on the implementation
+      // below. `description` was never compared either — the same #42 blind spot.
       if ((b.description ?? '') !== (c.description ?? '')) {
         changes.push(`Description: ${b.description || 'Unset'} → ${c.description || 'Unset'}`);
-      }
-      if ((b.rptiRemarks ?? '') !== (c.rptiRemarks ?? '')) {
-        changes.push(`RPTI remarks: ${b.rptiRemarks || 'Unset'} → ${c.rptiRemarks || 'Unset'}`);
       }
       return changes;
     },
@@ -307,6 +303,9 @@ export function computeDiff(baseVersion: Version, currentData: Version['data']):
       if (b.endDate !== c.endDate) changes.push(`End date: ${b.endDate} → ${c.endDate}`);
       if (b.status !== c.status) changes.push(`Status: ${getSegmentStatusName(b.status)} → ${getSegmentStatusName(c.status)}`);
       if (b.deliverableId !== c.deliverableId) changes.push(`Moved to deliverable "${getSegmentDeliverableName(c.deliverableId)}"`);
+      if ((b.rptiRemarks ?? '') !== (c.rptiRemarks ?? '')) {
+        changes.push(`RPTI remarks: ${b.rptiRemarks || 'Unset'} → ${c.rptiRemarks || 'Unset'}`);
+      }
       return changes;
     },
     (s) => deliverableOwners(s.deliverableId)

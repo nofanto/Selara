@@ -3,6 +3,7 @@ import { DeliverableSegment, Deliverable, DeliverableStatus, Initiative } from '
 import { X, Trash2 } from 'lucide-react';
 import { ConfirmModal } from './ConfirmModal';
 import { useFocusTrap } from '../lib/useFocusTrap';
+import { validateDeliverableSegment, ValidationErrors } from '../lib/validation';
 
 const STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: 'appstatus-planned',        label: 'Planned' },
@@ -40,6 +41,7 @@ export function DeliverableSegmentPanel({
 }: DeliverableSegmentPanelProps) {
   const [formData, setFormData] = useState<DeliverableSegment | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [errors, setErrors] = useState<ValidationErrors>({});
   const panelRef = useFocusTrap(isOpen, onClose);
 
   const statusOptions = deliverableStatuses && deliverableStatuses.length > 0
@@ -48,7 +50,10 @@ export function DeliverableSegmentPanel({
 
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
-    if (segment) setFormData({ ...segment });
+    if (segment) {
+      setFormData({ ...segment });
+      setErrors({});
+    }
   }, [segment]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
@@ -58,6 +63,9 @@ export function DeliverableSegmentPanel({
     e.preventDefault();
     if (!formData.startDate || !formData.endDate) return;
     if (formData.endDate <= formData.startDate) return;
+    const nextErrors = validateDeliverableSegment(formData);
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) return;
     onSave(formData);
   };
 
@@ -152,6 +160,44 @@ export function DeliverableSegmentPanel({
                     <option key={i.id} value={i.id}>{i.name}</option>
                   ))}
                 </select>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Filed CapEx</label>
+                  <input
+                    data-testid="segment-filed-capex"
+                    type="number"
+                    min="0"
+                    value={formData.capexAmount ?? ''}
+                    onChange={e => setFormData({ ...formData, capexAmount: e.target.value === '' ? undefined : Number(e.target.value) })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  {errors.capexAmount && <p className="text-xs text-red-600 mt-1">{errors.capexAmount}</p>}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Filed OpEx</label>
+                  <input
+                    data-testid="segment-filed-opex"
+                    type="number"
+                    min="0"
+                    value={formData.opexAmount ?? ''}
+                    onChange={e => setFormData({ ...formData, opexAmount: e.target.value === '' ? undefined : Number(e.target.value) })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  {errors.opexAmount && <p className="text-xs text-red-600 mt-1">{errors.opexAmount}</p>}
+                </div>
+              </div>
+
+              {field('RPTI Remarks (Keterangan)',
+                <textarea
+                  data-testid="segment-rpti-remarks"
+                  value={formData.rptiRemarks ?? ''}
+                  onChange={e => setFormData({ ...formData, rptiRemarks: e.target.value || undefined })}
+                  placeholder="Commentary filed for this implementation"
+                  rows={3}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
               )}
 
               <div className="grid grid-cols-2 gap-4">

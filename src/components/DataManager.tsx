@@ -275,8 +275,8 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery,
     { key: 'strategyId', label: 'Strategy', type: 'select', options: strategyOptions, width: '150px' },
     { key: 'startDate', label: 'Start Date', type: 'date', width: '130px' },
     { key: 'endDate', label: 'End Date', type: 'date', width: '130px' },
-    { key: 'capex', label: `CapEx (${data.timelineSettings.defaultCurrency || 'USD'})`, type: 'number', width: '120px' },
-    { key: 'opex', label: `OpEx (${data.timelineSettings.defaultCurrency || 'USD'})`, type: 'number', width: '120px' },
+    { key: 'capex', label: `Initiative CapEx (${data.timelineSettings.defaultCurrency || 'USD'})`, type: 'number', width: '150px' },
+    { key: 'opex', label: `Initiative OpEx (${data.timelineSettings.defaultCurrency || 'USD'})`, type: 'number', width: '150px' },
     { key: 'status', label: 'Status', type: 'select', options: [
       { value: 'planned', label: 'Planned' },
       { value: 'active', label: 'Active' },
@@ -293,10 +293,6 @@ export function DataManager({ data, onUpdate, onOpenTemplatePicker, searchQuery,
     { key: 'owner', label: 'Owner', type: 'text', width: '150px' },
     { key: 'isPlaceholder', label: 'Placeholder?', type: 'boolean', width: '80px' },
     { key: 'description', label: 'Description', type: 'textarea', width: '260px', placeholder: 'Add a description...' },
-    // The RPTI's two free-text columns are both owned here (ADR-0013): Deskripsi from
-    // `description` above, Keterangan from this. Labelled by what it feeds, because
-    // "Description" and "Remarks" alone would not tell anyone which column is which.
-    { key: 'rptiRemarks', label: 'RPTI Remarks (Keterangan)', type: 'textarea', width: '260px', placeholder: 'Noted about this work in the plan…' },
   ];
 
   const assetColumns: Column<Asset>[] = [

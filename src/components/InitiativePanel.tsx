@@ -213,6 +213,7 @@ export function InitiativePanel({ initiative, assets, deliverables = [], program
                                 <label htmlFor="capex" className="block text-sm font-medium text-slate-700 mb-1">
                                     CapEx ({defaultCurrency})
                                 </label>
+                                <p className="text-xs text-slate-500 mb-1">Initiative portfolio figure — not the RPTI filed amount</p>
                                 <div className="relative">
                                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                         <span className="text-slate-500 sm:text-sm">{defaultCurrency}</span>
@@ -233,6 +234,7 @@ export function InitiativePanel({ initiative, assets, deliverables = [], program
                                 <label htmlFor="opex" className="block text-sm font-medium text-slate-700 mb-1">
                                     OpEx ({defaultCurrency})
                                 </label>
+                                <p className="text-xs text-slate-500 mb-1">Initiative portfolio figure — not the RPTI filed amount</p>
                                 <div className="relative">
                                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                         <span className="text-slate-500 sm:text-sm">{defaultCurrency}</span>

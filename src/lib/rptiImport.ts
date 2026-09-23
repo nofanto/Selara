@@ -364,6 +364,9 @@ export function deriveWorkspaceFromRptiImport(
         startDate: qStart, endDate: openEndedDate(reportYear),
         status: RPTI_IMPORT_LIVE_STATUS_ID,
         initiativeId,
+        capexAmount: row.capexAmount,
+        opexAmount: row.opexAmount,
+        rptiRemarks: row.remarks,
       });
     } else if (hasEntry) {
       // A synthetic, unlinked prior-live segment is added only when the target has none of its
@@ -392,6 +395,9 @@ export function deriveWorkspaceFromRptiImport(
         id: anchorSegmentId, deliverableId: targetId,
         startDate: qStart, endDate: openEndedDate(reportYear),
         status: RPTI_IMPORT_LIVE_STATUS_ID, initiativeId,
+        capexAmount: row.capexAmount,
+        opexAmount: row.opexAmount,
+        rptiRemarks: row.remarks,
       });
     }
 
@@ -419,9 +425,6 @@ export function deriveWorkspaceFromRptiImport(
       capex: row.capexAmount ?? 0,
       opex: row.opexAmount ?? 0,
       description: row.description,
-      // The RPTI's two free-text columns both come from the Initiative now: Deskripsi
-      // from `description`, Keterangan from here (ADR-0013).
-      rptiRemarks: row.remarks,
     });
 
     rptiDetails.push({

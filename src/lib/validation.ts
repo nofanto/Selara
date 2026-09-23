@@ -1,4 +1,4 @@
-import { Initiative, Asset, Programme, Dependency, Milestone } from '../types';
+import { Initiative, Asset, Programme, Dependency, Milestone, DeliverableSegment } from '../types';
 
 export type ValidationErrors = Record<string, string>;
 
@@ -40,6 +40,17 @@ export function validateInitiative(
         errors.opex = 'OpEx cannot be negative';
     }
 
+    return errors;
+}
+
+export function validateDeliverableSegment(segment: DeliverableSegment): ValidationErrors {
+    const errors: ValidationErrors = {};
+    if (segment.capexAmount != null && segment.capexAmount < 0) {
+        errors.capexAmount = 'Filed CapEx cannot be negative';
+    }
+    if (segment.opexAmount != null && segment.opexAmount < 0) {
+        errors.opexAmount = 'Filed OpEx cannot be negative';
+    }
     return errors;
 }
 

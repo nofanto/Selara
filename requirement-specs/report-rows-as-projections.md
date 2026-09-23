@@ -324,6 +324,54 @@ by test rather than by inspection.
 
 ---
 
+### Q20 — current initiative remarks move only when placement is certain (2026-09-23)
+
+**Raised during the Phase 4 migration audit.** Q19 covers the pre-ADR-0013 shape, where a stored
+`RptiDetail.remarks` can name its implementation through `deliverableSegmentId`. The current
+workspace shape is different: `Initiative.rptiRemarks` has no implementation pointer, yet removing
+that field and its editor would otherwise make a preparer-entered value disappear silently.
+
+**Decided**: when an initiative has exactly one live-status implementation across all years, lift
+its remark onto that implementation. Planned and funded run-up segments do not count: an
+implementation is the transition into production, and counting run-up would misclassify the common
+one-run-up/one-go-live shape as ambiguous. An existing segment remark wins. The old schemaless
+property is never deleted, including after a successful lift, so the recoverable source remains.
+
+With several live implementations, leave the property on the initiative and raise a non-blocking
+data-health warning that quotes it and directs the preparer to the intended lifecycle segment
+panel. With zero implementations, place nothing and warn about nothing. An absent status vocabulary
+is also safe failure: without evidence of which segments are live, place nothing and warn about
+nothing.
+
+**Rejected — copy the remark to every implementation.** That can put words written about one piece
+of work onto another application's regulatory row. A blank optional value is honest; a wrong
+sentence in a filing is not.
+
+**Rejected — leave ambiguous remarks orphaned silently.** This value was visible and editable on
+the Initiatives tab before the change. Making it disappear without explanation repeats the silent
+loss this feature exists to prevent.
+
+**Two rules added in review, 2026-09-23**, both measured on the first implementation rather than
+reasoned about, and neither stated when Q19 and Q20 were written.
+
+1. **Where the Q19 and Q20 lifts name the same segment, the initiative's value wins.** Both can
+   target one implementation: a legacy `RptiDetail.remarks` through `deliverableSegmentId`, and the
+   initiative's own remark through the exactly-one rule. The first implementation applied them in
+   the other order, so a remark typed on the Initiatives tab was overwritten by evidence of an older
+   filing — and the overwritten value was the one that would have been filed as `Keterangan`. The
+   initiative's remark is the newer home and the one a preparer edits; old evidence must never
+   overwrite a deliberate edit, which is this lift's standing rule and was already the behaviour
+   before the field moved.
+
+2. **The ambiguity warning stays silent when an implementation already carries that remark.** The
+   lift is deliberately non-destructive, so a successfully placed remark stays on the initiative
+   too. Adding a second go-live afterwards made the naive count read "more than one implementation"
+   and tell the preparer to enter a remark already sitting on the first implementation and already
+   filed. A finding with no action behind it is how the gate loses the credibility the export path
+   depends on.
+
+---
+
 ### Q18 — `Initiative.deliverableId` is removed with its UI (2026-09-22)
 
 **Decided** during planning for [#52](https://github.com/nofanto/Selara/issues/52). The field exists

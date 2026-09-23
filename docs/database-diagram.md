@@ -72,6 +72,9 @@ erDiagram
         date endDate
         string status
         string initiativeId FK "optional; attributes this lifecycle phase to the driving Initiative"
+        number capexAmount "optional; filed RPTI CapEx for this implementation"
+        number opexAmount "optional; filed RPTI OpEx for this implementation"
+        string rptiRemarks "optional; filed RPTI Keterangan for this implementation"
         int row
         int rowSpan
     }
@@ -101,10 +104,9 @@ erDiagram
         string_array resourceIds FK
         date startDate
         date endDate
-        number capex "the filed RPTI figure — ADR-0013 Q7 removed the per-row override"
-        number opex "the filed RPTI figure — ADR-0013 Q7 removed the per-row override"
+        number capex "editable initiative portfolio figure; not an RPTI filing source"
+        number opex "editable initiative portfolio figure; not an RPTI filing source"
         string description "supplies the RPTI Deskripsi column"
-        string rptiRemarks "optional; supplies the RPTI Keterangan column — ADR-0013 Q2, distinct from description"
         boolean isPlaceholder
         string status
         string ragStatus

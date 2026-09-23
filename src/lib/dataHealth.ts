@@ -197,6 +197,36 @@ export function computeDataHealth(input: DataHealthInput): HealthIssue[] {
 
     const initiativeSegments = deliverableSegments.filter(segment => segment.initiativeId === i.id);
 
+    // The initiative budget drives portfolio views; implementation amounts are filed.
+    // Both states are legal, so divergence is reviewable and never export-blocking.
+    const implementations = initiativeSegments.filter(segment => isLiveStatusId(segment.status, deliverableStatuses));
+    const implementationCapex = implementations.reduce((sum, segment) => sum + (segment.capexAmount ?? 0), 0);
+    const implementationOpex = implementations.reduce((sum, segment) => sum + (segment.opexAmount ?? 0), 0);
+    if (implementations.length > 0 && (i.capex !== implementationCapex || i.opex !== implementationOpex)) {
+      issues.push({
+        id: `initiative-budget-divergence:${i.id}`, severity: 'warning', entityType: 'Initiative', entityId: i.id,
+        entityName: i.name,
+        message: `"${i.name}" has an initiative budget of CapEx ${i.capex.toLocaleString()} and OpEx ${i.opex.toLocaleString()}, while its implementations state CapEx ${implementationCapex.toLocaleString()} and OpEx ${implementationOpex.toLocaleString()}. Both are legal and the filing uses the implementation figures. Review the portfolio budget on the Initiatives tab or the filed figures in each lifecycle segment panel.`,
+        location: tab('initiatives'),
+      });
+    }
+
+    const legacyRemarks = (i as unknown as Record<string, unknown>).rptiRemarks;
+    const remarksImplementations = deliverableStatuses.length > 0 ? implementations : [];
+    // The lift is non-destructive, so a remark it successfully placed stays on the
+    // initiative as well. Adding a second go-live later would otherwise raise this
+    // warning about a remark that is already on an implementation and already filed
+    // — a finding with no action behind it, which is how a gate loses its credibility.
+    const alreadyPlaced = remarksImplementations.some(segment => segment.rptiRemarks === legacyRemarks);
+    if (typeof legacyRemarks === 'string' && legacyRemarks !== '' && !alreadyPlaced && remarksImplementations.length > 1) {
+      issues.push({
+        id: `initiative-orphaned-rpti-remarks:${i.id}`, severity: 'warning', entityType: 'Initiative', entityId: i.id,
+        entityName: i.name,
+        message: `"${i.name}" still carries the earlier initiative-level RPTI remark “${legacyRemarks}”. It is no longer filed because this initiative has more than one implementation and Selara cannot safely choose which row it describes. Open the intended implementation's lifecycle segment panel and enter the remark there.`,
+        location: tab('initiatives'),
+      });
+    }
+
     const reportTargets = new Set(initiativeSegments.map(segment => segment.deliverableId));
     if (!i.isPlaceholder && !i.deliverableId && reportTargets.size > 1) {
       issues.push({
@@ -664,6 +694,8 @@ const REPORTS_BY_CHECK: Record<string, HealthReport[]> = {
   // Rows of a return, and the things that stop one being generated at all.
   'initiative-rpti-multi-target': ['rpti'],
   'initiative-rpti-no-target': ['rpti'],
+  'initiative-budget-divergence': ['rpti'],
+  'initiative-orphaned-rpti-remarks': ['rpti'],
   'rpti-asset-target': ['rpti'],
   'rpti-incomplete': ['rpti'],
   'rpti-identity-conflict': ['rpti'],

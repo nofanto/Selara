@@ -69,8 +69,7 @@ export function RptiReportView({ rptiDetails, initiatives, deliverables, assets,
             </thead>
             <tbody>
               {rptiDetails.map((detail, index) => {
-                const initiative = initiatives.find(i => i.id === detail.initiativeId);
-                const { capexAmount, opexAmount } = resolveCost(detail, initiative);
+                const { capexAmount, opexAmount } = resolveCost(detail, deliverableSegments);
                 const quarter = detail.plannedImplementationQuarter
                   ?? suggestDeliverableQuarter(detail, deliverableSegments, deliverableStatuses).quarter
                   ?? '—';

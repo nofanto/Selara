@@ -259,9 +259,8 @@ export function projectRptiReturn(
         drCountry: deliverable?.drCountry ?? category?.drCountry,
         plannedImplementationQuarter: deriveQuarterFromDate(anchor.startDate),
         deliverableSegmentId: anchor.id,
-        // Keterangan comes from the work it comments on, matching Deskripsi two columns
-        // earlier, which has always come from the initiative (ADR-0013).
-        remarks: initiative?.rptiRemarks,
+        // Keterangan belongs to this implementation. Deskripsi remains initiative-owned.
+        remarks: anchor.rptiRemarks,
       });
     }
   }
@@ -488,10 +487,11 @@ export function suggestDeliverableQuarter(
   return { quarter: deriveQuarterFromDate(match.startDate), segmentId: match.id };
 }
 
-export function resolveCost(_detail: RptiDetail, initiative: Initiative | undefined): { capexAmount: number; opexAmount: number } {
+export function resolveCost(detail: RptiDetail, segments: DeliverableSegment[]): { capexAmount: number; opexAmount: number } {
+  const implementation = segments.find(segment => segment.id === detail.deliverableSegmentId);
   return {
-    capexAmount: initiative?.capex ?? 0,
-    opexAmount: initiative?.opex ?? 0,
+    capexAmount: implementation?.capexAmount ?? 0,
+    opexAmount: implementation?.opexAmount ?? 0,
   };
 }
 
@@ -553,7 +553,7 @@ export function exportRptiReportToExcel(
     const suggestion = detail.plannedImplementationQuarter
       ?? suggestDeliverableQuarter(detail, deliverableSegments, deliverableStatuses).quarter
       ?? '';
-    const { capexAmount, opexAmount } = resolveCost(detail, initiative);
+    const { capexAmount, opexAmount } = resolveCost(detail, deliverableSegments);
     return [
       index + 1,
       targetName,

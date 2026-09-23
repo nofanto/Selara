@@ -114,7 +114,12 @@ describe('the fields ADR-0013 moved survive the workspace round trip (contract 2
   const initiative = {
     id: 'init-1', name: 'Gateway Upgrade', programmeId: 'prog-1', assetId: 'asset-1',
     startDate: '2027-01-01', endDate: '2027-12-31', capex: 100, opex: 10,
-    description: 'Deskripsi text', rptiRemarks: 'Keterangan text',
+    description: 'Deskripsi text',
+  };
+  const implementation = {
+    id: 'seg-1', deliverableId: 'deliv-1', initiativeId: 'init-1', status: 'appstatus-in-production',
+    startDate: '2027-01-01', endDate: '2031-12-31', capexAmount: 100, opexAmount: 10,
+    rptiRemarks: 'Keterangan text',
   };
 
   it('carries all eight Deliverable attributes plus the widened developer', () => {
@@ -126,11 +131,12 @@ describe('the fields ADR-0013 moved survive the workspace round trip (contract 2
     }
   });
 
-  it('carries rptiRemarks distinctly from description on the Initiative', () => {
-    const wb = buildWorkbook({ ...emptyWorkspace, initiatives: [initiative] } as never);
-    const [back] = parseWorkbook(wb).initiatives as unknown as Record<string, unknown>[];
+  it('carries implementation rptiRemarks distinctly from the Initiative description', () => {
+    const wb = buildWorkbook({ ...emptyWorkspace, initiatives: [initiative], deliverableSegments: [implementation] } as never);
+    const [backInitiative] = parseWorkbook(wb).initiatives as unknown as Record<string, unknown>[];
+    const [backSegment] = parseWorkbook(wb).deliverableSegments as unknown as Record<string, unknown>[];
 
-    expect(back?.description).toBe('Deskripsi text');
-    expect(back?.rptiRemarks, 'rptiRemarks did not survive the round trip').toBe('Keterangan text');
+    expect(backInitiative?.description).toBe('Deskripsi text');
+    expect(backSegment?.rptiRemarks, 'rptiRemarks did not survive the round trip').toBe('Keterangan text');
   });
 });
