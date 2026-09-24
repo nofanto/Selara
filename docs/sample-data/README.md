@@ -55,6 +55,10 @@ something different:
   Open API Banking Platform has a new Q1 build and a Q3 upgrade, with different
   CapEx, OpEx and commentary. The pair exercises same-file matching and proves
   that round-trip verification operates at implementation grain rather than name grain.
+  It imports as **one application and two initiatives** — *Open API Banking Platform — Q1
+  2027* and *— Q3 2027* — each spanning only its own quarter. Two initiatives rather than
+  one is deliberate: Deskripsi is filed from the initiative, and the two rows describe
+  different work, so merging them would lose one description.
 - **4 new infrastructure items** — DRC relocation, server refresh, SD-WAN,
   firewall/SIEM. These carry RPTI codes `51`–`54`, which LKPTI does not have at all.
   An LKPTI-only workspace structurally cannot reach them, and that is the reason the

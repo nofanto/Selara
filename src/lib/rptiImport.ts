@@ -4,7 +4,7 @@ import {
   Initiative, Programme, RptiCategoryCode, RptiDetail, RptiDeveloper, RptiDevelopmentType,
   RptiQuarter, RptiRelatedParty,
 } from '../types';
-import { RPTI_CATEGORY_LABELS, periodForQuarter, isLiveStatusId, openEndedDate } from './rpti';
+import { RPTI_CATEGORY_LABELS, periodForQuarter, isLiveStatusId } from './rpti';
 import { IN_PRODUCTION_STATUS, SEEDED_DELIVERABLE_STATUSES } from './deliverableStatusDefaults';
 
 /**
@@ -209,6 +209,28 @@ export const RPTI_IMPORT_PROGRAMME_ID = 'rpti-import-programme';
 export const RPTI_IMPORT_LIVE_STATUS_ID = IN_PRODUCTION_STATUS.id;
 
 /**
+ * How long an imported implementation stays live depends on what it is (Q21).
+ *
+ * A **new** build creates the application, so its live phase is the application's
+ * existence — held to a three-year planning horizon from the go-live quarter's first
+ * day, exactly: a Q3 2027 go-live is live until 2030-06-30. Every quarter of the filed
+ * year still spans 31 December, which is what keeps a Q1-Q3 build in that year's LKPTI.
+ *
+ * An **upgrade** is an event on something already running, so only its filed quarter
+ * is the implementation. The application's continued existence is carried by its own
+ * inventory history — or, where it has none, by the synthetic prior phase below.
+ */
+const NEW_BUILD_LIVE_YEARS = 3;
+
+function importedLiveEnd(developmentType: 'new' | 'upgrade', goLive: string, quarterEnd: string): string {
+  if (developmentType === 'upgrade') return quarterEnd;
+  const [year, month, day] = goLive.split('-').map(Number);
+  // UTC throughout: a local-time Date can shift the result a day either side of midnight.
+  return new Date(Date.UTC(year + NEW_BUILD_LIVE_YEARS, month - 1, day) - 86_400_000)
+    .toISOString().slice(0, 10);
+}
+
+/**
  * Turns parsed rows into workspace entities.
  *
  * Pure: identical inputs produce identical output, and every id derives from the
@@ -361,12 +383,7 @@ export function deriveWorkspaceFromRptiImport(
       anchorSegmentId = `rpti-import-seg-${n}`;
       deliverableSegments.push({
         id: anchorSegmentId, deliverableId: targetId,
-        // Open-ended from the filed quarter, not bounded by it. The row states a
-        // go-live, and a thing that goes live stays live until something ends it;
-        // ending the segment at the quarter made the application live for three
-        // months and then absent, and made its presence in the year-end LKPTI
-        // depend on whether the filed quarter happened to be Q4.
-        startDate: qStart, endDate: openEndedDate(reportYear),
+        startDate: qStart, endDate: importedLiveEnd(row.developmentType, qStart, qEnd),
         status: RPTI_IMPORT_LIVE_STATUS_ID,
         initiativeId,
         capexAmount: row.capexAmount,
@@ -401,7 +418,7 @@ export function deriveWorkspaceFromRptiImport(
       anchorSegmentId = `rpti-import-seg-${n}`;
       deliverableSegments.push({
         id: anchorSegmentId, deliverableId: targetId,
-        startDate: qStart, endDate: openEndedDate(reportYear),
+        startDate: qStart, endDate: importedLiveEnd(row.developmentType, qStart, qEnd),
         status: RPTI_IMPORT_LIVE_STATUS_ID, initiativeId,
         capexAmount: row.capexAmount,
         opexAmount: row.opexAmount,
@@ -415,10 +432,15 @@ export function deriveWorkspaceFromRptiImport(
     // arrived with 14 errors before this was fixed.
     initiatives.push({
       id: initiativeId,
-      name: row.name,
+      // The RPTI has no initiative-name column, so the application name is all there
+      // is. The quarter keeps two rows for one application distinguishable (Q21).
+      name: `${row.name} — ${row.plannedQuarter} ${reportYear}`,
       programmeId: RPTI_IMPORT_PROGRAMME_ID,
       assetId: initiativeAssetId,
-      startDate: `${reportYear}-01-01`,
+      // Exactly the filed quarter. The return states when the work goes live and nothing
+      // about when it began; starting on 1 January made every bar's length encode which
+      // quarter was filed — Q1 three months, Q4 twelve (Q21).
+      startDate: qStart,
       endDate: qEnd,
       capex: row.capexAmount ?? 0,
       opex: row.opexAmount ?? 0,

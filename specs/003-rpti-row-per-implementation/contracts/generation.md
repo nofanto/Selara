@@ -39,6 +39,11 @@ below supersedes one explicitly.
    quarter was filed: measured on the published sample, a Q4 build joined the 2027 inventory and the
    Q1–Q3 builds did not. Both importers now use one horizon — an LKPTI entry and a filed go-live are
    the same claim, *this is live from that date*.
+
+   **REVISED by Q21 (2026-09-24):** `new` → three years from the filed quarter's first day;
+   `upgrade` → the filed quarter only. The shared horizon described above no longer holds: the
+   LKPTI importer still runs entries to its as-at year plus five, so which return supplied an
+   application now decides when it leaves the inventory. Measured and recorded in Q21.
 3. **One go-live files exactly once, in one year.** A segment starting in 2027 and running to 2031
    produces a row in 2027 and in no other year. Today it produces one every year until the segment
    ends — the second of the three symptoms in research.md R1.

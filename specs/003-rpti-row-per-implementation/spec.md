@@ -153,6 +153,12 @@ each stored row is either matched or named.
   filed quarter, for `new` and `upgrade` alike. A quarter-bounded anchor makes year-end LKPTI
   membership depend on which quarter was filed — a Q4 build joins that year's inventory and a Q1–Q3
   build does not — and draws a three-month lifespan on the timeline for work that is ongoing.
+
+  **REVISED by Q21 (2026-09-24).** The live phase now depends on the development type: a `new`
+  build is live for three years from its filed quarter's first day, an `upgrade` for its filed
+  quarter only. The Q4-only defect above stays fixed for `new`, since three years from any quarter
+  spans 31 December. For `upgrade` it does not arise in the ordinary flow, because the application's
+  own inventory history carries its LKPTI membership — see Q21 for the one case where it does.
 - **FR-002**: Each row MUST state the implementation time of its own implementation. No
   implementation belonging to the report year may be absent from the generated return.
 - **FR-003**: An initiative with exactly one implementation in the report year MUST continue to

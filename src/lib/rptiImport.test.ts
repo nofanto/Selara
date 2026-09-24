@@ -7,7 +7,7 @@ import {
   deriveWorkspaceFromRptiImport,
   RPTI_IMPORT_LIVE_STATUS_ID,
 } from './rptiImport';
-import { RPTI_CATEGORY_LABELS, projectRptiReturn, openEndedDate } from './rpti';
+import { RPTI_CATEGORY_LABELS, projectRptiReturn } from './rpti';
 import { generateLkptiDetails } from './lkpti';
 import type { Asset, AssetCategory, Deliverable, DeliverableSegment } from '../types';
 import { SEEDED_DELIVERABLE_STATUSES } from './deliverableStatusDefaults';
@@ -117,17 +117,23 @@ describe('deriveWorkspaceFromRptiImport — placement', () => {
     assetCategories: [{ id: 'c-1', name: 'Area', categoryCode: '04' } as AssetCategory],
   };
 
-  it('gives a newly created build one open-ended live start at the filed quarter', () => {
-    // The filed implementation is a transition into production; the segment starts
-    // on its planned date so regeneration files that same quarter, and runs
-    // open-ended because a thing that goes live stays live until something ends it.
+  it('gives a new build a live phase of three years from its filed quarter (Q21)', () => {
+    // A new build creates the application, so its live phase is the application's
+    // existence — bounded to a three-year planning horizon rather than extended five.
+    // It still spans 31 December of the filed year for every quarter, which is what
+    // keeps a Q1-Q3 build in that year's LKPTI (the defect FR-001c fixed).
     const out = deriveWorkspaceFromRptiImport(parse({ jenis: 'new', quarter: 'Q3' }), 2027, EMPTY);
     expect(out.deliverableSegments).toHaveLength(1);
     expect(out.deliverableSegments[0]).toMatchObject({
-      startDate: '2027-07-01', endDate: openEndedDate(2027), status: RPTI_IMPORT_LIVE_STATUS_ID,
+      startDate: '2027-07-01', endDate: '2030-06-30', status: RPTI_IMPORT_LIVE_STATUS_ID,
     });
-    expect(out.deliverableSegments[0].endDate > '2027-12-31').toBe(true);
   });
+
+  it.each([['Q1', '2027-01-01', '2029-12-31'], ['Q4', '2027-10-01', '2030-09-30']] as const)(
+    'measures three years from the first day of a %s go-live (Q21)', (quarter, start, end) => {
+      const out = deriveWorkspaceFromRptiImport(parse({ jenis: 'new', quarter }), 2027, EMPTY);
+      expect(out.deliverableSegments[0]).toMatchObject({ startDate: start, endDate: end });
+    });
 
   it('gives a newly created upgrade a prior live phase and filed live start', () => {
     // Reachable only for infrastructure, which no LKPTI can carry. The prior
@@ -139,8 +145,10 @@ describe('deriveWorkspaceFromRptiImport — placement', () => {
     expect(out.deliverableSegments[0]).toMatchObject({
       startDate: '2026-01-01', endDate: '2026-12-31', status: RPTI_IMPORT_LIVE_STATUS_ID,
     });
+    // An upgrade is an event on something already running: only its filed quarter
+    // is the implementation. The synthetic 2026 phase above is what says it existed.
     expect(out.deliverableSegments[1]).toMatchObject({
-      startDate: '2027-07-01', endDate: openEndedDate(2027), status: RPTI_IMPORT_LIVE_STATUS_ID,
+      startDate: '2027-07-01', endDate: '2027-09-30', status: RPTI_IMPORT_LIVE_STATUS_ID,
     });
   });
 
@@ -187,9 +195,39 @@ describe('deriveWorkspaceFromRptiImport — placement', () => {
     });
     expect(out.unresolved).toHaveLength(0);
     expect(out.deliverableSegments).toHaveLength(1);
+    // Only the filed quarter. The inventory's own segment (2021 onward) already says
+    // the application is running; an open-ended upgrade segment drew a second live bar
+    // beside it through 2032 that said nothing the first did not (Q21).
     expect(out.deliverableSegments[0]).toMatchObject({
-      startDate: '2027-07-01', endDate: openEndedDate(2027), status: RPTI_IMPORT_LIVE_STATUS_ID,
+      startDate: '2027-07-01', endDate: '2027-09-30', status: RPTI_IMPORT_LIVE_STATUS_ID,
     });
+  });
+
+  it('spans each imported initiative over exactly its filed quarter (Q21)', () => {
+    // The return states a go-live quarter and nothing about when work began. Starting
+    // every initiative on 1 January made a bar's length encode which quarter was filed —
+    // Q1 three months, Q4 twelve — rather than anything about the work.
+    for (const [quarter, start, end] of [
+      ['Q1', '2027-01-01', '2027-03-31'], ['Q2', '2027-04-01', '2027-06-30'],
+      ['Q3', '2027-07-01', '2027-09-30'], ['Q4', '2027-10-01', '2027-12-31'],
+    ] as const) {
+      const [initiative] = deriveWorkspaceFromRptiImport(parse({ jenis: 'new', quarter }), 2027, EMPTY).initiatives;
+      expect(initiative, quarter).toMatchObject({ startDate: start, endDate: end });
+    }
+  });
+
+  it('names each imported initiative with its filed quarter (Q21)', () => {
+    // The RPTI has no initiative-name column. Without the quarter, two rows for one
+    // application import as two initiatives with the same name and cannot be told apart.
+    const out = deriveWorkspaceFromRptiImport(parseRptiImportWorkbook(wb([
+      row({ name: 'Open API Banking Platform', jenis: 'new', quarter: 'Q1' }),
+      row({ no: 2, name: 'Open API Banking Platform', jenis: 'upgrade', quarter: 'Q3' }),
+    ])).rows, 2027, EMPTY);
+    expect(out.initiatives.map(i => i.name)).toEqual([
+      'Open API Banking Platform — Q1 2027', 'Open API Banking Platform — Q3 2027',
+    ]);
+    // The application itself is still one thing, named as filed.
+    expect(out.deliverables.map(d => d.name)).toEqual(['Open API Banking Platform']);
   });
 
   it('still regenerates as an upgrade in both cases', () => {

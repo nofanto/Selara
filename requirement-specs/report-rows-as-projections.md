@@ -327,6 +327,73 @@ by test rather than by inspection.
 
 ---
 
+### Q21 — an imported implementation's dates follow what the return states (2026-09-24)
+
+**Raised by the product owner** after importing both sample returns and finding two overlapping
+`Open API Banking Platform` initiatives on one asset. The overlap had nothing to do with there being
+two initiatives — one per filed row is required, because Deskripsi is initiative-owned and the two
+rows state different descriptions. It came from the dates the importer invented.
+
+**Decided — three rules.**
+
+1. **An imported initiative spans exactly its filed quarter.** It used to start on 1 January of the
+   report year whatever quarter was filed, so a bar's length encoded *which quarter was filed* rather
+   than anything about the work: Q1 three months, Q4 twelve. The return states a go-live quarter and
+   nothing about when work began. The quarter is the one thing it does say.
+2. **An imported initiative's name carries its filed quarter**, as `<application> — Q3 2027`. The RPTI
+   has no initiative-name column, so both Open API initiatives were named after the application and
+   could not be told apart. Naming them after their descriptions was rejected: those are sentences,
+   and they make unreadable bar labels.
+3. **An imported implementation's live phase depends on its development type** *(product owner's
+   rule)*:
+   - **`new`** — from the filed quarter's first day for **three years**. A new build *creates* the
+     application, so its live phase is the application's existence, bounded to a planning horizon
+     rather than extended five years as before.
+   - **`upgrade`** — **the filed quarter only**. An upgrade is an event on an application that already
+     exists. Its continued existence is carried by its own inventory history, so an open-ended upgrade
+     segment drew a second live bar in parallel with the inventory's own, through 2032, saying nothing
+     the first did not.
+
+   *"Three years" is taken as exactly three years of live phase from the go-live quarter's first day
+   — a Q3 2027 go-live is live until 2030-06-30 — held in one named constant.*
+
+**What it revises: FR-001c and contract 2c** (2026-09-23), which anchored both types on an
+open-ended live phase. The defect that motivated them stays fixed for `new`: a quarter-bounded anchor
+put a Q4 build into that year's LKPTI and left Q1–Q3 builds out, and a three-year phase from any 2027
+quarter spans 31 December 2027. For `upgrade` that reasoning never applied in the ordinary flow,
+because the application's inventory segment carries its LKPTI membership, not the upgrade's.
+
+**Rejected — keep both open-ended (FR-001c as written).** It treats an event and an existence as the
+same thing, and draws the redundant parallel bar described above.
+
+**Measured on the published samples, before → after.** The RPTI regenerates identically — 13 rows,
+the same development types in the same order, zero round-trip losses. The two Open API initiatives
+now sit in Q1 and Q3 without overlapping. The inventory:
+
+| As at 31 Dec | 2026 | 2027 | 2028 | 2029 | 2030 | 2031 | 2032 |
+|---|---|---|---|---|---|---|---|
+| Before | 13 | 16 | 16 | 16 | 16 | 16 | 7 |
+| After  | 13 | 16 | 16 | 16 | **13** | **13** | **0** |
+
+Before, the four upgraded inventory applications stayed "live" into 2032, a year past their own
+inventory horizon, purely because an upgrade's open-ended segment outlived it — an event extending
+an existence. After, the three new applications leave in 2030 while the thirteen LKPTI applications
+stay until 2031.
+
+**Two consequences this does not resolve, recorded rather than absorbed:**
+
+1. **The two importers now use different horizons.** LKPTI entries run to their as-at year plus
+   five; RPTI new builds run three years from go-live. When an application leaves the inventory
+   therefore depends on which return supplied it. Contract 2c's shared horizon existed to prevent
+   exactly that. Left unaligned because the LKPTI importer was not part of this decision.
+2. **An upgrade to an application with no live history of its own** — a hand-built workspace, not
+   the LKPTI + RPTI onboarding flow — **drops out of the inventory in the year it is upgraded**,
+   unless the quarter is Q4. Measured: Q1–Q3 upgrades are in the 2026 LKPTI through the synthetic
+   prior phase and absent from 2027 on; a Q4 upgrade is present in 2027 only. It is the Q4-only
+   defect FR-001c fixed, returning for this one case. The rule's premise — that the application's
+   existence is carried by its own inventory history — does not hold when there is none. Its RPTI
+   filing is unaffected and still types as `upgrade`.
+
 ### Q20 — current initiative remarks move only when placement is certain (2026-09-23)
 
 **Raised during the Phase 4 migration audit.** Q19 covers the pre-ADR-0013 shape, where a stored
