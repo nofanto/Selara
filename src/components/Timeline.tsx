@@ -2607,7 +2607,6 @@ export function Timeline({ assets, deliverables = [], initiatives, milestones, p
               : null
         }
         assets={assets}
-        deliverables={deliverables}
         programmes={programmes}
         strategies={strategies}
         dependencies={dependencies}

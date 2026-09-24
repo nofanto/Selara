@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Initiative, Asset, Deliverable, Programme, Strategy, Dependency, Resource, Decision } from '../types';
+import { Initiative, Asset, Programme, Strategy, Dependency, Resource, Decision } from '../types';
 import { X, Save, Trash2, ExternalLink } from 'lucide-react';
 import { validateInitiative, ValidationErrors } from '../lib/validation';
 import { ConfirmModal } from './ConfirmModal';
@@ -8,7 +8,6 @@ import { useFocusTrap } from '../lib/useFocusTrap';
 interface InitiativePanelProps {
     initiative: Initiative | null;
     assets: Asset[];
-    deliverables?: Deliverable[];
     programmes: Programme[];
     strategies: Strategy[];
     dependencies?: Dependency[];
