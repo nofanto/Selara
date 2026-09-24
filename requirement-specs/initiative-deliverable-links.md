@@ -1,7 +1,7 @@
 # Showing which deliverables an initiative drives (Design Notes)
 
-> **Status:** Open — design options for [#54](https://github.com/nofanto/Selara/issues/54). No code
-> until one is chosen (CLAUDE.md step 0).
+> **Status:** Decided 2026-09-25 — see *Decided* below. Implementation tracked by
+> [#54](https://github.com/nofanto/Selara/issues/54) and User Story 26.
 > **Context:** Since [#52](https://github.com/nofanto/Selara/issues/52) (PR #53), one initiative can
 > drive several deliverables. The link is not stored on the initiative. Each **lifecycle segment**
 > names both its application (`deliverableId`) and the initiative behind it (`initiativeId`), so an
@@ -102,17 +102,45 @@ them, each with a jump to its segment.
 only on select and styled unlike any dependency, once A and D are in use and it's clear whether
 the gap remains. **C rejected**: colour identifies a programme, not an initiative.
 
-## Open questions
+## Decided (2026-09-25)
 
-1. **Which option or options?** Recommendation above; the decision is the product owner's.
-2. **Both directions?** Should selecting a segment highlight its initiative as well as the reverse?
-   Recommended yes: "whose work is this?" is as common as "what does this deliver?".
-3. **Hidden targets.** When a highlighted segment is inside a collapsed category, expand the
-   category, show an indicator on its header, or leave it to D's list?
-4. **Other groupings and display modes.** Accept that A is inert outside grouping by asset with
-   display `both`, with D still working, or switch to that view when a highlight is requested?
-5. **Group bars.** When the selected initiative is merged into a group bar, highlight the group, or
-   expand it?
+The product owner chose **A + D**, answering the five open questions as follows.
+
+1. **A and D together.** The count badge and list work everywhere; the highlight gives the spatial
+   link on request.
+2. **Both directions.** Selecting a segment highlights its initiative as well as the reverse.
+3. **Hidden segments are expanded and marked.** A category collapsed over a highlighted bar opens,
+   and its header is marked so it's clear why it opened.
+4. **Other views: accepted.** The highlight only works when grouped by asset with display `both`.
+   Elsewhere, selection behaves as it does today and the badge still works.
+5. **Group bars are expanded.** A group bar hiding the focused initiative opens so the initiative can
+   be seen.
+
+**Rules settled while recording them.** None needed the product owner, but each is a choice, so it's
+written down.
+
+- **Expansion is temporary.** A category or group opened for a highlight shows expanded only while
+  the highlight lasts, and returns to its saved state when it ends. The saved collapse settings —
+  `collapsedCategories` in session storage and `collapsedGroups` in the timeline settings — are
+  never changed. A highlight is a way of looking, not an edit, and overwriting someone's layout
+  every time they click a bar would be. The mark on the header is what explains the temporary
+  opening.
+- **One highlight set, whichever end is clicked.** The set is the initiative plus all of its
+  segments. Selecting the initiative focuses it; selecting one of its segments focuses its
+  initiative, and the clicked segment keeps its normal selection outline. "What does this deliver?"
+  and "whose work is this?" end in the same picture.
+- **The most recent click decides the focus.** Initiative and segment selection are independent
+  today and can both be set at once. Rather than change that, the highlight follows whichever was
+  selected last. Escape and a click on the empty timeline clear it, exactly as they clear selection
+  now.
+- **Nothing linked, nothing dims.** An initiative with no segments, or a segment with no initiative,
+  behaves exactly as today. Dimming the whole timeline to highlight one bar would say nothing.
+- **The badge counts deliverables, not segments.** The question is *which applications*. An
+  initiative with three implementations on one application shows 1. The list names each deliverable
+  and its asset; choosing one focuses the initiative and scrolls to that deliverable's earliest
+  linked segment. The highlight already shows the rest.
+- **Categories count at both ends.** A category is revealed if it hides the focused initiative *or*
+  any of its segments.
 
 ## Verification needs
 
