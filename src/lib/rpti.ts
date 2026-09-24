@@ -58,9 +58,11 @@ export function periodForQuarter(quarter: RptiQuarter, year: number): { startDat
   return { startDate: `${year}-${start}`, endDate: `${year}-${end}` };
 }
 
-// A freshly-imported "live" segment has no known end — DeliverableSegment.endDate is a
-// required field, so we anchor it several years out, matching how demo data represents
-// an ongoing live segment (see src/demoData.ts) rather than inventing a null-endDate concept.
+// Both LKPTI and RPTI importers use this planning horizon for an imported application's
+// live phase. DeliverableSegment.endDate is required, though neither return knows when
+// the application will retire. LKPTI anchors it to the inventory's as-at year; RPTI
+// anchors a new build to its filed go-live year. Thus a 2026 LKPTI entry ends in 2031
+// and a 2027 RPTI new build ends in 2032: the same rule, with different evidence dates.
 const OPEN_ENDED_YEARS_OUT = 5;
 
 /**
@@ -68,9 +70,8 @@ const OPEN_ENDED_YEARS_OUT = 5;
  * Reading `new Date()` here meant the same filed return imported in 2026 and in 2030
  * produced different workspaces from identical input (lkptiImport T032).
  *
- * Shared by both importers: an LKPTI entry and an RPTI filed go-live are the same
- * claim — this is live from that date — and an end date that differs between them
- * makes year-end inventory membership depend on which return happened to supply it.
+ * Shared by both importers, each anchored to the year its return establishes the
+ * application is live: LKPTI's as-at year or RPTI's new-build go-live year.
  */
 export function openEndedDate(fromYear: number): string {
   return `${fromYear + OPEN_ENDED_YEARS_OUT}-12-31`;

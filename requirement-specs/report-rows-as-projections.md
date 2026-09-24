@@ -345,7 +345,7 @@ rows state different descriptions. It came from the dates the importer invented.
    could not be told apart. Naming them after their descriptions was rejected: those are sentences,
    and they make unreadable bar labels.
 3. **An imported implementation's live phase depends on its development type** *(product owner's
-   rule)*:
+   first version, 2026-09-24; revised below)*:
    - **`new`** — from the filed quarter's first day for **three years**. A new build *creates* the
      application, so its live phase is the application's existence, bounded to a planning horizon
      rather than extended five years as before.
@@ -357,36 +357,49 @@ rows state different descriptions. It came from the dates the importer invented.
    *"Three years" is taken as exactly three years of live phase from the go-live quarter's first day
    — a Q3 2027 go-live is live until 2030-06-30 — held in one named constant.*
 
+   **Revised by the product owner, 2026-09-24:** `new` uses the same five-year horizon as the LKPTI
+   importer, through **31 December of the filed go-live year plus five**. Thus every 2027 new build
+   remains live through 2032-12-31, regardless of quarter. The original three-year rule above remains
+   as the first version of this decision. `upgrade` remains the filed quarter only; the open edge case
+   below is still open. Both importers call `openEndedDate`, which owns the one horizon constant.
+
 **What it revises: FR-001c and contract 2c** (2026-09-23), which anchored both types on an
-open-ended live phase. The defect that motivated them stays fixed for `new`: a quarter-bounded anchor
-put a Q4 build into that year's LKPTI and left Q1–Q3 builds out, and a three-year phase from any 2027
-quarter spans 31 December 2027. For `upgrade` that reasoning never applied in the ordinary flow,
+open-ended live phase. Under the first version, the defect that motivated them stayed fixed for
+`new`: a quarter-bounded anchor put a Q4 build into that year's LKPTI and left Q1–Q3 builds out,
+and a three-year phase from any 2027 quarter spans 31 December 2027. The revised five-year phase
+also spans that date. For `upgrade` that reasoning never applied in the ordinary flow,
 because the application's inventory segment carries its LKPTI membership, not the upgrade's.
 
 **Rejected — keep both open-ended (FR-001c as written).** It treats an event and an existence as the
 same thing, and draws the redundant parallel bar described above.
 
-**Measured on the published samples, before → after.** The RPTI regenerates identically — 13 rows,
+**Measured on the published samples, before → after the first version.** The RPTI regenerates identically — 13 rows,
 the same development types in the same order, zero round-trip losses. The two Open API initiatives
 now sit in Q1 and Q3 without overlapping. The inventory:
 
 | As at 31 Dec | 2026 | 2027 | 2028 | 2029 | 2030 | 2031 | 2032 |
 |---|---|---|---|---|---|---|---|
 | Before | 13 | 16 | 16 | 16 | 16 | 16 | 7 |
-| After  | 13 | 16 | 16 | 16 | **13** | **13** | **0** |
+| After first version | 13 | 16 | 16 | 16 | **13** | **13** | **0** |
 
 Before, the four upgraded inventory applications stayed "live" into 2032, a year past their own
 inventory horizon, purely because an upgrade's open-ended segment outlived it — an event extending
-an existence. After, the three new applications leave in 2030 while the thirteen LKPTI applications
+an existence. After the first version, the three new applications leave in 2030 while the thirteen LKPTI applications
 stay until 2031.
 
-**Two consequences this does not resolve, recorded rather than absorbed:**
+**Two consequences recorded with the first version:**
 
-1. **The two importers now use different horizons.** LKPTI entries run to their as-at year plus
-   five; RPTI new builds run three years from go-live. When an application leaves the inventory
-   therefore depends on which return supplied it. Contract 2c's shared horizon existed to prevent
-   exactly that. Left unaligned because the LKPTI importer was not part of this decision.
-2. **An upgrade to an application with no live history of its own** — a hand-built workspace, not
+1. **RESOLVED by the 2026-09-24 revision — the two importers used different horizons.** LKPTI entries
+   ran to their as-at year plus five; RPTI new builds ran three years from go-live. When an application
+   left the inventory therefore depended on which return supplied it. Contract 2c's shared horizon existed to prevent
+   exactly that. The revised rule gives both importers the same five-year horizon. Their end dates
+   legitimately differ because the LKPTI sample is evidence of being live as at 2026-12-31 and the
+   RPTI sample is evidence of a 2027 go-live: the former ends in 2031, the latter in 2032. Measured
+   inventory rows as at 31 December, 2026–2032: **13, 16, 16, 16, 13, 13, 0** before this revision;
+   **13, 16, 16, 16, 16, 16, 3** after. The regenerated 2027 RPTI stays at **13 rows**, with
+   development types in the same order: `upgrade, upgrade, upgrade, upgrade, new, upgrade, new, new,
+   new, new, new, new, upgrade`; round-trip losses remain **zero**.
+2. **OPEN — an upgrade to an application with no live history of its own** — a hand-built workspace, not
    the LKPTI + RPTI onboarding flow — **drops out of the inventory in the year it is upgraded**,
    unless the quarter is Q4. Measured: Q1–Q3 upgrades are in the 2026 LKPTI through the synthetic
    prior phase and absent from 2027 on; a Q4 upgrade is present in 2027 only. It is the Q4-only

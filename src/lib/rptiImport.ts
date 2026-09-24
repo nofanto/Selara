@@ -4,7 +4,7 @@ import {
   Initiative, Programme, RptiCategoryCode, RptiDetail, RptiDeveloper, RptiDevelopmentType,
   RptiQuarter, RptiRelatedParty,
 } from '../types';
-import { RPTI_CATEGORY_LABELS, periodForQuarter, isLiveStatusId } from './rpti';
+import { RPTI_CATEGORY_LABELS, periodForQuarter, isLiveStatusId, openEndedDate } from './rpti';
 import { IN_PRODUCTION_STATUS, SEEDED_DELIVERABLE_STATUSES } from './deliverableStatusDefaults';
 
 /**
@@ -212,22 +212,16 @@ export const RPTI_IMPORT_LIVE_STATUS_ID = IN_PRODUCTION_STATUS.id;
  * How long an imported implementation stays live depends on what it is (Q21).
  *
  * A **new** build creates the application, so its live phase is the application's
- * existence — held to a three-year planning horizon from the go-live quarter's first
- * day, exactly: a Q3 2027 go-live is live until 2030-06-30. Every quarter of the filed
- * year still spans 31 December, which is what keeps a Q1-Q3 build in that year's LKPTI.
+ * existence — held to the shared five-year horizon from its filed go-live year.
+ * A Q3 2027 go-live is live through 2032-12-31, as is every 2027 quarter.
  *
  * An **upgrade** is an event on something already running, so only its filed quarter
  * is the implementation. The application's continued existence is carried by its own
  * inventory history — or, where it has none, by the synthetic prior phase below.
  */
-const NEW_BUILD_LIVE_YEARS = 3;
-
-function importedLiveEnd(developmentType: 'new' | 'upgrade', goLive: string, quarterEnd: string): string {
+function importedLiveEnd(developmentType: 'new' | 'upgrade', reportYear: number, quarterEnd: string): string {
   if (developmentType === 'upgrade') return quarterEnd;
-  const [year, month, day] = goLive.split('-').map(Number);
-  // UTC throughout: a local-time Date can shift the result a day either side of midnight.
-  return new Date(Date.UTC(year + NEW_BUILD_LIVE_YEARS, month - 1, day) - 86_400_000)
-    .toISOString().slice(0, 10);
+  return openEndedDate(reportYear);
 }
 
 /**
@@ -383,7 +377,7 @@ export function deriveWorkspaceFromRptiImport(
       anchorSegmentId = `rpti-import-seg-${n}`;
       deliverableSegments.push({
         id: anchorSegmentId, deliverableId: targetId,
-        startDate: qStart, endDate: importedLiveEnd(row.developmentType, qStart, qEnd),
+        startDate: qStart, endDate: importedLiveEnd(row.developmentType, reportYear, qEnd),
         status: RPTI_IMPORT_LIVE_STATUS_ID,
         initiativeId,
         capexAmount: row.capexAmount,
@@ -418,7 +412,7 @@ export function deriveWorkspaceFromRptiImport(
       anchorSegmentId = `rpti-import-seg-${n}`;
       deliverableSegments.push({
         id: anchorSegmentId, deliverableId: targetId,
-        startDate: qStart, endDate: importedLiveEnd(row.developmentType, qStart, qEnd),
+        startDate: qStart, endDate: importedLiveEnd(row.developmentType, reportYear, qEnd),
         status: RPTI_IMPORT_LIVE_STATUS_ID, initiativeId,
         capexAmount: row.capexAmount,
         opexAmount: row.opexAmount,

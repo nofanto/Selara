@@ -7,7 +7,7 @@ import {
   deriveWorkspaceFromRptiImport,
   RPTI_IMPORT_LIVE_STATUS_ID,
 } from './rptiImport';
-import { RPTI_CATEGORY_LABELS, projectRptiReturn } from './rpti';
+import { RPTI_CATEGORY_LABELS, projectRptiReturn, openEndedDate } from './rpti';
 import { generateLkptiDetails } from './lkpti';
 import type { Asset, AssetCategory, Deliverable, DeliverableSegment } from '../types';
 import { SEEDED_DELIVERABLE_STATUSES } from './deliverableStatusDefaults';
@@ -117,22 +117,23 @@ describe('deriveWorkspaceFromRptiImport — placement', () => {
     assetCategories: [{ id: 'c-1', name: 'Area', categoryCode: '04' } as AssetCategory],
   };
 
-  it('gives a new build a live phase of three years from its filed quarter (Q21)', () => {
+  it('gives a new build the shared five-year live horizon from its report year (Q21)', () => {
     // A new build creates the application, so its live phase is the application's
-    // existence — bounded to a three-year planning horizon rather than extended five.
-    // It still spans 31 December of the filed year for every quarter, which is what
+    // existence — bounded to the same five-year horizon as LKPTI.
+    // It spans 31 December of the filed year for every quarter, which is what
     // keeps a Q1-Q3 build in that year's LKPTI (the defect FR-001c fixed).
     const out = deriveWorkspaceFromRptiImport(parse({ jenis: 'new', quarter: 'Q3' }), 2027, EMPTY);
     expect(out.deliverableSegments).toHaveLength(1);
     expect(out.deliverableSegments[0]).toMatchObject({
-      startDate: '2027-07-01', endDate: '2030-06-30', status: RPTI_IMPORT_LIVE_STATUS_ID,
+      startDate: '2027-07-01', endDate: openEndedDate(2027), status: RPTI_IMPORT_LIVE_STATUS_ID,
     });
+    expect(out.deliverableSegments[0].endDate).toBe('2032-12-31');
   });
 
-  it.each([['Q1', '2027-01-01', '2029-12-31'], ['Q4', '2027-10-01', '2030-09-30']] as const)(
-    'measures three years from the first day of a %s go-live (Q21)', (quarter, start, end) => {
+  it.each([['Q1', '2027-01-01'], ['Q4', '2027-10-01']] as const)(
+    'uses the shared report-year horizon for a %s go-live (Q21)', (quarter, start) => {
       const out = deriveWorkspaceFromRptiImport(parse({ jenis: 'new', quarter }), 2027, EMPTY);
-      expect(out.deliverableSegments[0]).toMatchObject({ startDate: start, endDate: end });
+      expect(out.deliverableSegments[0]).toMatchObject({ startDate: start, endDate: openEndedDate(2027) });
     });
 
   it('gives a newly created upgrade a prior live phase and filed live start', () => {

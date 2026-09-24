@@ -25,6 +25,10 @@ The years differ on purpose. A bank filing in late 2026 files an inventory *as a
 2026 beside a plan *for* 2027; neither spreadsheet layout carries a year, so Selara
 asks for each one rather than guessing.
 
+Imported applications use one five-year live horizon. The 2026 LKPTI inventory is evidence they
+are live as at 2026-12-31, so those entries run through 2031-12-31. A new build in the 2027 RPTI
+goes live in 2027, so it runs through 2032-12-31. Upgrades remain live for their filed quarter only.
+
 ## What you should see
 
 > **Import complete** — LKPTI 2026: 13 row(s) · RPTI 2027: 14 row(s). No rows were
