@@ -171,7 +171,9 @@ internal consistency.
 
 ---
 
-### Q13 — repairing an unresolved imported row is a three-screen manual job (raised 2026-09-19)
+### Q13 — repairing an unresolved imported row is a three-screen manual job (raised 2026-09-19) — **REVISED by Q22 (2026-09-25)**
+
+The text below is kept as written. Since then, spec 003 removed the Initiative's Deliverable selection, so the journey is two steps rather than three. More importantly, it moved the filed values onto the segment, which turned the manual repair into one that silently files wrong values. Q22 records what was measured and what was decided.
 
 **Deferred to its own Spec Kit feature — filed as [#51](https://github.com/nofanto/Selara/issues/51).**
 Raised by the product owner after repairing the sample's unresolved row by hand.
@@ -280,6 +282,96 @@ remarks. Worth weighing when that work is scheduled.
 ---
 
 ## Decided
+
+### Q22 — an unresolved row is repaired semi-automatically, from the finding (2026-09-25)
+
+**Why this is more than friction — measured on `main` at 7da8edd.** On the published samples, the
+repair the error message describes (create the Deliverable, then a live segment linking it to the
+initiative) **clears the export gate while the return then states three wrong values**:
+
+| | Filed in the return | After the documented repair |
+|---|---|---|
+| Blocks export? | — | no |
+| Development type | `upgrade` | `new` |
+| CapEx / OpEx | 2.9bn / 640m | 0 / 0 |
+| Keterangan | *"Not present in the 2026 LKPTI — needs a target."* | empty |
+
+The only signal is a non-blocking budget-divergence warning. It comes from three earlier decisions
+working together:
+- spec 003 moved filed cost and Keterangan onto the segment, and the repair creates a bare one;
+- `new` versus `upgrade` is decided from the application's live history, and a freshly created
+  application has none;
+- the gate matches rows by identity, not contents (Q12), so it does not notice.
+
+This breaks **spec 002's FR-025**: *"Nothing MUST require the preparer to re-key a value the return
+already supplied."* The message is also wrong on its own terms. It says the row *"points at a
+Deliverable that no longer exists"*, but for an unresolved import the Deliverable never existed.
+
+**An unresolved row is always an upgrade to an application.** Rows filed as `new` always create
+their application (`rptiImport.ts`), and unmatched infrastructure is created automatically
+(FR-019a). So Q13's option *"this is a new application"* contradicts the filed return, which says
+`upgrade`.
+
+**Decided (product owner): a semi-automatic repair, started from the finding.** The finding — in
+Data Health and in the pre-export gate — offers two resolutions. Each opens a form **pre-filled from
+what the return filed**, which the preparer checks and confirms. Making the judgement still needs a
+person; *recording* it no longer means re-typing what the return said.
+
+- **A — "It's this existing application."** The inventory lists it under another name. The
+  preparer picks the application; the filed implementation is created on it.
+- **B — "The bank runs it, but the inventory doesn't list it."** The application is created much as
+  unmatched infrastructure already is (FR-019a), including a prior live phase so that it stays an
+  upgrade.
+
+Either way, confirming creates the **live segment for the filed implementation**: linked to the
+initiative, starting in the filed quarter, carrying the filed CapEx, OpEx and Keterangan. The
+initiative moves to that application's asset. Until now it sat under an unrelated one — the first
+asset in the inventory.
+
+**Where each pre-filled value comes from** *(confirmed by the product owner)*.
+- **From the stored row, which remains read-only evidence (Q12):** name, category, developer, DC/DR
+  locations, planned quarter, Keterangan.
+- **From the initiative's budget:** CapEx and OpEx. The stored row no longer holds cost (Q7), and
+  FR-026 says the system need not keep a separate copy of what was imported. The importer seeded
+  the initiative's budget from the filed row, but the preparer may have edited it since, which is
+  exactly why the form shows it for confirmation rather than using it silently.
+
+**Unchanged by this.** The stored row stays as it is (Q12's source-side principle, and the rejected
+identity-remap editor stays rejected). Creating a deliverable directly in the Data Manager stays
+exactly as it is.
+
+**Near matches (A)** *(confirmed by the product owner)*. Likely candidates are suggested for the preparer to choose from, and never
+chosen automatically. That is FR-019's reason for holding the row back in the first place: the two
+returns name things differently. The published sample has no near match.
+
+**Rejected — a default live segment whenever a deliverable is created, starting in the quarter it
+is added.** Proposed by the product owner as a lighter-weight alternative, then withdrawn after
+measurement. "The quarter it was added" is when someone typed it in, not when it goes live.
+Measured on the samples:
+- In the #51 repair it still leaves the gate blocked, because the segment names no initiative.
+- Once linked, it files the row in **2026** instead of 2027, typed `new`, with no cost or Keterangan,
+  and lists the application in the 2026 inventory.
+- In ordinary planning, a genuine first build going live in 2027 files as **`upgrade`**, because
+  the default segment counts as earlier live history, and it appears in an inventory before it exists.
+
+This is the same class of problem the project has already removed twice, with invented import
+history (FR-018b) and an invented `Planned` status: the application stating as fact something
+nobody told it.
+
+**Rejected — Q13's "this is a new application" option.** It contradicts the filed development type.
+
+**B's prior live phase is continuous (product owner).** An application "the bank runs" gets live
+history that runs continuously up to the shared five-year horizon (`openEndedDate`). The same rule
+applies to the importer's synthetic prior phase, so the repair and the importer create the same shape.
+This **closes Q21's open consequence 2**. That case is an upgrade with no live history of its own,
+which drops out of the inventory in its upgrade year unless it was filed for Q4. Fixing it only for
+repairs would have left two rules for one situation.
+
+**The error message is corrected now, separately (product owner).** It no longer says the
+Deliverable "no longer exists". It also warns that the manual repair files a new application with
+zero cost unless the preparer enters the filed values. This is a separate, small change and does
+not wait for the feature: the current message leads preparers into the silent corruption measured
+above.
 
 ### Q19 — the legacy remarks lift follows the field; the legacy cost lift does not (2026-09-23)
 
@@ -399,7 +491,7 @@ stay until 2031.
    **13, 16, 16, 16, 16, 16, 3** after. The regenerated 2027 RPTI stays at **13 rows**, with
    development types in the same order: `upgrade, upgrade, upgrade, upgrade, new, upgrade, new, new,
    new, new, new, new, upgrade`; round-trip losses remain **zero**.
-2. **OPEN — an upgrade to an application with no live history of its own** — a hand-built workspace, not
+2. **DECIDED by Q22 (2026-09-25): prior live history is continuous to the shared horizon** — was OPEN: **an upgrade to an application with no live history of its own** — a hand-built workspace, not
    the LKPTI + RPTI onboarding flow — **drops out of the inventory in the year it is upgraded**,
    unless the quarter is Q4. Measured: Q1–Q3 upgrades are in the 2026 LKPTI through the synthetic
    prior phase and absent from 2027 on; a Q4 upgrade is present in 2027 only. It is the Q4-only
