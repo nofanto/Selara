@@ -3,6 +3,7 @@ import {
   Initiative, Milestone, Dependency, Decision, Resource, Programme, Strategy,
   RptiDetail, LkptiDetail, TimelineSettings,
 } from '../types';
+import { isRepairableUnresolvedRow } from './unresolvedRowRepair';
 import { deletedAnchorRepair, isLiveStatusId, isPreLaunchStatusId, reconcileRptiReturn, resolveAssetCategory } from './rpti';
 
 // Tabs of src/components/DataManager.tsx's own `Tab` union — defined here (the pure
@@ -49,6 +50,7 @@ export interface HealthIssue {
    * with no special case for issues that hit both.
    */
   reports: HealthReport[];
+  action?: { kind: 'repair-unresolved-rpti-row'; rowId: string };
 }
 
 export interface DataHealthInput {
@@ -334,6 +336,7 @@ export function computeDataHealth(input: DataHealthInput): HealthIssue[] {
       issues.push({
         id: `rpti-target:${r.id}`, severity: 'error', entityType: 'RptiDetail', entityId: r.id,
         entityName: label, message: reconciliation.message, location: tab('deliverables'),
+        ...(isRepairableUnresolvedRow(r) ? { action: { kind: 'repair-unresolved-rpti-row' as const, rowId: r.id } } : {}),
       });
     }
     if (r.deliverableSegmentId && !segmentIds.has(r.deliverableSegmentId)) {

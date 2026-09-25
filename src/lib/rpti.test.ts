@@ -1,6 +1,6 @@
 import { demoInitiatives, demoDeliverables, demoDeliverableSegments, demoDeliverableStatuses, demoAssets, demoAssetCategories } from '../demoData';
 import { describe, expect, it } from 'vitest';
-import { projectRptiReturn, reconcileRptiReturn, ProjectRptiInput, periodForQuarter, deriveQuarterFromDate, resolveCost } from './rpti';
+import { projectRptiReturn, reconcileRptiReturn, ProjectRptiInput, periodForQuarter, deriveQuarterFromDate, resolveCost, hasLiveHistoryBefore, continuousPriorLivePhase, openEndedDate, filedAttributesFor } from './rpti';
 import type { AssetCategory, Asset, Deliverable, DeliverableSegment, DeliverableStatus, Initiative, RptiDetail } from '../types';
 
 const statuses: DeliverableStatus[] = [
@@ -55,6 +55,61 @@ function makeContext(overrides: Partial<ProjectRptiInput> = {}): ProjectRptiInpu
     ...overrides,
   };
 }
+
+describe('hasLiveHistoryBefore', () => {
+  it('requires an earlier live start on the same Deliverable', () => {
+    const segments = [
+      makeSegment({ id: 'planned', startDate: '2025-01-01', status: 'appstatus-planned' }),
+      makeSegment({ id: 'other', deliverableId: 'deliv-2', startDate: '2025-01-01' }),
+      makeSegment({ id: 'same-day', startDate: '2026-04-01' }),
+    ];
+    expect(hasLiveHistoryBefore('deliv-1', '2026-04-01', segments, statuses)).toBe(false);
+    expect(hasLiveHistoryBefore('deliv-1', '2026-04-01', [...segments, makeSegment({ id: 'earlier-live', startDate: '2026-03-31' })], statuses)).toBe(true);
+  });
+});
+
+describe('continuousPriorLivePhase', () => {
+  it('is unlinked and lasts through the shared planning horizon', () => {
+    const phase = continuousPriorLivePhase('d', 2027, 'live', 'id');
+    expect(phase).toEqual({ id: 'id', deliverableId: 'd', startDate: '2026-01-01', endDate: openEndedDate(2027), status: 'live' });
+    expect(phase).not.toHaveProperty('initiativeId');
+  });
+});
+
+describe('filedAttributesFor', () => {
+  const category = makeAssetCategory({ categoryCode: '07', dcCity: 'Singapore', dcCountry: 'Singapore', drCity: 'Batam', drCountry: 'Indonesia' });
+  const assets = [makeAsset()];
+  const categories = [category];
+  it('derives named provider, inhouse, inherited defaults and overrides', () => {
+    expect(filedAttributesFor(makeDeliverable({ developer: 'Vendor X', ppjtiRelatedParty: 'yes' }), assets, categories)).toMatchObject({
+      categoryCode: '07', developer: 'PPJTI', ppjtiRelatedParty: 'yes', dcCity: 'Singapore', drCity: 'Batam',
+    });
+    expect(filedAttributesFor(makeDeliverable({ developer: 'inhouse', ppjtiRelatedParty: 'yes' }), assets, categories)).toMatchObject({
+      categoryCode: '07', developer: 'inhouse', ppjtiRelatedParty: 'n/a', dcCity: 'Singapore', drCity: 'Batam',
+    });
+    expect(filedAttributesFor(makeDeliverable(), assets, categories)).toMatchObject({
+      categoryCode: '07', ppjtiRelatedParty: 'n/a', dcCity: 'Singapore', dcCountry: 'Singapore', drCity: 'Batam', drCountry: 'Indonesia',
+    });
+    expect(filedAttributesFor(makeDeliverable({ categoryCode: '04', dcCity: 'Jakarta', drCountry: 'Malaysia' }), assets, categories)).toMatchObject({
+      categoryCode: '04', dcCity: 'Jakarta', dcCountry: 'Singapore', drCity: 'Batam', drCountry: 'Malaysia',
+    });
+  });
+
+  it('matches every projected Deliverable in the existing demo fixture', () => {
+    const input = { initiatives: demoInitiatives, deliverables: demoDeliverables,
+      deliverableSegments: demoDeliverableSegments, deliverableStatuses: demoDeliverableStatuses,
+      assets: demoAssets, assetCategories: demoAssetCategories };
+    const year = new Date().getFullYear();
+    const keys = ['categoryCode', 'developer', 'ppjtiRelatedParty', 'dcCity', 'dcCountry', 'drCity', 'drCountry'] as const;
+    const rows = [year - 1, year, year + 1, year + 2].flatMap(y => projectRptiReturn(input, y));
+    expect(rows.length).toBeGreaterThan(0); // guard: an empty projection would make the loop vacuous
+    for (const row of rows) {
+      const deliverable = demoDeliverables.find(d => d.id === row.targetId)!;
+      const attributes = filedAttributesFor(deliverable, demoAssets, demoAssetCategories);
+      expect(Object.fromEntries(keys.map(key => [key, row[key]]))).toEqual(Object.fromEntries(keys.map(key => [key, attributes[key]])));
+    }
+  });
+});
 
 describe('projectRptiReturn', () => {
   it('files the shipped demo only in each go-live year', () => {

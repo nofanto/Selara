@@ -29,15 +29,21 @@ another port.
 
 ## Phase 1: Setup
 
-- [ ] T001 Confirm the branch `051-repair-from-finding` is based on `9e38187`: the interim fix rebased onto `origin/main` at `e30f718` (#57, which adds `src/lib/diffFieldPolicy.ts` that T013 and T046 need). Confirm both suites are green there before any change: `npm run test:unit` and `npx playwright test`, with exit codes logged to `/tmp/selara-004-baseline-*.log`.
-- [ ] T002 [P] Record the **before** measurements in `/tmp/selara-004-baseline-measure.log`, using a throwaway Vitest probe that is not committed:
+- [x] T001 Confirm the branch `051-repair-from-finding` is based on `9e38187`: the interim fix rebased onto `origin/main` at `e30f718` (#57, which adds `src/lib/diffFieldPolicy.ts` that T013 and T046 need). **Done 2026-09-25, before dispatch, on `9e38187` plus docs only (`85c6c51` adds no code):**
+  - `npm run test:unit`: **583/583**, exit 0 (`/tmp/selara-004-baseline-unit.log`);
+  - `npx playwright test`: exit 0, **685 passed, 4 flaky, 4 skipped** (`/tmp/selara-004-baseline-e2e.log`);
+  - the four flaky files (data-manager-layout, decision-link-integrity, decisions, deliverables), re-run alone: **37/37** on the first attempt (`/tmp/selara-004-baseline-e2e-flaky-rerun.log`). The flakiness was full-suite load, not a regression.
+  - eslint: 0 errors. tsc: 1 error, the `excel.ts:295` baseline.
+- [x] T002 [P] Record the **before** measurements in `/tmp/selara-004-baseline-measure.log`, using a throwaway Vitest probe that is not committed:
   - the sample import's synthetic prior segments (id, dates, Deliverable type);
   - LKPTI row counts as at 31 December 2026-2032 (expected to equal Q21's 13, 16, 16, 16, 16, 16, 3);
   - the 2027 RPTI development-type order.
 
   SC-004 and contract 19 compare against this.
+  - Done: `/tmp/selara-004-baseline-measure.log`; prior `rpti-import-seg-prior-13` is infrastructure, 2026-01-01 to 2026-12-31; LKPTI counts 13/16/16/16/16/16/3; RPTI 2027 has 13 rows in the recorded type order. Throwaway probe deleted.
 
-- [ ] T003 [P] Write the user story `docs/user-stories/27-repair-unresolved-rpti-row.md` **before any test**, with acceptance criteria mirroring US1-US3 and links to spec 004 and Q22. The constitution's lifecycle puts requirements (Step 1) before test-driven development (Step 2). *(Moved from Polish after `/speckit-analyze` L1.)*
+- [x] T003 [P] Write the user story `docs/user-stories/27-repair-unresolved-rpti-row.md` **before any test**, with acceptance criteria mirroring US1-US3 and links to spec 004 and Q22. The constitution's lifecycle puts requirements (Step 1) before test-driven development (Step 2). *(Moved from Polish after `/speckit-analyze` L1.)*
+  - Done: `docs/user-stories/27-repair-unresolved-rpti-row.md` records US1–US3 before tests.
 ---
 
 ## Phase 2: Foundational (blocking: no user story may start before these)
@@ -46,30 +52,40 @@ another port.
 or `upgrade`. It lands **alone**, with every existing projection and importer test green and **no
 expectation changed**, before anything new calls it.
 
-- [ ] T004 [P] Failing tests for **contract 1** in `src/lib/rpti.test.ts`. `hasLiveHistoryBefore` is exported, and:
+- [x] T004 [P] Failing tests for **contract 1** in `src/lib/rpti.test.ts`. `hasLiveHistoryBefore` is exported, and:
+  - Done: Red `/tmp/selara-004-t004-red.log`: missing export; 1 failed, 93 passed. Green with T005: `/tmp/selara-004-t004-green.log`.
   - it is true only for a live segment on the same Deliverable starting strictly before the date;
   - a non-live earlier segment, a segment on another Deliverable, and a same-day start are all false.
 
   Red: the export does not exist.
-- [ ] T005 Implement `hasLiveHistoryBefore` in `src/lib/rpti.ts`, and replace the `wasLiveBefore` closure in `projectRptiReturn` with it.
+- [x] T005 Implement `hasLiveHistoryBefore` in `src/lib/rpti.ts`, and replace the `wasLiveBefore` closure in `projectRptiReturn` with it.
+  - Done: Green `/tmp/selara-004-t004-green.log`: 117/117 projection, round-trip and sample tests; no existing expectations edited.
   - Run the whole of `rpti.test.ts`, `roundTrip.test.ts` and `sampleReturns.test.ts`. They must be green **with zero expectation edits**.
   - Log it to `/tmp/selara-004-t004-green.log`.
-- [ ] T006 Replace the importer's copy of the same test (`targetAlreadyLiveBeforeImplementation`, `src/lib/rptiImport.ts:394-401`) with `hasLiveHistoryBefore`. Keep the same-import history exactly as passed today (FR-018b of spec 003). `rptiImport.test.ts` must be green with zero expectation edits.
-- [ ] T007 Failing tests for **contract 2** in `src/lib/rpti.test.ts`. `continuousPriorLivePhase('d', 2027, 'live', 'id')` equals `{ id, deliverableId: 'd', startDate: '2026-01-01', endDate: openEndedDate(2027), status: 'live' }` and has no `initiativeId` key.
-- [ ] T008 Implement `continuousPriorLivePhase` in `src/lib/rpti.ts`. It is not called yet; T040 switches the importer over.
-- [ ] T009 Failing tests for **contract 3** in `src/lib/rpti.test.ts`. `filedAttributesFor(deliverable, assets, categories)` returns what projection files for that Deliverable, in these cases:
+- [x] T006 Replace the importer's copy of the same test (`targetAlreadyLiveBeforeImplementation`, `src/lib/rptiImport.ts:394-401`) with `hasLiveHistoryBefore`. Keep the same-import history exactly as passed today (FR-018b of spec 003). `rptiImport.test.ts` must be green with zero expectation edits.
+  - Done: Green `/tmp/selara-004-t006-green.log`: 68/68 importer tests; same-import history retained and no expectations edited.
+- [x] T007 Failing tests for **contract 2** in `src/lib/rpti.test.ts`. `continuousPriorLivePhase('d', 2027, 'live', 'id')` equals `{ id, deliverableId: 'd', startDate: '2026-01-01', endDate: openEndedDate(2027), status: 'live' }` and has no `initiativeId` key.
+  - Done: Red `/tmp/selara-004-t007-red.log`: missing export; 1 failed, 94 passed. Green with T008: `/tmp/selara-004-t008-green.log`.
+- [x] T008 Implement `continuousPriorLivePhase` in `src/lib/rpti.ts`. It is not called yet; T040 switches the importer over.
+  - Done: Green `/tmp/selara-004-t008-green.log`: 95/95; helper is not called by importer yet.
+- [x] T009 Failing tests for **contract 3** in `src/lib/rpti.test.ts`. `filedAttributesFor(deliverable, assets, categories)` returns what projection files for that Deliverable, in these cases:
+  - Done: Red `/tmp/selara-004-t009-red.log`: missing export; 2 failed, 95 passed. Green with T010: `/tmp/selara-004-t010-green.log`.
   - a named provider → `PPJTI` with the stored related party;
   - `inhouse` → `inhouse` with `n/a`;
   - no override → the Asset Category's code and DC/DR;
   - with an override → the override.
 
   Also assert, over every Deliverable in the existing projection fixtures, that the projection's row attributes equal `filedAttributesFor`.
-- [ ] T010 Implement `filedAttributesFor` in `src/lib/rpti.ts`, and make `projectRptiReturn` build its attribute columns from it (`rpti.ts:215-240`). The existing projection and round-trip tests must stay green with zero expectation edits.
-- [ ] T011 [P] Failing tests for **contracts 4-5** in the new file `src/lib/unresolvedRowRepair.test.ts`:
+- [x] T010 Implement `filedAttributesFor` in `src/lib/rpti.ts`, and make `projectRptiReturn` build its attribute columns from it (`rpti.ts:215-240`). The existing projection and round-trip tests must stay green with zero expectation edits.
+  - Done: Green `/tmp/selara-004-t010-green.log`: 120/120 projection, round-trip and sample tests; no existing expectations edited.
+- [x] T011 [P] Failing tests for **contracts 4-5** in the new file `src/lib/unresolvedRowRepair.test.ts`:
+  - Done: Red `/tmp/selara-004-t011-red.log`: missing module; test file could not collect. Green with T012: `/tmp/selara-004-t012-green.log`.
   - `isRepairableUnresolvedRow` is true only for a `rpti-import-unresolved-*` target with no `deliverableSegmentId`. A deleted Deliverable's row, and an anchored row, are false.
   - `repairOptions` is `['existing', 'create']` for category `12` and `['existing']` for each of `51`-`54` and `99`.
-- [ ] T012 Create `src/lib/unresolvedRowRepair.ts` with `isRepairableUnresolvedRow` and `repairOptions`. Import `UNRESOLVED_IMPORT_TARGET_PREFIX` from `rpti.ts`. Take the infrastructure codes from one exported constant, moving `INFRASTRUCTURE_CODES` out of `rptiImport.ts` so there is one copy.
-- [ ] T013 Failing test for **contract 6** in `src/lib/dataHealth.test.ts`. Only the `rpti-target:<rowId>` issue of an unresolved row carries `action: { kind: 'repair-unresolved-rpti-row', rowId }`. A deleted-Deliverable `missing-target` issue, and every other issue, carry no `action`. Then add the optional, computed `action` field to `HealthIssue` in `src/lib/dataHealth.ts` and set it. Confirm `src/lib/diffFieldPolicy.test.ts` is unaffected, since `HealthIssue` is not stored.
+- [x] T012 Create `src/lib/unresolvedRowRepair.ts` with `isRepairableUnresolvedRow` and `repairOptions`. Import `UNRESOLVED_IMPORT_TARGET_PREFIX` from `rpti.ts`. Take the infrastructure codes from one exported constant, moving `INFRASTRUCTURE_CODES` out of `rptiImport.ts` so there is one copy.
+  - Done: Green `/tmp/selara-004-t012-green.log`: 70/70 helper and importer tests; infrastructure codes live in `rpti.ts` beside category labels and the existing importer dependency, avoiding a reverse dependency.
+- [x] T013 Failing test for **contract 6** in `src/lib/dataHealth.test.ts`. Only the `rpti-target:<rowId>` issue of an unresolved row carries `action: { kind: 'repair-unresolved-rpti-row', rowId }`. A deleted-Deliverable `missing-target` issue, and every other issue, carry no `action`. Then add the optional, computed `action` field to `HealthIssue` in `src/lib/dataHealth.ts` and set it. Confirm `src/lib/diffFieldPolicy.test.ts` is unaffected, since `HealthIssue` is not stored.
+  - Done: Red `/tmp/selara-004-t013-red.log`: only the missing action assertion failed. Green `/tmp/selara-004-t013-green.log`: 182/182 health and diff-field-policy tests; action is computed only.
 
 **Checkpoint**: generation output is byte-identical to before (T005, T006 and T010 green without expectation edits). The three shared rules exist. The app can tell a repairable finding apart. Nothing user-visible has changed.
 
