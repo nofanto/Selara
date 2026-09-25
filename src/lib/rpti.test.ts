@@ -846,6 +846,78 @@ describe('reconcileRptiReturn — stored rows are reconciliation evidence, never
     expect(reconcileRptiReturn(repaired)).toEqual([]);
   });
 
+  // #51 interim fix (Q22). Following the old message cleared the gate while the
+  // return then filed `new`, 0/0 and an empty Keterangan instead of what was filed.
+  describe('the manual repair must say which filed values it does not carry over (#51)', () => {
+    const unresolved = storedRow({
+      id: 'rpti-import-row-1', targetId: 'rpti-import-unresolved-1', developmentType: 'upgrade',
+      plannedImplementationQuarter: 'Q3', remarks: 'Not present in the 2026 LKPTI',
+    });
+    const importedInitiative = makeInitiative({
+      name: 'Core Banking GL — Q3 2027', capex: 2_900_000_000, opex: 640_000_000,
+    });
+    const messageFor = (row: RptiDetail) => {
+      const input = ctx([row], []);
+      input.initiatives = [importedInitiative];
+      const findings = reconcileRptiReturn(input);
+      expect(findings).toHaveLength(1); // guard: otherwise every assertion below is vacuous
+      expect(findings[0].reason).toBe('missing-target');
+      return findings[0].message;
+    };
+
+    it('does not claim an unresolved import\'s application once existed', () => {
+      const message = messageFor(unresolved);
+      expect(message).not.toMatch(/no longer exists/i);
+      // An ambiguous match is unresolved too (several entries, not none).
+      expect(message).toMatch(/could not match to exactly one entry in your inventory/i);
+    });
+
+    it('does not call an infrastructure row an application (Codex review)', () => {
+      // Ambiguous infrastructure matches stay unresolved (FR-019a creates only on no match).
+      const message = messageFor({ ...unresolved, categoryCode: '51' });
+      expect(message).not.toMatch(/application/i);
+    });
+
+    it('does not present a possibly edited budget as the filed figures (Codex review)', () => {
+      // The stored row holds no cost (FR-026), so the budget is the best available
+      // source, but it may have been edited since import (Q22).
+      expect(messageFor(unresolved)).toMatch(/current budget.*check it against the filed return/i);
+    });
+
+    it('states each filed value the manual repair would otherwise lose', () => {
+      const message = messageFor(unresolved);
+      expect(message).toMatch(/earlier live segment/i);
+      expect(message).toMatch(/as new instead of upgrade/i);
+      expect(message).toMatch(/Q3/);
+      expect(message).toContain((2_900_000_000).toLocaleString());
+      expect(message).toContain((640_000_000).toLocaleString());
+      expect(message).toContain('"Not present in the 2026 LKPTI"');
+    });
+
+    it('keeps "no longer exists" for a deleted application, and warns about the same values', () => {
+      const message = messageFor(storedRow({ targetId: 'deliv-gone', developmentType: 'upgrade', remarks: 'kept' }));
+      expect(message).toMatch(/no longer exists/i);
+      expect(message).toMatch(/as new instead of upgrade/i);
+      // A reassigned existing segment keeps its values, so only a new one files 0 (Codex review).
+      expect(message).toMatch(/a new segment's CapEx and OpEx file as 0/);
+      expect(message).toMatch(/a new segment's Keterangan files empty unless entered as "kept"/);
+    });
+
+    it('ends as one sentence whether or not the filed remark ends in a full stop', () => {
+      for (const row of [unresolved, { ...unresolved, remarks: 'ends with a stop.' }, { ...unresolved, remarks: undefined }]) {
+        const message = messageFor(row);
+        expect(message).toMatch(/[^.;]\.$/);
+        expect(message).not.toContain('.".');
+      }
+    });
+
+    it('does not warn about the development type for a row filed as new', () => {
+      const message = messageFor(storedRow({ targetId: 'deliv-gone', developmentType: 'new' }));
+      expect(message).not.toMatch(/instead of upgrade/i);
+      expect(message).not.toMatch(/Keterangan/);
+    });
+  });
+
   it('keeps a missing-initiative finding until its replacement also has the named segment', () => {
     const repaired = ctx([storedRow({ initiativeId: 'init-gone' })], []);
     repaired.initiatives = [makeInitiative()];

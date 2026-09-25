@@ -4,7 +4,7 @@ import {
   Initiative, Programme, RptiCategoryCode, RptiDetail, RptiDeveloper, RptiDevelopmentType,
   RptiQuarter, RptiRelatedParty,
 } from '../types';
-import { RPTI_CATEGORY_LABELS, periodForQuarter, isLiveStatusId, openEndedDate } from './rpti';
+import { RPTI_CATEGORY_LABELS, periodForQuarter, isLiveStatusId, openEndedDate, UNRESOLVED_IMPORT_TARGET_PREFIX } from './rpti';
 import { IN_PRODUCTION_STATUS, SEEDED_DELIVERABLE_STATUSES } from './deliverableStatusDefaults';
 
 /**
@@ -327,7 +327,7 @@ export function deriveWorkspaceFromRptiImport(
         // an id that will not resolve — computeDataHealth's existing rpti-target
         // check reports it, so no new rule and no import-results store is needed.
         unresolved.push({ rowNumber: row.rowNumber, name: row.name, categoryCode: row.categoryCode });
-        targetId = `rpti-import-unresolved-${n}`;
+        targetId = `${UNRESOLVED_IMPORT_TARGET_PREFIX}${n}`;
         // The report row's target is deliberately left unresolvable (that is what
         // data health reports), but the initiative must not also dangle — one
         // finding per problem, not three.
