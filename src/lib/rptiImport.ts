@@ -4,7 +4,7 @@ import {
   Initiative, Programme, RptiCategoryCode, RptiDetail, RptiDeveloper, RptiDevelopmentType,
   RptiQuarter, RptiRelatedParty,
 } from '../types';
-import { RPTI_CATEGORY_LABELS, periodForQuarter, isLiveStatusId, openEndedDate, UNRESOLVED_IMPORT_TARGET_PREFIX } from './rpti';
+import { RPTI_CATEGORY_LABELS, periodForQuarter, hasLiveHistoryBefore, openEndedDate, UNRESOLVED_IMPORT_TARGET_PREFIX, INFRASTRUCTURE_CODES } from './rpti';
 import { IN_PRODUCTION_STATUS, SEEDED_DELIVERABLE_STATUSES } from './deliverableStatusDefaults';
 
 /**
@@ -24,13 +24,6 @@ export const RPTI_IMPORT_HEADERS = [
   'Pengembang', 'PPJTI Pihak Terkait', 'Lokasi Data Center', 'Lokasi Disaster Recovery Center',
   'Waktu Rencana Implementasi', 'Estimasi Biaya CapEx', 'Estimasi Biaya OpEx', 'Keterangan',
 ];
-
-/**
- * The five codes that describe infrastructure rather than an application.
- * RPTI carries both; LKPTI (Daftar Aplikasi) carries only applications, which is
- * why `generateLkptiDetails` filters by type and `projectRptiReturn` must not.
- */
-const INFRASTRUCTURE_CODES = new Set<string>(['51', '52', '53', '54', '99']);
 
 export interface RptiImportRow {
   rowNumber: number;
@@ -391,13 +384,9 @@ export function deriveWorkspaceFromRptiImport(
       // this import, and is compared with this implementation's date (contract 2b),
       // not the report-year boundary. The filed quarter itself is always a live
       // start, for both new and upgrade rows.
-      const targetAlreadyLiveBeforeImplementation = [
-        ...(existing.deliverableSegments ?? []),
-        ...deliverableSegments,
-      ].some(seg =>
-        seg.deliverableId === targetId
-        && seg.startDate < qStart
-        && isLiveStatusId(seg.status, existing.deliverableStatuses ?? []),
+      const targetAlreadyLiveBeforeImplementation = hasLiveHistoryBefore(
+        targetId, qStart, [...(existing.deliverableSegments ?? []), ...deliverableSegments],
+        existing.deliverableStatuses ?? [],
       );
       if (row.developmentType === 'upgrade' && !targetAlreadyLiveBeforeImplementation) {
         deliverableSegments.push({

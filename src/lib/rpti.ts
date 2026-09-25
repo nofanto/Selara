@@ -23,6 +23,14 @@ export const RPTI_CATEGORY_LABELS: Record<RptiCategoryCode, string> = {
   '99': 'Other infrastructure',
 };
 
+/**
+ * The five codes that describe infrastructure rather than an application.
+ * RPTI carries both; LKPTI (Daftar Aplikasi) carries only applications, which is
+ * why `generateLkptiDetails` filters by type and `projectRptiReturn` must not.
+ * Shared by the importer and the #51 repair, which offers creation only for applications.
+ */
+export const INFRASTRUCTURE_CODES = new Set<string>(['51', '52', '53', '54', '99']);
+
 const LIVE_STATUS_FALLBACK_ID = 'appstatus-in-production';
 const LIVE_STATUS_FALLBACK_PATTERN = /production|live/i;
 
@@ -77,11 +85,67 @@ export function openEndedDate(fromYear: number): string {
   return `${fromYear + OPEN_ENDED_YEARS_OUT}-12-31`;
 }
 
+/**
+ * Live history for an application the bank already runs but the workspace has no history for:
+ * live, unlinked (so it files no RPTI row of its own), from 1 January of the year before the filed
+ * year through the shared planning horizon. It overlaps the filed quarter's implementation rather
+ * than splitting around it. Used by the importer's synthetic prior phase and the #51 repair, so both
+ * follow one rule (Q22; specs/004-repair-from-finding research R5).
+ */
+export function continuousPriorLivePhase(
+  deliverableId: string,
+  filedYear: number,
+  status: string,
+  id: string,
+): DeliverableSegment {
+  return { id, deliverableId, startDate: `${filedYear - 1}-01-01`, endDate: openEndedDate(filedYear), status };
+}
+
 export function isLiveStatusId(statusId: string, deliverableStatuses: DeliverableStatus[]): boolean {
   const status = deliverableStatuses.find(s => s.id === statusId);
   if (status) return !!status.isLiveStatus || (!deliverableStatuses.some(s => s.isLiveStatus) && (statusId === LIVE_STATUS_FALLBACK_ID || LIVE_STATUS_FALLBACK_PATTERN.test(status.name)));
   // No matching DeliverableStatus record (e.g. legacy default id with no record) — fall back to id/name pattern.
   return statusId === LIVE_STATUS_FALLBACK_ID;
+}
+
+/**
+ * A deliverable that was already live before this go-live already exists — this
+ * go-live is an upgrade to it, not a first-ever "new" build,
+ * regardless of which initiative is now touching it.
+ * Deliberately deliverable-wide (not filtered by initiativeId): "has this ever
+ * gone live" is a fact about the deliverable, not about who's working on it now.
+ *
+ * Tested on startDate, not endDate. An application the bank actually runs is
+ * *continuously* live — that is what an LKPTI entry means, "live as at 31
+ * December" — so its segment straddles the report year and would never satisfy
+ * "ended before it". Requiring the live run to have finished first classified
+ * every ongoing application's enhancement as a brand-new build, which is
+ * precisely the misclassification this product exists to avoid. A genuine new
+ * build is still 'new': none of its live segments start before the year.
+ *
+ * Measured against *this implementation's* own start, not against the start of the
+ * filing year. Two go-lives on a brand-new application in one year would otherwise
+ * both be 'new', stating in a single return that the same application was built
+ * from nothing twice; the second is an enhancement to what the first delivered.
+ * Segments sharing a start date are both 'new' — neither precedes the other, and
+ * they state the same quarter anyway.
+ *
+ * The one definition of "was live before". Projection types each row with it, the RPTI importer
+ * decides its synthetic prior phase with it, and the #51 repair decides whether a chosen entry needs
+ * prior history with it. Copies of this rule have drifted before; keep it single
+ * (specs/004-repair-from-finding research R6).
+ */
+export function hasLiveHistoryBefore(
+  deliverableId: string,
+  date: string,
+  segments: DeliverableSegment[],
+  statuses: DeliverableStatus[],
+): boolean {
+  return segments.some(seg =>
+    seg.deliverableId === deliverableId
+    && seg.startDate < date
+    && isLiveStatusId(seg.status, statuses)
+  );
 }
 
 const PRE_LAUNCH_STATUS_FALLBACK_IDS = new Set(['appstatus-planned', 'appstatus-funded']);
@@ -125,6 +189,41 @@ export function resolveAssetCategory(
 }
 
 /**
+ * The Deliverable-owned columns an RPTI row files for this Deliverable (ADR-0013): exactly what
+ * `projectRptiReturn` states, which builds its rows from this. The #51 repair compares a filed row
+ * against it, so a difference means what would be *filed* differs, not merely a raw field.
+ */
+export function filedAttributesFor(
+  deliverable: Deliverable | undefined,
+  assets: Asset[],
+  assetCategories: AssetCategory[],
+): Pick<RptiDetail, 'categoryCode' | 'developer' | 'ppjtiRelatedParty' | 'dcCity' | 'dcCountry' | 'drCity' | 'drCountry'> {
+  const category = resolveAssetCategory(deliverable, assets, assetCategories);
+  // Deliverable.developer now carries either 'inhouse' or a provider's *name*
+  // (ADR-0013). The RPTI column wants the classification, so anything that is not
+  // 'inhouse' is PPJTI — a third party, whoever they are. LKPTI emits the name
+  // itself, which is why one field can serve both returns.
+  const rawDeveloper = deliverable?.developer;
+  const developer: RptiDeveloper | undefined =
+    rawDeveloper === undefined || rawDeveloper === ''
+      ? undefined
+      : rawDeveloper === 'inhouse' ? 'inhouse' : 'PPJTI';
+  return {
+    categoryCode: deliverable?.categoryCode ?? category?.categoryCode,
+    developer,
+    // 'n/a' by definition whenever the resolved developer isn't PPJTI — there is no
+    // third party, so there is no relationship to disclose. When it *is* PPJTI the
+    // answer is a fact about the vendor that nothing can derive, so it is read from
+    // the deliverable, where the preparer records it (FR-014).
+    ppjtiRelatedParty: developer !== 'PPJTI' ? 'n/a' : deliverable?.ppjtiRelatedParty,
+    dcCity: deliverable?.dcCity ?? category?.dcCity,
+    dcCountry: deliverable?.dcCountry ?? category?.dcCountry,
+    drCity: deliverable?.drCity ?? category?.drCity,
+    drCountry: deliverable?.drCountry ?? category?.drCountry,
+  };
+}
+
+/**
  * Projects the RPTI return for a single report year from the workspace's canonical
  * planning entities — see requirement-specs/rpti-auto-generation.md for the
  * row-generation rule and requirement-specs/rpti-auto-fill-improvements.md for the
@@ -149,33 +248,7 @@ export function projectRptiReturn(
   // Placeholder initiatives (empty markers, not real work) are excluded the same way.
   const initiativeIds = new Set(initiatives.filter(i => i.isPlaceholder !== true).map(i => i.id));
 
-  // A deliverable that was already live before this go-live already exists — this
-  // go-live is an upgrade to it, not a first-ever "new" build,
-  // regardless of which initiative is now touching it.
-  // Deliberately deliverable-wide (not filtered by initiativeId): "has this ever
-  // gone live" is a fact about the deliverable, not about who's working on it now.
-  //
-  // Tested on startDate, not endDate. An application the bank actually runs is
-  // *continuously* live — that is what an LKPTI entry means, "live as at 31
-  // December" — so its segment straddles the report year and would never satisfy
-  // "ended before it". Requiring the live run to have finished first classified
-  // every ongoing application's enhancement as a brand-new build, which is
-  // precisely the misclassification this product exists to avoid. A genuine new
-  // build is still 'new': none of its live segments start before the year.
-  //
-  // Measured against *this implementation's* own start, not against the start of the
-  // filing year. Two go-lives on a brand-new application in one year would otherwise
-  // both be 'new', stating in a single return that the same application was built
-  // from nothing twice; the second is an enhancement to what the first delivered.
-  // Segments sharing a start date are both 'new' — neither precedes the other, and
-  // they state the same quarter anyway.
-  const wasLiveBefore = (deliverableId: string, startDate: string): boolean =>
-    deliverableSegments.some(seg =>
-      seg.deliverableId === deliverableId &&
-      seg.startDate < startDate &&
-      isLiveStatusId(seg.status, deliverableStatuses)
-    );
-
+  // new or upgrade: see hasLiveHistoryBefore, shared with the importer and the #51 repair.
   const qualifying = deliverableSegments
     .filter(seg => !!seg.initiativeId && initiativeIds.has(seg.initiativeId)
       && startsInReportYear(seg) && isLiveStatusId(seg.status, deliverableStatuses));
@@ -202,41 +275,28 @@ export function projectRptiReturn(
       if (groupInitiativeId !== initiativeId) continue;
       items.sort(byStartDateAsc).forEach(segment => rowsForInitiative.push({
         anchor: segment, deliverableId,
-        developmentType: wasLiveBefore(deliverableId, segment.startDate) ? 'upgrade' : 'new',
+        developmentType: hasLiveHistoryBefore(deliverableId, segment.startDate, deliverableSegments, deliverableStatuses) ? 'upgrade' : 'new',
       }));
     }
     rowsForInitiative.sort((a, b) =>
       a.anchor.startDate.localeCompare(b.anchor.startDate) || a.anchor.id.localeCompare(b.anchor.id));
     for (const { anchor, deliverableId, developmentType } of rowsForInitiative) {
       const deliverable = deliverables.find(d => d.id === deliverableId);
-      const category = resolveAssetCategory(deliverable, assets, assetCategories);
-      // Deliverable.developer now carries either 'inhouse' or a provider's *name*
-      // (ADR-0013). The RPTI column wants the classification, so anything that is not
-      // 'inhouse' is PPJTI — a third party, whoever they are. LKPTI emits the name
-      // itself, which is why one field can serve both returns.
-      const rawDeveloper = deliverable?.developer;
-      const developer: RptiDeveloper | undefined =
-        rawDeveloper === undefined || rawDeveloper === ''
-          ? undefined
-          : rawDeveloper === 'inhouse' ? 'inhouse' : 'PPJTI';
+      const attributes = filedAttributesFor(deliverable, assets, assetCategories);
 
       results.push({
         id: `rpti-gen-${anchor.id}-${reportYear}`,
         initiativeId,
         targetType: 'deliverable',
         targetId: deliverableId,
-        categoryCode: deliverable?.categoryCode ?? category?.categoryCode,
+        categoryCode: attributes.categoryCode,
         developmentType,
-        developer,
-        // 'n/a' by definition whenever the resolved developer isn't PPJTI — there is no
-        // third party, so there is no relationship to disclose. When it *is* PPJTI the
-        // answer is a fact about the vendor that nothing can derive, so it is read from
-        // the deliverable, where the preparer records it (FR-014).
-        ppjtiRelatedParty: developer !== 'PPJTI' ? 'n/a' : deliverable?.ppjtiRelatedParty,
-        dcCity: deliverable?.dcCity ?? category?.dcCity,
-        dcCountry: deliverable?.dcCountry ?? category?.dcCountry,
-        drCity: deliverable?.drCity ?? category?.drCity,
-        drCountry: deliverable?.drCountry ?? category?.drCountry,
+        developer: attributes.developer,
+        ppjtiRelatedParty: attributes.ppjtiRelatedParty,
+        dcCity: attributes.dcCity,
+        dcCountry: attributes.dcCountry,
+        drCity: attributes.drCity,
+        drCountry: attributes.drCountry,
         plannedImplementationQuarter: deriveQuarterFromDate(anchor.startDate),
         deliverableSegmentId: anchor.id,
         // Keterangan belongs to this implementation. Deskripsi remains initiative-owned.

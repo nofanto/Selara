@@ -657,6 +657,21 @@ describe('computeDataHealth — unresolved RPTI import references (#38)', () => 
     });
   });
 
+  it('offers repair only on the unresolved row target issue', () => {
+    const anchored = { ...unresolvedRow, id: 'anchored', deliverableSegmentId: 'missing-segment' };
+    const deleted = { ...unresolvedRow, id: 'deleted', targetId: 'deleted-deliverable' };
+    const issues = computeDataHealth(baseInput({ initiatives: [initiative], rptiDetails: [unresolvedRow, anchored, deleted] }));
+    expect(findIssue(issues, `rpti-target:${unresolvedRow.id}`)?.action).toEqual({
+      kind: 'repair-unresolved-rpti-row', rowId: unresolvedRow.id,
+    });
+    // Guards: both issues must exist, or the two toBeUndefined checks below pass vacuously.
+    expect(findIssue(issues, `rpti-target:${anchored.id}`)).toBeDefined();
+    expect(findIssue(issues, `rpti-target:${deleted.id}`)).toBeDefined();
+    expect(findIssue(issues, `rpti-target:${anchored.id}`)?.action).toBeUndefined();
+    expect(findIssue(issues, `rpti-target:${deleted.id}`)?.action).toBeUndefined();
+    expect(issues.filter(issue => issue.id !== `rpti-target:${unresolvedRow.id}`).every(issue => issue.action === undefined)).toBe(true);
+  });
+
   it('names the row so the user can find it, rather than reporting an opaque id', () => {
     const issues = computeDataHealth(baseInput({ initiatives: [initiative], rptiDetails: [unresolvedRow] }));
     expect(findIssue(issues, `rpti-target:${unresolvedRow.id}`)?.entityName).toBe('Core Banking GL');
