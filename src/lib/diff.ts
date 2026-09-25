@@ -50,7 +50,7 @@ export type DiffOwner = { id: string; name: string };
  *
  * `asset` groups the summary (requirement-specs/diff-summary.md §2); `deliverable`
  * clusters rows within a group (§6). Both are unset for portfolio-level types
- * (programmes, strategies, resources, categories, statuses, decisions) and for
+ * (programmes, strategies, resources, categories, statuses) and for
  * dependencies, which join two initiatives that may sit under different assets.
  * `deliverable` alone is unset for entities that hang off the asset directly —
  * initiatives, milestones, and RPTI rows targeting an asset.
@@ -152,6 +152,7 @@ export function computeDiff(baseVersion: Version, currentData: Version['data']):
       if ((b.maturity ?? null) !== (c.maturity ?? null)) {
         changes.push(`Maturity: ${b.maturity ?? 'Unrated'} → ${c.maturity ?? 'Unrated'}`);
       }
+      if ((b.externalId ?? '') !== (c.externalId ?? '')) changes.push(`External ID: ${b.externalId || 'Unset'} → ${c.externalId || 'Unset'}`);
       return changes;
     },
     (asset) => ({ asset: resolveAsset(asset.id) })
@@ -198,9 +199,34 @@ export function computeDiff(baseVersion: Version, currentData: Version['data']):
         changes.push(`Moved from Asset "${oldAsset}" to "${newAsset}"`);
       }
       // Deskripsi is initiative-owned. Keterangan is compared on the implementation
-      // below. `description` was never compared either — the same #42 blind spot.
+      // segment below.
       if ((b.description ?? '') !== (c.description ?? '')) {
         changes.push(`Description: ${b.description || 'Unset'} → ${c.description || 'Unset'}`);
+      }
+      if (b.programmeId !== c.programmeId) {
+        const before = baseVersion.data.programmes.find(p => p.id === b.programmeId)?.name || 'Unknown programme';
+        const after = currentData.programmes.find(p => p.id === c.programmeId)?.name || 'Unknown programme';
+        changes.push(`Programme: ${before} → ${after}`);
+      }
+      if ((b.strategyId ?? '') !== (c.strategyId ?? '')) {
+        const before = baseVersion.data.strategies.find(s => s.id === b.strategyId)?.name || 'Unassigned';
+        const after = currentData.strategies.find(s => s.id === c.strategyId)?.name || 'Unassigned';
+        changes.push(`Strategy: ${before} → ${after}`);
+      }
+      if (!!b.isPlaceholder !== !!c.isPlaceholder) changes.push(`Placeholder: ${b.isPlaceholder ? 'yes' : 'no'} → ${c.isPlaceholder ? 'yes' : 'no'}`);
+      if ((b.status ?? '') !== (c.status ?? '')) changes.push(`Status: ${b.status || 'Unset'} → ${c.status || 'Unset'}`);
+      if ((b.ragStatus ?? '') !== (c.ragStatus ?? '')) changes.push(`RAG status: ${b.ragStatus || 'Unset'} → ${c.ragStatus || 'Unset'}`);
+      if ((b.progress ?? null) !== (c.progress ?? null)) changes.push(`Progress: ${b.progress == null ? 'Unset' : `${b.progress}%`} → ${c.progress == null ? 'Unset' : `${c.progress}%`}`);
+      if ((b.owner ?? '') !== (c.owner ?? '')) changes.push(`Owner: ${b.owner || 'Unset'} → ${c.owner || 'Unset'}`);
+      if ((b.ownerId ?? '') !== (c.ownerId ?? '')) {
+        const before = baseVersion.data.resources.find(r => r.id === b.ownerId)?.name || 'Unassigned';
+        const after = currentData.resources.find(r => r.id === c.ownerId)?.name || 'Unassigned';
+        changes.push(`Owner resource: ${before} → ${after}`);
+      }
+      if (JSON.stringify(b.resourceIds ?? []) !== JSON.stringify(c.resourceIds ?? [])) {
+        const names = (ids: string[] | undefined, resources: typeof currentData.resources) =>
+          (ids ?? []).map(id => resources.find(r => r.id === id)?.name || id).join(', ') || 'None';
+        changes.push(`Assigned resources: ${names(b.resourceIds, baseVersion.data.resources)} → ${names(c.resourceIds, currentData.resources)}`);
       }
       return changes;
     },
@@ -223,6 +249,8 @@ export function computeDiff(baseVersion: Version, currentData: Version['data']):
       const changes: string[] = [];
       if (b.type !== c.type) changes.push(`Type: ${b.type} → ${c.type}`);
       if (b.sourceId !== c.sourceId || b.targetId !== c.targetId) changes.push('Endpoints reconnected');
+      if ((b.sourceType ?? 'initiative') !== (c.sourceType ?? 'initiative')) changes.push(`Source type: ${b.sourceType ?? 'initiative'} → ${c.sourceType ?? 'initiative'}`);
+      if ((b.targetType ?? 'initiative') !== (c.targetType ?? 'initiative')) changes.push(`Target type: ${b.targetType ?? 'initiative'} → ${c.targetType ?? 'initiative'}`);
       return changes;
     }
   );
@@ -236,6 +264,11 @@ export function computeDiff(baseVersion: Version, currentData: Version['data']):
       if (b.name !== c.name) changes.push(`Renamed to "${c.name}"`);
       if (b.date !== c.date) changes.push(`Date: ${b.date} → ${c.date}`);
       if (b.type !== c.type) changes.push(`Type: ${b.type} → ${c.type}`);
+      if (b.assetId !== c.assetId) {
+        const before = baseVersion.data.assets.find(a => a.id === b.assetId)?.name || 'Unknown asset';
+        const after = currentData.assets.find(a => a.id === c.assetId)?.name || 'Unknown asset';
+        changes.push(`Moved from Asset "${before}" to "${after}"`);
+      }
       return changes;
     },
     (m) => ({ asset: resolveAsset(m.assetId) })
@@ -256,17 +289,18 @@ export function computeDiff(baseVersion: Version, currentData: Version['data']):
         const newAsset = currentData.assets.find(a => a.id === c.assetId)?.name || 'Unknown';
         changes.push(`Moved from Asset "${oldAsset}" to "${newAsset}"`);
       }
-      // The nine fields ADR-0013 moved onto the entities that own them. Each must be
-      // named explicitly: `compareEntities` is generic over entities, not over their
-      // fields, so an unlisted field changes with no history entry and no error
-      // (https://github.com/nofanto/Selara/issues/42). These feed a regulatory return,
-      // which makes "changed, but nobody can see when" the wrong failure to accept.
+      // Attributes on the deliverable, including ADR-0013's nine moved fields,
+      // keep their readable messages here. diffFieldPolicy and its test require
+      // each classified field to produce an entry.
       for (const [field, label] of [
         ['platform', 'Platform'], ['database', 'Database'],
         ['dcProvider', 'DC provider'], ['drcProvider', 'DRC provider'],
         ['backupStrategy', 'Backup strategy'], ['systemOwner', 'System owner'],
         ['ownership', 'Ownership'], ['developer', 'Developer'],
         ['ppjtiRelatedParty', 'PPJTI related party'],
+        ['description', 'Description'], ['categoryCode', 'Category code'],
+        ['dcCity', 'DC city'], ['dcCountry', 'DC country'],
+        ['drCity', 'DR city'], ['drCountry', 'DR country'],
       ] as const) {
         const before = (b as unknown as Record<string, unknown>)[field] ?? '';
         const after = (c as unknown as Record<string, unknown>)[field] ?? '';
@@ -300,9 +334,8 @@ export function computeDiff(baseVersion: Version, currentData: Version['data']):
     (s) => `${getSegmentDeliverableName(s.deliverableId)} (${s.startDate} → ${s.endDate})`,
     (b, c) => {
       const changes: string[] = [];
-      // Listed explicitly, like every other field here: compareEntities is generic
-      // over entities, not over their fields, so a new field is invisible to the
-      // version diff until it is named.
+      // Keep the segment's hand-written messages; diffFieldPolicy and its test
+      // require a message for each classified field.
       if ((b.title ?? '') !== (c.title ?? '')) {
         changes.push(`Title: ${b.title || '(none)'} → ${c.title || '(none)'}`);
       }
@@ -365,6 +398,12 @@ export function computeDiff(baseVersion: Version, currentData: Version['data']):
       const changes: string[] = [];
       if (b.name !== c.name) changes.push(`Renamed from "${b.name}" to "${c.name}"`);
       if ((b.order ?? null) !== (c.order ?? null)) changes.push(`Order: ${b.order ?? 'Unset'} → ${c.order ?? 'Unset'}`);
+      for (const [field, label] of [
+        ['categoryCode', 'Category code'], ['dcCity', 'DC city'],
+        ['dcCountry', 'DC country'], ['drCity', 'DR city'], ['drCountry', 'DR country'],
+      ] as const) {
+        if ((b[field] ?? '') !== (c[field] ?? '')) changes.push(`${label}: ${b[field] || 'Unset'} → ${c[field] || 'Unset'}`);
+      }
       return changes;
     }
   );
@@ -405,6 +444,19 @@ export function computeDiff(baseVersion: Version, currentData: Version['data']):
       if (b.developmentType !== c.developmentType) changes.push(`Development type: ${b.developmentType} → ${c.developmentType}`);
       if (b.developer !== c.developer) changes.push(`Developer: ${b.developer} → ${c.developer}`);
       if (b.ppjtiRelatedParty !== c.ppjtiRelatedParty) changes.push(`PPJTI related party: ${b.ppjtiRelatedParty} → ${c.ppjtiRelatedParty}`);
+      if (b.initiativeId !== c.initiativeId) changes.push(`Initiative: ${getInitiativeName(b.initiativeId)} → ${getInitiativeName(c.initiativeId)}`);
+      if (b.targetType !== c.targetType || b.targetId !== c.targetId) {
+        changes.push(`Target: ${b.targetType} "${getRptiTargetName(b.targetType, b.targetId)}" → ${c.targetType} "${getRptiTargetName(c.targetType, c.targetId)}"`);
+      }
+      for (const [field, label] of [
+        ['dcCity', 'DC city'], ['dcCountry', 'DC country'],
+        ['drCity', 'DR city'], ['drCountry', 'DR country'],
+      ] as const) {
+        if ((b[field] ?? '') !== (c[field] ?? '')) changes.push(`${label}: ${b[field] || 'Unset'} → ${c[field] || 'Unset'}`);
+      }
+      if ((b.deliverableSegmentId ?? '') !== (c.deliverableSegmentId ?? '')) {
+        changes.push(`Implementation segment: ${b.deliverableSegmentId || 'Unassigned'} → ${c.deliverableSegmentId || 'Unassigned'}`);
+      }
       if ((b.plannedImplementationQuarter ?? '') !== (c.plannedImplementationQuarter ?? '')) {
         changes.push(`Planned quarter: ${b.plannedImplementationQuarter ?? 'Unset'} → ${c.plannedImplementationQuarter ?? 'Unset'}`);
       }
@@ -427,6 +479,16 @@ export function computeDiff(baseVersion: Version, currentData: Version['data']):
       const changes: string[] = [];
       if (b.categoryCode !== c.categoryCode) changes.push(`Category code: ${b.categoryCode} → ${c.categoryCode}`);
       if (b.developer !== c.developer) changes.push(`Developer: ${b.developer} → ${c.developer}`);
+      if (b.targetId !== c.targetId) changes.push(`Deliverable: ${getLkptiTargetName(b.targetId)} → ${getLkptiTargetName(c.targetId)}`);
+      if ((b.targetName ?? '') !== (c.targetName ?? '')) changes.push(`Filed application name: ${b.targetName || 'Unset'} → ${c.targetName || 'Unset'}`);
+      for (const [field, label] of [
+        ['dcCity', 'DC city'], ['dcCountry', 'DC country'],
+        ['drCity', 'DR city'], ['drCountry', 'DR country'],
+        ['dcProvider', 'DC provider'], ['drcProvider', 'DRC provider'],
+        ['functionDescription', 'Function description'],
+      ] as const) {
+        if ((b[field] ?? '') !== (c[field] ?? '')) changes.push(`${label}: ${b[field] || 'Unset'} → ${c[field] || 'Unset'}`);
+      }
       if ((b.platform ?? '') !== (c.platform ?? '')) changes.push(`Platform: ${b.platform ?? 'Unset'} → ${c.platform ?? 'Unset'}`);
       if ((b.database ?? '') !== (c.database ?? '')) changes.push(`Database: ${b.database ?? 'Unset'} → ${c.database ?? 'Unset'}`);
       if ((b.backupStrategy ?? '') !== (c.backupStrategy ?? '')) changes.push(`Backup strategy: ${b.backupStrategy ?? 'Unset'} → ${c.backupStrategy ?? 'Unset'}`);
