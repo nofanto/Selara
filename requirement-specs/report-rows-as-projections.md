@@ -307,18 +307,23 @@ This breaks **spec 002's FR-025**: *"Nothing MUST require the preparer to re-key
 already supplied."* The message is also wrong on its own terms. It says the row *"points at a
 Deliverable that no longer exists"*, but for an unresolved import the Deliverable never existed.
 
-**An unresolved row is always an upgrade to an application.** Rows filed as `new` always create
-their application (`rptiImport.ts`), and unmatched infrastructure is created automatically
-(FR-019a). So Q13's option *"this is a new application"* contradicts the filed return, which says
-`upgrade`.
+**An unresolved row is always an upgrade.** Rows filed as `new` always create their application
+(`rptiImport.ts`). An upgrade is left unresolved when it matches **no** entry or **several**. Only
+applications can match none, because unmatched infrastructure is created automatically (FR-019a).
+Either kind can match several: two same-named applications, or two same-named infrastructure
+entries. Either way Q13's option *"this is a new application"* contradicts the filed return, which
+says `upgrade`. *(Corrected 2026-09-25 after Codex review: the first version said "always an upgrade
+to an application", which missed ambiguous infrastructure.)*
 
 **Decided (product owner): a semi-automatic repair, started from the finding.** The finding — in
 Data Health and in the pre-export gate — offers two resolutions. Each opens a form **pre-filled from
 what the return filed**, which the preparer checks and confirms. Making the judgement still needs a
 person; *recording* it no longer means re-typing what the return said.
 
-- **A — "It's this existing application."** The inventory lists it under another name. The
-  preparer picks the application; the filed implementation is created on it.
+- **A — "It's this existing entry."** The inventory lists it under another name, or lists several
+  entries of that name. The preparer picks one; the filed implementation is created on it. This is
+  the only option for ambiguous infrastructure: entries of that name exist, so B would create a
+  duplicate.
 - **B — "The bank runs it, but the inventory doesn't list it."** The application is created much as
   unmatched infrastructure already is (FR-019a), including a prior live phase so that it stays an
   upgrade.
@@ -329,8 +334,14 @@ initiative moves to that application's asset. Until now it sat under an unrelate
 asset in the inventory.
 
 **Where each pre-filled value comes from** *(confirmed by the product owner)*.
-- **From the stored row, which remains read-only evidence (Q12):** name, category, developer, DC/DR
-  locations, planned quarter, Keterangan.
+- **From the stored row, which remains read-only evidence (Q12):** category, developer and
+  related party, DC/DR locations, planned quarter, Keterangan. A PPJTI row states `PPJTI`, not the
+  provider's name, so the form asks for the name.
+- **From the imported initiative's name:** the application's name. The stored row does not hold one,
+  and the importer's list of unresolved rows is not kept after import. The importer names the
+  initiative `<application> — Q3 2027` (Q21), so the form offers that name without the quarter
+  suffix, for the preparer to check, since the initiative may have been renamed. *(Corrected
+  2026-09-25 after Codex review: the first version listed the name under the stored row.)*
 - **From the initiative's budget:** CapEx and OpEx. The stored row no longer holds cost (Q7), and
   FR-026 says the system need not keep a separate copy of what was imported. The importer seeded
   the initiative's budget from the filed row, but the preparer may have edited it since, which is
@@ -339,6 +350,19 @@ asset in the inventory.
 **Unchanged by this.** The stored row stays as it is (Q12's source-side principle, and the rejected
 identity-remap editor stays rejected). Creating a deliverable directly in the Data Manager stays
 exactly as it is.
+
+**A, when the chosen entry has no live history before the filed quarter** *(product owner,
+2026-09-25)*. The row would file as `new`, contradicting the return. The repair adds the same
+continuous prior live phase as B, and the form shows it before confirming. Choosing the entry
+states that the bank already runs it; an upgrade needs that history.
+
+**A, when the chosen entry's attributes differ from the filed row** *(product owner, 2026-09-25)*.
+Category, developer, related party and DC/DR are the Deliverable's (ADR-0013): the return files
+the Deliverable's values, and the same values feed the LKPTI. The form lists each field that
+differs, filed next to current, and the preparer decides per field whether to update the
+Deliverable, which also changes the LKPTI, or keep it. Nothing changes silently in either
+direction. Rejected: always keeping the Deliverable's values, which misfiles silently; always
+taking the filed values, which rewrites the inventory silently.
 
 **Near matches (A)** *(confirmed by the product owner)*. Likely candidates are suggested for the preparer to choose from, and never
 chosen automatically. That is FR-019's reason for holding the row back in the first place: the two
@@ -372,6 +396,29 @@ Deliverable "no longer exists". It also warns that the manual repair files a new
 zero cost unless the preparer enters the filed values. This is a separate, small change and does
 not wait for the feature: the current message leads preparers into the silent corruption measured
 above.
+
+Codex review then measured a second silent misfiling on the sample. A bare new Deliverable files
+category **01**, no developer and empty DC/DR, where the row filed 12, `inhouse`, Jakarta and
+Surabaya. It raises no finding and no Data Health error. So the message also lists the filed
+Deliverable attributes, using the Deliverables tab's labels. That includes a PPJTI row's related
+party even when it is `n/a`, because a blank Deliverable regenerates it as empty.
+
+**A row anchored to a deleted implementation is repaired by restore or re-import** *(product owner,
+2026-09-25)*. Codex review found that a stored row anchored to a segment that no longer exists can
+never clear: recreating the Deliverable or the segment makes a new implementation, and contract
+14 / T038 forbid an anchored row from falling back to another one. The product owner first chose
+a fallback when the anchor is gone. That choice was withdrawn once it came out that the fallback
+is the case T038 was written against. Suppose an initiative filed Q2 on X and Q4 on Y, and X is
+deleted: the fallback would find Y's Q4 as the only match and silently drop the Q2 row, which is
+the #52 defect. Narrowing the fallback by quarter would match on contents, which Q13 rules out.
+**Decided:** keep the rule. For these rows, the message and Data Health's `rpti-segment` issue say
+to restore a saved version from before the deletion (History tab), or to re-import the filing.
+The old advice ("create or open the segment", "restore that work on the timeline") could never
+clear the finding. An anchored segment that still exists but is not live keeps the segment-panel
+repair, which works. The rule applies whatever else is missing: the Initiative, the Deliverable or
+a legacy Asset target. Restoring any one of them still leaves the anchored segment gone, so every
+one of those findings gets the restore-or-re-import repair (third Codex review). Restoring a saved
+version brings back the original segment id; a test pins that the finding then clears.
 
 ### Q19 — the legacy remarks lift follows the field; the legacy cost lift does not (2026-09-23)
 
