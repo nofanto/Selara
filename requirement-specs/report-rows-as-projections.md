@@ -391,6 +391,22 @@ This **closes Q21's open consequence 2**. That case is an upgrade with no live h
 which drops out of the inventory in its upgrade year unless it was filed for Q4. Fixing it only for
 repairs would have left two rules for one situation.
 
+**Existing workspaces keep their old prior phases, with a warning** *(product owner, 2026-09-25;
+spec 004 FR-018)*. Prior phases the importer created under the one-year rule are never changed
+automatically. Where one still has the importer's exact original shape and leaves its entry out of
+an inventory year, Data Health shows a non-blocking warning that names the missing years and offers
+the extension, applied only when the preparer confirms. Rejected: extending them silently when the
+workspace next opens, which changes stored data without anyone deciding to, the thing this feature
+removes elsewhere. Also rejected: leaving them with no signal, which keeps a known inventory gap
+invisible.
+
+**After a B repair, the regenerated inventory includes the application from the year before the
+filed year** *(product owner, 2026-09-25; spec 004 plan)*. B means the bank ran it, and the prior live
+phase starts on 1 January of the year before the filed year. So a regenerated 2026 LKPTI lists
+Legacy Teller: 14 rows against the 13 filed. The dialog says so before confirming. Rejected: starting
+the prior phase in the filed year. That keeps the old inventory unchanged, but a Q1 filing would then
+have no live history *before* its implementation and would file `new`.
+
 **The error message is corrected now, separately (product owner).** It no longer says the
 Deliverable "no longer exists". It also warns that the manual repair files a new application with
 zero cost unless the preparer enters the filed values. This is a separate, small change and does
