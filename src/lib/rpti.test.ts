@@ -735,14 +735,17 @@ describe('reconcileRptiReturn — stored rows are reconciliation evidence, never
     ]);
   });
 
-  it('names an anchored stored row whose implementation no longer exists and gives a segment repair (T038)', () => {
+  it('names an anchored stored row whose implementation no longer exists and gives a repair that can clear it (T038)', () => {
     const findings = reconcileRptiReturn(ctx([
       storedRow({ deliverableSegmentId: 'deleted-implementation' }),
     ], [segment()]));
 
     expect(findings).toMatchObject([{ rowId: 'row-1' }]);
-    expect(findings[0].message).toMatch(/segment panel/i);
-    expect(findings[0].message).toMatch(/timeline/i);
+    // #51 review: a recreated segment is a different implementation and, by this very
+    // rule, can never clear the finding, so the repair is a restore or a re-import.
+    expect(findings[0].message).toMatch(/History tab/);
+    expect(findings[0].message).toMatch(/re-import the filing/i);
+    expect(findings[0].message).not.toMatch(/segment panel/i);
   });
 
   it('matches only by implementation identity when stored contents differ from projection (T039)', () => {
@@ -909,6 +912,76 @@ describe('reconcileRptiReturn — stored rows are reconciliation evidence, never
         expect(message).toMatch(/[^.;]\.$/);
         expect(message).not.toContain('.".');
       }
+    });
+
+    it('states the filed Deliverable attributes a bare new Deliverable would file differently (Codex review)', () => {
+      // Measured on the sample: a bare repair filed category 01, no developer and empty
+      // DC/DR where the row filed 12, inhouse, Jakarta and Surabaya, with no finding at all.
+      const message = messageFor({ ...unresolved, categoryCode: '12', developer: 'inhouse',
+        dcCity: 'Jakarta', dcCountry: 'Indonesia', drCity: 'Surabaya', drCountry: 'Indonesia' });
+      expect(message).toContain('Category Code Override 12');
+      expect(message).toContain('Developer inhouse');
+      // The Deliverables tab has four separate fields, not combined ones (Codex review).
+      expect(message).toContain('DC City Override Jakarta, DC Country Override Indonesia');
+      expect(message).toContain('DR City Override Surabaya, DR Country Override Indonesia');
+      expect(message).not.toMatch(/Provider Related Party/);
+    });
+
+    it('asks for the provider name and related party for a row filed as PPJTI', () => {
+      const message = messageFor({ ...unresolved, developer: 'PPJTI', ppjtiRelatedParty: 'yes' });
+      expect(message).toMatch(/Developer the provider's name \(filed as PPJTI\)/);
+      expect(message).toContain('Provider Related Party yes');
+    });
+
+    it('states a filed related party of n/a for a PPJTI row, which a blank Deliverable would not file (Codex review)', () => {
+      expect(messageFor({ ...unresolved, developer: 'PPJTI', ppjtiRelatedParty: 'n/a' })).toContain('Provider Related Party n/a');
+    });
+
+    it('sends every anchored row whose implementation is gone to restore or re-import, whatever else is missing (Codex review)', () => {
+      const gone = { deliverableSegmentId: 'seg-gone' };
+      const cases: [string, RptiDetail, string][] = [
+        ['initiative gone, target kept', storedRow({ ...gone, initiativeId: 'init-gone' }), 'missing-initiative'],
+        ['initiative and target gone', storedRow({ ...gone, initiativeId: 'init-gone', targetId: 'deliv-gone' }), 'missing-initiative'],
+        ['legacy asset target', storedRow({ ...gone, targetType: 'asset', targetId: 'asset-1' }), 'asset-target'],
+      ];
+      for (const [name, row, reason] of cases) {
+        const findings = reconcileRptiReturn(ctx([row], []));
+        expect(findings, name).toHaveLength(1);
+        expect(findings[0].reason, name).toBe(reason);
+        expect(findings[0].message, name).toMatch(/History tab/);
+        expect(findings[0].message, name).toMatch(/re-import the filing/i);
+      }
+    });
+
+    it('clears once the anchored implementation is restored, which is what the advice promises', () => {
+      const row = storedRow({ targetId: 'deliv-gone', deliverableSegmentId: 'seg-live-2027' });
+      const deleted = ctx([row], []);
+      deleted.deliverables = [];
+      expect(reconcileRptiReturn(deleted)[0]?.message).toMatch(/History tab/); // guard: the dead-anchor case
+      const restored = ctx([row], [segment({ deliverableId: 'deliv-gone' })]);
+      restored.deliverables = [makeDeliverable({ id: 'deliv-gone' })];
+      expect(reconcileRptiReturn(restored)).toEqual([]);
+    });
+
+    it('does not send an anchored row with a deleted implementation to a repair that cannot clear it', () => {
+      // Its Deliverable was deleted, which removed the anchored segment too. T038 forbids
+      // falling back to another implementation, so a recreated one never matches.
+      const input = ctx([storedRow({ targetId: 'deliv-gone', deliverableSegmentId: 'seg-gone', developmentType: 'upgrade' })], []);
+      const [finding] = reconcileRptiReturn(input);
+      expect(finding.reason).toBe('missing-target');
+      expect(finding.message).toMatch(/History tab/);
+      expect(finding.message).toMatch(/re-import the filing/i);
+      expect(finding.message).not.toMatch(/create or open the Deliverable's live lifecycle segment/);
+    });
+
+    it('keeps the segment-panel repair when the anchored segment still exists but is not live', () => {
+      // That one can be repaired in place: give the same segment a live status again.
+      const findings = reconcileRptiReturn(ctx([storedRow({ deliverableSegmentId: 'seg-live-2027' })],
+        [segment({ status: 'appstatus-planned' })]));
+      expect(findings).toHaveLength(1);
+      expect(findings[0].reason).toBe('unanchored');
+      expect(findings[0].message).toMatch(/segment panel/i);
+      expect(findings[0].message).not.toMatch(/History tab/);
     });
 
     it('does not warn about the development type for a row filed as new', () => {

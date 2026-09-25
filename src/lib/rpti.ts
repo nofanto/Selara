@@ -290,6 +290,41 @@ export const UNRESOLVED_IMPORT_TARGET_PREFIX = 'rpti-import-unresolved-';
  * An unresolved import has no segment yet; a deleted target's segment may be
  * reassigned with its values intact, so only a new one is said to lose them.
  */
+/**
+ * The row's Deliverable-owned values (ADR-0013), named by the Deliverables tab's own
+ * labels. Generation reads them from the Deliverable, so a bare new one files its
+ * category default and blanks instead, with no finding (#51 review, measured).
+ */
+function filedDeliverableAttributes(row: RptiDetail): string {
+  const parts: string[] = [];
+  if (row.categoryCode) parts.push(`Category Code Override ${row.categoryCode}`);
+  if (row.developer === 'PPJTI') {
+    parts.push("Developer the provider's name (filed as PPJTI)");
+    // Including n/a: a blank Deliverable regenerates it as empty, not n/a.
+    if (row.ppjtiRelatedParty) parts.push(`Provider Related Party ${row.ppjtiRelatedParty}`);
+  } else if (row.developer) {
+    parts.push(`Developer ${row.developer}`);
+  }
+  if (row.dcCity) parts.push(`DC City Override ${row.dcCity}`);
+  if (row.dcCountry) parts.push(`DC Country Override ${row.dcCountry}`);
+  if (row.drCity) parts.push(`DR City Override ${row.drCity}`);
+  if (row.drCountry) parts.push(`DR Country Override ${row.drCountry}`);
+  return parts.join(', ');
+}
+
+/**
+ * The repair for a row anchored to an implementation that no longer exists. A recreated
+ * segment is a different implementation, and an anchored row never falls back to
+ * another one (contract 14, T038), so rebuilding it can never clear the finding.
+ * Shared with Data Health's rpti-segment issue so the two cannot disagree.
+ */
+export function deletedAnchorRepair(label: string, alsoGone: string[] = []): string {
+  const together = alsoGone.length ? ` together with its ${alsoGone.join(' and ')}` : '';
+  return `The filed RPTI row for "${label}" was filed for one specific implementation, which has since been deleted${together}. `
+    + 'Recreating it does not clear this: a new lifecycle segment is a different implementation, and a filed row is never moved onto another one. '
+    + 'On the History tab, restore a saved version from before the deletion (this replaces every change made since), or re-import the filing.';
+}
+
 function filedValuesNotCarriedOver(row: RptiDetail, initiative: Initiative, imported: boolean): string {
   const quarter = row.plannedImplementationQuarter ? ` starting in the filed quarter, ${row.plannedImplementationQuarter},` : '';
   const segment = imported ? 'the segment' : 'a new segment';
@@ -297,6 +332,8 @@ function filedValuesNotCarriedOver(row: RptiDetail, initiative: Initiative, impo
   if (row.developmentType === 'upgrade') {
     differences.push('without an earlier live segment on the Deliverable, it files as new instead of upgrade');
   }
+  const attributes = filedDeliverableAttributes(row);
+  if (attributes) differences.push(`the Deliverable's own values file unless set to what was filed on the Deliverables tab: ${attributes}`);
   if (row.remarks) differences.push(`${segment}'s Keterangan files empty unless entered as "${row.remarks}"`);
   // The stored row holds no cost (FR-026). The import set the budget from the filed
   // row, but it may have been edited since, so it is offered for checking, not as fact.
@@ -334,6 +371,7 @@ export function reconcileRptiReturn(input: ReconcileRptiInput): RptiReconciliati
   const { storedDetails, initiatives, deliverables, deliverableSegments, deliverableStatuses } = input;
   const initiativeById = new Map(initiatives.map(i => [i.id, i]));
   const deliverableById = new Map(deliverables.map(d => [d.id, d]));
+  const segmentIds = new Set(deliverableSegments.map(s => s.id));
   const findings: RptiReconciliationFinding[] = [];
 
   // Each live lifecycle segment is one canonical implementation identity. The
@@ -407,6 +445,21 @@ export function reconcileRptiReturn(input: ReconcileRptiInput): RptiReconciliati
     if (match.candidate && claimCount.get(match.candidate.key) === 1) continue;
     if (match.candidate) {
       add('identity-conflict', `More than one stored RPTI row maps to the same current plan line for "${label}". One generated row cannot account for every stored row; repair or re-import the filing evidence before exporting.`);
+      continue;
+    }
+
+    // Checked before every reason below: rebuilding any part of an anchored row's
+    // implementation makes a new one, which contract 14 forbids it to match.
+    const anchorGone = !!row.deliverableSegmentId && !segmentIds.has(row.deliverableSegmentId);
+    if (anchorGone) {
+      const alsoGone = [
+        ...(row.targetType === 'deliverable' && !deliverableById.has(row.targetId) ? ['Deliverable'] : []),
+        ...(!initiative ? ['Initiative'] : []),
+      ];
+      const reason: RptiReconciliationReason = row.targetType === 'asset' ? 'asset-target'
+        : !initiative ? 'missing-initiative'
+          : alsoGone.length ? 'missing-target' : 'unanchored';
+      add(reason, deletedAnchorRepair(label, alsoGone));
       continue;
     }
 

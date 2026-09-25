@@ -3,7 +3,7 @@ import {
   Initiative, Milestone, Dependency, Decision, Resource, Programme, Strategy,
   RptiDetail, LkptiDetail, TimelineSettings,
 } from '../types';
-import { isLiveStatusId, isPreLaunchStatusId, reconcileRptiReturn, resolveAssetCategory } from './rpti';
+import { deletedAnchorRepair, isLiveStatusId, isPreLaunchStatusId, reconcileRptiReturn, resolveAssetCategory } from './rpti';
 
 // Tabs of src/components/DataManager.tsx's own `Tab` union — defined here (the pure
 // lib layer) as the source of truth so DataManager can import it instead of the other
@@ -339,7 +339,7 @@ export function computeDataHealth(input: DataHealthInput): HealthIssue[] {
     if (r.deliverableSegmentId && !segmentIds.has(r.deliverableSegmentId)) {
       issues.push({
         id: `rpti-segment:${r.id}`, severity: 'error', entityType: 'RptiDetail', entityId: r.id,
-        entityName: label, message: `The filed RPTI row for "${label}" refers to a lifecycle segment that no longer exists. Restore that work on the timeline — generation derives the row's quarter from it.`, location: tab('deliverables'),
+        entityName: label, message: deletedAnchorRepair(label, [...(r.targetType === 'deliverable' && !targetExists ? ['Deliverable'] : []), ...(!initiativeIds.has(r.initiativeId) ? ['Initiative'] : [])]), location: tab('deliverables'),
       });
     }
   }

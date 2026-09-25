@@ -167,6 +167,9 @@ describe('computeDataHealth — hard checks (dangling references)', () => {
     expect(findIssue(issues, `rpti-initiative:${r.id}`)?.severity).toBe('error');
     expect(findIssue(issues, `rpti-target:${r.id}`)?.severity).toBe('error');
     expect(findIssue(issues, `rpti-segment:${r.id}`)?.severity).toBe('error');
+    // A recreated segment cannot stand in for the anchored one (T038), so the repair is a
+    // restore or a re-import, not "restore that work on the timeline" (#51 review).
+    expect(findIssue(issues, `rpti-segment:${r.id}`)?.message).toMatch(/History tab.*re-import the filing/is);
   });
 
   it('blocks a legacy asset-target RPTI row and names the source-side repair', () => {

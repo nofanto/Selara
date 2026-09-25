@@ -96,6 +96,10 @@ describe('the published sample returns', () => {
     expect(named[0].message).toContain(filedInitiative.capex.toLocaleString());
     expect(named[0].message).toContain(filedInitiative.opex.toLocaleString());
     expect(named[0].message).toContain(`"${unresolvedRow.remarks}"`);
+    // A bare new Deliverable files its category default and blank DC/DR, with no finding.
+    expect(named[0].message).toContain(`Category Code Override ${unresolvedRow.categoryCode}`);
+    expect(named[0].message).toContain(`DC City Override ${unresolvedRow.dcCity}, DC Country Override ${unresolvedRow.dcCountry}`);
+    expect(named[0].message).toContain(`DR City Override ${unresolvedRow.drCity}, DR Country Override ${unresolvedRow.drCountry}`);
     expect(filedInitiative.capex).toBeGreaterThan(0); // guard: a 0 budget would make the cost check vacuous
 
     // Guard against a gate that simply shouts at everything: the twelve rows that
