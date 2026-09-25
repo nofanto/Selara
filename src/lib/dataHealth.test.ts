@@ -672,6 +672,13 @@ describe('computeDataHealth — unresolved RPTI import references (#38)', () => 
     expect(issues.filter(issue => issue.id !== `rpti-target:${unresolvedRow.id}`).every(issue => issue.action === undefined)).toBe(true);
   });
 
+  it('offers no repair when the initiative is gone too, since the repair has nothing to start from', () => {
+    // Coordinator review of US1: the button rendered, but the dialog could not open.
+    const issues = computeDataHealth(baseInput({ initiatives: [], rptiDetails: [unresolvedRow] }));
+    expect(findIssue(issues, `rpti-target:${unresolvedRow.id}`)).toBeDefined(); // guard
+    expect(findIssue(issues, `rpti-target:${unresolvedRow.id}`)?.action).toBeUndefined();
+  });
+
   it('names the row so the user can find it, rather than reporting an opaque id', () => {
     const issues = computeDataHealth(baseInput({ initiatives: [initiative], rptiDetails: [unresolvedRow] }));
     expect(findIssue(issues, `rpti-target:${unresolvedRow.id}`)?.entityName).toBe('Core Banking GL');

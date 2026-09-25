@@ -46,9 +46,10 @@ Click any issue to jump straight to where it can be fixed:
 - A newly imported LKPTI row retains its filed application name, so creating exactly one same-name
   replacement Deliverable clears a stale-target finding. An older orphaned row may not contain that
   identity evidence; in that case the finding tells you to re-import the filing instead of guessing.
+- An unmatched imported RPTI upgrade has a **Repair** button beside its finding. Choose **The bank runs it, but the inventory doesn’t list it** to add the missing application. Check the name, filed attributes, and the initiative’s current CapEx and OpEx against the return before confirming. The filed quarter and year are read-only. For a PPJTI row, enter the provider’s actual name. The repair adds live history from the year before the filing, creates the filed implementation, and clears the finding in one undoable change. **Cancel** changes nothing.
 - The workspace currency issue opens the **RPTI** tab, where the currency is set. It's a property of the workspace rather than of any one record, so nothing is pre-filled into the search box.
 
-This report is read-only — there's no editing here. It only tells you what needs attention and takes you to the screen where you'd normally make that fix.
+Other findings take you to the screen where their source record can be fixed.
 
 ## Two things worth knowing
 

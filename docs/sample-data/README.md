@@ -74,9 +74,11 @@ something different:
   It keeps its `upgrade` classification when the return is regenerated.
 - **1 *application* upgrade that matches nothing** — *Legacy Teller Application*. It
   is imported and flagged, not dropped and not guessed at. Both returns list
-  applications, so a non-match here really is a naming disagreement to resolve. This is the single error in the
-  review: *"An RPTI row for 'Legacy Teller Application' points at a deliverable that
-  no longer exists."* Give it a target in the RPTI tab of Data Manager to clear it.
+  applications, so a non-match here really is a naming disagreement to resolve. The
+  Data Health and RPTI pre-export findings offer **Repair**. Choose **The bank runs it,
+  but the inventory doesn’t list it**, check the pre-filled values against the return,
+  and confirm. The repair creates the application, its prior live history, and the
+  filed implementation together; the stored row remains unchanged.
 
 Three things that look odd but are intended:
 

@@ -336,7 +336,8 @@ export function computeDataHealth(input: DataHealthInput): HealthIssue[] {
       issues.push({
         id: `rpti-target:${r.id}`, severity: 'error', entityType: 'RptiDetail', entityId: r.id,
         entityName: label, message: reconciliation.message, location: tab('deliverables'),
-        ...(isRepairableUnresolvedRow(r) ? { action: { kind: 'repair-unresolved-rpti-row' as const, rowId: r.id } } : {}),
+        // The repair starts from the initiative (its name, year and budget), so none without one.
+        ...(isRepairableUnresolvedRow(r) && initiativeIds.has(r.initiativeId) ? { action: { kind: 'repair-unresolved-rpti-row' as const, rowId: r.id } } : {}),
       });
     }
     if (r.deliverableSegmentId && !segmentIds.has(r.deliverableSegmentId)) {
