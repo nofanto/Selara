@@ -35,7 +35,7 @@ Groups are ordered by significance rather than alphabetically:
 2. **Things added or removed** next — a change of scope, not drift.
 3. **Everything else** after that: schedule moves, budget changes, renames, status changes.
 
-Changes with no asset — programmes, strategies, resources, categories, app statuses, decisions, and relationships that span two assets — collect in a **Portfolio-level** group, always last.
+Changes with no asset — programmes, strategies, resources, categories, app statuses, and relationships that span two assets — collect in a **Portfolio-level** group, always last. Decisions appear in the separate **Decisions in this span** section.
 
 Two things the summary does deliberately:
 
@@ -48,7 +48,7 @@ The complete breakdown by entity type. Every type the comparison covers gets a s
 
 Assets · Programmes · Strategies · Initiatives · Relationships · Milestones · Deliverables · Deliverable Segments · App Statuses · Resources · Categories · RPTI · LKPTI
 
-Nothing is filtered here — including the cosmetic changes the summary sets aside. Use this view when you need to account for every field that moved.
+Nothing is filtered here — including the cosmetic changes the summary sets aside. Use this view when you need to account for changes to asset, programme, strategy, initiative, relationship, milestone, deliverable, segment, status, resource, category, RPTI, and LKPTI fields. This includes regulatory classification and DC/DR location changes, ownership and assignment changes, and placeholder status. Item IDs identify records; timeline-only layout changes (segment row and height, relationship arrow offset) are omitted.
 
 The **History Differences** report and the **Difference Report** reached from the Version Manager render the same content — they are two entry points to one comparison, so neither shows anything the other hides.
 
