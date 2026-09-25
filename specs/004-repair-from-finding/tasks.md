@@ -99,24 +99,28 @@ expectation changed**, before anything new calls it.
 
 ### Tests for User Story 1 (write first; see each fail) ⚠️
 
-- [ ] T014 [P] [US1] Failing tests for **contracts 7-8** in `src/lib/unresolvedRowRepair.test.ts`. `unresolvedRowRepairDraft`:
+- [x] T014 [P] [US1] Failing tests for **contracts 7-8** in `src/lib/unresolvedRowRepair.test.ts`. `unresolvedRowRepairDraft`:
+  - Done: Red `/tmp/selara-004-t014-red.log`; green `/tmp/selara-004-t014-green.log`: provenance, renamed-name flag, PPJTI input, clock independence.
   - **name:** `"Legacy Teller Application — Q3 2027"` → `Legacy Teller Application`, source `initiative-name`. A renamed initiative with no suffix gives the whole name, `check: true`.
   - **year:** from the suffix; if there is none, from `startDate`.
   - **other values:** quarter, category, related party, DC/DR and Keterangan from the row; CapEx/OpEx from the initiative, source `initiative-budget`.
   - **PPJTI:** empty provider name, `needs-input`.
   - **Clock:** output is identical under `vi.setSystemTime` set to another year.
-- [ ] T015 [US1] Failing tests for **contracts 13-18 (option B)** in `src/lib/unresolvedRowRepair.test.ts`, with **frozen** input state:
+- [x] T015 [US1] Failing tests for **contracts 13-18 (option B)** in `src/lib/unresolvedRowRepair.test.ts`, with **frozen** input state:
+  - Done: Red `/tmp/selara-004-t015-red.log`; green `/tmp/selara-004-t015-green.log`: frozen-state B writes, preconditions, status/category reuse, reconciliation, idempotence.
   - **Fields written:** exactly the data-model "option B" set, with the R11 ids. The Asset Category is created only when no category has the code. The live status is the workspace's own, and `IN_PRODUCTION_STATUS` is added only when none is live (R4).
   - **Nothing else:** deep equality over every other collection. The stored row is byte-identical (Q12).
   - **Post-condition:** `reconcileRptiReturn` has no finding for the row. `projectRptiReturn(result, 2027)` has one row for the initiative: `upgrade`, Q3, with the confirmed values.
   - **Preconditions:** `ok: false` for a missing row, for an initiative that has a live implementation, and for a `PPJTI` row whose provider name is empty or `PPJTI`.
   - **Idempotence:** a second apply returns `ok: false`.
-- [ ] T016 [P] [US1] Failing **SC-001** test in `src/lib/sampleReturns.test.ts`. After importing both samples, B on the Legacy Teller row with its unedited draft gives:
+- [x] T016 [P] [US1] Failing **SC-001** test in `src/lib/sampleReturns.test.ts`. After importing both samples, B on the Legacy Teller row with its unedited draft gives:
+  - Done: Red `/tmp/selara-004-t016-red.log`; green `/tmp/selara-004-t016-green.log`: sample filed-column and cost fidelity with a nonzero budget.
   - `projectRptiReturn(…, 2027)`: a row equal to the stored filed row in **every** filed column (type, quarter, category, developer, related party, DC/DR, Keterangan, CapEx, OpEx);
   - `reconcileRptiReturn`: `[]`.
 
   Guard: the draft's CapEx is > 0, so the comparison is not vacuous.
-- [ ] T017 [P] [US1] Failing E2E in the new file `e2e/unresolved-row-repair.spec.ts`, via onboarding both samples:
+- [x] T017 [P] [US1] Failing E2E in the new file `e2e/unresolved-row-repair.spec.ts`, via onboarding both samples:
+  - Done: Red `/tmp/selara-004-t017-red.log`; green `/tmp/selara-004-t017-green.log`: Data Health and gate entry points, sourced form, confirm/cancel/undo, FR-003.
   - The Data Health review shows **Repair** on the Legacy Teller finding.
   - Choosing B shows every filed value pre-filled, CapEx/OpEx labelled as the initiative's current budget, the quarter and year read-only, and the note that this adds it to the inventory from 2026 (FR-010a).
   - Confirm: the finding is gone, and RPTI 2027 generates with the gate clear.
@@ -127,21 +131,34 @@ expectation changed**, before anything new calls it.
 
 ### Implementation for User Story 1
 
-- [ ] T018 [US1] Implement `unresolvedRowRepairDraft` in `src/lib/unresolvedRowRepair.ts` (research R3). T014 green.
-- [ ] T019 [US1] Implement `applyUnresolvedRowRepair` for option B in `src/lib/unresolvedRowRepair.ts` (research R2, R4, R5, R9, R11), using `continuousPriorLivePhase` and the importer's category-creation shape. T015 and T016 green.
-- [ ] T020 [US1] Create `src/components/UnresolvedRowRepairDialog.tsx`:
+- [x] T018 [US1] Implement `unresolvedRowRepairDraft` in `src/lib/unresolvedRowRepair.ts` (research R3). T014 green.
+  - Done: Red `/tmp/selara-004-t014-red.log`; green `/tmp/selara-004-t014-green.log`: draft values use filed evidence and initiative provenance.
+- [x] T019 [US1] Implement `applyUnresolvedRowRepair` for option B in `src/lib/unresolvedRowRepair.ts` (research R2, R4, R5, R9, R11), using `continuousPriorLivePhase` and the importer's category-creation shape. T015 and T016 green.
+  - Done: Red `/tmp/selara-004-t015-red.log`, `/tmp/selara-004-t016-red.log`; green `/tmp/selara-004-t015-green.log`, `/tmp/selara-004-t016-green.log`: one pure B repair reproduces the sample.
+- [x] T020 [US1] Create `src/components/UnresolvedRowRepairDialog.tsx`:
+  - Done: Red `/tmp/selara-004-t017-red.log`; green `/tmp/selara-004-t017-green.log`: sourced dialog form and confirmation workflow.
   - the option choice, limited to what `repairOptions` allows;
   - the B form with source labels, the read-only quarter and year, the required provider name for `PPJTI`, and the 2026-inventory note;
   - on confirm, call the host with the request, and show the reason if the host reports `ok: false`.
 
   Follow the existing modal patterns (`ConfirmModal.tsx`, `useFocusTrap`).
-- [ ] T021 [US1] Wire it up:
+- [x] T021 [US1] Wire it up:
+  - Done: Red `/tmp/selara-004-t017-red.log`; green `/tmp/selara-004-t017-green.log`: Data Health action and one App update; undo restores the finding.
   - `src/components/DataHealthReportView.tsx` renders an issue's `action` as a **Repair** button.
   - `src/components/ReportsView.tsx` hosts the dialog.
   - `src/App.tsx` adds `onRepairUnresolvedRow`, which runs `applyUnresolvedRowRepair` on `getCurrentState()` and on `ok` calls **one** `handleUpdate` (research R2).
-- [ ] T022 [US1] In the RPTI pre-export gate (`src/components/ReportsView.tsx:181-203`), render reconciliation findings as objects, not strings, so a repairable one shows **Repair** beside its message. T017's gate scenario green.
-- [ ] T023 [US1] Point the unresolved-row message at the new action. In `src/lib/rpti.ts`, the `missing-target` message for an unresolved import leads with "Use **Repair** on this finding", then keeps the manual steps and the filed-value list for anyone repairing by hand. Update the #51 assertions in `src/lib/rpti.test.ts` and `sampleReturns.test.ts` test-first.
-- [ ] T024 [US1] **Falsification.** Revert T018, T019 and T021 in turn, and confirm T014-T017 fail for the right reason each time. Also show T017's FR-003 guard has teeth, by temporarily making Deliverable creation add a segment. Log to `/tmp/selara-004-us1-falsify.log`.
+- [x] T022 [US1] In the RPTI pre-export gate (`src/components/ReportsView.tsx:181-203`), render reconciliation findings as objects, not strings, so a repairable one shows **Repair** beside its message. T017's gate scenario green.
+  - Done: Red `/tmp/selara-004-t017-red.log`; green `/tmp/selara-004-t017-green.log`: gate finding retains row identity and opens Repair.
+- [x] T023 [US1] Point the unresolved-row message at the new action. In `src/lib/rpti.ts`, the `missing-target` message for an unresolved import leads with "Use **Repair** on this finding", then keeps the manual steps and the filed-value list for anyone repairing by hand. Update the #51 assertions in `src/lib/rpti.test.ts` and `sampleReturns.test.ts` test-first.
+  - Done: Red `/tmp/selara-004-t023-red.log`; green `/tmp/selara-004-t023-green.log`: Repair leads the unresolved message, with manual filed values preserved.
+- [x] T024 [US1] **Falsification.** Revert T018, T019 and T021 in turn, and confirm T014-T017 fail for the right reason each time. Also show T017's FR-003 guard has teeth, by temporarily making Deliverable creation add a segment. Log to `/tmp/selara-004-us1-falsify.log`.
+  - Done: Falsification `/tmp/selara-004-us1-falsify.log`: disabling draft, apply, Data Health wiring, and the FR-003 no-segment rule each failed its guard.
+
+- [x] T024a [US1] **Coordinator review, 2026-09-25.** Four gaps found in the US1 implementation and fixed test-first (red `/tmp/selara-004-review-us1-red.log`, `/tmp/selara-004-review-us1-e2e-red.log`, `…-red2.log`; green `/tmp/selara-004-review-us1-green.log`, `/tmp/selara-004-review-us1-e2e-green.log`):
+  - Data Health offered **Repair** on an unresolved row whose initiative is also gone, but the dialog cannot start without one, so the click did nothing. The action now needs the initiative too.
+  - **Category code** was free text: `123` or infrastructure `51` passed validation and created a category with no name. It is now a dropdown of application codes, and apply rejects anything else.
+  - **Related party** was free text. It is now a yes/no/n/a dropdown, and apply rejects other values.
+  - **An emptied CapEx or OpEx box filed 0** (`Number('')` is 0), the exact #51 corruption. An empty box is now "no value", and the repair is refused with a reason. Seen red in the E2E before the fix: the dialog closed and no error was shown.
 
 **Checkpoint**: the MVP. The published sample repairs from the finding and regenerates exactly as filed, with zero re-keyed values (SC-001, SC-002 for B).
 

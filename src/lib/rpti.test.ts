@@ -925,6 +925,7 @@ describe('reconcileRptiReturn — stored rows are reconciliation evidence, never
 
     it('does not claim an unresolved import\'s application once existed', () => {
       const message = messageFor(unresolved);
+      expect(message).toMatch(/^Use Repair on this finding/);
       expect(message).not.toMatch(/no longer exists/i);
       // An ambiguous match is unresolved too (several entries, not none).
       expect(message).toMatch(/could not match to exactly one entry in your inventory/i);

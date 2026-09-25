@@ -539,7 +539,7 @@ export function reconcileRptiReturn(input: ReconcileRptiInput): RptiReconciliati
     if (row.targetType === 'deliverable' && !deliverables.some(d => d.id === row.targetId)) {
       const imported = row.targetId.startsWith(UNRESOLVED_IMPORT_TARGET_PREFIX);
       const cause = imported
-        ? `The filed RPTI row for "${label}" is an upgrade the import could not match to exactly one entry in your inventory, so no Deliverable was created for it. On the Deliverables tab, create it, or identify the existing entry if the inventory names it differently.`
+        ? `Use Repair on this finding to confirm the filed values. The filed RPTI row for "${label}" is an upgrade the import could not match to exactly one entry in your inventory, so no Deliverable was created for it. On the Deliverables tab, create it, or identify the existing entry if the inventory names it differently.`
         : `The stored RPTI row for "${label}" points at a Deliverable that no longer exists. On the Deliverables tab, create or correct the Deliverable the filed plan refers to.`;
       add('missing-target', `${cause} Then, on the Visualiser timeline: ${filedValuesNotCarriedOver(row, initiative, imported)}`);
       continue;

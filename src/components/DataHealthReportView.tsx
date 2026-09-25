@@ -7,6 +7,7 @@ import { AlertTriangle, AlertCircle, ChevronRight } from 'lucide-react';
 
 interface DataHealthReportViewProps extends DataHealthInput {
   onNavigate: (location: HealthIssueLocation, entityName: string) => void;
+  onRepairUnresolvedRow?: (rowId: string) => void;
 }
 
 const SEVERITY_STYLES: Record<HealthSeverity, { badge: string; icon: React.ReactNode; label: string }> = {
@@ -111,7 +112,7 @@ function summarise(check: string): string {
 }
 
 export function DataHealthReportView(props: DataHealthReportViewProps) {
-  const { onNavigate, ...healthInput } = props;
+  const { onNavigate, onRepairUnresolvedRow, ...healthInput } = props;
   const [severityFilter, setSeverityFilter] = useState<HealthSeverity | 'all'>('all');
   const [phaseFilter, setPhaseFilter] = useState<HealthPhase | 'all'>('all');
   const [reportFilter, setReportFilter] = useState<HealthReport | 'all' | 'none'>('all');
@@ -280,6 +281,13 @@ export function DataHealthReportView(props: DataHealthReportViewProps) {
                           <span className="text-sm text-slate-600 flex-1">{issue.message}</span>
                           <span className="text-xs text-slate-400 flex-shrink-0">{issue.entityType}</span>
                         </button>
+                        {issue.action?.kind === 'repair-unresolved-rpti-row' && onRepairUnresolvedRow && (
+                          <button type="button" data-testid={`repair-unresolved-row-${issue.action.rowId}`}
+                            onClick={() => onRepairUnresolvedRow(issue.action!.rowId)}
+                            className="ml-14 mb-2 rounded-lg border border-indigo-300 bg-white px-3 py-1 text-sm font-medium text-indigo-700 hover:bg-indigo-50">
+                            Repair
+                          </button>
+                        )}
                       </li>
                     ))}
                   </ul>

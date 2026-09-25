@@ -14,10 +14,10 @@ The stored row remains read-only evidence. The repair changes planning entities 
 
 ### AC1 — Create a missing application
 
-- [ ] An unresolved application upgrade finding offers “The bank runs it, but the inventory doesn't list it.” Its form pre-fills the filed category, developer classification, related party, locations, quarter and Keterangan from the stored row; name and year from the initiative name; and cost from the initiative's current budget, clearly labelled for checking.
-- [ ] For a filed PPJTI developer, the form requires a provider name because the return does not supply one. The quarter and year cannot be edited.
-- [ ] Confirming creates the application and asset, a continuous live phase beginning in the prior year, and the filed live implementation with its cost and Keterangan. The form says that this also adds the application to the prior year's inventory.
-- [ ] The initiative moves to the new asset, the finding clears, and the regenerated filed-year RPTI row matches every filed column. Cancel changes nothing; Undo restores the finding in one step.
+- [x] An unresolved application upgrade finding offers “The bank runs it, but the inventory doesn't list it.” Its form pre-fills the filed category, developer classification, related party, locations, quarter and Keterangan from the stored row; name and year from the initiative name; and cost from the initiative's current budget, clearly labelled for checking.
+- [x] For a filed PPJTI developer, the form requires a provider name because the return does not supply one. The quarter and year cannot be edited.
+- [x] Confirming creates the application and asset, a continuous live phase beginning in the prior year, and the filed live implementation with its cost and Keterangan. The form says that this also adds the application to the prior year's inventory.
+- [x] The initiative moves to the new asset, the finding clears, and the regenerated filed-year RPTI row matches every filed column. Cancel changes nothing; Undo restores the finding in one step.
 
 ### AC2 — Resolve to an existing entry
 
@@ -33,6 +33,6 @@ The stored row remains read-only evidence. The repair changes planning entities 
 
 ## Boundaries
 
-- [ ] Repair is offered only for an unanchored `rpti-import-unresolved-*` row, never for a deleted Deliverable's row.
-- [ ] Confirmation rechecks that the row and initiative are still eligible, and applying twice cannot duplicate the implementation.
-- [ ] Ordinary Deliverable creation continues to create no lifecycle segment.
+- [x] Repair is offered only for an unanchored `rpti-import-unresolved-*` row, never for a deleted Deliverable's row.
+- [x] Confirmation rechecks that the row and initiative are still eligible, and applying twice cannot duplicate the implementation.
+- [x] Ordinary Deliverable creation continues to create no lifecycle segment.

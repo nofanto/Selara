@@ -3,7 +3,8 @@ import * as XLSX from 'xlsx';
 import { readFileSync } from 'node:fs';
 import { parseLkptiImportWorkbook, deriveWorkspaceFromLkptiImport } from './lkptiImport';
 import { parseRptiImportWorkbook, deriveWorkspaceFromRptiImport } from './rptiImport';
-import { projectRptiReturn, reconcileRptiReturn } from './rpti';
+import { projectRptiReturn, reconcileRptiReturn, resolveCost } from './rpti';
+import { applyUnresolvedRowRepair, unresolvedRowRepairDraft } from './unresolvedRowRepair';
 import { generateLkptiDetails } from './lkpti';
 import { mergeDeliverableStatuses } from './deliverableStatusDefaults';
 import { computeDataHealth } from './dataHealth';
@@ -17,6 +18,42 @@ const load = (n: string) => XLSX.read(readFileSync(new URL(`../../docs/sample-da
  * `node scripts/generate-sample-returns.mjs`.
  */
 describe('the published sample returns', () => {
+  it('SC-001: option B reproduces the Legacy Teller filing with no re-keyed values', () => {
+    const inv = deriveWorkspaceFromLkptiImport(parseLkptiImportWorkbook(load('sample-lkpti-2026.xlsx')).rows, 2026);
+    const out = deriveWorkspaceFromRptiImport(parseRptiImportWorkbook(load('sample-rpti-2027.xlsx')).rows, 2027, {
+      deliverables: inv.deliverables, assets: inv.assets, assetCategories: inv.assetCategories,
+      deliverableSegments: inv.deliverableSegments, deliverableStatuses: inv.deliverableStatuses,
+    });
+    const workspace = {
+      assets: [...inv.assets, ...out.assets], assetCategories: [...inv.assetCategories, ...out.assetCategories],
+      deliverables: [...inv.deliverables.map(d => out.updatedDeliverables.find(u => u.id === d.id) ?? d), ...out.deliverables],
+      deliverableSegments: [...inv.deliverableSegments, ...out.deliverableSegments],
+      deliverableStatuses: mergeDeliverableStatuses(inv.deliverableStatuses, out.deliverableStatuses),
+      initiatives: out.initiatives, rptiDetails: out.rptiDetails,
+    };
+    const filed = out.rptiDetails.find(r => r.targetId.startsWith('rpti-import-unresolved-'))!;
+    const draft = unresolvedRowRepairDraft(filed, workspace);
+    expect(draft.capex.value).toBeGreaterThan(0);
+    const repaired = applyUnresolvedRowRepair(workspace, { rowId: filed.id, option: 'create', confirmed: {
+      name: draft.name.value, filedYear: draft.filedYear.value, quarter: draft.quarter.value,
+      categoryCode: draft.categoryCode.value, developer: draft.developer.value,
+      providerName: draft.providerName.value, ppjtiRelatedParty: draft.ppjtiRelatedParty.value,
+      dcCity: draft.dcCity.value, dcCountry: draft.dcCountry.value,
+      drCity: draft.drCity.value, drCountry: draft.drCountry.value,
+      remarks: draft.remarks.value, capex: draft.capex.value, opex: draft.opex.value,
+    } });
+    expect(repaired.ok).toBe(true);
+    if (!repaired.ok) return;
+    expect(reconcileRptiReturn({ ...repaired.state, storedDetails: repaired.state.rptiDetails })).toEqual([]);
+    const generated = projectRptiReturn(repaired.state, 2027).filter(r => r.initiativeId === filed.initiativeId);
+    expect(generated).toHaveLength(1);
+    const fields = ['developmentType', 'plannedImplementationQuarter', 'categoryCode', 'developer',
+      'ppjtiRelatedParty', 'dcCity', 'dcCountry', 'drCity', 'drCountry', 'remarks'] as const;
+    for (const field of fields) expect(generated[0][field], field).toEqual(filed[field]);
+    expect(resolveCost(generated[0], repaired.state.deliverableSegments)).toEqual({
+      capexAmount: draft.capex.value, opexAmount: draft.opex.value,
+    });
+  });
   it('LKPTI parses with nothing skipped', () => {
     const { rows, skipped } = parseLkptiImportWorkbook(load('sample-lkpti-2026.xlsx'));
     expect(skipped).toEqual([]);
@@ -86,6 +123,7 @@ describe('the published sample returns', () => {
     expect(named, 'the one underivable row must raise exactly one finding').toHaveLength(1);
     expect(named[0].message, 'the finding must name the repair, not just the symptom')
       .toMatch(/Deliverable|application/i);
+    expect(named[0].message).toMatch(/^Use Repair on this finding/);
     // #51 (Q22): the manual repair must not silently file different values, so the
     // message states what this return filed — measured values, not the unit fixture's.
     const filedInitiative = out.initiatives.find(i => i.id === unresolvedRow.initiativeId)!;

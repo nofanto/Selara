@@ -33,6 +33,7 @@ import { getAppData, saveAppData, getAllVersions } from './lib/db';
 import { importFromExcel } from './lib/excel';
 import { parseRptiImportFile, deriveWorkspaceFromRptiImport } from './lib/rptiImport';
 import { parseLkptiImportFile, deriveWorkspaceFromLkptiImport } from './lib/lkptiImport';
+import { applyUnresolvedRowRepair, type UnresolvedRowRepairRequest } from './lib/unresolvedRowRepair';
 import { validateImportSchema } from './lib/importValidation';
 import { importSharedWorkspace } from './lib/share';
 import { getTemplateData, TemplateId } from './lib/workspaceTemplates';
@@ -651,6 +652,12 @@ export default function App() {
       setDbSaveError('Failed to save changes. Your data may not persist after a reload. If this keeps happening, try refreshing the page.');
     }
   }, []);
+
+  const handleRepairUnresolvedRow = useCallback(async (request: UnresolvedRowRepairRequest) => {
+    const result = applyUnresolvedRowRepair(getCurrentStateRef.current(), request);
+    if (result.ok) await handleUpdate(result.state);
+    return result;
+  }, [handleUpdate]);
 
   // Reloads full state from IndexedDB in response to another tab's save (see
   // requirement-specs/cross-tab-sync.md). Unlike handleUpdate, this never re-saves
@@ -1766,6 +1773,7 @@ export default function App() {
               lkptiDetails={lkptiDetails}
               onSaveAsset={handleUpdateAsset}
               onNavigate={handleNavigateFromHealthIssue}
+              onRepairUnresolvedRow={handleRepairUnresolvedRow}
             />
           </Suspense>
         ) : view === 'history' ? (
