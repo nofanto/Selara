@@ -1,6 +1,9 @@
 import React from 'react';
+import { Link2 } from 'lucide-react';
 import { Initiative, Resource, TimelineSettings } from '../types';
 import { cn } from '../lib/utils';
+import { linkStateClass, type LinkState } from '../lib/initiativeLinks';
+
 
 const ICON_BTN = "w-5 h-5 bg-white hover:bg-slate-100 rounded shadow-sm text-slate-700 text-[10px] flex items-center justify-center leading-none";
 const MAX_DESCRIPTION_CHARS = 600;
@@ -26,6 +29,11 @@ export interface InitiativeBarProps {
   isGroup?: boolean;
   isOnCriticalPath?: boolean;
   isSelected: boolean;
+  /** Set only while a highlight is on; absent means the bar is drawn as it always was. */
+  linkState?: LinkState;
+  /** Distinct deliverables this initiative's segments name; no badge when absent. */
+  linkCount?: number;
+  onOpenLinks?: (anchor: HTMLElement) => void;
 
   // Group bar metadata
   groupIds?: string[];
@@ -60,6 +68,9 @@ export function InitiativeBar({
   isGroup = false,
   isOnCriticalPath = false,
   isSelected,
+  linkState,
+  linkCount,
+  onOpenLinks,
   resources,
   settings,
   progName,
@@ -88,6 +99,7 @@ export function InitiativeBar({
       data-initiative-id={init.id}
       data-testid={isGroup ? 'project-group-bar' : `initiative-bar-${init.id}`}
       data-selected={isSelected ? 'true' : undefined}
+      data-link={linkState}
       data-critical-path={isOnCriticalPath ? 'true' : 'false'}
       onMouseDown={onMoveStart}
       onClick={(e) => {
@@ -106,7 +118,9 @@ export function InitiativeBar({
           : isGroup
             ? 'border-2 border-dashed border-blue-400/60 text-slate-900 font-bold'
             : cn(colorClass, 'text-white border-white/20'),
-        isOnCriticalPath && 'ring-2 ring-amber-400 ring-offset-1 z-10',
+        // The critical-path ring wins over the highlight ring, so a highlight never hides it.
+        isOnCriticalPath ? 'ring-2 ring-amber-400 ring-offset-1 z-10' : linkStateClass(linkState),
+        isOnCriticalPath && linkState === 'dimmed' && linkStateClass('dimmed'),
         isSelected && 'outline outline-2 outline-dashed outline-slate-800 z-20',
       )}
       style={{ left: `${left}%`, width: `${width}%`, height, top }}
@@ -172,6 +186,27 @@ export function InitiativeBar({
           >
             {init.name}
           </div>
+
+          {/* How many deliverables this initiative drives (User Story 26, AC1). A button of
+              its own: mouse-down and click stop here so they neither drag nor select the bar,
+              and it opens a list rendered outside the bar, which clips its contents. */}
+          {!isGroup && linkCount !== undefined && linkCount > 0 && onOpenLinks && width > 4 && (
+            <button
+              type="button"
+              data-testid={`initiative-link-badge-${init.id}`}
+              aria-label={`Show the ${linkCount} deliverable${linkCount === 1 ? '' : 's'} ${init.name} drives`}
+              title={`Drives ${linkCount} deliverable${linkCount === 1 ? '' : 's'}`}
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => { e.stopPropagation(); onOpenLinks(e.currentTarget); }}
+              className={cn(
+                'flex-shrink-0 flex items-center gap-0.5 rounded px-1 text-[9px] font-bold leading-tight',
+                init.isPlaceholder ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-white/25 text-white hover:bg-white/40',
+              )}
+            >
+              <Link2 size={9} aria-hidden="true" />
+              {linkCount}
+            </button>
+          )}
 
           {settings.budgetVisualisation === 'label' && hasBudget && (
             <div data-testid="initiative-budget-pill" className="flex-shrink-0 flex flex-col gap-0.5">

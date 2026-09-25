@@ -26,53 +26,54 @@ owner chose a **count badge and list** (option D) together with **highlight on s
 
 ### AC1 — Count badge
 
-- [ ] An initiative bar linked to at least one lifecycle segment shows the number of **distinct
+- [x] An initiative bar linked to at least one lifecycle segment shows the number of **distinct
   deliverables** those segments name. Three implementations on one application show **1**.
-- [ ] An initiative with no linked segments shows no badge.
-- [ ] The badge appears in every grouping (asset, programme, strategy) and every display mode that
-  draws initiative bars.
+- [x] An initiative with no linked segments shows no badge.
+- [x] The badge appears in every grouping (asset, programme, strategy) and every display mode that
+  draws initiative bars, provided the bar is wide enough to show its name. A sliver-width bar has no
+  room for either.
 
 ### AC2 — Deliverable list and jump
 
-- [ ] Activating the badge lists the deliverables by name, each with the asset it sits under.
-- [ ] Choosing one focuses the initiative (AC3) and scrolls that deliverable's earliest linked segment
+- [x] Activating the badge lists the deliverables by name, each with the asset it sits under.
+- [x] Choosing one focuses the initiative (AC3) and scrolls that deliverable's earliest linked segment
   into view.
-- [ ] The badge is a keyboard-reachable button, and Escape closes the list.
+- [x] The badge is a keyboard-reachable button, and Escape closes the list.
 
 ### AC3 — Highlight from an initiative
 
-- [ ] Grouped by asset with display `both`, selecting an initiative that has linked segments marks
+- [x] Grouped by asset with display `both`, selecting an initiative that has linked segments marks
   that initiative and every one of its segments as highlighted, and dims every other initiative and
   segment bar.
-- [ ] Selecting an initiative with **no** linked segments dims nothing — the timeline behaves as it
+- [x] Selecting an initiative with **no** linked segments dims nothing — the timeline behaves as it
   does today.
 
 ### AC4 — Highlight from a segment
 
-- [ ] Selecting a segment attributed to an initiative produces the **same** highlight as selecting
+- [x] Selecting a segment attributed to an initiative produces the **same** highlight as selecting
   that initiative: the initiative and all of its segments. The clicked segment keeps its normal
   selection outline.
-- [ ] Selecting a segment with no initiative dims nothing.
-- [ ] Whichever of an initiative or a segment was selected most recently decides the highlight.
+- [x] Selecting a segment with no initiative dims nothing.
+- [x] Whichever of an initiative or a segment was selected most recently decides the highlight.
 
 ### AC5 — Revealing hidden ends, temporarily
 
-- [ ] If a highlighted bar — the initiative or any of its segments — is inside a collapsed category,
+- [x] If a highlighted bar — the initiative or any of its segments — is inside a collapsed category,
   that category is shown expanded while the highlight lasts, and its header is marked as opened for
   a highlight.
-- [ ] If the focused initiative is inside a collapsed group bar, the group is shown expanded while the
+- [x] If the focused initiative is inside a collapsed group bar, the group is shown expanded while the
   highlight lasts.
-- [ ] When the highlight ends, the category and group return to collapsed. The saved collapse
+- [x] When the highlight ends, the category and group return to collapsed. The saved collapse
   settings are unchanged throughout.
 
 ### AC6 — Clearing
 
-- [ ] Escape, or a click on the empty timeline, ends the highlight, exactly as either already clears
+- [x] Escape, or a click on the empty timeline, ends the highlight, exactly as either already clears
   selection.
 
 ### AC7 — Other views
 
-- [ ] Grouped by programme or strategy, or with display `initiatives` or `deliverables`, selection
+- [x] Grouped by programme or strategy, or with display `initiatives` or `deliverables`, selection
   dims nothing and expands nothing. The badge (AC1, AC2) still works.
 
 ## Out of scope

@@ -14,7 +14,7 @@ Segments let you model the full lifecycle of each deliverable across your portfo
 2. The **Add Lifecycle Segment** panel opens.
 3. Choose which **Deliverable** the segment belongs to.
 4. Select a **Status**.
-5. Optionally pick an **Initiative** — this attributes the lifecycle phase to the piece of work driving it.
+5. Optionally pick an **Initiative** — this attributes the lifecycle phase to the piece of work driving it. One initiative can drive segments on several deliverables; see [Seeing What an Initiative Delivers](initiative-links.md).
 6. For a live implementation, enter its **Filed CapEx**, **Filed OpEx**, and **RPTI Remarks (Keterangan)**. These values belong to this implementation and feed its RPTI row.
 7. Set the **Start Date** and **End Date**.
 8. Click **Add Segment**.
