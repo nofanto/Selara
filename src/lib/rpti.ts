@@ -277,6 +277,35 @@ export interface RptiReconciliationFinding {
   row: RptiDetail;
 }
 
+/**
+ * Target id prefix for an imported upgrade row whose application matched nothing in
+ * the inventory (FR-019). Its Deliverable never existed, unlike a deleted one.
+ */
+export const UNRESOLVED_IMPORT_TARGET_PREFIX = 'rpti-import-unresolved-';
+
+/**
+ * What the manual repair of a missing target does not carry over (#51, Q22). A new
+ * Deliverable and a bare segment would file `new`, zero cost and an empty
+ * Keterangan, while the gate clears, so the message states each filed value.
+ * An unresolved import has no segment yet; a deleted target's segment may be
+ * reassigned with its values intact, so only a new one is said to lose them.
+ */
+function filedValuesNotCarriedOver(row: RptiDetail, initiative: Initiative, imported: boolean): string {
+  const quarter = row.plannedImplementationQuarter ? ` starting in the filed quarter, ${row.plannedImplementationQuarter},` : '';
+  const segment = imported ? 'the segment' : 'a new segment';
+  const differences: string[] = [];
+  if (row.developmentType === 'upgrade') {
+    differences.push('without an earlier live segment on the Deliverable, it files as new instead of upgrade');
+  }
+  if (row.remarks) differences.push(`${segment}'s Keterangan files empty unless entered as "${row.remarks}"`);
+  // The stored row holds no cost (FR-026). The import set the budget from the filed
+  // row, but it may have been edited since, so it is offered for checking, not as fact.
+  differences.push(`${segment}'s CapEx and OpEx file as 0 unless entered in that segment panel`
+    + (imported ? ` (this Initiative's current budget is CapEx ${initiative.capex.toLocaleString()} and OpEx ${initiative.opex.toLocaleString()}; the import set it from the filed row, but it may have been edited since, so check it against the filed return)` : ''));
+  return `create or open the Deliverable's live lifecycle segment${quarter} and, in its lifecycle segment panel, select this Initiative. `
+    + `The repair does not carry over the filed values; unless you enter them, the return files different ones: ${differences.join('; ')}.`;
+}
+
 export interface ReconcileRptiInput {
   /** Stored rows (`AppState.rptiDetails`) — read as evidence, never written or returned. */
   storedDetails: RptiDetail[];
@@ -395,7 +424,11 @@ export function reconcileRptiReturn(input: ReconcileRptiInput): RptiReconciliati
       continue;
     }
     if (row.targetType === 'deliverable' && !deliverables.some(d => d.id === row.targetId)) {
-      add('missing-target', `The stored RPTI row for "${label}" points at a Deliverable that no longer exists. On the Deliverables tab, create or correct the application the filed plan refers to. Then, on the Visualiser timeline, open the implementation's lifecycle segment panel and select that Deliverable together with this Initiative, so generation has a row to derive.`);
+      const imported = row.targetId.startsWith(UNRESOLVED_IMPORT_TARGET_PREFIX);
+      const cause = imported
+        ? `The filed RPTI row for "${label}" is an upgrade the import could not match to exactly one entry in your inventory, so no Deliverable was created for it. On the Deliverables tab, create it, or identify the existing entry if the inventory names it differently.`
+        : `The stored RPTI row for "${label}" points at a Deliverable that no longer exists. On the Deliverables tab, create or correct the Deliverable the filed plan refers to.`;
+      add('missing-target', `${cause} Then, on the Visualiser timeline: ${filedValuesNotCarriedOver(row, initiative, imported)}`);
       continue;
     }
     const targetName = deliverables.find(d => d.id === row.targetId)?.name ?? row.targetId;

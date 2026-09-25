@@ -86,6 +86,17 @@ describe('the published sample returns', () => {
     expect(named, 'the one underivable row must raise exactly one finding').toHaveLength(1);
     expect(named[0].message, 'the finding must name the repair, not just the symptom')
       .toMatch(/Deliverable|application/i);
+    // #51 (Q22): the manual repair must not silently file different values, so the
+    // message states what this return filed — measured values, not the unit fixture's.
+    const filedInitiative = out.initiatives.find(i => i.id === unresolvedRow.initiativeId)!;
+    expect(unresolvedRow.developmentType).toBe('upgrade'); // guard: the sample's unresolved row
+    expect(named[0].message).not.toMatch(/no longer exists/i);
+    expect(named[0].message).toMatch(/new instead of upgrade/);
+    expect(named[0].message).toContain(`filed quarter, ${unresolvedRow.plannedImplementationQuarter}`);
+    expect(named[0].message).toContain(filedInitiative.capex.toLocaleString());
+    expect(named[0].message).toContain(filedInitiative.opex.toLocaleString());
+    expect(named[0].message).toContain(`"${unresolvedRow.remarks}"`);
+    expect(filedInitiative.capex).toBeGreaterThan(0); // guard: a 0 budget would make the cost check vacuous
 
     // Guard against a gate that simply shouts at everything: the twelve rows that
     // *can* be derived must stay silent, or the preparer learns to ignore it.
