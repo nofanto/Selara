@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useMediaQuery } from '../lib/useMediaQuery';
 import { Asset, Deliverable, DeliverableSegment, DeliverableStatus, Decision, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource } from '../types';
 import { differenceInDays, format, parseISO, isValid, addQuarters, getYear, getQuarter, addDays, startOfMonth, lastDayOfMonth, addMonths, addWeeks } from 'date-fns';
@@ -11,6 +12,7 @@ import { DeliverableSegmentPanel } from './DeliverableSegmentPanel';
 import { DependencyPanel } from './DependencyPanel';
 import { ArrowDisambiguator } from './ArrowDisambiguator';
 import { computeCriticalPath } from '../lib/criticalPath';
+import { categoriesToReveal, groupsToReveal, highlightSet, linkedDeliverableCounts, linkedDeliverables, linkStateClass, type LinkFocus } from '../lib/initiativeLinks';
 import {
   MIN_ROW_HEIGHT,
   BAR_HEIGHT,
@@ -214,6 +216,12 @@ export function Timeline({ assets, deliverables = [], initiatives, milestones, p
   const [selectedSegmentId, setSelectedSegmentId] = useState<string | null>(null);
   const [creatingSegmentParams, setCreatingSegmentParams] = useState<{ id: string; assetId: string; startDate: string; endDate: string; row: number } | null>(null);
   const [segmentPanelId, setSegmentPanelId] = useState<string | null>(null); // separate from selectedSegmentId — panel only opens when this is set
+  // User Story 26. Whichever of an initiative or a segment was selected most recently
+  // decides the highlight; it is honoured only while that selection still stands (see
+  // activeLinkFocus), so every existing place that clears selection ends it too.
+  const [linkFocus, setLinkFocus] = useState<LinkFocus | null>(null);
+  const [linkListFor, setLinkListFor] = useState<{ initiativeId: string; rect: DOMRect } | null>(null);
+  const [pendingJumpSegmentId, setPendingJumpSegmentId] = useState<string | null>(null);
   const [drawingDependency, setDrawingDependency] = useState<{
     sourceId: string;
     sourceType: 'initiative' | 'milestone' | 'segment';
@@ -410,6 +418,53 @@ export function Timeline({ assets, deliverables = [], initiatives, milestones, p
     }
   }, [filteredInitiatives, resizing, moving]);
 
+  // ── Initiative–deliverable links (User Story 26) ─────────────────────────────
+  // The highlight exists only grouped by asset with display 'both', the one view that
+  // draws both ends. Elsewhere selection behaves exactly as it always has.
+  const activeLinkFocus: LinkFocus | null =
+    linkFocus && ((linkFocus.kind === 'initiative' && selectedInitiativeId === linkFocus.id)
+      || (linkFocus.kind === 'segment' && selectedSegmentId === linkFocus.id))
+      ? linkFocus : null;
+  const linkHighlightEnabled = (settings.groupBy || 'asset') === 'asset' && (settings.display || 'both') === 'both';
+  const { linkHighlight, revealedCategories, effectiveCollapsedCategories, effectiveCollapsedGroups } = useMemo(() => {
+    const highlight = linkHighlightEnabled ? highlightSet(activeLinkFocus, localSegments, localInitiatives) : null;
+    // Temporary: anything revealed here counts as expanded only while the highlight
+    // lasts. The saved state — collapsedCategories in session storage, collapsedGroups
+    // in settings — is never written, so it returns by itself when the highlight ends.
+    const categories = categoriesToReveal(highlight, localInitiatives, deliverables, assets, collapsedCategories);
+    const focused = highlight ? localInitiatives.find(i => i.id === highlight.initiativeId) : undefined;
+    const groups = focused
+      ? groupsToReveal(highlight, tlGetGroupsForAsset(localInitiatives.filter(i => i.assetId === focused.assetId), dependencies), settings.collapsedGroups)
+      : new Set<string>();
+    return {
+      linkHighlight: highlight,
+      revealedCategories: categories,
+      effectiveCollapsedCategories: categories.size
+        ? new Set([...collapsedCategories].filter(id => !categories.has(id))) : collapsedCategories,
+      effectiveCollapsedGroups: (settings.collapsedGroups ?? []).filter(key => !groups.has(key)),
+    };
+  }, [linkHighlightEnabled, activeLinkFocus, localSegments, localInitiatives, deliverables, assets, collapsedCategories, dependencies, settings.collapsedGroups]);
+  const linkStateFor = (kind: 'initiative' | 'segment', id: string): 'highlighted' | 'dimmed' | undefined => {
+    if (!linkHighlight) return undefined;
+    const on = kind === 'initiative' ? linkHighlight.initiativeId === id : linkHighlight.segmentIds.has(id);
+    return on ? 'highlighted' : 'dimmed';
+  };
+  const linkCountByInitiative = useMemo(
+    () => linkedDeliverableCounts(localSegments, deliverables),
+    [localSegments, deliverables],
+  );
+  const selectInitiative = (id: string) => { setSelectedInitiativeId(id); setLinkFocus({ kind: 'initiative', id }); };
+  // Runs after the render in which the list's choice selected the initiative, so a category
+  // it had to reveal is already expanded and the segment exists to scroll to.
+  useEffect(() => {
+    if (!pendingJumpSegmentId) return;
+    const el = containerRef.current?.querySelector<HTMLElement>(`[data-segment-id="${CSS.escape(pendingJumpSegmentId)}"]`);
+    el?.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' });
+    setPendingJumpSegmentId(null);
+  }, [pendingJumpSegmentId]);
+  const openLinkList = (initiativeId: string, anchor: HTMLElement) =>
+    setLinkListFor({ initiativeId, rect: anchor.getBoundingClientRect() });
+
   useEffect(() => {
     if (!movingSegment && !resizingSegment && !resizingSegmentVertical) {
       setLocalSegments(deliverableSegmentsProp);
@@ -541,6 +596,7 @@ export function Timeline({ assets, deliverables = [], initiatives, milestones, p
       if (e.key === 'Escape') {
         setSelectedInitiativeId(null);
         setSelectedSegmentId(null);
+        setLinkListFor(null);
       }
     };
     document.addEventListener('keydown', handler);
@@ -999,7 +1055,8 @@ export function Timeline({ assets, deliverables = [], initiatives, milestones, p
 
   const layoutAsset = (assetInitiatives: Initiative[]) => {
     const groups = getGroupsForAsset(assetInitiatives);
-    const collapsedGroups = groups.filter(g => settings.collapsedGroups?.includes(g.sort().join('|')));
+    // Effective, not saved: a group opened for a highlight renders expanded (User Story 26).
+    const collapsedGroups = groups.filter(g => effectiveCollapsedGroups.includes(g.sort().join('|')));
     const collapsedGroupIds = new Set(collapsedGroups.flat());
 
     const entities: any[] = [];
@@ -1349,7 +1406,7 @@ export function Timeline({ assets, deliverables = [], initiatives, milestones, p
     }, 50);
 
     return () => clearTimeout(timer);
-  }, [localInitiatives, localSegments, assets, totalWidth, sortedCategoryIds, assetsByCategory, settings, collapsedCategories, dependencies]);
+  }, [localInitiatives, localSegments, assets, totalWidth, sortedCategoryIds, assetsByCategory, settings, effectiveCollapsedCategories, effectiveCollapsedGroups, dependencies]);
 
   const formatOverlapDuration = (days: number) => {
     if (settings.monthsToShow <= 3) {
@@ -1797,12 +1854,15 @@ export function Timeline({ assets, deliverables = [], initiatives, milestones, p
                             subtitle={subtitle}
                             isOnCriticalPath={isOnCriticalPath}
                             isSelected={selectedInitiativeId === init.id}
+                            linkState={linkStateFor('initiative', init.id)}
+                            linkCount={linkCountByInitiative.get(init.id)}
+                            onOpenLinks={(anchor) => openLinkList(init.id, anchor)}
                             resources={resources}
                             settings={settings}
                             progName={prog?.name}
                             stratName={strat?.name}
                             isDraggingRef={isDraggingRef}
-                            onSelect={() => setSelectedInitiativeId(init.id)}
+                            onSelect={() => selectInitiative(init.id)}
                             onOpenPanel={() => setInitiativePanelId(init.id)}
                             onMoveStart={(e) => {
                               isDraggingRef.current = false;
@@ -1856,12 +1916,15 @@ export function Timeline({ assets, deliverables = [], initiatives, milestones, p
                             subtitle={subtitle}
                             isOnCriticalPath={isOnCriticalPath}
                             isSelected={selectedInitiativeId === init.id}
+                            linkState={linkStateFor('initiative', init.id)}
+                            linkCount={linkCountByInitiative.get(init.id)}
+                            onOpenLinks={(anchor) => openLinkList(init.id, anchor)}
                             resources={resources}
                             settings={settings}
                             progName={prog?.name}
                             stratName={strat?.name}
                             isDraggingRef={isDraggingRef}
-                            onSelect={() => setSelectedInitiativeId(init.id)}
+                            onSelect={() => selectInitiative(init.id)}
                             onOpenPanel={() => setInitiativePanelId(init.id)}
                             onMoveStart={(e) => {
                               isDraggingRef.current = false;
@@ -1882,7 +1945,9 @@ export function Timeline({ assets, deliverables = [], initiatives, milestones, p
             {groupBy === 'asset' && sortedCategoryIds.map((catId) => {
               const category = assetCategories.find(c => c.id === catId);
               const categoryName = category?.name || 'Uncategorized';
-              const isCollapsed = collapsedCategories.has(catId);
+              // Effective, not saved: a category opened for a highlight renders expanded.
+              const isCollapsed = effectiveCollapsedCategories.has(catId);
+              const isRevealedForLink = revealedCategories.has(catId);
 
               // Filter assets for this category based on empty row settings
               let categoryAssets = assetsByCategory[catId] || [];
@@ -1926,6 +1991,15 @@ export function Timeline({ assets, deliverables = [], initiatives, milestones, p
                           ({categoryAssets.length} asset{categoryAssets.length !== 1 ? 's' : ''})
                         </span>
                       </button>
+                      {isRevealedForLink && (
+                        <span
+                          data-testid={`category-revealed-${catId}`}
+                          title="Collapsed, shown open because it holds part of the highlighted initiative. It closes again when the highlight ends."
+                          className="rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold normal-case tracking-normal text-sky-700"
+                        >
+                          Opened for highlight
+                        </span>
+                      )}
                     </div>
                     <div className="flex-shrink-0" style={{ width: totalWidth }} />
                   </div>
@@ -2035,6 +2109,9 @@ export function Timeline({ assets, deliverables = [], initiatives, milestones, p
                                 isGroup={isGroup}
                                 isOnCriticalPath={isOnCriticalPath}
                                 isSelected={selectedInitiativeId === init.id}
+                                linkState={linkStateFor('initiative', init.id)}
+                                linkCount={linkCountByInitiative.get(init.id)}
+                                onOpenLinks={(anchor) => openLinkList(init.id, anchor)}
                                 groupProgrammeNames={groupProgrammeNames}
                                 groupStrategyNames={groupStrategyNames}
                                 resources={resources}
@@ -2042,7 +2119,7 @@ export function Timeline({ assets, deliverables = [], initiatives, milestones, p
                                 progName={prog?.name}
                                 stratName={strat?.name}
                                 isDraggingRef={isDraggingRef}
-                                onSelect={() => setSelectedInitiativeId(init.id)}
+                                onSelect={() => selectInitiative(init.id)}
                                 onOpenPanel={() => setInitiativePanelId(init.id)}
                                 onMoveStart={(e) => {
                                   isDraggingRef.current = false;
@@ -2064,7 +2141,7 @@ export function Timeline({ assets, deliverables = [], initiatives, milestones, p
                             if (groupItems.length === 0) return null;
 
                             const groupId = group.sort().join('|');
-                            const isCollapsed = settings.collapsedGroups?.includes(groupId);
+                            const isCollapsed = effectiveCollapsedGroups.includes(groupId);
                             if (isCollapsed) return null; // Handled as a single bar in layoutItems
 
                             const minLeft = Math.min(...groupItems.map(it => it.left));
@@ -2191,6 +2268,7 @@ export function Timeline({ assets, deliverables = [], initiatives, milestones, p
                                     data-testid={`segment-bar-${seg.id}`}
                                     data-segment-id={seg.id}
                                     data-selected={isSegSelected ? 'true' : undefined}
+                                    data-link={linkStateFor('segment', seg.id)}
                                     onMouseDown={(e) => {
                                       isDraggingRef.current = false;
                                       setMovingSegment({ id: seg.id, initialX: e.clientX, initialY: e.clientY, initialRow: row, initialStart: seg.startDate, initialEnd: seg.endDate });
@@ -2199,6 +2277,7 @@ export function Timeline({ assets, deliverables = [], initiatives, milestones, p
                                       e.stopPropagation();
                                       if (isDraggingRef.current) { isDraggingRef.current = false; return; }
                                       setSelectedSegmentId(seg.id);
+                                      setLinkFocus({ kind: 'segment', id: seg.id });
                                       setCreatingSegmentParams(null);
                                     }}
                                     onDoubleClick={(e) => {
@@ -2209,6 +2288,7 @@ export function Timeline({ assets, deliverables = [], initiatives, milestones, p
                                     className={cn(
                                       "absolute rounded-md shadow-sm border border-white/20 flex flex-col justify-center px-2 overflow-hidden cursor-pointer hover:z-20 hover:shadow-xl select-none group/seg",
                                       colorClass, "text-white",
+                                      linkStateClass(linkStateFor('segment', seg.id)),
                                       isSegSelected && "outline outline-2 outline-dashed outline-slate-800 z-[50]"
                                     )}
                                     style={{ left: `${left}%`, width: `${Math.max(width, 0.5)}%`, height, top }}
@@ -2505,12 +2585,15 @@ export function Timeline({ assets, deliverables = [], initiatives, milestones, p
                                       top={top}
                                       colorClass={getInitiativeColor(init, prog, strat)}
                                       isSelected={selectedInitiativeId === init.id}
+                                      linkState={linkStateFor('initiative', init.id)}
+                                      linkCount={linkCountByInitiative.get(init.id)}
+                                      onOpenLinks={(anchor) => openLinkList(init.id, anchor)}
                                       resources={resources}
                                       settings={settings}
                                       progName={prog?.name}
                                       stratName={strat?.name}
                                       isDraggingRef={isDraggingRef}
-                                      onSelect={() => setSelectedInitiativeId(init.id)}
+                                      onSelect={() => selectInitiative(init.id)}
                                       onOpenPanel={() => setInitiativePanelId(init.id)}
                                       onMoveStart={(e) => {
                                         isDraggingRef.current = false;
@@ -2580,6 +2663,47 @@ export function Timeline({ assets, deliverables = [], initiatives, milestones, p
           </div>
         </div>
       )}
+
+      {linkListFor && createPortal((() => {
+        const listInitiative = localInitiatives.find(i => i.id === linkListFor.initiativeId);
+        const items = listInitiative ? linkedDeliverables(listInitiative.id, localSegments, deliverables, assets) : [];
+        const { rect } = linkListFor;
+        return (
+          // React events bubble through portals to the timeline, whose click clears selection.
+          // Both layers stop them, or choosing a deliverable would undo the selection it makes.
+          <div className="fixed inset-0 z-[70]" onClick={(e) => { e.stopPropagation(); setLinkListFor(null); }}>
+            <div
+              role="dialog"
+              aria-label={`Deliverables ${listInitiative?.name ?? 'this initiative'} drives`}
+              data-testid="initiative-link-list"
+              className="absolute w-72 rounded-lg border border-slate-200 bg-white p-2 shadow-xl"
+              style={{ left: Math.max(8, Math.min(rect.left, window.innerWidth - 296)), top: rect.bottom + 4 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="px-2 pb-1 text-[11px] font-semibold text-slate-500">{listInitiative?.name} drives</div>
+              <ul>
+                {items.map(item => (
+                  <li key={item.deliverable.id}>
+                    <button
+                      type="button"
+                      data-testid={`initiative-link-item-${item.deliverable.id}`}
+                      className="w-full rounded px-2 py-1.5 text-left text-xs hover:bg-slate-100 focus:bg-slate-100 focus:outline-none"
+                      onClick={() => {
+                        selectInitiative(linkListFor.initiativeId);
+                        setPendingJumpSegmentId(item.earliestSegmentId);
+                        setLinkListFor(null);
+                      }}
+                    >
+                      <span className="font-medium text-slate-800">{item.deliverable.name}</span>
+                      <span className="text-slate-500"> — {item.asset?.name ?? 'Unknown asset'}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        );
+      })(), document.body)}
 
       <InitiativePanel
         isOpen={initiativePanelId !== null || creatingInitiativeParams !== null}

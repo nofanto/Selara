@@ -61,6 +61,7 @@ Follow these three pages to get up and running quickly:
 | [Lifecycle Segments](05-applications/lifecycle-segments.md) | Adding coloured lifecycle segments to the timeline |
 | [Managing Segments](05-applications/managing-segments.md) | Editing, dragging, resizing, and deleting segments |
 | [Display Mode](05-applications/display-mode.md) | Showing initiatives, deliverables, or both |
+| [Seeing What an Initiative Delivers](05-applications/initiative-links.md) | The deliverable count on an initiative, and highlighting an initiative with its segments |
 
 ### 06 Display Settings
 
