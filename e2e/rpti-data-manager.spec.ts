@@ -1,5 +1,16 @@
 import { test, expect } from '@playwright/test';
+import * as fs from 'node:fs';
 import { seedReportRecords, reportFixture, generateReport, exportedReportText } from './report-fixtures';
+
+async function downloadedRptiBytes(page: import('@playwright/test').Page): Promise<Buffer> {
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    page.getByTestId('rpti-report-export-btn').click(),
+  ]);
+  const path = await download.path();
+  if (!path) throw new Error('No downloaded workbook');
+  return fs.readFileSync(path);
+}
 
 test.describe('RPTI stored rows and canonical sources', () => {
   test.beforeEach(async ({ page }) => {
@@ -19,13 +30,6 @@ test.describe('RPTI stored rows and canonical sources', () => {
     await expect(table.locator('input, select, textarea')).toHaveCount(0);
     await expect(page.getByTestId('add-row-btn-rpti')).toHaveCount(0);
     await expect(page.getByTestId('rpti-generate-btn')).toHaveCount(0);
-  });
-
-  test('Initiatives uses the established Deliverable label for the declared filing target', async ({ page }) => {
-    await page.getByTestId('data-manager-tab-initiatives').click();
-    const headers = page.locator('[data-testid="data-manager"] thead');
-    await expect(headers.getByText('Deliverable', { exact: true })).toBeVisible();
-    await expect(headers.getByText('RPTI Target', { exact: true })).toHaveCount(0);
   });
 
   test('global search filters stored rows by their displayed target name', async ({ page }) => {
@@ -72,10 +76,10 @@ test.describe('RPTI stored rows and canonical sources', () => {
     await expect(page.getByTestId('rpti-readonly-table').locator('tbody tr')).toHaveCount(0);
   });
 
-  test('Reports generates the inferred live target with its quarter and initiative cost', async ({ page }) => {
+  test('Reports generates the segment-owned live target with its quarter and implementation cost', async ({ page }) => {
     await generateReport(page, 'rpti');
     const row = page.getByTestId('rpti-detail-table').locator('tbody tr').filter({ hasText: 'Filing Application' });
-    await expect(row).toContainText('upgrade');
+    await expect(row).toContainText('new');
     await expect(row).toContainText('Q1');
     await expect(row).toContainText('100');
   });
@@ -87,6 +91,58 @@ test.describe('RPTI stored rows and canonical sources', () => {
     const exported = await exportedReportText(page, 'rpti');
     for (const value of ['Jakarta, Indonesia', 'Surabaya, Indonesia', 'n/a']) expect(exported).toContain(value);
     await expect(row).not.toContainText('Stored filing remark');
+  });
+
+  test('a divergent initiative budget raises a warning without changing the generated filing (T021)', async ({ page }) => {
+    await seedReportRecords(page, {
+      initiatives: [{ ...reportFixture.initiatives[0], capex: 100, opex: 10 }],
+      deliverableSegments: [{ ...reportFixture.deliverableSegments[0], capexAmount: 100, opexAmount: 10 }],
+    }, ['initiatives', 'deliverableSegments']);
+
+    await generateReport(page, 'rpti');
+    const before = await downloadedRptiBytes(page);
+
+    await page.getByTestId('nav-data-manager').click();
+    await page.getByTestId('data-manager-tab-initiatives').click();
+    const initiativeRow = page.locator('tbody tr[data-real="true"]')
+      .filter({ has: page.locator('input[value="Filing Initiative"]') });
+    await initiativeRow.locator('td[data-key="capex"] input').fill('999');
+    await initiativeRow.locator('td[data-key="capex"] input').press('Tab');
+    await initiativeRow.locator('td[data-key="opex"] input').fill('99');
+    await initiativeRow.locator('td[data-key="opex"] input').press('Tab');
+
+    await page.getByTestId('nav-reports').click();
+    await page.getByTestId('report-card-data-health').click();
+    const warningGroup = page.getByTestId('data-health-group-initiative-budget-divergence');
+    await expect(warningGroup).toContainText('Warning');
+    await warningGroup.click();
+    const warnings = page.getByTestId('data-health-group-items-initiative-budget-divergence');
+    await expect(warnings).toContainText('Filing Initiative');
+    await expect(warnings).toContainText(/initiative.*999.*99/i);
+    await expect(warnings).toContainText(/implementation.*100.*10/i);
+    await expect(warnings).toContainText(/Initiatives tab.*lifecycle segment/i);
+
+    await generateReport(page, 'rpti');
+    const after = await downloadedRptiBytes(page);
+    expect(Buffer.compare(after, before), 'the warning must not alter any filed byte').toBe(0);
+  });
+
+  test('filed cost and remarks entered on the segment survive reload and reach generation (T022)', async ({ page }) => {
+    await page.getByTestId('nav-visualiser').click();
+    await page.getByTestId('segment-bar-filing-segment').dblclick();
+    const panel = page.getByTestId('segment-panel');
+    await panel.getByTestId('segment-filed-capex').fill('432');
+    await panel.getByTestId('segment-filed-opex').fill('43');
+    await panel.getByTestId('segment-rpti-remarks').fill('Implementation-owned note');
+    await panel.getByRole('button', { name: 'Save Changes' }).click();
+
+    await page.reload();
+    await generateReport(page, 'rpti');
+    const row = page.getByTestId('rpti-detail-table').locator('tbody tr').filter({ hasText: 'Filing Application' });
+    await expect(row).toContainText('432');
+    await expect(row).toContainText('43');
+    await expect(row).toContainText('Implementation-owned note');
+    expect(await exportedReportText(page, 'rpti')).toContain('Implementation-owned note');
   });
 
   test('Default Currency is maintained in visualiser settings and persists across reload', async ({ page }) => {

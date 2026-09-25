@@ -4,8 +4,8 @@ import {
   Initiative, Programme, RptiCategoryCode, RptiDetail, RptiDeveloper, RptiDevelopmentType,
   RptiQuarter, RptiRelatedParty,
 } from '../types';
-import { RPTI_CATEGORY_LABELS, periodForQuarter, isLiveStatusId } from './rpti';
-import { PLANNED_STATUS, IN_PRODUCTION_STATUS, SEEDED_DELIVERABLE_STATUSES } from './deliverableStatusDefaults';
+import { RPTI_CATEGORY_LABELS, periodForQuarter, isLiveStatusId, openEndedDate } from './rpti';
+import { IN_PRODUCTION_STATUS, SEEDED_DELIVERABLE_STATUSES } from './deliverableStatusDefaults';
 
 /**
  * Strict-format parser for a filed RPTI Format 3.1 return — the inverse of
@@ -206,8 +206,23 @@ export function parseRptiImportFile(file: File): Promise<ParseRptiImportResult> 
 export const RPTI_IMPORT_PROGRAMME_ID = 'rpti-import-programme';
 // Shared with the LKPTI importer and demo data rather than importer-specific: one
 // vocabulary per workspace, whichever path seeded it. See deliverableStatusDefaults.ts.
-export const RPTI_IMPORT_PRELAUNCH_STATUS_ID = PLANNED_STATUS.id;
 export const RPTI_IMPORT_LIVE_STATUS_ID = IN_PRODUCTION_STATUS.id;
+
+/**
+ * How long an imported implementation stays live depends on what it is (Q21).
+ *
+ * A **new** build creates the application, so its live phase is the application's
+ * existence — held to the shared five-year horizon from its filed go-live year.
+ * A Q3 2027 go-live is live through 2032-12-31, as is every 2027 quarter.
+ *
+ * An **upgrade** is an event on something already running, so only its filed quarter
+ * is the implementation. The application's continued existence is carried by its own
+ * inventory history — or, where it has none, by the synthetic prior phase below.
+ */
+function importedLiveEnd(developmentType: 'new' | 'upgrade', reportYear: number, quarterEnd: string): string {
+  if (developmentType === 'upgrade') return quarterEnd;
+  return openEndedDate(reportYear);
+}
 
 /**
  * Turns parsed rows into workspace entities.
@@ -269,7 +284,12 @@ export function deriveWorkspaceFromRptiImport(
     let targetId: string | undefined;
     let initiativeAssetId = '';
     if (row.developmentType === 'upgrade') {
-      const matches = existing.deliverables.filter(
+      // A later row in this same return may upgrade an application an earlier
+      // row created. Identical name and category within one filed return are
+      // already explicit identity evidence; no cross-return naming judgement is
+      // involved. Only look backward through `deliverables`, which contains the
+      // entries created so far in this import.
+      const matches = [...existing.deliverables, ...deliverables].filter(
         d => d.name.trim().toLowerCase() === row.name.trim().toLowerCase()
           && d.categoryCode === row.categoryCode,
       );
@@ -296,8 +316,8 @@ export function deriveWorkspaceFromRptiImport(
         // Leaving it unresolved created a dead end: a data-health error the user
         // could never clear by importing, because no LKPTI could ever supply the
         // target. The bank does run this infrastructure; the plan says so. Creating
-        // it records that, and the live segment below — live precisely because this
-        // is an upgrade — keeps it classified as one on regeneration.
+        // it records that. A prior-live phase plus the filed live start below
+        // keep it classified as an upgrade on regeneration.
         //
         // Still only when nothing matched. A later import that does find the entry
         // this one created attaches to it rather than making a second copy.
@@ -344,59 +364,59 @@ export function deriveWorkspaceFromRptiImport(
     const hasEntry = !unresolved.some(u => u.rowNumber === row.rowNumber);
     let anchorSegmentId: string | undefined;
     if (hasEntry && createdEntry) {
-      // One segment for an entry this import created, and its status says whether
-      // the thing exists yet — which is exactly what `Jenis Pengembangan` states.
-      //
-      // `upgrade` means the bank already runs it (the only way to reach this branch
-      // is infrastructure, which no LKPTI can carry), so the segment is live. `new`
-      // means it does not exist yet, so the segment is planned and nothing asserts
-      // it ever goes live: the return files an intention, not an outcome.
-      //
-      // Both regenerate to the development type that was filed. A lone planned
-      // segment with no prior live history reads as 'new'; a lone live segment
-      // reads as 'upgrade'. The span is the filed quarter either way, so
-      // deriveQuarterFromDate recovers the quarter the bank filed.
+      // Every filed implementation is a transition into production. An imported
+      // upgrade with no inventory history (infrastructure cannot be in LKPTI)
+      // also needs a prior live phase to preserve its filed development type.
+      if (row.developmentType === 'upgrade') {
+        deliverableSegments.push({
+          id: `rpti-import-seg-prior-${n}`, deliverableId: targetId,
+          startDate: `${reportYear - 1}-01-01`, endDate: `${reportYear - 1}-12-31`,
+          status: RPTI_IMPORT_LIVE_STATUS_ID,
+        });
+      }
       anchorSegmentId = `rpti-import-seg-${n}`;
       deliverableSegments.push({
         id: anchorSegmentId, deliverableId: targetId,
-        startDate: qStart, endDate: qEnd,
-        status: row.developmentType === 'upgrade' ? RPTI_IMPORT_LIVE_STATUS_ID : RPTI_IMPORT_PRELAUNCH_STATUS_ID,
+        startDate: qStart, endDate: importedLiveEnd(row.developmentType, reportYear, qEnd),
+        status: RPTI_IMPORT_LIVE_STATUS_ID,
         initiativeId,
+        capexAmount: row.capexAmount,
+        opexAmount: row.opexAmount,
+        rptiRemarks: row.remarks,
       });
     } else if (hasEntry) {
-      // Attached to an entry that already existed, so this import adds the planned
-      // enhancement and nothing else — the target carries its own history.
-      //
-      // A synthetic prior-live segment is added only when the target has none of its
-      // own. It exists to keep the filed `upgrade` from regenerating as `new`, which
-      // hasPriorLiveSegment decides from a live segment starting before the report
-      // year. A target that came from an LKPTI import already has one, running from
-      // its go-live date, so adding another drew a second, shorter bar wholly inside
-      // the first. Adding it unconditionally also drew a "Planned" period across
-      // years the inventory says the application was live, which contradicts it.
-      //
-      // No trailing live segment either, for the same reason a `new` build gets none:
-      // the return files an intention, not an outcome.
-      const targetAlreadyLiveBeforeYear = (existing.deliverableSegments ?? []).some(seg =>
+      // A synthetic, unlinked prior-live segment is added only when the target has none of its
+      // own. It exists to keep the filed `upgrade` from regenerating as `new`.
+      // History includes both the incoming workspace and rows already processed in
+      // this import, and is compared with this implementation's date (contract 2b),
+      // not the report-year boundary. The filed quarter itself is always a live
+      // start, for both new and upgrade rows.
+      const targetAlreadyLiveBeforeImplementation = [
+        ...(existing.deliverableSegments ?? []),
+        ...deliverableSegments,
+      ].some(seg =>
         seg.deliverableId === targetId
-        && seg.startDate < `${reportYear}-01-01`
+        && seg.startDate < qStart
         && isLiveStatusId(seg.status, existing.deliverableStatuses ?? []),
       );
-      if (!targetAlreadyLiveBeforeYear) {
+      if (row.developmentType === 'upgrade' && !targetAlreadyLiveBeforeImplementation) {
         deliverableSegments.push({
           id: `rpti-import-seg-prior-${n}`, deliverableId: targetId,
           // Ends in the prior year, not on 1 January of this one: it records that
           // the thing already ran before the plan, so it must not also count as
           // part of the plan's own report-year activity.
           startDate: `${reportYear - 1}-01-01`, endDate: `${reportYear - 1}-12-31`,
-          status: RPTI_IMPORT_LIVE_STATUS_ID, initiativeId,
+          status: RPTI_IMPORT_LIVE_STATUS_ID,
         });
       }
-      anchorSegmentId = `rpti-import-seg-plan-${n}`;
+      anchorSegmentId = `rpti-import-seg-${n}`;
       deliverableSegments.push({
         id: anchorSegmentId, deliverableId: targetId,
-        startDate: qStart, endDate: qEnd,
-        status: RPTI_IMPORT_PRELAUNCH_STATUS_ID, initiativeId,
+        startDate: qStart, endDate: importedLiveEnd(row.developmentType, reportYear, qEnd),
+        status: RPTI_IMPORT_LIVE_STATUS_ID, initiativeId,
+        capexAmount: row.capexAmount,
+        opexAmount: row.opexAmount,
+        rptiRemarks: row.remarks,
       });
     }
 
@@ -406,27 +426,19 @@ export function deriveWorkspaceFromRptiImport(
     // arrived with 14 errors before this was fixed.
     initiatives.push({
       id: initiativeId,
-      name: row.name,
+      // The RPTI has no initiative-name column, so the application name is all there
+      // is. The quarter keeps two rows for one application distinguishable (Q21).
+      name: `${row.name} — ${row.plannedQuarter} ${reportYear}`,
       programmeId: RPTI_IMPORT_PROGRAMME_ID,
       assetId: initiativeAssetId,
-      // The importer knows exactly which deliverable this row is about — it either
-      // matched it or just created it — so the initiative records it rather than
-      // naming only the asset. It matters most for a matched upgrade, where the
-      // asset can hold several deliverables and the initiative works on one.
-      //
-      // Only when the row resolved. An unresolved row's targetId points at nothing,
-      // and computeDataHealth raises `initiative-deliverable` as an error for a
-      // deliverableId that does not resolve (dataHealth.ts:164) — that row already
-      // has its one finding, and this must not add a second for the same problem.
-      deliverableId: hasEntry ? targetId : undefined,
-      startDate: `${reportYear}-01-01`,
+      // Exactly the filed quarter. The return states when the work goes live and nothing
+      // about when it began; starting on 1 January made every bar's length encode which
+      // quarter was filed — Q1 three months, Q4 twelve (Q21).
+      startDate: qStart,
       endDate: qEnd,
       capex: row.capexAmount ?? 0,
       opex: row.opexAmount ?? 0,
       description: row.description,
-      // The RPTI's two free-text columns both come from the Initiative now: Deskripsi
-      // from `description`, Keterangan from here (ADR-0013).
-      rptiRemarks: row.remarks,
     });
 
     rptiDetails.push({

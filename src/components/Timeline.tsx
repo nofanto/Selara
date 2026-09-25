@@ -72,6 +72,8 @@ export function Timeline({ assets, deliverables = [], initiatives, milestones, p
   const colorBy = settings.colorBy || 'programme';
 
   const STATUS_COLORS: Record<string, string> = {
+    // Same neutral as RAG_COLORS.none, for the same reason: nothing has been stated.
+    none: 'bg-slate-300',
     planned: 'bg-slate-400',
     active: 'bg-blue-500',
     done: 'bg-emerald-500',
@@ -90,8 +92,12 @@ export function Timeline({ assets, deliverables = [], initiatives, milestones, p
     done: 'Done',
     cancelled: 'Cancelled',
   };
-  const normalizeInitiativeStatus = (status: Initiative['status'] | string | undefined): Initiative['status'] => {
-    return Object.hasOwn(STATUS_LABELS, status ?? '') ? (status as Initiative['status']) : 'planned';
+  // Unset is a real state, not a synonym for Planned, and it is the ordinary state of an
+  // imported initiative — neither importer sets a status. Returning undefined lets the two
+  // call sites below treat it exactly as they already treat an unset ragStatus: a neutral
+  // colour and no subtitle. See requirement-specs/initiative-status-unset.md.
+  const normalizeInitiativeStatus = (status: Initiative['status'] | string | undefined): Initiative['status'] | undefined => {
+    return Object.hasOwn(STATUS_LABELS, status ?? '') ? (status as Initiative['status']) : undefined;
   };
   const RAG_COLORS: Record<string, string> = {
     green: 'bg-green-500',
@@ -130,7 +136,7 @@ export function Timeline({ assets, deliverables = [], initiatives, milestones, p
   // ── Shared colour + subtitle helpers (single source of truth) ────────────
   function getInitiativeColor(init: Initiative, prog: Programme | undefined, strat: Strategy | undefined): string {
     if (colorBy === 'rag')       return RAG_COLORS[init.ragStatus || 'none'];
-    if (colorBy === 'status')    return STATUS_COLORS[normalizeInitiativeStatus(init.status)];
+    if (colorBy === 'status')    return STATUS_COLORS[normalizeInitiativeStatus(init.status) ?? 'none'];
     if (colorBy === 'programme') return prog?.color || 'bg-slate-500';
     return strat?.color || 'bg-slate-400';
   }
@@ -144,7 +150,7 @@ export function Timeline({ assets, deliverables = [], initiatives, milestones, p
     groupStrategyNames?: string,
   ): string | undefined {
     if (colorBy === 'rag')       return init.ragStatus ? RAG_LABELS[init.ragStatus] : undefined;
-    if (colorBy === 'status')    return STATUS_LABELS[normalizeInitiativeStatus(init.status)];
+    if (colorBy === 'status')    { const s = normalizeInitiativeStatus(init.status); return s ? STATUS_LABELS[s] : undefined; }
     if (isGroup)                 return colorBy === 'programme' ? groupProgrammeNames : groupStrategyNames;
     return colorBy === 'programme' ? prog?.name : strat?.name;
   }
@@ -2601,7 +2607,6 @@ export function Timeline({ assets, deliverables = [], initiatives, milestones, p
               : null
         }
         assets={assets}
-        deliverables={deliverables}
         programmes={programmes}
         strategies={strategies}
         dependencies={dependencies}

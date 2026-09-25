@@ -149,3 +149,11 @@ without saying so is worse than one that does not change at all.
   post-dates the as-at date, and keeps a filed date the as-at supports, which is more precise than
   a segment start (FR-017). Understating it here is the mistake worth recording: the residual
   framing is why it went unfixed for a whole review cycle.
+
+### Superseded in part by implementation-grain RPTI rows
+
+Spec 003, Q17 supersedes this ADR's placement of RPTI `Keterangan` on
+`Initiative.rptiRemarks`. Once one filed row corresponds to one implementation, commentary and
+filed CapEx/OpEx belong to that implementation (`DeliverableSegment`); otherwise two
+implementations could not state different values without repeating or overwriting each other. The
+initiative CapEx/OpEx fields remain separate, editable portfolio figures and are not filing sources.

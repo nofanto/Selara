@@ -54,8 +54,8 @@ export interface DeliverableStatus {
   id: string;
   name: string;
   color: string;
-  isLiveStatus?: boolean; // Marks this status as "live/in production" — used to auto-derive RPTI planned implementation quarter
-  isPreLaunchStatus?: boolean; // Marks this status as "planned/funded" pre-launch work — RPTI generation's allow-list, see requirement-specs/rpti-auto-generation.md
+  isLiveStatus?: boolean; // Marks a production phase; its start can anchor an RPTI implementation and quarter
+  isPreLaunchStatus?: boolean; // Marks planned/funded run-up work; it does not create an RPTI row
 }
 
 /**
@@ -67,20 +67,11 @@ export interface Initiative {
   programmeId: string;
   strategyId?: string;
   assetId: string;
-  deliverableId?: string; // Optional: links the initiative to a specific deliverable within the asset
   startDate: string; // ISO format: YYYY-MM-DD
   endDate: string;   // ISO format: YYYY-MM-DD
   capex: number;     // Capital expenditure
   opex: number;      // Operational expenditure
   description?: string;
-  /**
-   * RPTI `Keterangan` — commentary on this piece of work.
-   *
-   * Distinct from `description`, which supplies the RPTI's *other* free-text column,
-   * `Deskripsi`. Description says what the initiative is; this says what should be
-   * noted about it in the plan. Both end up in the same return, in different columns.
-   */
-  rptiRemarks?: string;
   isPlaceholder?: boolean;
   status?: 'planned' | 'active' | 'done' | 'cancelled';
   ragStatus?: 'green' | 'amber' | 'red';
@@ -220,6 +211,9 @@ export interface DeliverableSegment {
   endDate: string;   // ISO format: YYYY-MM-DD
   status: string;
   initiativeId?: string; // Optionally attributes this lifecycle phase to the Initiative driving it
+  capexAmount?: number; // Estimasi Biaya CapEx for this implementation; see Q17 in report-rows-as-projections.md
+  opexAmount?: number; // Estimasi Biaya OpEx for this implementation; see Q17 in report-rows-as-projections.md
+  rptiRemarks?: string; // Keterangan for this implementation; see Q17 in report-rows-as-projections.md
   row?: number;      // Which row within the swimlane (0-indexed). Auto-assigned if absent.
   rowSpan?: number;  // How many rows tall this segment is (default 1). Controlled by bottom-edge drag.
 }
@@ -234,9 +228,9 @@ export type RptiCategoryCode =
   | '49' | '51' | '52' | '53' | '54' | '99';
 
 /**
- * One row of the RPTI (IT Development Plan Report) regulatory report — an
- * Initiative's planned development activity on its linked Deliverable. It is a
- * generated projection; the Initiative owns the filed cost.
+ * One row of the RPTI (IT Development Plan Report) regulatory report — one
+ * planned implementation on a Deliverable. It is a generated projection, and the
+ * implementation supplies its filed cost and commentary.
  */
 export interface RptiDetail {
   id: string;
@@ -253,7 +247,7 @@ export interface RptiDetail {
   drCountry?: string;
   plannedImplementationQuarter?: RptiQuarter;
   deliverableSegmentId?: string; // Set when the quarter is auto-derived (targetType 'deliverable' only)
-  remarks?: string; // Projection of Initiative.rptiRemarks (ADR-0013) — the RPTI `Keterangan` column
+  remarks?: string; // Projection of DeliverableSegment.rptiRemarks — the RPTI `Keterangan` column
 }
 
 // LKPTI 3.2.6's own category_code enum excludes RPTI's infrastructure-only codes

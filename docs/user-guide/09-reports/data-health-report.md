@@ -32,6 +32,8 @@ Alongside its phase, each issue has a severity:
 - **Error** (red) — a dangling reference, or a value the OJK schema would reject outright: a malformed or impossible date, a date in the future, or text over a field's character cap.
 - **Warning** (amber) — a report-generation gap, or a value that is legal but problematic: a duplicate application name, text carrying a line break or stray whitespace into a flat spreadsheet cell, or a workspace currency that isn't IDR.
 
+A budget-divergence warning is informational: it compares the initiative's portfolio budget with the total filed on its implementation segments. Both figures are legal and export remains available. Review the initiative in **Data Manager → Initiatives** or edit the filed values in the lifecycle segment panel, depending on which figure needs attention.
+
 Two filter groups sit above the list and **combine**: **All / Errors / Warnings** for severity, and **Both phases / Validity / Completeness** for phase. So "every error, whichever phase it came from" and "just the validity warnings" are both one click away.
 
 ## Fixing an issue

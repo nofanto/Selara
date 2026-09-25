@@ -1,4 +1,5 @@
-import type { Deliverable, Initiative, LkptiDetail, RptiDetail } from '../types';
+import type { Deliverable, DeliverableSegment, DeliverableStatus, Initiative, LkptiDetail, RptiDetail } from '../types';
+import { isLiveStatusId } from './rpti';
 
 /**
  * Carries the attributes that used to live on report rows onto the entities that
@@ -7,7 +8,8 @@ import type { Deliverable, Initiative, LkptiDetail, RptiDetail } from '../types'
  * `LkptiDetail` was the only record able to hold a deliverable's platform, database,
  * providers, backup strategy, system owner, ownership and the vendor's name, so it
  * held them by default rather than by design. They now live on `Deliverable`
- * (ADR-0013), and `RptiDetail.remarks` lives on `Initiative` as `rptiRemarks`.
+ * (ADR-0013). Legacy `RptiDetail.remarks` now lifts to its explicitly named
+ * `DeliverableSegment` implementation (spec 003 Q17).
  *
  * Broad in-place migration tooling remains out of scope — see
  * `requirement-specs/report-rows-as-projections.md` Q4. Instead, this idempotent lift
@@ -37,6 +39,8 @@ const LKPTI_ATTRIBUTES = [
 
 export interface AttributeLiftInput {
   deliverables: Deliverable[];
+  deliverableSegments: DeliverableSegment[];
+  deliverableStatuses: DeliverableStatus[];
   initiatives: Initiative[];
   lkptiDetails: LkptiDetail[];
   rptiDetails: RptiDetail[];
@@ -44,6 +48,7 @@ export interface AttributeLiftInput {
 
 export interface AttributeLiftResult {
   deliverables: Deliverable[];
+  deliverableSegments: DeliverableSegment[];
   initiatives: Initiative[];
   /** Stored rows with legacy cost overrides removed after they have been lifted. */
   rptiDetails: RptiDetail[];
@@ -52,7 +57,7 @@ export interface AttributeLiftResult {
 }
 
 export function liftReportRowAttributes(input: AttributeLiftInput): AttributeLiftResult {
-  const { deliverables, initiatives, lkptiDetails, rptiDetails } = input;
+  const { deliverables, deliverableSegments, deliverableStatuses, initiatives, lkptiDetails, rptiDetails } = input;
   let changed = false;
 
   // Read through an index rather than the declared type: these properties are exactly
@@ -85,17 +90,41 @@ export function liftReportRowAttributes(input: AttributeLiftInput): AttributeLif
     return { ...deliverable, ...patch };
   });
 
-  // An initiative's remarks come from whichever of its report rows carries one.
-  const remarksByInitiative = new Map<string, string>();
+  const remarksBySegment = new Map<string, string>();
   for (const row of rptiDetails) {
     const remarks = asRecord(row).remarks;
-    if (typeof remarks === 'string' && remarks !== '' && !remarksByInitiative.has(row.initiativeId)) {
-      remarksByInitiative.set(row.initiativeId, remarks);
+    if (typeof remarks === 'string' && remarks !== '' && row.deliverableSegmentId
+      && !remarksBySegment.has(row.deliverableSegmentId)) {
+      remarksBySegment.set(row.deliverableSegmentId, remarks);
     }
   }
 
+  // The ADR-0013 home carried no implementation pointer, so it is placed only when
+  // the initiative has exactly one live implementation across all years. An absent
+  // status vocabulary is uncertainty, not proof that there is no work — place
+  // nothing rather than guess (Q20).
+  const currentRemarksBySegment = new Map<string, string>();
+  if (deliverableStatuses.length > 0) for (const initiative of initiatives) {
+    const remarks = asRecord(initiative).rptiRemarks;
+    if (typeof remarks !== 'string' || remarks === '') continue;
+    const implementations = deliverableSegments.filter(segment =>
+      segment.initiativeId === initiative.id && isLiveStatusId(segment.status, deliverableStatuses));
+    if (implementations.length === 1) currentRemarksBySegment.set(implementations[0].id, remarks);
+  }
+
+  // Both sources can name the same segment, and then their order decides what is
+  // filed. The initiative's own value is the newer home and the one the preparer
+  // types into; a legacy row is evidence of an older filing. Newer wins, which is
+  // this file's standing rule — old evidence must never overwrite a deliberate edit.
+  const liftedDeliverableSegments = deliverableSegments.map(segment => {
+    if (segment.rptiRemarks !== undefined && segment.rptiRemarks !== '') return segment;
+    const remarks = currentRemarksBySegment.get(segment.id) ?? remarksBySegment.get(segment.id);
+    if (!remarks) return segment;
+    changed = true;
+    return { ...segment, rptiRemarks: remarks };
+  });
+
   const liftedInitiatives = initiatives.map(initiative => {
-    const remarks = remarksByInitiative.get(initiative.id);
     const legacy = rptiDetails.find(row => row.initiativeId === initiative.id && (
       (typeof asRecord(row).capexAmount === 'number' && asRecord(row).capexAmount !== initiative.capex)
       || (typeof asRecord(row).opexAmount === 'number' && asRecord(row).opexAmount !== initiative.opex)
@@ -103,13 +132,9 @@ export function liftReportRowAttributes(input: AttributeLiftInput): AttributeLif
     const legacyRecord = legacy ? asRecord(legacy) : undefined;
     const capex = typeof legacyRecord?.capexAmount === 'number' ? legacyRecord.capexAmount : initiative.capex;
     const opex = typeof legacyRecord?.opexAmount === 'number' ? legacyRecord.opexAmount : initiative.opex;
-    const rptiRemarks = initiative.rptiRemarks !== undefined && initiative.rptiRemarks !== ''
-      ? initiative.rptiRemarks
-      : remarks;
-
-    if (capex === initiative.capex && opex === initiative.opex && rptiRemarks === initiative.rptiRemarks) return initiative;
+    if (capex === initiative.capex && opex === initiative.opex) return initiative;
     changed = true;
-    return { ...initiative, capex, opex, rptiRemarks };
+    return { ...initiative, capex, opex };
   });
 
   // Cost fields are the exception to the otherwise non-destructive lift. They used
@@ -125,5 +150,6 @@ export function liftReportRowAttributes(input: AttributeLiftInput): AttributeLif
     return cleaned as unknown as RptiDetail;
   });
 
-  return { deliverables: liftedDeliverables, initiatives: liftedInitiatives, rptiDetails: cleanedRptiDetails, changed };
+  return { deliverables: liftedDeliverables, deliverableSegments: liftedDeliverableSegments,
+    initiatives: liftedInitiatives, rptiDetails: cleanedRptiDetails, changed };
 }

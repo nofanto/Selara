@@ -185,10 +185,85 @@ test.describe('Colour by Status', () => {
     await expect(statusField.locator('option[value="cancelled"]')).toBeAttached();
   });
 
+  /**
+   * Unset is the ordinary state of an imported initiative — neither importer sets a
+   * status — so both editors must be able to express it. Without an empty option a
+   * preparer cannot clear a status once set, and the panel pre-selects Planned for an
+   * initiative that has none, so pressing Save writes a claim nobody made.
+   * See requirement-specs/initiative-status-unset.md.
+   */
+  test('an initiative with no status can be left, and set back to, unset', async ({ page }) => {
+    await page.locator('[data-testid^="initiative-bar"]').first().click();
+    await page.getByTestId('initiative-action-edit').click();
+    const panel = page.getByTestId('initiative-panel');
+    const status = panel.locator('[data-testid="initiative-status"]');
+    await expect(status.locator('option[value=""]')).toBeAttached();
+
+    await status.selectOption('active');
+    await panel.getByRole('button', { name: 'Save Changes' }).click();
+    await expect(panel).toBeHidden();
+
+    await page.locator('[data-testid^="initiative-bar"]').first().click();
+    await page.getByTestId('initiative-action-edit').click();
+    const panel2 = page.getByTestId('initiative-panel');
+    await panel2.locator('[data-testid="initiative-status"]').selectOption('');
+    await panel2.getByRole('button', { name: 'Save Changes' }).click();
+    await expect(panel2).toBeHidden();
+
+    await page.reload();
+    await page.waitForSelector('[data-testid="asset-row-content"]', { timeout: 10000 });
+    await page.locator('[data-testid^="initiative-bar"]').first().click();
+    await page.getByTestId('initiative-action-edit').click();
+    await expect(page.getByTestId('initiative-panel').locator('[data-testid="initiative-status"]'))
+      .toHaveValue('');
+  });
+
+  /**
+   * The Visualiser used to answer "Planned" for an initiative that had no status,
+   * while the Data Manager showed the same field blank — and By Progress is where a
+   * preparer looks to see how work is going, so an invented status is read as fact.
+   * Unset now renders the way an unset RAG already does: no subtitle.
+   * See requirement-specs/initiative-status-unset.md.
+   */
+  test('By Progress shows no status label for an initiative whose status is unset', async ({ page }) => {
+    const bar = page.locator('[data-testid^="initiative-bar"]').first();
+    await bar.click();
+    await page.getByTestId('initiative-action-edit').click();
+    const panel = page.getByTestId('initiative-panel');
+    // Guard: the demo sets a status on every initiative, so without clearing one this
+    // test would pass while never reaching the case it names.
+    await expect(panel.locator('[data-testid="initiative-status"]')).not.toHaveValue('');
+    await panel.locator('[data-testid="initiative-status"]').selectOption('');
+    await panel.getByRole('button', { name: 'Save Changes' }).click();
+    await expect(panel).toBeHidden();
+
+    await openViewOptions(page);
+    await page.getByRole('button', { name: 'By Progress' }).click();
+    await expect(page.getByTestId('colour-legend')).toContainText('Planned');
+
+    const cleared = page.locator('[data-testid^="initiative-bar"]').first();
+    await expect(cleared).not.toContainText('Planned');
+    await expect(cleared).not.toContainText('Active');
+    await expect(cleared).not.toContainText('Done');
+    await expect(cleared).not.toContainText('Cancelled');
+
+    // And it must not be coloured as Planned either — the bar is the part a preparer
+    // reads at a glance, so a neutral swatch is half the answer and the label is the
+    // other half. Neutral is the same one an unset RAG already uses.
+    await expect(cleared).toHaveClass(/bg-slate-300/);
+    await expect(cleared).not.toHaveClass(/bg-slate-400/);
+  });
+
   test('status column appears in Data Manager Initiatives table', async ({ page }) => {
     await page.getByTestId('nav-data-manager').click();
     await page.getByTestId('data-manager').getByRole('button', { name: /Initiatives/ }).click();
     await expect(page.getByTestId('data-manager').getByRole('columnheader', { name: 'Status', exact: true })).toBeVisible();
+  });
+
+  test('Initiatives table no longer offers a Deliverable column (T043c)', async ({ page }) => {
+    await page.getByTestId('nav-data-manager').click();
+    await page.getByTestId('data-manager').getByRole('button', { name: /Initiatives/ }).click();
+    await expect(page.getByTestId('data-manager').getByRole('columnheader', { name: 'Deliverable', exact: true })).toHaveCount(0);
   });
 
   test('status change persists after reload', async ({ page }) => {

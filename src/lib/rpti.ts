@@ -58,6 +58,25 @@ export function periodForQuarter(quarter: RptiQuarter, year: number): { startDat
   return { startDate: `${year}-${start}`, endDate: `${year}-${end}` };
 }
 
+// Both LKPTI and RPTI importers use this planning horizon for an imported application's
+// live phase. DeliverableSegment.endDate is required, though neither return knows when
+// the application will retire. LKPTI anchors it to the inventory's as-at year; RPTI
+// anchors a new build to its filed go-live year. Thus a 2026 LKPTI entry ends in 2031
+// and a 2027 RPTI new build ends in 2032: the same rule, with different evidence dates.
+const OPEN_ENDED_YEARS_OUT = 5;
+
+/**
+ * Anchored to the year the preparer stated the return covers, never to the clock.
+ * Reading `new Date()` here meant the same filed return imported in 2026 and in 2030
+ * produced different workspaces from identical input (lkptiImport T032).
+ *
+ * Shared by both importers, each anchored to the year its return establishes the
+ * application is live: LKPTI's as-at year or RPTI's new-build go-live year.
+ */
+export function openEndedDate(fromYear: number): string {
+  return `${fromYear + OPEN_ENDED_YEARS_OUT}-12-31`;
+}
+
 export function isLiveStatusId(statusId: string, deliverableStatuses: DeliverableStatus[]): boolean {
   const status = deliverableStatuses.find(s => s.id === statusId);
   if (status) return !!status.isLiveStatus || (!deliverableStatuses.some(s => s.isLiveStatus) && (statusId === LIVE_STATUS_FALLBACK_ID || LIVE_STATUS_FALLBACK_PATTERN.test(status.name)));
@@ -76,29 +95,6 @@ export function isPreLaunchStatusId(statusId: string, deliverableStatuses: Deliv
   const status = deliverableStatuses.find(s => s.id === statusId);
   if (status) return !!status.isPreLaunchStatus || (!deliverableStatuses.some(s => s.isPreLaunchStatus) && (PRE_LAUNCH_STATUS_FALLBACK_IDS.has(statusId) || PRE_LAUNCH_STATUS_FALLBACK_PATTERN.test(status.name)));
   return PRE_LAUNCH_STATUS_FALLBACK_IDS.has(statusId);
-}
-
-type SegmentKind = 'new' | 'live' | 'excluded';
-
-// Classifies a segment's status for RPTI generation as an allow-list: only a status
-// recognized as live or pre-launch (planned/funded) qualifies — everything else,
-// including any custom status a workspace adds later (Cancelled, On Hold, ...), is
-// excluded by default. See requirement-specs/rpti-auto-generation.md rule 3 / ADR-0009.
-function classifySegmentKind(statusId: string, deliverableStatuses: DeliverableStatus[]): SegmentKind {
-  if (isLiveStatusId(statusId, deliverableStatuses)) return 'live';
-  if (isPreLaunchStatusId(statusId, deliverableStatuses)) return 'new';
-  return 'excluded';
-}
-
-/** Q10: target ownership is initiative-wide, never inferred separately per filing year. */
-export function resolveRptiTarget(
-  initiative: Initiative, segments: DeliverableSegment[], deliverables: Deliverable[],
-): string | undefined {
-  if (initiative.deliverableId) return initiative.deliverableId;
-  const targets = new Set(segments.filter(segment => segment.initiativeId === initiative.id).map(segment => segment.deliverableId));
-  if (targets.size !== 1) return undefined;
-  const target = [...targets][0];
-  return deliverables.some(deliverable => deliverable.id === target) ? target : undefined;
 }
 
 /**
@@ -143,20 +139,19 @@ export function projectRptiReturn(
 ): RptiDetail[] {
   const { deliverableSegments, deliverableStatuses, initiatives, deliverables, assets, assetCategories } = input;
 
-  // Overlap, not "starts in": a segment qualifies if any part of its
-  // [startDate, endDate] range falls within the report year, even if it
-  // started in an earlier year or continues into the next one.
+  // A plan line belongs to the year its implementation starts, not every
+  // year an open-ended live phase happens to overlap.
   const yearStart = `${reportYear}-01-01`;
   const yearEnd = `${reportYear}-12-31`;
-  const overlapsReportYear = (seg: DeliverableSegment) => seg.startDate <= yearEnd && seg.endDate >= yearStart;
+  const startsInReportYear = (seg: DeliverableSegment) => seg.startDate >= yearStart && seg.startDate <= yearEnd;
   // Deleting an Initiative doesn't clean up DeliverableSegment.initiativeId, so a segment
   // can carry a dangling reference to an initiative that no longer exists — skip those.
   // Placeholder initiatives (empty markers, not real work) are excluded the same way.
   const initiativeIds = new Set(initiatives.filter(i => i.isPlaceholder !== true).map(i => i.id));
 
-  // A deliverable that was already live before the report year already exists — a
-  // planned/funded segment this year is an upgrade to it, not a first-ever "new"
-  // build, regardless of which initiative is now touching it.
+  // A deliverable that was already live before this go-live already exists — this
+  // go-live is an upgrade to it, not a first-ever "new" build,
+  // regardless of which initiative is now touching it.
   // Deliberately deliverable-wide (not filtered by initiativeId): "has this ever
   // gone live" is a fact about the deliverable, not about who's working on it now.
   //
@@ -167,85 +162,87 @@ export function projectRptiReturn(
   // every ongoing application's enhancement as a brand-new build, which is
   // precisely the misclassification this product exists to avoid. A genuine new
   // build is still 'new': none of its live segments start before the year.
-  const hasPriorLiveSegment = (deliverableId: string): boolean =>
+  //
+  // Measured against *this implementation's* own start, not against the start of the
+  // filing year. Two go-lives on a brand-new application in one year would otherwise
+  // both be 'new', stating in a single return that the same application was built
+  // from nothing twice; the second is an enhancement to what the first delivered.
+  // Segments sharing a start date are both 'new' — neither precedes the other, and
+  // they state the same quarter anyway.
+  const wasLiveBefore = (deliverableId: string, startDate: string): boolean =>
     deliverableSegments.some(seg =>
       seg.deliverableId === deliverableId &&
-      seg.startDate < yearStart &&
-      classifySegmentKind(seg.status, deliverableStatuses) === 'live'
+      seg.startDate < startDate &&
+      isLiveStatusId(seg.status, deliverableStatuses)
     );
 
   const qualifying = deliverableSegments
-    .filter(seg => !!seg.initiativeId && initiativeIds.has(seg.initiativeId) && overlapsReportYear(seg))
-    .map(seg => ({ segment: seg, kind: classifySegmentKind(seg.status, deliverableStatuses) }))
-    .filter((s): s is { segment: DeliverableSegment; kind: 'new' | 'live' } => s.kind !== 'excluded');
+    .filter(seg => !!seg.initiativeId && initiativeIds.has(seg.initiativeId)
+      && startsInReportYear(seg) && isLiveStatusId(seg.status, deliverableStatuses));
 
-  const targets = new Map(initiatives.map(initiative => [initiative.id, resolveRptiTarget(initiative, deliverableSegments, deliverables)]));
-  const groups = new Map<string, { segment: DeliverableSegment; kind: 'new' | 'live' }[]>();
-  for (const item of qualifying) {
-    const initiative = initiatives.find(candidate => candidate.id === item.segment.initiativeId);
-    // The Initiative is the canonical RPTI plan line. Segments on another
-    // deliverable remain timeline history but are not a second filing target.
-    const target = initiative && targets.get(initiative.id);
-    // Unresolved/ambiguous targets are diagnosed by data health and gate export.
-    if (!initiative || !target || item.segment.deliverableId !== target) continue;
-    const key = initiative.id;
+  // Each live start is an implementation. The segment itself names the
+  // application; an initiative can trigger more than one application's go-live.
+  const groups = new Map<string, DeliverableSegment[]>();
+  for (const segment of qualifying) {
+    const key = `${segment.initiativeId}\u0000${segment.deliverableId}`;
     const group = groups.get(key);
-    if (group) group.push(item);
-    else groups.set(key, [item]);
+    if (group) group.push(segment);
+    else groups.set(key, [segment]);
   }
 
-  const byStartDateAsc = (a: { segment: DeliverableSegment }, b: { segment: DeliverableSegment }) =>
-    a.segment.startDate.localeCompare(b.segment.startDate);
+  const byStartDateAsc = (a: DeliverableSegment, b: DeliverableSegment) =>
+    a.startDate.localeCompare(b.startDate) || a.id.localeCompare(b.id);
 
   const results: RptiDetail[] = [];
-  for (const [initiativeId, items] of groups) {
-    const deliverableId = targets.get(initiativeId);
-    if (!deliverableId) continue;
-    const newItems = items.filter(i => i.kind === 'new').sort(byStartDateAsc);
-    const liveItems = items.filter(i => i.kind === 'live').sort(byStartDateAsc);
+  for (const initiative of initiatives) {
+    const initiativeId = initiative.id;
+    const rowsForInitiative: { anchor: DeliverableSegment; deliverableId: string; developmentType: RptiDetail['developmentType'] }[] = [];
+    for (const [key, items] of groups) {
+      const [groupInitiativeId, deliverableId] = key.split('\u0000');
+      if (groupInitiativeId !== initiativeId) continue;
+      items.sort(byStartDateAsc).forEach(segment => rowsForInitiative.push({
+        anchor: segment, deliverableId,
+        developmentType: wasLiveBefore(deliverableId, segment.startDate) ? 'upgrade' : 'new',
+      }));
+    }
+    rowsForInitiative.sort((a, b) =>
+      a.anchor.startDate.localeCompare(b.anchor.startDate) || a.anchor.id.localeCompare(b.anchor.id));
+    for (const { anchor, deliverableId, developmentType } of rowsForInitiative) {
+      const deliverable = deliverables.find(d => d.id === deliverableId);
+      const category = resolveAssetCategory(deliverable, assets, assetCategories);
+      // Deliverable.developer now carries either 'inhouse' or a provider's *name*
+      // (ADR-0013). The RPTI column wants the classification, so anything that is not
+      // 'inhouse' is PPJTI — a third party, whoever they are. LKPTI emits the name
+      // itself, which is why one field can serve both returns.
+      const rawDeveloper = deliverable?.developer;
+      const developer: RptiDeveloper | undefined =
+        rawDeveloper === undefined || rawDeveloper === ''
+          ? undefined
+          : rawDeveloper === 'inhouse' ? 'inhouse' : 'PPJTI';
 
-    const developmentType: RptiDetail['developmentType'] =
-      newItems.length > 0 && !hasPriorLiveSegment(deliverableId) ? 'new' : 'upgrade';
-    const anchor = newItems.length > 0
-      ? (liveItems.length > 0 ? liveItems[liveItems.length - 1] : newItems[newItems.length - 1])
-      : liveItems[liveItems.length - 1];
-
-    const deliverable = deliverables.find(d => d.id === deliverableId);
-    const initiative = initiatives.find(i => i.id === initiativeId);
-    const category = resolveAssetCategory(deliverable, assets, assetCategories);
-    // Deliverable.developer now carries either 'inhouse' or a provider's *name*
-    // (ADR-0013). The RPTI column wants the classification, so anything that is not
-    // 'inhouse' is PPJTI — a third party, whoever they are. LKPTI emits the name
-    // itself, which is why one field can serve both returns.
-    const rawDeveloper = deliverable?.developer;
-    const developer: RptiDeveloper | undefined =
-      rawDeveloper === undefined || rawDeveloper === ''
-        ? undefined
-        : rawDeveloper === 'inhouse' ? 'inhouse' : 'PPJTI';
-
-    results.push({
-      id: `rpti-gen-${initiativeId}-${deliverableId}-${reportYear}`,
-      initiativeId,
-      targetType: 'deliverable',
-      targetId: deliverableId,
-      categoryCode: deliverable?.categoryCode ?? category?.categoryCode,
-      developmentType,
-      developer,
-      // 'n/a' by definition whenever the resolved developer isn't PPJTI — there is no
-      // third party, so there is no relationship to disclose. When it *is* PPJTI the
-      // answer is a fact about the vendor that nothing can derive, so it is read from
-      // the deliverable, where the preparer records it (FR-014).
-      ppjtiRelatedParty: developer !== 'PPJTI' ? 'n/a' : deliverable?.ppjtiRelatedParty,
-      dcCity: deliverable?.dcCity ?? category?.dcCity,
-      dcCountry: deliverable?.dcCountry ?? category?.dcCountry,
-      drCity: deliverable?.drCity ?? category?.drCity,
-      drCountry: deliverable?.drCountry ?? category?.drCountry,
-      plannedImplementationQuarter: deriveQuarterFromDate(anchor.segment.startDate),
-      deliverableSegmentId: anchor.segment.id,
-      // Keterangan comes from the work it comments on, matching Deskripsi two columns
-      // earlier, which has always come from the initiative (ADR-0013).
-      remarks: initiative?.rptiRemarks,
-    });
+      results.push({
+        id: `rpti-gen-${anchor.id}-${reportYear}`,
+        initiativeId,
+        targetType: 'deliverable',
+        targetId: deliverableId,
+        categoryCode: deliverable?.categoryCode ?? category?.categoryCode,
+        developmentType,
+        developer,
+        // 'n/a' by definition whenever the resolved developer isn't PPJTI — there is no
+        // third party, so there is no relationship to disclose. When it *is* PPJTI the
+        // answer is a fact about the vendor that nothing can derive, so it is read from
+        // the deliverable, where the preparer records it (FR-014).
+        ppjtiRelatedParty: developer !== 'PPJTI' ? 'n/a' : deliverable?.ppjtiRelatedParty,
+        dcCity: deliverable?.dcCity ?? category?.dcCity,
+        dcCountry: deliverable?.dcCountry ?? category?.dcCountry,
+        drCity: deliverable?.drCity ?? category?.drCity,
+        drCountry: deliverable?.drCountry ?? category?.drCountry,
+        plannedImplementationQuarter: deriveQuarterFromDate(anchor.startDate),
+        deliverableSegmentId: anchor.id,
+        // Keterangan belongs to this implementation. Deskripsi remains initiative-owned.
+        remarks: anchor.rptiRemarks,
+      });
+    }
   }
 
   return results;
@@ -310,32 +307,41 @@ export function reconcileRptiReturn(input: ReconcileRptiInput): RptiReconciliati
   const deliverableById = new Map(deliverables.map(d => [d.id, d]));
   const findings: RptiReconciliationFinding[] = [];
 
-  // A canonical row identity exists independently of any selected filing year: one
-  // Initiative, its resolved target, and at least one qualifying segment on that pair.
-  // Filed values are deliberately not compared here (Q12); that policy remains open.
-  const canonical = initiatives.flatMap(initiative => {
-    if (initiative.isPlaceholder === true) return [];
-    const targetId = resolveRptiTarget(initiative, deliverableSegments, deliverables);
-    if (!targetId || !deliverableById.has(targetId)) return [];
-    const anchored = deliverableSegments.some(seg =>
-      seg.initiativeId === initiative.id
-      && seg.deliverableId === targetId
-      && classifySegmentKind(seg.status, deliverableStatuses) !== 'excluded');
-    return anchored ? [{ key: `${initiative.id}\u0000${targetId}`, initiative, targetId }] : [];
+  // Each live lifecycle segment is one canonical implementation identity. The
+  // segment names both the Initiative and the application; no initiative-wide
+  // target is inferred. Filed values remain deliberately outside identity (Q13).
+  const canonical = deliverableSegments.flatMap(segment => {
+    const initiative = segment.initiativeId ? initiativeById.get(segment.initiativeId) : undefined;
+    if (!initiative || initiative.isPlaceholder === true
+      || !deliverableById.has(segment.deliverableId)
+      || !isLiveStatusId(segment.status, deliverableStatuses)) return [];
+    return [{ key: segment.id, initiative, segment, targetId: segment.deliverableId }];
   });
 
   const candidateFor = (row: RptiDetail) => {
+    // Imported rows carry the implementation anchor. It survives target or
+    // Initiative correction on that segment, so it is authoritative when present.
+    if (row.deliverableSegmentId) {
+      const anchored = canonical.filter(c => c.segment.id === row.deliverableSegmentId);
+      if (anchored.length === 1) return { candidate: anchored[0], ambiguous: false };
+      return { candidate: undefined, ambiguous: anchored.length > 1 };
+    }
+
+    // Rows from the previous model have no segment anchor. They can still be
+    // accounted for only when the old (initiative, target) identity names exactly
+    // one current implementation.
     const exact = canonical.filter(c =>
       row.targetType === 'deliverable'
       && c.initiative.id === row.initiativeId
       && c.targetId === row.targetId);
     if (exact.length === 1) return { candidate: exact[0], ambiguous: false };
+    if (exact.length > 1) return { candidate: undefined, ambiguous: true };
 
     // When the target was recreated (including a legacy bare-Asset target), the
-    // surviving Initiative identifies its replacement only after the preparer has
-    // explicitly selected it. Inference alone is not the named repair.
+    // surviving Initiative identifies a replacement through the segment the
+    // preparer corrected. More than one implementation is not enough evidence.
     const byInitiative = canonical.filter(c => {
-      if (c.initiative.id !== row.initiativeId || c.initiative.deliverableId !== c.targetId) return false;
+      if (c.initiative.id !== row.initiativeId) return false;
       if (row.targetType === 'asset') return deliverableById.get(c.targetId)?.assetId === row.targetId;
       return true;
     });
@@ -357,17 +363,6 @@ export function reconcileRptiReturn(input: ReconcileRptiInput): RptiReconciliati
     claimCount.set(match.candidate.key, (claimCount.get(match.candidate.key) ?? 0) + 1);
   }
 
-  // Reconciliation deliberately requires a qualifying segment before a canonical
-  // identity exists. These helpers only make the repair copy reflect how far the
-  // preparer has already progressed; they do not relax that anchored rule.
-  const hasQualifyingSegment = (initiativeId: string, targetId: string) =>
-    deliverableSegments.some(seg =>
-      seg.initiativeId === initiativeId
-      && seg.deliverableId === targetId
-      && classifySegmentKind(seg.status, deliverableStatuses) !== 'excluded');
-  const remainingSegmentMessage = (initiativeName: string, targetName: string) =>
-    `The Deliverable and the Initiative's Deliverable selection for "${initiativeName}" are already in place. The remaining step is on the Visualiser timeline: add a qualifying lifecycle segment that links this Initiative to "${targetName}"; selecting the Deliverable alone does not give generation a row to derive.`;
-
   for (const match of matches) {
     const { row } = match;
     const initiative = initiativeById.get(row.initiativeId);
@@ -377,7 +372,7 @@ export function reconcileRptiReturn(input: ReconcileRptiInput): RptiReconciliati
     };
 
     if (match.ambiguous) {
-      add('identity-conflict', `The stored RPTI row "${row.id}" matches more than one current plan line by identity. Make the Initiative target unambiguous before generating the filing.`);
+      add('identity-conflict', `The stored RPTI row "${row.id}" matches more than one current implementation by identity. On the Visualiser timeline, open the relevant lifecycle segment panels and make the implementation identity unambiguous before generating the filing.`);
       continue;
     }
     if (match.candidate && claimCount.get(match.candidate.key) === 1) continue;
@@ -387,63 +382,24 @@ export function reconcileRptiReturn(input: ReconcileRptiInput): RptiReconciliati
     }
 
     if (row.targetType === 'asset') {
-      const selectedReplacement = initiative?.deliverableId
-        ? deliverableById.get(initiative.deliverableId)
-        : undefined;
-      if (initiative?.isPlaceholder !== true
-        && selectedReplacement?.assetId === row.targetId
-        && !hasQualifyingSegment(initiative.id, selectedReplacement.id)) {
-        add('asset-target', remainingSegmentMessage(initiative.name, selectedReplacement.name));
-      } else {
-        add('asset-target', `The stored RPTI row for "${label}" targets an Asset directly, which no filing year can reproduce. On the Deliverables tab, create the application or infrastructure item as a Deliverable under that Asset. On the Initiatives tab, select it in this Initiative's Deliverable column. Then, on the Visualiser timeline, add a qualifying lifecycle segment linking the Initiative to the Deliverable.`);
-      }
+      add('asset-target', `The stored RPTI row for "${label}" targets an Asset directly, which no filing year can reproduce. On the Deliverables tab, create the application or infrastructure item as a Deliverable under that Asset. Then, on the Visualiser timeline, create or open the implementation's lifecycle segment panel and select both that Deliverable and this Initiative.`);
       continue;
     }
     if (!initiative) {
       const target = deliverableById.get(row.targetId);
-      const replacements = target
-        ? initiatives.filter(candidate =>
-            candidate.isPlaceholder !== true
-            && candidate.deliverableId === target.id)
-        : [];
-      if (target && replacements.length === 1
-        && !hasQualifyingSegment(replacements[0].id, target.id)) {
-        add('missing-initiative', remainingSegmentMessage(replacements[0].name, target.name));
-      } else if (target) {
-        add('missing-initiative', `The stored RPTI row "${row.id}" points at an Initiative that no longer exists, so no filing year can reproduce it. On the Initiatives tab, recreate the Initiative and select "${target.name}" in its Deliverable column. Then, on the Visualiser timeline, add a qualifying lifecycle segment linking that Initiative to the Deliverable. If the intended Initiative cannot be identified safely, re-import the filing instead.`);
+      if (target) {
+        add('missing-initiative', `The stored RPTI row "${row.id}" points at an Initiative that no longer exists, so no filing year can reproduce it. Recreate the Initiative, then on the Visualiser timeline create or open the implementation's lifecycle segment panel and select that Initiative together with "${target.name}". If the intended Initiative cannot be identified safely, re-import the filing instead.`);
       } else {
         add('missing-initiative', `The stored RPTI row "${row.id}" has both its Initiative and Deliverable missing, so no current source pair can identify it safely. Re-import the filing it came from before generating.`);
       }
       continue;
     }
     if (row.targetType === 'deliverable' && !deliverables.some(d => d.id === row.targetId)) {
-      const selectedReplacement = initiative.deliverableId
-        ? deliverableById.get(initiative.deliverableId)
-        : undefined;
-      if (selectedReplacement
-        && initiative.isPlaceholder !== true
-        && !hasQualifyingSegment(initiative.id, selectedReplacement.id)) {
-        add('missing-target', remainingSegmentMessage(initiative.name, selectedReplacement.name));
-      } else {
-        add('missing-target', `The stored RPTI row for "${label}" points at a Deliverable that no longer exists. On the Deliverables tab, create or correct the application the filed plan refers to. On the Initiatives tab, select it in this Initiative's Deliverable column. Then, on the Visualiser timeline, add a qualifying lifecycle segment linking the Initiative to the Deliverable, so generation has a row to derive.`);
-      }
+      add('missing-target', `The stored RPTI row for "${label}" points at a Deliverable that no longer exists. On the Deliverables tab, create or correct the application the filed plan refers to. Then, on the Visualiser timeline, open the implementation's lifecycle segment panel and select that Deliverable together with this Initiative, so generation has a row to derive.`);
       continue;
     }
-    // Reproducible in *some* year: the initiative resolves to this row's target
-    // (Q10's rule, year-independent by design) and at least one of its segments on
-    // that target carries a status generation accepts. The selected year is
-    // deliberately not consulted — absence from it proves nothing (contract 2's
-    // companion rule in Q11).
-    const derivable = initiative.isPlaceholder !== true
-      && resolveRptiTarget(initiative, deliverableSegments, deliverables) === row.targetId
-      && deliverableSegments.some(seg =>
-        seg.initiativeId === initiative.id &&
-        seg.deliverableId === row.targetId &&
-        classifySegmentKind(seg.status, deliverableStatuses) !== 'excluded');
-    if (!derivable) {
-      const targetName = deliverables.find(d => d.id === row.targetId)?.name ?? row.targetId;
-      add('unanchored', `The stored RPTI row for "${label}" has no lifecycle segment on "${targetName}" that generation could reproduce in any filing year. Add that segment to the Visualiser timeline for this Initiative — selecting the Deliverable on the Initiatives tab does not on its own give generation anything to derive.`);
-    }
+    const targetName = deliverables.find(d => d.id === row.targetId)?.name ?? row.targetId;
+    add('unanchored', `The stored RPTI row for "${label}" has no current implementation that generation could reproduce in any filing year. On the Visualiser timeline, create or open the intended lifecycle segment panel and select "${targetName}" together with this Initiative, using a live status for the implementation.`);
   }
 
   return findings;
@@ -470,10 +426,11 @@ export function suggestDeliverableQuarter(
   return { quarter: deriveQuarterFromDate(match.startDate), segmentId: match.id };
 }
 
-export function resolveCost(_detail: RptiDetail, initiative: Initiative | undefined): { capexAmount: number; opexAmount: number } {
+export function resolveCost(detail: RptiDetail, segments: DeliverableSegment[]): { capexAmount: number; opexAmount: number } {
+  const implementation = segments.find(segment => segment.id === detail.deliverableSegmentId);
   return {
-    capexAmount: initiative?.capex ?? 0,
-    opexAmount: initiative?.opex ?? 0,
+    capexAmount: implementation?.capexAmount ?? 0,
+    opexAmount: implementation?.opexAmount ?? 0,
   };
 }
 
@@ -535,7 +492,7 @@ export function exportRptiReportToExcel(
     const suggestion = detail.plannedImplementationQuarter
       ?? suggestDeliverableQuarter(detail, deliverableSegments, deliverableStatuses).quarter
       ?? '';
-    const { capexAmount, opexAmount } = resolveCost(detail, initiative);
+    const { capexAmount, opexAmount } = resolveCost(detail, deliverableSegments);
     return [
       index + 1,
       targetName,

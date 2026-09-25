@@ -57,6 +57,45 @@ function importedWorkspace() {
   };
 }
 
+function rptiRoundTripLosses(costReader: typeof resolveCost = resolveCost) {
+  const { rptiSource, out, workspace } = importedWorkspace();
+  const regenerated = projectRptiReturn(workspace as never, REPORT_YEAR);
+  const unresolved = new Set(out.unresolved.map(u => u.name));
+  const implementationKey = (name: string, quarter: string) => `${name}\u0000${quarter}`;
+  const byImplementation = new Map(
+    regenerated.map(row => [
+      implementationKey(
+        workspace.deliverables.find(d => d.id === row.targetId)?.name ?? '',
+        row.plannedImplementationQuarter,
+      ),
+      row,
+    ]),
+  );
+
+  const lost: string[] = [];
+  for (const src of rptiSource) {
+    // A row the workspace cannot reproduce is the preparer's to repair (FR-024/025),
+    // not a round-trip failure — it is asserted separately below.
+    if (unresolved.has(src.name)) continue;
+    const got = byImplementation.get(implementationKey(src.name, src.plannedQuarter));
+    if (!got) { lost.push(`${src.name} ${src.plannedQuarter}: no row generated at all`); continue; }
+    const check = (field: string, expected: unknown, actual: unknown) => {
+      if (expected === undefined || expected === '') return;
+      if (actual !== expected) lost.push(`${src.name} ${src.plannedQuarter}.${field}: filed ${JSON.stringify(expected)}, regenerated ${JSON.stringify(actual)}`);
+    };
+    check('developmentType', src.developmentType, got.developmentType);
+    check('categoryCode', src.categoryCode, got.categoryCode);
+    check('developer', src.developer, got.developer);
+    check('ppjtiRelatedParty', src.ppjtiRelatedParty, got.ppjtiRelatedParty);
+    check('plannedImplementationQuarter', src.plannedQuarter, got.plannedImplementationQuarter);
+    check('remarks', src.remarks, (got as unknown as Record<string, unknown>).remarks);
+    const cost = costReader(got, out.deliverableSegments);
+    check('capexAmount', src.capexAmount, cost.capexAmount);
+    check('opexAmount', src.opexAmount, cost.opexAmount);
+  }
+  return lost;
+}
+
 describe('SC-001: a generated return reproduces the imported one', () => {
   it('LKPTI: every value the filed return supplied survives regeneration', () => {
     const { lkptiSource, inv, workspace } = importedWorkspace();
@@ -104,39 +143,66 @@ describe('SC-001: a generated return reproduces the imported one', () => {
   });
 
   it('RPTI: every value the filed return supplied survives regeneration', () => {
-    const { rptiSource, out, workspace } = importedWorkspace();
-
-    const regenerated = projectRptiReturn(workspace as never, REPORT_YEAR);
-    const unresolved = new Set(out.unresolved.map(u => u.name));
-    const byName = new Map(
-      regenerated.map(r => [workspace.deliverables.find(d => d.id === r.targetId)?.name, r]),
-    );
-
-    const lost: string[] = [];
-    for (const src of rptiSource) {
-      // A row the workspace cannot reproduce is the preparer's to repair (FR-024/025),
-      // not a round-trip failure — it is asserted separately below.
-      if (unresolved.has(src.name)) continue;
-      const got = byName.get(src.name);
-      if (!got) { lost.push(`${src.name}: no row generated at all`); continue; }
-      const initiative = out.initiatives.find(i => i.id === got.initiativeId);
-      const check = (field: string, expected: unknown, actual: unknown) => {
-        if (expected === undefined || expected === '') return;
-        if (actual !== expected) lost.push(`${src.name}.${field}: filed ${JSON.stringify(expected)}, regenerated ${JSON.stringify(actual)}`);
-      };
-      check('developmentType', src.developmentType, got.developmentType);
-      check('categoryCode', src.categoryCode, got.categoryCode);
-      check('developer', src.developer, got.developer);
-      check('ppjtiRelatedParty', src.ppjtiRelatedParty, got.ppjtiRelatedParty);
-      check('plannedImplementationQuarter', src.plannedQuarter, got.plannedImplementationQuarter);
-      check('remarks', src.remarks, (got as unknown as Record<string, unknown>).remarks);
-      // Through resolveCost: the detail fields are overrides over the initiative's figures.
-      const cost = resolveCost(got, initiative);
-      check('capexAmount', src.capexAmount, cost.capexAmount);
-      check('opexAmount', src.opexAmount, cost.opexAmount);
-    }
-    expect(out.rptiDetails.length, 'guard: the import produced rows to compare against').toBe(13);
+    const { out } = importedWorkspace();
+    const lost = rptiRoundTripLosses();
+    expect(out.rptiDetails.length, 'guard: the import produced rows to compare against').toBe(14);
     expect(lost, `${lost.length} filed value(s) did not survive regeneration`).toEqual([]);
+  });
+
+  it('RPTI: the loss check detects every cost when implementation cost reads return zero', () => {
+    const lost = rptiRoundTripLosses(() => ({ capexAmount: 0, opexAmount: 0 }));
+    expect(lost, `${lost.length} losses found with the implementation-cost read stubbed`).toHaveLength(26);
+    expect(lost.filter(message => message.includes('.capexAmount:'))).toHaveLength(13);
+    expect(lost.filter(message => message.includes('.opexAmount:'))).toHaveLength(13);
+  });
+
+  it('RPTI: two implementations of one application keep their own filed values', () => {
+    const { rptiSource, workspace } = importedWorkspace();
+    const source = rptiSource
+      .filter(row => row.name === 'Open API Banking Platform')
+      .sort((a, b) => a.plannedQuarter.localeCompare(b.plannedQuarter));
+
+    expect(source.map(row => ({
+      developmentType: row.developmentType,
+      quarter: row.plannedQuarter,
+      capex: row.capexAmount,
+      opex: row.opexAmount,
+      remarks: row.remarks,
+    })), 'guard: the published workbook carries the adversarial pair').toEqual([
+      {
+        developmentType: 'new', quarter: 'Q1', capex: 8_800_000_000, opex: 1_500_000_000,
+        remarks: 'SNAP-compliant open banking initiative.',
+      },
+      {
+        developmentType: 'upgrade', quarter: 'Q3', capex: 3_600_000_000, opex: 720_000_000,
+        remarks: 'Partner API phase 2 capacity upgrade.',
+      },
+    ]);
+
+    const target = workspace.deliverables.find(d => d.name === 'Open API Banking Platform')!;
+    const regenerated = projectRptiReturn(workspace as never, REPORT_YEAR)
+      .filter(row => row.targetId === target.id)
+      .sort((a, b) => a.plannedImplementationQuarter.localeCompare(b.plannedImplementationQuarter));
+
+    expect(regenerated.map(row => {
+      const cost = resolveCost(row, workspace.deliverableSegments);
+      return {
+        developmentType: row.developmentType,
+        quarter: row.plannedImplementationQuarter,
+        capex: cost.capexAmount,
+        opex: cost.opexAmount,
+        remarks: (row as unknown as Record<string, unknown>).remarks,
+      };
+    })).toEqual([
+      {
+        developmentType: 'new', quarter: 'Q1', capex: 8_800_000_000, opex: 1_500_000_000,
+        remarks: 'SNAP-compliant open banking initiative.',
+      },
+      {
+        developmentType: 'upgrade', quarter: 'Q3', capex: 3_600_000_000, opex: 720_000_000,
+        remarks: 'Partner API phase 2 capacity upgrade.',
+      },
+    ]);
   });
 
   it('a row the workspace cannot reproduce is identified, not silently dropped', () => {

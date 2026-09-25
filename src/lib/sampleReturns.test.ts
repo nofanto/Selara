@@ -4,7 +4,9 @@ import { readFileSync } from 'node:fs';
 import { parseLkptiImportWorkbook, deriveWorkspaceFromLkptiImport } from './lkptiImport';
 import { parseRptiImportWorkbook, deriveWorkspaceFromRptiImport } from './rptiImport';
 import { projectRptiReturn, reconcileRptiReturn } from './rpti';
+import { generateLkptiDetails } from './lkpti';
 import { mergeDeliverableStatuses } from './deliverableStatusDefaults';
+import { computeDataHealth } from './dataHealth';
 
 const load = (n: string) => XLSX.read(readFileSync(new URL(`../../docs/sample-data/${n}`, import.meta.url)), { type: 'buffer' });
 
@@ -25,7 +27,7 @@ describe('the published sample returns', () => {
   it('RPTI parses with nothing skipped', () => {
     const { rows, skipped } = parseRptiImportWorkbook(load('sample-rpti-2027.xlsx'));
     expect(skipped).toEqual([]);
-    expect(rows).toHaveLength(13);
+    expect(rows).toHaveLength(14);
   });
 
   it('RPTI carries both applications and infrastructure', () => {
@@ -133,6 +135,47 @@ describe('the published sample returns', () => {
     expect(regenerated.some(r => r.targetId === replacementTargetId),
       'and the next generation must actually produce the row').toBe(true);
   });
+
+  it('keeps reconciliation, target health and generated row counts stable for the extended import', () => {
+    const inv = deriveWorkspaceFromLkptiImport(parseLkptiImportWorkbook(load('sample-lkpti-2026.xlsx')).rows, 2026);
+    const out = deriveWorkspaceFromRptiImport(parseRptiImportWorkbook(load('sample-rpti-2027.xlsx')).rows, 2027, {
+      deliverables: inv.deliverables, assets: inv.assets, assetCategories: inv.assetCategories,
+      deliverableSegments: inv.deliverableSegments, deliverableStatuses: inv.deliverableStatuses,
+    });
+    const workspace = {
+      deliverables: [
+        ...inv.deliverables.map(d => out.updatedDeliverables.find(u => u.id === d.id) ?? d),
+        ...out.deliverables,
+      ],
+      assets: [...inv.assets, ...out.assets],
+      assetCategories: [...inv.assetCategories, ...out.assetCategories],
+      deliverableSegments: [...inv.deliverableSegments, ...out.deliverableSegments],
+      deliverableStatuses: mergeDeliverableStatuses(inv.deliverableStatuses, out.deliverableStatuses),
+      initiatives: out.initiatives,
+    };
+    const reconciliation = reconcileRptiReturn({ ...workspace, storedDetails: out.rptiDetails });
+    const health = computeDataHealth({
+      ...workspace,
+      programmes: out.programmes,
+      milestones: [], dependencies: [], decisions: [], resources: [], strategies: [],
+      rptiDetails: out.rptiDetails,
+      lkptiDetails: inv.lkptiDetails,
+      timelineSettings: { defaultCurrency: 'IDR' },
+    });
+    const metrics = {
+      reconciliationFindings: reconciliation.length,
+      multiTargetErrors: health.filter(issue => issue.id.startsWith('initiative-rpti-multi-target:')).length,
+      noTargetErrors: health.filter(issue => issue.id.startsWith('initiative-rpti-no-target:')).length,
+      generatedRows: projectRptiReturn(workspace, 2027).length,
+    };
+
+    expect(metrics).toEqual({
+      reconciliationFindings: 1,
+      multiTargetErrors: 0,
+      noTargetErrors: 0,
+      generatedRows: 13,
+    });
+  });
 });
 
 describe('a planned enhancement to an application the bank already runs', () => {
@@ -160,6 +203,34 @@ describe('a planned enhancement to an application the bank already runs', () => 
     };
   };
 
+  /**
+   * The imported anchor asserts a go-live, so the application is live from that date
+   * on — not for its filed quarter and then gone. Anchoring it to the quarter made
+   * year-end membership depend on *which* quarter was filed: a Q4 build spanned
+   * 31 December and joined the inventory, a Q1-Q3 build did not, and each one's
+   * timeline bar ended three months after it started. Measured on the sample: LKPTI
+   * as at 2027-12-31 held 14 applications, the 13 from the 2026 inventory plus the
+   * one new build that happened to be filed for Q4.
+   */
+  it('keeps every filed new build live from its go-live, whichever quarter it states', () => {
+    const w = merged();
+    const workspace = {
+      deliverableSegments: w.deliverableSegments, deliverableStatuses: w.deliverableStatuses,
+      deliverables: w.deliverables, assets: w.assets, assetCategories: w.assetCategories,
+    };
+    const asAt = (date: string) => new Set(generateLkptiDetails({ asAtDate: date, ...workspace })
+      .map(row => w.deliverables.find(d => d.id === row.targetId)?.name));
+    const newApplications = projectRptiReturn({ ...workspace, initiatives: w.out.initiatives }, 2027)
+      .filter(row => row.developmentType === 'new')
+      .map(row => w.deliverables.find(d => d.id === row.targetId))
+      .filter(deliverable => deliverable?.type === 'application')
+      .map(deliverable => deliverable!.name);
+    // Guard: an empty or single-quarter set would make the assertion below vacuous.
+    expect(newApplications.length).toBeGreaterThan(1);
+    const inventory = asAt('2027-12-31');
+    expect(newApplications.filter(name => !inventory.has(name))).toEqual([]);
+  });
+
   it('does not duplicate the application it enhances', () => {
     const w = merged();
     expect(w.deliverables.filter(d => d.name === 'Payment Gateway')).toHaveLength(1);
@@ -182,6 +253,24 @@ describe('a planned enhancement to an application the bank already runs', () => 
     expect(forPg).toHaveLength(1);
     expect(forPg[0].developmentType).toBe('upgrade');
     expect(forPg[0].plannedImplementationQuarter).toBe('Q1');
+  });
+
+  it('regenerates the sample’s imported new and upgrade types from live history', () => {
+    const w = merged();
+    const regen = projectRptiReturn({
+      deliverableSegments: w.deliverableSegments, deliverableStatuses: w.deliverableStatuses,
+      initiatives: w.out.initiatives, deliverables: w.deliverables,
+      assets: w.assets, assetCategories: w.assetCategories,
+    }, 2027);
+    for (const [name, types] of [
+      ['Open API Banking Platform', ['new', 'upgrade']], ['Payment Gateway', ['upgrade']],
+    ] as const) {
+      const target = w.deliverables.find(deliverable => deliverable.name === name)!;
+      expect(w.out.rptiDetails.filter(row => row.targetId === target.id).map(row => row.developmentType), name)
+        .toEqual(types);
+      expect(regen.filter(row => row.targetId === target.id).map(row => row.developmentType), name)
+        .toEqual(types);
+    }
   });
 
   it('keeps the three new applications classified as new', () => {

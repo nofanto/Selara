@@ -76,6 +76,8 @@ type AppState = {
 function liftWorkspaceReportAttributes(data: AppState): AppState {
   const lifted = liftReportRowAttributes({
     deliverables: data.deliverables || [],
+    deliverableSegments: data.deliverableSegments || [],
+    deliverableStatuses: data.deliverableStatuses || [],
     initiatives: data.initiatives || [],
     lkptiDetails: data.lkptiDetails || [],
     rptiDetails: data.rptiDetails || [],
@@ -83,6 +85,7 @@ function liftWorkspaceReportAttributes(data: AppState): AppState {
   return {
     ...data,
     deliverables: lifted.deliverables,
+    deliverableSegments: lifted.deliverableSegments,
     initiatives: lifted.initiatives,
     rptiDetails: lifted.rptiDetails,
   };
@@ -328,6 +331,8 @@ export default function App() {
           // See requirement-specs/report-rows-as-projections.md Q4 and FR-019.
           const lifted = liftReportRowAttributes({
             deliverables: dbData.deliverables || [],
+            deliverableSegments: (dbData as any).deliverableSegments || [],
+            deliverableStatuses: (dbData as any).deliverableStatuses || [],
             initiatives: dbData.initiatives || [],
             lkptiDetails: (dbData as any).lkptiDetails || [],
             rptiDetails: (dbData as any).rptiDetails || [],
@@ -344,6 +349,7 @@ export default function App() {
             await saveAppData({
               ...dbData,
               deliverables: lifted.deliverables,
+              deliverableSegments: lifted.deliverableSegments,
               initiatives: liftedInitiatives,
               rptiDetails: lifted.rptiDetails,
             });
@@ -351,7 +357,7 @@ export default function App() {
 
           setAssets(dbData.assets);
           setDeliverables(lifted.deliverables);
-          setDeliverableSegments((dbData as any).deliverableSegments || []);
+          setDeliverableSegments(lifted.deliverableSegments);
           setInitiatives(liftedInitiatives);
           setMilestones(dbData.milestones);
           setProgrammes(dbData.programmes);

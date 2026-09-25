@@ -8,7 +8,7 @@ import {
   isLkptiCategoryCode,
   toDdMmYyyy,
 } from './lkpti';
-import { RPTI_CATEGORY_LABELS } from './rpti';
+import { RPTI_CATEGORY_LABELS, openEndedDate } from './rpti';
 import { IN_PRODUCTION_STATUS } from './deliverableStatusDefaults';
 
 /**
@@ -213,17 +213,6 @@ export interface DerivedLkptiWorkspace {
   lkptiDetails: LkptiDetail[];
 }
 
-// A freshly-imported "live" segment has no known end — DeliverableSegment.endDate is a
-// required field, so we anchor it several years out, matching how demo data represents
-// an ongoing live segment (see src/demoData.ts) rather than inventing a null-endDate concept.
-const OPEN_ENDED_YEARS_OUT = 5;
-
-// Anchored to the year the preparer stated the return covers, never to the clock.
-// Reading `new Date()` here meant the same filed return imported in 2026 and in 2030
-// produced different workspaces from identical input (T032).
-function openEndedDate(asAtYear: number): string {
-  return `${asAtYear + OPEN_ENDED_YEARS_OUT}-12-31`;
-}
 
 /**
  * Derives a starter workspace from parsed LKPTI rows — see

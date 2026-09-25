@@ -24,11 +24,12 @@ export const reportFixture = {
   assetCategories: [{ id: 'filing-category', name: 'Filing Category', categoryCode: '06', dcCountry: 'Indonesia', drCity: 'Surabaya', drCountry: 'Indonesia' }],
   programmes: [{ id: 'filing-programme', name: 'Filing Programme', color: 'blue' }],
   initiatives: [{ id: 'filing-initiative', name: 'Filing Initiative', programmeId: 'filing-programme', assetId: 'filing-asset',
-    startDate: '2026-01-01', endDate: '2026-12-31', capex: 100, opex: 10, rptiRemarks: 'Entity remarks' }],
+    startDate: '2026-01-01', endDate: '2026-12-31', capex: 100, opex: 10 }],
   deliverables: [{ id: 'filing-deliverable', assetId: 'filing-asset', name: 'Filing Application', type: 'application',
     developer: 'inhouse', dcCity: 'Jakarta', platform: 'Linux RHEL 9', systemOwner: 'Filing Owner' }],
   deliverableSegments: [{ id: 'filing-segment', deliverableId: 'filing-deliverable', initiativeId: 'filing-initiative',
-    status: 'appstatus-in-production', startDate: '2026-03-15', endDate: '2026-12-31' }],
+    status: 'appstatus-in-production', startDate: '2026-03-15', endDate: '2026-12-31',
+    capexAmount: 100, opexAmount: 10, rptiRemarks: 'Entity remarks' }],
 };
 
 export async function generateReport(page: Page, report: 'rpti' | 'lkpti', year = '2026') {

@@ -5,10 +5,10 @@ import {
   RPTI_IMPORT_SHEET_NAME,
   parseRptiImportWorkbook,
   deriveWorkspaceFromRptiImport,
-  RPTI_IMPORT_PRELAUNCH_STATUS_ID,
   RPTI_IMPORT_LIVE_STATUS_ID,
 } from './rptiImport';
-import { RPTI_CATEGORY_LABELS, projectRptiReturn } from './rpti';
+import { RPTI_CATEGORY_LABELS, projectRptiReturn, openEndedDate } from './rpti';
+import { generateLkptiDetails } from './lkpti';
 import type { Asset, AssetCategory, Deliverable, DeliverableSegment } from '../types';
 import { SEEDED_DELIVERABLE_STATUSES } from './deliverableStatusDefaults';
 
@@ -117,25 +117,38 @@ describe('deriveWorkspaceFromRptiImport — placement', () => {
     assetCategories: [{ id: 'c-1', name: 'Area', categoryCode: '04' } as AssetCategory],
   };
 
-  it('gives a newly created build one planned segment spanning the filed quarter', () => {
-    // Planned, not live: a `new` row states an intention to build, and the return
-    // never asserts the thing reaches production. Inventing a live period would put
-    // a go-live on the timeline that nobody filed.
+  it('gives a new build the shared five-year live horizon from its report year (Q21)', () => {
+    // A new build creates the application, so its live phase is the application's
+    // existence — bounded to the same five-year horizon as LKPTI.
+    // It spans 31 December of the filed year for every quarter, which is what
+    // keeps a Q1-Q3 build in that year's LKPTI (the defect FR-001c fixed).
     const out = deriveWorkspaceFromRptiImport(parse({ jenis: 'new', quarter: 'Q3' }), 2027, EMPTY);
     expect(out.deliverableSegments).toHaveLength(1);
     expect(out.deliverableSegments[0]).toMatchObject({
-      startDate: '2027-07-01', endDate: '2027-09-30', status: RPTI_IMPORT_PRELAUNCH_STATUS_ID,
+      startDate: '2027-07-01', endDate: openEndedDate(2027), status: RPTI_IMPORT_LIVE_STATUS_ID,
     });
+    expect(out.deliverableSegments[0].endDate).toBe('2032-12-31');
   });
 
-  it('gives a newly created upgrade one live segment, because it already runs', () => {
-    // Reachable only for infrastructure, which no LKPTI can carry. `upgrade` says
-    // the bank already operates it, so the segment is live rather than planned.
+  it.each([['Q1', '2027-01-01'], ['Q4', '2027-10-01']] as const)(
+    'uses the shared report-year horizon for a %s go-live (Q21)', (quarter, start) => {
+      const out = deriveWorkspaceFromRptiImport(parse({ jenis: 'new', quarter }), 2027, EMPTY);
+      expect(out.deliverableSegments[0]).toMatchObject({ startDate: start, endDate: openEndedDate(2027) });
+    });
+
+  it('gives a newly created upgrade a prior live phase and filed live start', () => {
+    // Reachable only for infrastructure, which no LKPTI can carry. The prior
+    // phase distinguishes the filed implementation from a first build.
     const out = deriveWorkspaceFromRptiImport(
       parse({ jenis: 'upgrade', quarter: 'Q3', kategori: RPTI_CATEGORY_LABELS['52'] }), 2027, EMPTY);
     expect(out.deliverables).toHaveLength(1); // guard: otherwise this was unresolved
-    expect(out.deliverableSegments).toHaveLength(1);
+    expect(out.deliverableSegments).toHaveLength(2);
     expect(out.deliverableSegments[0]).toMatchObject({
+      startDate: '2026-01-01', endDate: '2026-12-31', status: RPTI_IMPORT_LIVE_STATUS_ID,
+    });
+    // An upgrade is an event on something already running: only its filed quarter
+    // is the implementation. The synthetic 2026 phase above is what says it existed.
+    expect(out.deliverableSegments[1]).toMatchObject({
       startDate: '2027-07-01', endDate: '2027-09-30', status: RPTI_IMPORT_LIVE_STATUS_ID,
     });
   });
@@ -151,10 +164,28 @@ describe('deriveWorkspaceFromRptiImport — placement', () => {
     expect(earliest < '2027-01-01').toBe(true);
   });
 
-  it('adds only the planned enhancement when the target is already live', () => {
+  it('uses synthetic prior-live history without filing an extra prior-year row', () => {
+    for (const [label, source] of [
+      ['matched application', { rows: parse({ jenis: 'upgrade', quarter: 'Q3' }), existing: inventory }],
+      ['created infrastructure', { rows: parse({ jenis: 'upgrade', quarter: 'Q3', kategori: RPTI_CATEGORY_LABELS['52'] }), existing: EMPTY }],
+    ] as const) {
+      const out = deriveWorkspaceFromRptiImport(source.rows, 2027, source.existing);
+      const context = {
+        deliverableSegments: out.deliverableSegments,
+        deliverableStatuses: out.deliverableStatuses,
+        initiatives: out.initiatives,
+        deliverables: [...source.existing.deliverables, ...out.deliverables],
+        assets: [...source.existing.assets, ...out.assets],
+        assetCategories: [...source.existing.assetCategories, ...out.assetCategories],
+      };
+      expect(projectRptiReturn(context, 2026), label).toEqual([]);
+      expect(projectRptiReturn(context, 2027).map(row => row.developmentType), label).toEqual(['upgrade']);
+    }
+  });
+
+  it('adds only the filed live start when the target is already live', () => {
     // The LKPTI-backed case: the target carries a live segment from its go-live date,
-    // so a second one drew a shorter bar wholly inside the first, and the planned
-    // period contradicted the inventory by claiming pre-launch while it was live.
+    // so the importer does not invent another prior-live phase.
     const out = deriveWorkspaceFromRptiImport(parse({ jenis: 'upgrade', quarter: 'Q3' }), 2027, {
       ...inventory,
       deliverableSegments: [{
@@ -165,9 +196,39 @@ describe('deriveWorkspaceFromRptiImport — placement', () => {
     });
     expect(out.unresolved).toHaveLength(0);
     expect(out.deliverableSegments).toHaveLength(1);
+    // Only the filed quarter. The inventory's own segment (2021 onward) already says
+    // the application is running; an open-ended upgrade segment drew a second live bar
+    // beside it through 2032 that said nothing the first did not (Q21).
     expect(out.deliverableSegments[0]).toMatchObject({
-      startDate: '2027-07-01', endDate: '2027-09-30', status: RPTI_IMPORT_PRELAUNCH_STATUS_ID,
+      startDate: '2027-07-01', endDate: '2027-09-30', status: RPTI_IMPORT_LIVE_STATUS_ID,
     });
+  });
+
+  it('spans each imported initiative over exactly its filed quarter (Q21)', () => {
+    // The return states a go-live quarter and nothing about when work began. Starting
+    // every initiative on 1 January made a bar's length encode which quarter was filed —
+    // Q1 three months, Q4 twelve — rather than anything about the work.
+    for (const [quarter, start, end] of [
+      ['Q1', '2027-01-01', '2027-03-31'], ['Q2', '2027-04-01', '2027-06-30'],
+      ['Q3', '2027-07-01', '2027-09-30'], ['Q4', '2027-10-01', '2027-12-31'],
+    ] as const) {
+      const [initiative] = deriveWorkspaceFromRptiImport(parse({ jenis: 'new', quarter }), 2027, EMPTY).initiatives;
+      expect(initiative, quarter).toMatchObject({ startDate: start, endDate: end });
+    }
+  });
+
+  it('names each imported initiative with its filed quarter (Q21)', () => {
+    // The RPTI has no initiative-name column. Without the quarter, two rows for one
+    // application import as two initiatives with the same name and cannot be told apart.
+    const out = deriveWorkspaceFromRptiImport(parseRptiImportWorkbook(wb([
+      row({ name: 'Open API Banking Platform', jenis: 'new', quarter: 'Q1' }),
+      row({ no: 2, name: 'Open API Banking Platform', jenis: 'upgrade', quarter: 'Q3' }),
+    ])).rows, 2027, EMPTY);
+    expect(out.initiatives.map(i => i.name)).toEqual([
+      'Open API Banking Platform — Q1 2027', 'Open API Banking Platform — Q3 2027',
+    ]);
+    // The application itself is still one thing, named as filed.
+    expect(out.deliverables.map(d => d.name)).toEqual(['Open API Banking Platform']);
   });
 
   it('still regenerates as an upgrade in both cases', () => {
@@ -194,17 +255,59 @@ describe('deriveWorkspaceFromRptiImport — placement', () => {
     }
   });
 
-  it('gives every derived segment an initiativeId, or regeneration would omit the work', () => {
+  it('links the filed implementation but not synthetic history to the initiative', () => {
     const out = deriveWorkspaceFromRptiImport(parse({ jenis: 'upgrade' }), 2027, inventory);
     expect(out.deliverableSegments.length).toBeGreaterThan(0); // guard against a vacuous every()
-    expect(out.deliverableSegments.every(s => !!s.initiativeId)).toBe(true);
+    expect(out.deliverableSegments.find(s => s.startDate.startsWith('2027'))?.initiativeId).toBe(out.initiatives[0].id);
+    expect(out.deliverableSegments.find(s => s.startDate.startsWith('2026'))?.initiativeId).toBeUndefined();
   });
 
-  it('creates one initiative per row carrying that row cost', () => {
+  it('matches an upgrade to the exact application created earlier in the same return', () => {
+    const { rows } = parseRptiImportWorkbook(wb([
+      row({ name: 'Open API Banking Platform', jenis: 'new', kategori: RPTI_CATEGORY_LABELS['06'], quarter: 'Q1' }),
+      row({ no: 2, name: 'Open API Banking Platform', jenis: 'upgrade', kategori: RPTI_CATEGORY_LABELS['06'], quarter: 'Q3' }),
+    ]));
+    const out = deriveWorkspaceFromRptiImport(rows, 2027, EMPTY);
+
+    expect(out.unresolved).toEqual([]);
+    expect(out.deliverables).toHaveLength(1);
+    expect(out.rptiDetails.map(detail => detail.targetId)).toEqual([
+      out.deliverables[0].id,
+      out.deliverables[0].id,
+    ]);
+  });
+
+  it('uses an earlier row in the same return as live history without inventing prior-year history', () => {
+    const { rows } = parseRptiImportWorkbook(wb([
+      row({ name: 'Open API Banking Platform', jenis: 'new', kategori: RPTI_CATEGORY_LABELS['06'], quarter: 'Q1' }),
+      row({ no: 2, name: 'Open API Banking Platform', jenis: 'upgrade', kategori: RPTI_CATEGORY_LABELS['06'], quarter: 'Q3' }),
+    ]));
+    const out = deriveWorkspaceFromRptiImport(rows, 2027, EMPTY);
+    const target = out.deliverables[0];
+    const context = {
+      initiatives: out.initiatives,
+      deliverables: out.deliverables,
+      assets: out.assets,
+      assetCategories: out.assetCategories,
+      deliverableSegments: out.deliverableSegments,
+      deliverableStatuses: out.deliverableStatuses,
+    };
+
+    expect(generateLkptiDetails({ ...context, asAtDate: '2026-12-31' } as never))
+      .toEqual([]);
+    expect(out.deliverableSegments.filter(segment => segment.deliverableId === target.id)
+      .map(segment => segment.startDate)).toEqual(['2027-01-01', '2027-07-01']);
+    expect(projectRptiReturn(context, 2027).map(detail => detail.developmentType))
+      .toEqual(['new', 'upgrade']);
+  });
+
+  it('seeds both the initiative budget and filed implementation with each row cost (T028a)', () => {
     const { rows } = parseRptiImportWorkbook(wb([row({ name: 'A', capex: 500, opex: 50 }), row({ no: 2, name: 'B', capex: 900, opex: 90 })]));
     const out = deriveWorkspaceFromRptiImport(rows, 2027, EMPTY);
     expect(out.initiatives).toHaveLength(2);
     expect(out.initiatives.map(i => i.capex).sort()).toEqual([500, 900]);
+    expect(out.deliverableSegments.map(s => [s.capexAmount, s.opexAmount]).sort((a, b) => Number(a[0]) - Number(b[0])))
+      .toEqual([[500, 50], [900, 90]]);
   });
 });
 
@@ -423,16 +526,13 @@ describe('an upgrade to infrastructure the LKPTI cannot contain', () => {
   });
 });
 
-describe('an imported initiative names the deliverable it works on', () => {
-  /**
-   * The initiative used to carry only an assetId, so opening it showed no
-   * deliverable even though the importer knew precisely which one the row matched
-   * or created. An asset can hold several deliverables, so naming the asset alone
-   * loses which one the plan is about.
-   */
+describe('an imported initiative leaves its legacy filing target unset', () => {
+  // A segment names the application its own implementation targets. The importer
+  // therefore preserves only the initiative's real asset relationship; it does not
+  // repopulate the legacy single-target field that Phase 6 removes.
   const parse = (over = {}) => parseRptiImportWorkbook(wb([row(over)])).rows;
 
-  it('links a matched upgrade to the deliverable it attached to', () => {
+  it('does not set the legacy target for a matched upgrade', () => {
     const inventory = {
       deliverables: [{ id: 'd-1', assetId: 'a-1', name: 'Core Banking GL', type: 'application', categoryCode: '04' } as Deliverable],
       assets: [{ id: 'a-1', name: 'Core Banking GL', categoryId: 'c-1' } as Asset],
@@ -440,13 +540,14 @@ describe('an imported initiative names the deliverable it works on', () => {
     };
     const out = deriveWorkspaceFromRptiImport(parse({ jenis: 'upgrade' }), 2027, inventory);
     expect(out.unresolved).toEqual([]); // guard
-    expect(out.initiatives[0].deliverableId).toBe('d-1');
+    expect(Object.hasOwn(out.initiatives[0], 'deliverableId')).toBe(false);
     expect(out.initiatives[0].assetId).toBe('a-1');
   });
 
-  it('links a created row to the deliverable it created', () => {
+  it('does not set the legacy target for a created row', () => {
     const out = deriveWorkspaceFromRptiImport(parse({ jenis: 'new' }), 2027, EMPTY);
-    expect(out.initiatives[0].deliverableId).toBe(out.deliverables[0].id);
+    expect(out.deliverables).toHaveLength(1); // guard: the row was created normally
+    expect(Object.hasOwn(out.initiatives[0], 'deliverableId')).toBe(false);
   });
 
   it('leaves it unset for an unresolved row, which has no deliverable to name', () => {
@@ -454,20 +555,17 @@ describe('an imported initiative names the deliverable it works on', () => {
     // and computeDataHealth reports that as a second error for one problem.
     const out = deriveWorkspaceFromRptiImport(parse({ jenis: 'upgrade' }), 2027, EMPTY);
     expect(out.unresolved).toHaveLength(1); // guard
-    expect(out.initiatives[0].deliverableId).toBeUndefined();
+    expect(Object.hasOwn(out.initiatives[0], 'deliverableId')).toBe(false);
   });
 
-  it('never points an initiative at a deliverable the result does not contain', () => {
+  it('leaves the legacy target unset across resolved and unresolved row shapes', () => {
     const { rows } = parseRptiImportWorkbook(wb([
       row({ name: 'A', jenis: 'new' }),
       row({ no: 2, name: 'B', jenis: 'upgrade' }),
       row({ no: 3, name: 'C', jenis: 'new', kategori: RPTI_CATEGORY_LABELS['52'] }),
     ]));
     const out = deriveWorkspaceFromRptiImport(rows, 2027, EMPTY);
-    const ids = new Set(out.deliverables.map(d => d.id));
-    for (const i of out.initiatives) {
-      if (i.deliverableId) expect(ids.has(i.deliverableId), i.name).toBe(true);
-    }
+    expect(out.initiatives.map(i => Object.hasOwn(i, 'deliverableId'))).toEqual([false, false, false]);
   });
 });
 
@@ -481,9 +579,9 @@ describe('the importer records row fields on the entities they describe', () => 
    */
   const parseOne = (over = {}) => parseRptiImportWorkbook(wb([row(over)])).rows;
 
-  it('writes Keterangan onto the Initiative as rptiRemarks', () => {
+  it('writes Keterangan onto the filed implementation as rptiRemarks', () => {
     const out = deriveWorkspaceFromRptiImport(parseOne({ remarks: 'Regulatory deadline driven.' }), 2027, EMPTY);
-    expect(out.initiatives[0].rptiRemarks).toBe('Regulatory deadline driven.');
+    expect(out.deliverableSegments[0].rptiRemarks).toBe('Regulatory deadline driven.');
   });
 
   it('writes the related-party answer onto the Deliverable', () => {
@@ -493,7 +591,7 @@ describe('the importer records row fields on the entities they describe', () => 
 
   it('leaves both unset when the return did not supply them', () => {
     const out = deriveWorkspaceFromRptiImport(parseOne({ remarks: '', ppjti: '' }), 2027, EMPTY);
-    expect(out.initiatives[0].rptiRemarks).toBeUndefined();
+    expect(out.deliverableSegments[0].rptiRemarks).toBeUndefined();
     expect(out.deliverables[0].ppjtiRelatedParty).toBeUndefined();
   });
 

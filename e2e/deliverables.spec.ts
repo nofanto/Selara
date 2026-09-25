@@ -69,88 +69,19 @@ test.describe('Deliverables — Data Manager tab', () => {
   });
 });
 
-test.describe('Deliverables — InitiativePanel dropdown', () => {
+test.describe('Deliverables — InitiativePanel', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
     await page.waitForSelector('[data-testid="asset-row-content"]', { timeout: 20000 });
   });
 
-  test('Deliverable dropdown appears in the InitiativePanel', async ({ page }) => {
+  test('Initiative panel no longer offers a Deliverable selection (T043c)', async ({ page }) => {
     const bar = page.locator('[data-testid^="initiative-bar"]').first();
     await bar.click();
     await page.getByTestId('initiative-action-edit').click();
     const panel = page.getByTestId('initiative-panel');
     await expect(panel).toBeVisible();
-    await expect(panel.locator('[data-testid="initiative-deliverable"]')).toBeVisible();
-  });
-
-  test('Deliverable dropdown is filtered to the selected asset', async ({ page }) => {
-    // Open an initiative on an asset that has deliverables (a-ciam in demo data)
-    const bar = page.locator('[data-initiative-id="i-ciam-passkey"]').first();
-    await bar.click();
-    await page.getByTestId('initiative-action-edit').click();
-    const panel = page.getByTestId('initiative-panel');
-    await expect(panel).toBeVisible();
-
-    const appDropdown = panel.locator('[data-testid="initiative-deliverable"]');
-    await expect(appDropdown).toBeVisible();
-
-    // Should show only apps belonging to a-ciam — count options (minus the blank one)
-    const options = appDropdown.locator('option');
-    const count = await options.count();
-    expect(count).toBeGreaterThan(1); // at least the blank + one app option
-  });
-
-  test('Changing asset resets the deliverable selection', async ({ page }) => {
-    const bar = page.locator('[data-initiative-id="i-ciam-passkey"]').first();
-    await bar.click();
-    await page.getByTestId('initiative-action-edit').click();
-    const panel = page.getByTestId('initiative-panel');
-    await expect(panel).toBeVisible();
-
-    const appDropdown = panel.locator('[data-testid="initiative-deliverable"]');
-    // Select a deliverable first
-    const options = await appDropdown.locator('option').all();
-    if (options.length > 1) {
-      const secondOptionValue = await options[1].getAttribute('value');
-      if (secondOptionValue) {
-        await appDropdown.selectOption(secondOptionValue);
-        expect(await appDropdown.inputValue()).toBe(secondOptionValue);
-      }
-    }
-
-    // Change the asset — deliverable should reset to blank
-    const assetSelect = panel.locator('#assetId');
-    await assetSelect.selectOption('a-web');
-    await expect(appDropdown).toHaveValue('');
-  });
-
-  test('Deliverable assignment saves and persists after reload', async ({ page }) => {
-    const bar = page.locator('[data-initiative-id="i-ciam-passkey"]').first();
-    await bar.click();
-    await page.getByTestId('initiative-action-edit').click();
-    const panel = page.getByTestId('initiative-panel');
-    await expect(panel).toBeVisible();
-
-    const appDropdown = panel.locator('[data-testid="initiative-deliverable"]');
-    const options = await appDropdown.locator('option:not([value=""])').all();
-    if (options.length > 0) {
-      const appValue = await options[0].getAttribute('value');
-      if (appValue) {
-        await appDropdown.selectOption(appValue);
-        await panel.getByRole('button', { name: 'Save Changes' }).click();
-        await expect(panel).toBeHidden();
-
-        await page.reload();
-        await page.waitForSelector('[data-testid="asset-row-content"]', { timeout: 20000 });
-        const bar2 = page.locator('[data-initiative-id="i-ciam-passkey"]').first();
-        await bar2.click();
-        await page.getByTestId('initiative-action-edit').click();
-        const panel2 = page.getByTestId('initiative-panel');
-        await expect(panel2).toBeVisible();
-        await expect(panel2.locator('[data-testid="initiative-deliverable"]')).toHaveValue(appValue);
-      }
-    }
+    await expect(panel.locator('[data-testid="initiative-deliverable"]')).toHaveCount(0);
   });
 });
 
@@ -179,29 +110,10 @@ test.describe('Deliverables — Visualiser sub-rows', () => {
     await expect(segmentBar).toBeVisible();
   });
 
-  test('initiatives linked to a deliverable remain visible at the asset level', async ({ page }) => {
-    // Link i-ciam-passkey to a deliverable and verify it still renders in the asset row
-    const bar = page.locator('[data-initiative-id="i-ciam-passkey"]').first();
-    await bar.click();
-    await page.getByTestId('initiative-action-edit').click();
-    const panel = page.getByTestId('initiative-panel');
-    await expect(panel).toBeVisible();
-
-    const appDropdown = panel.locator('[data-testid="initiative-deliverable"]');
-    const allOptions = await appDropdown.locator('option').all();
-    const nonBlankOptions = [];
-    for (const opt of allOptions) {
-      const val = await opt.getAttribute('value');
-      if (val) nonBlankOptions.push(val);
-    }
-    if (nonBlankOptions.length > 0) {
-      await appDropdown.selectOption(nonBlankOptions[0]);
-      await panel.getByRole('button', { name: 'Save Changes' }).click();
-      await expect(panel).toBeHidden();
-
-      // The initiative bar should still appear in the main timeline (at asset level)
-      await expect(page.locator('[data-initiative-id="i-ciam-passkey"]').first()).toBeVisible();
-    }
+  test('initiatives linked to a deliverable through a lifecycle segment remain visible at the asset level', async ({ page }) => {
+    // Demo data links i-ciam-passkey to app-okta through seg-okta-prod.
+    // Segment linkage must not move the Initiative bar out of its Asset row.
+    await expect(page.locator('[data-initiative-id="i-ciam-passkey"]').first()).toBeVisible();
   });
 
   test('assets with no deliverables render without an deliverables swimlane', async ({ page }) => {
