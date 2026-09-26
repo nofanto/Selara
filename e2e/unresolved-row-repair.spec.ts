@@ -1,5 +1,6 @@
 import { test, expect, Page } from '@playwright/test';
 import * as path from 'path';
+import { seedReportRecords, readStore } from './report-fixtures';
 
 const SAMPLE = path.join(process.cwd(), 'docs', 'sample-data');
 
@@ -125,5 +126,120 @@ test.describe('repair unresolved RPTI row from its finding', () => {
     await page.getByRole('button', { name: 'Add Row' }).click();
     await expect.poll(() => count('deliverables')).toBe(deliverablesBefore + 1);
     expect(await count('deliverableSegments')).toBe(before);
+  });
+});
+
+test.describe('US3: an importer prior phase that leaves an application out of inventory years', () => {
+  const OLD_PRIOR_ID = 'rpti-import-seg-prior-1';
+  const GAP_ID = `rpti-import-prior-phase-gap:${OLD_PRIOR_ID}`;
+
+  // An application the bank already ran, left by an older import with its synthetic prior
+  // phase in the original one-year shape, plus the Q1 2027 implementation that was filed.
+  // The prior ends on 2026-12-31, so from 2027 on the application drops out of the LKPTI.
+  const oldShapeFixture = {
+    programmes: [{ id: 'gap-programme', name: 'Plan', color: 'blue' }],
+    assetCategories: [{ id: 'gap-category', name: 'Internal management', categoryCode: '12' }],
+    assets: [{ id: 'a-gap', name: 'Core Teller System', categoryId: 'gap-category', maturity: 1 }],
+    deliverables: [{ id: 'gap-app', assetId: 'a-gap', name: 'Core Teller System', type: 'application', developer: 'inhouse' }],
+    initiatives: [{ id: 'gap-init', name: 'Core Teller System — Q1 2027', programmeId: 'gap-programme', assetId: 'a-gap',
+      startDate: '2027-01-01', endDate: '2027-03-31', capex: 100, opex: 10 }],
+    deliverableStatuses: [{ id: 'appstatus-in-production', name: 'In Production', color: 'bg-emerald-500', isLiveStatus: true }],
+    deliverableSegments: [
+      { id: OLD_PRIOR_ID, deliverableId: 'gap-app', startDate: '2026-01-01', endDate: '2026-12-31',
+        status: 'appstatus-in-production' },
+      { id: 'gap-impl', deliverableId: 'gap-app', initiativeId: 'gap-init', startDate: '2027-01-01', endDate: '2027-03-31',
+        status: 'appstatus-in-production', capexAmount: 100, opexAmount: 10, rptiRemarks: 'Filed remark' },
+    ],
+  };
+
+  const endDateOfOldPrior = async (page: Page) => {
+    const stored = await readStore(page, 'deliverableSegments');
+    return (stored.find(row => row.id === OLD_PRIOR_ID) as { endDate?: string } | undefined)?.endDate;
+  };
+
+  const openReport = async (page: Page, slug: string) => {
+    if (await page.getByTestId('report-back-btn').isVisible().catch(() => false)) {
+      await page.getByTestId('report-back-btn').click();
+    }
+    await page.getByTestId(`report-card-${slug}`).click();
+  };
+
+  const expandGapGroup = (page: Page) => page.getByTestId('data-health-group-rpti-import-prior-phase-gap').click();
+
+  const expectRptiExportsWithNoGate = async (page: Page) => {
+    await openReport(page, 'rpti');
+    await page.getByTestId('rpti-report-year-input').fill('2027');
+    await page.getByTestId('rpti-generate-report-btn').click();
+    await expect(page.getByTestId('rpti-pre-export-gate')).toHaveCount(0);
+    const [download] = await Promise.all([
+      page.waitForEvent('download'),
+      page.getByTestId('rpti-report-export-btn').click(),
+    ]);
+    expect(download).toBeTruthy();
+  };
+
+  const TEMPLATE_STORES = [
+    'assets', 'initiatives', 'milestones', 'programmes', 'strategies', 'dependencies',
+    'assetCategories', 'resources', 'deliverables', 'deliverableSegments', 'deliverableStatuses',
+    'decisions', 'rptiDetails', 'lkptiDetails',
+  ];
+
+  test.beforeEach(async ({ page }) => {
+    // The config injects `scenia-e2e` to bypass the tutorial modal, but that also makes an
+    // empty workspace auto-load the RPTI catalogue template. Wait for that save, then seed
+    // the fixture with a full clear so it is the whole workspace.
+    await page.addInitScript(() => localStorage.setItem('scenia_has_seen_landing', 'true'));
+    await page.goto('/');
+    await page.waitForFunction(async () => {
+      return await new Promise<boolean>(resolve => {
+        const req = indexedDB.open('it-initiative-visualiser');
+        req.onsuccess = () => {
+          const db = req.result;
+          if (!db.objectStoreNames.contains('assets')) { db.close(); resolve(false); return; }
+          const count = db.transaction('assets', 'readonly').objectStore('assets').count();
+          count.onsuccess = () => { db.close(); resolve(count.result > 0); };
+          count.onerror = () => { db.close(); resolve(false); };
+        };
+        req.onerror = () => resolve(false);
+      });
+    }, null, { timeout: 20000 });
+    await seedReportRecords(page, oldShapeFixture, [...TEMPLATE_STORES, ...Object.keys(oldShapeFixture)]);
+    await expect(page.getByTestId('nav-reports')).toBeVisible({ timeout: 20000 });
+  });
+
+  test('warns about the old shape, extends only on demand, never blocks the RPTI, and undoes in one step', async ({ page }) => {
+    await page.getByTestId('nav-reports').click();
+    await page.getByTestId('report-card-data-health').click();
+    await expect(page.getByTestId('data-health-report-view')).toBeVisible();
+
+    // FR-018: loading the workspace and rendering Data Health must not touch the stored phase.
+    expect(await endDateOfOldPrior(page)).toBe('2026-12-31');
+
+    // The non-blocking warning names the entry and the years it is missing from.
+    await expandGapGroup(page);
+    const warning = page.getByTestId(`data-health-issue-${GAP_ID}`);
+    await expect(warning).toContainText('Core Teller System');
+    await expect(warning).toContainText('2027');
+    await expect(warning).toContainText('2032');
+
+    // Not blocked before the extension.
+    await expectRptiExportsWithNoGate(page);
+
+    // Extend clears the warning and writes only the one end date.
+    await openReport(page, 'data-health');
+    await expandGapGroup(page);
+    await page.getByTestId(`extend-import-prior-phase-${OLD_PRIOR_ID}`).click();
+    await expect(page.getByTestId(`data-health-issue-${GAP_ID}`)).toHaveCount(0);
+    await expect.poll(() => endDateOfOldPrior(page)).toBe('2032-12-31');
+
+    // Not blocked after either.
+    await expectRptiExportsWithNoGate(page);
+
+    // Undo restores the warning and the old shape in one step.
+    await page.getByTitle('Undo').click();
+    await openReport(page, 'data-health');
+    await expandGapGroup(page);
+    await expect(page.getByTestId(`data-health-issue-${GAP_ID}`)).toBeVisible();
+    await expect.poll(() => endDateOfOldPrior(page)).toBe('2026-12-31');
   });
 });

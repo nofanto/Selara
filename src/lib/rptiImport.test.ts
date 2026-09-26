@@ -7,7 +7,7 @@ import {
   deriveWorkspaceFromRptiImport,
   RPTI_IMPORT_LIVE_STATUS_ID,
 } from './rptiImport';
-import { RPTI_CATEGORY_LABELS, projectRptiReturn, openEndedDate } from './rpti';
+import { RPTI_CATEGORY_LABELS, projectRptiReturn, openEndedDate, continuousPriorLivePhase } from './rpti';
 import { generateLkptiDetails } from './lkpti';
 import type { Asset, AssetCategory, Deliverable, DeliverableSegment } from '../types';
 import { SEEDED_DELIVERABLE_STATUSES } from './deliverableStatusDefaults';
@@ -144,7 +144,9 @@ describe('deriveWorkspaceFromRptiImport — placement', () => {
     expect(out.deliverables).toHaveLength(1); // guard: otherwise this was unresolved
     expect(out.deliverableSegments).toHaveLength(2);
     expect(out.deliverableSegments[0]).toMatchObject({
-      startDate: '2026-01-01', endDate: '2026-12-31', status: RPTI_IMPORT_LIVE_STATUS_ID,
+      // FR-017 changed this from the original one-year shape ending 2026-12-31 to the
+      // continuous phase running to the shared horizon (R5). The intent below is unchanged.
+      startDate: '2026-01-01', endDate: openEndedDate(2027), status: RPTI_IMPORT_LIVE_STATUS_ID,
     });
     // An upgrade is an event on something already running: only its filed quarter
     // is the implementation. The synthetic 2026 phase above is what says it existed.
@@ -308,6 +310,95 @@ describe('deriveWorkspaceFromRptiImport — placement', () => {
     expect(out.initiatives.map(i => i.capex).sort()).toEqual([500, 900]);
     expect(out.deliverableSegments.map(s => [s.capexAmount, s.opexAmount]).sort((a, b) => Number(a[0]) - Number(b[0])))
       .toEqual([[500, 50], [900, 90]]);
+  });
+});
+
+describe('deriveWorkspaceFromRptiImport — the synthetic prior phase follows the continuous rule (contract 19, FR-017)', () => {
+  /**
+   * The importer used to invent a one-year prior phase ending `${reportYear-1}-12-31`, which left
+   * the entry out of the LKPTI in every later year of the horizon (Q21 consequence 2). Both of its
+   * prior-phase paths must now produce exactly what the #51 repair produces — one helper, one rule
+   * (specs/004-repair-from-finding research R5).
+   */
+  const parse = (over = {}) => parseRptiImportWorkbook(wb([row(over)])).rows;
+  const inventory = {
+    deliverables: [{ id: 'd-existing', assetId: 'a-1', name: 'Core Banking GL', type: 'application', categoryCode: '04' } as Deliverable],
+    assets: [{ id: 'a-1', name: 'Core Banking GL', categoryId: 'c-1' } as Asset],
+    assetCategories: [{ id: 'c-1', name: 'Area', categoryCode: '04' } as AssetCategory],
+  };
+
+  it('gives the entry it creates itself (FR-019a infrastructure) a continuous prior live phase', () => {
+    const out = deriveWorkspaceFromRptiImport(
+      parse({ jenis: 'upgrade', quarter: 'Q3', kategori: RPTI_CATEGORY_LABELS['52'] }), 2027, EMPTY);
+    expect(out.deliverables).toHaveLength(1); // guard: otherwise this row was unresolved
+    expect(out.deliverableSegments[0]).toEqual(
+      continuousPriorLivePhase(out.deliverables[0].id, 2027, RPTI_IMPORT_LIVE_STATUS_ID, 'rpti-import-seg-prior-1'));
+  });
+
+  it('gives a matched entry with no live history of its own a continuous prior live phase', () => {
+    const out = deriveWorkspaceFromRptiImport(parse({ jenis: 'upgrade', quarter: 'Q3' }), 2027, inventory);
+    expect(out.unresolved).toHaveLength(0); // guard: otherwise the row was unresolved
+    expect(out.deliverableSegments[0]).toEqual(
+      continuousPriorLivePhase('d-existing', 2027, RPTI_IMPORT_LIVE_STATUS_ID, 'rpti-import-seg-prior-1'));
+  });
+
+  it('still adds no prior when the same import already supplies the history (FR-018b)', () => {
+    // The rule this must not disturb: a Q3 upgrade of an application a Q1 row of the very
+    // same return created has real history — inventing prior-phase history for it was
+    // rejected (spec 003 FR-018b) and stays rejected under the continuous rule.
+    const { rows } = parseRptiImportWorkbook(wb([
+      row({ name: 'Open API Banking Platform', jenis: 'new', kategori: RPTI_CATEGORY_LABELS['06'], quarter: 'Q1' }),
+      row({ no: 2, name: 'Open API Banking Platform', jenis: 'upgrade', kategori: RPTI_CATEGORY_LABELS['06'], quarter: 'Q3' }),
+    ]));
+    const out = deriveWorkspaceFromRptiImport(rows, 2027, EMPTY);
+    expect(out.deliverableSegments.some(segment => segment.id.startsWith('rpti-import-seg-prior-'))).toBe(false);
+  });
+});
+
+describe('an imported upgrade stays in the inventory through the horizon (US3 scenarios 1-2, FR-017)', () => {
+  /**
+   * The defect Q21 consequence 2 recorded: an upgrade to an application with no live history of
+   * its own dropped out of the LKPTI in the year it was upgraded, because the importer's one-year
+   * prior phase ended on 31 December of the prior year. US3 acceptance scenarios 1 and 2 say the
+   * synthetic prior phase must hold the entry in the inventory from the year before the filed year
+   * through the horizon, while the filed year still types `upgrade` and the prior files no row.
+   */
+  const parse = (over = {}) => parseRptiImportWorkbook(wb([row(over)])).rows;
+  const inventory = {
+    deliverables: [{ id: 'd-existing', assetId: 'a-1', name: 'Core Banking GL', type: 'application', categoryCode: '04' } as Deliverable],
+    assets: [{ id: 'a-1', name: 'Core Banking GL', categoryId: 'c-1' } as Asset],
+    assetCategories: [{ id: 'c-1', name: 'Area', categoryCode: '04' } as AssetCategory],
+  };
+  const importQ2Upgrade = () => {
+    const out = deriveWorkspaceFromRptiImport(parse({ jenis: 'upgrade', quarter: 'Q2' }), 2027, inventory);
+    expect(out.unresolved).toHaveLength(0); // guard: an unmatched row would make both tests vacuous
+    return {
+      deliverableSegments: out.deliverableSegments,
+      deliverableStatuses: out.deliverableStatuses,
+      initiatives: out.initiatives,
+      deliverables: [...inventory.deliverables, ...out.deliverables],
+      assets: [...inventory.assets, ...out.assets],
+      assetCategories: [...inventory.assetCategories, ...out.assetCategories],
+    };
+  };
+
+  it('is in the LKPTI as at 31 December of every year from the year before the filed year to the horizon', () => {
+    const context = importQ2Upgrade();
+    // 2026 is the year before the filed year; openEndedDate(2027) is 2032 — the shared horizon.
+    for (let year = 2026; year <= 2032; year++) {
+      const rows = generateLkptiDetails({ ...context, asAtDate: `${year}-12-31` });
+      expect(rows.map(row => row.targetId), String(year)).toContain('d-existing');
+    }
+  });
+
+  it('still files as an upgrade in the filed year, and the prior phase files no row of its own', () => {
+    const context = importQ2Upgrade();
+    const rows = projectRptiReturn(context, 2027);
+    expect(rows).toHaveLength(1); // guard: the unlinked prior phase must not add a row
+    expect(rows[0]).toMatchObject({
+      developmentType: 'upgrade', plannedImplementationQuarter: 'Q2', targetId: 'd-existing',
+    });
+    expect(projectRptiReturn(context, 2026)).toEqual([]);
   });
 });
 

@@ -1,7 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { RptiDetail } from '../types';
-import { applyUnresolvedRowRepair, unresolvedRowRepairDraft } from './unresolvedRowRepair';
+import { applyUnresolvedRowRepair, extendImportPriorPhase, priorPhaseGaps, unresolvedRowRepairDraft } from './unresolvedRowRepair';
 import { projectRptiReturn, reconcileRptiReturn, openEndedDate } from './rpti';
+import { computeDataHealth } from './dataHealth';
+import { liftReportRowAttributes } from './attributeLift';
+import { generateLkptiDetails } from './lkpti';
+import { SEEDED_DELIVERABLE_STATUSES } from './deliverableStatusDefaults';
 
 const row: RptiDetail = {
   id: 'row-1', initiativeId: 'init-1', targetType: 'deliverable',
@@ -152,5 +156,142 @@ describe('applyUnresolvedRowRepair option B (contracts 13–18)', () => {
     // An emptied number box reaches apply as NaN; filing 0 instead is the #51 corruption.
     expect(applyUnresolvedRowRepair(base, { ...request, confirmed: { ...confirmed, capex: Number.NaN } }).ok).toBe(false);
     expect(applyUnresolvedRowRepair(base, { ...request, confirmed: { ...confirmed, opex: Number.NaN } }).ok).toBe(false);
+  });
+});
+
+// ── US3: prior-phase gaps in existing workspaces (contracts 20–21, FR-018/FR-018a) ──
+
+/**
+ * A workspace as an importer left it before FR-017: the synthetic prior phase in its original
+ * one-year shape, on an application (and its infrastructure twin, which the LKPTI never lists).
+ * Contract 20 recognises this shape by every property at once, so each fixture below varies one.
+ */
+const gapState = () => ({
+  assets: [
+    { id: 'a-app', name: 'Core Teller System', categoryId: 'cat-1' },
+    { id: 'a-infra', name: 'Primary Data Center', categoryId: 'cat-1' },
+  ],
+  assetCategories: [{ id: 'cat-1', name: 'Internal management', categoryCode: '12' as const }],
+  deliverables: [
+    { id: 'deliv-app', assetId: 'a-app', name: 'Core Teller System', type: 'application' as const, developer: 'inhouse' },
+    { id: 'deliv-infra', assetId: 'a-infra', name: 'Primary Data Center', type: 'infrastructure' as const, categoryCode: '51' as const },
+  ],
+  deliverableSegments: [
+    { id: 'rpti-import-seg-prior-1', deliverableId: 'deliv-app',
+      startDate: '2026-01-01', endDate: '2026-12-31', status: 'appstatus-in-production' },
+    { id: 'rpti-import-seg-prior-2', deliverableId: 'deliv-infra',
+      startDate: '2026-01-01', endDate: '2026-12-31', status: 'appstatus-in-production' },
+  ],
+  deliverableStatuses: SEEDED_DELIVERABLE_STATUSES,
+});
+const oldShapePrior = { id: 'rpti-import-seg-prior-1', deliverableId: 'deliv-app',
+  startDate: '2026-01-01', endDate: '2026-12-31', status: 'appstatus-in-production' };
+
+describe('priorPhaseGaps (contracts 20–21)', () => {
+  it('finds the exact importer shape on an application and lists the years it leaves out', () => {
+    // 2026-12-31 holds the entry in the 2026 inventory only; Y+1…Y+6 = 2027…2032 are the
+    // 31 Decembers the continuous phase would have covered. The infrastructure prior is
+    // absent: LKPTI is Daftar Aplikasi (research R10).
+    expect(priorPhaseGaps(gapState())).toEqual([
+      { segmentId: 'rpti-import-seg-prior-1', deliverableId: 'deliv-app', segmentYear: 2026,
+        missingYears: [2027, 2028, 2029, 2030, 2031, 2032] },
+    ]);
+  });
+
+  // Contract 21, once per property: change any one of them and the segment is no longer the
+  // importer's shape — an edited phase is the preparer's decision, not a gap to warn about.
+  it.each([
+    ['id prefix', (seg: typeof oldShapePrior) => ({ ...seg, id: 'handmade-prior-1' })],
+    ['start date', (seg: typeof oldShapePrior) => ({ ...seg, startDate: '2026-01-02' })],
+    ['end date (the preparer shortened it)', (seg: typeof oldShapePrior) => ({ ...seg, endDate: '2026-12-30' })],
+    ['end date (already extended to the horizon)', (seg: typeof oldShapePrior) => ({ ...seg, endDate: openEndedDate(2027) })],
+    ['initiativeId set', (seg: typeof oldShapePrior) => ({ ...seg, initiativeId: 'init-1' })],
+  ] as const)('returns nothing when the %s differs', (_label, mutate) => {
+    const state = gapState();
+    expect(priorPhaseGaps({ ...state, deliverableSegments: [mutate(oldShapePrior)] })).toEqual([]);
+  });
+
+  it('returns nothing when the status is not the importer live status id', () => {
+    const state = gapState();
+    const otherLive = { id: 'custom-live', name: 'Running', color: 'bg-emerald-500', isLiveStatus: true };
+    expect(priorPhaseGaps({
+      ...state,
+      deliverableStatuses: [...state.deliverableStatuses, otherLive],
+      deliverableSegments: [{ ...oldShapePrior, status: 'custom-live' }],
+    })).toEqual([]);
+  });
+
+  it('returns nothing when another live segment already covers every year', () => {
+    const state = gapState();
+    const covering = { id: 'seg-inventory-history', deliverableId: 'deliv-app',
+      startDate: '2021-08-17', endDate: '2035-12-31', status: 'appstatus-in-production' };
+    expect(priorPhaseGaps({ ...state, deliverableSegments: [oldShapePrior, covering] })).toEqual([]);
+  });
+
+  it('lists only the Decembers no live segment of the Deliverable spans', () => {
+    const state = gapState();
+    const partial = { id: 'seg-two-years', deliverableId: 'deliv-app',
+      startDate: '2027-01-01', endDate: '2029-12-31', status: 'appstatus-in-production' };
+    const gaps = priorPhaseGaps({ ...state, deliverableSegments: [oldShapePrior, partial] });
+    expect(gaps).toHaveLength(1);
+    expect(gaps[0].missingYears).toEqual([2030, 2031, 2032]);
+  });
+
+  it('FR-018: nothing automatic — gap detection, Data Health and the load-time lift leave a frozen old-shape workspace byte-identical', () => {
+    // The rule Q22 chose over migrating on open: detection reads, only the preparer's
+    // Extend writes. Every path data takes on its way into live state runs here.
+    const state = freeze(structuredClone({
+      ...gapState(),
+      initiatives: [], lkptiDetails: [], rptiDetails: [], milestones: [], dependencies: [],
+      decisions: [], resources: [], programmes: [], strategies: [],
+      timelineSettings: { defaultCurrency: 'IDR' },
+    }));
+    const before = JSON.stringify(state);
+    expect(() => priorPhaseGaps(state)).not.toThrow();
+    expect(() => computeDataHealth(state)).not.toThrow();
+    expect(() => liftReportRowAttributes(state)).not.toThrow();
+    expect(JSON.stringify(state)).toBe(before);
+    const lifted = liftReportRowAttributes(state);
+    expect(lifted.changed).toBe(false);
+    expect(lifted.deliverableSegments).toEqual(state.deliverableSegments);
+    // The detection itself still finds the gap — proving the frozen run was a real one.
+    expect(priorPhaseGaps(state).map(gap => gap.segmentId)).toEqual(['rpti-import-seg-prior-1']);
+  });
+});
+
+describe('extendImportPriorPhase (contract 23)', () => {
+  it('changes only that segment end date, to the horizon of the filed year the phase belongs to', () => {
+    // A prior phase covering 2026 came from a 2027 filing, so the extension runs to
+    // openEndedDate(2027) — the same horizon continuousPriorLivePhase would have given it.
+    const input = freeze(structuredClone(gapState()));
+    const next = extendImportPriorPhase(input, 'rpti-import-seg-prior-1');
+    expect(next).not.toBe(input);
+    expect(next.deliverableSegments.find(s => s.id === 'rpti-import-seg-prior-1'))
+      .toEqual({ ...oldShapePrior, endDate: openEndedDate(2027) });
+    expect(next.deliverableSegments.map(s => s.id)).toEqual(input.deliverableSegments.map(s => s.id));
+    expect(next.deliverableSegments.filter(s => s.id !== 'rpti-import-seg-prior-1'))
+      .toEqual(input.deliverableSegments.filter(s => s.id !== 'rpti-import-seg-prior-1'));
+    for (const key of ['assets', 'assetCategories', 'deliverables', 'deliverableStatuses'] as const) {
+      expect(next[key]).toEqual(input[key]);
+    }
+    expect(input.deliverableSegments.find(s => s.id === 'rpti-import-seg-prior-1')?.endDate).toBe('2026-12-31');
+  });
+
+  it('closes the gap: no entry remains, and the LKPTI holds the application in every formerly missing year', () => {
+    const next = extendImportPriorPhase(structuredClone(gapState()), 'rpti-import-seg-prior-1');
+    expect(priorPhaseGaps(next)).toEqual([]);
+    for (let year = 2027; year <= 2032; year++) {
+      const rows = generateLkptiDetails({
+        asAtDate: `${year}-12-31`,
+        deliverableSegments: next.deliverableSegments, deliverableStatuses: next.deliverableStatuses,
+        deliverables: next.deliverables, assets: next.assets, assetCategories: next.assetCategories,
+      });
+      expect(rows.map(row => row.targetId), String(year)).toContain('deliv-app');
+    }
+  });
+
+  it('changes nothing when the named segment is gone', () => {
+    const input = structuredClone(gapState());
+    expect(extendImportPriorPhase(input, 'rpti-import-seg-prior-99')).toEqual(input);
   });
 });

@@ -34,6 +34,7 @@ interface ReportsViewProps {
   onSaveAsset?: (asset: Asset) => void;
   onNavigate?: (location: HealthIssueLocation, entityName: string) => void;
   onRepairUnresolvedRow?: (request: UnresolvedRowRepairRequest) => Promise<{ ok: true; state: UnresolvedRowRepairState } | { ok: false; reason: string }>;
+  onExtendImportPriorPhase?: (segmentId: string) => void;
   /**
    * Open directly on a given report instead of the card grid. Needed because
    * `selectedReport` is local state with no other way in, and onboarding has to
@@ -106,7 +107,7 @@ function depSentence(dep: Dependency, src: Initiative, tgt: Initiative, perspect
   return `${src.name} and ${tgt.name} are related.`;
 }
 
-export function ReportsView({ assets, initiatives, milestones, dependencies, currentData, programmes, strategies, assetCategories, resources = [], deliverables = [], deliverableSegments = [], deliverableStatuses = [], rptiDetails = [], lkptiDetails = [], onSaveAsset, onNavigate, onRepairUnresolvedRow, initialReport }: ReportsViewProps) {
+export function ReportsView({ assets, initiatives, milestones, dependencies, currentData, programmes, strategies, assetCategories, resources = [], deliverables = [], deliverableSegments = [], deliverableStatuses = [], rptiDetails = [], lkptiDetails = [], onSaveAsset, onNavigate, onRepairUnresolvedRow, onExtendImportPriorPhase, initialReport }: ReportsViewProps) {
   const [selectedReport, setSelectedReport] = useState<ReportSlug | null>(initialReport ?? null);
   // Offered, not assumed: the year the preparer stated at onboarding pre-fills the box
   // they still have to see and confirm (FR-009, contract 1). An empty default is correct
@@ -642,6 +643,7 @@ export function ReportsView({ assets, initiatives, milestones, dependencies, cur
             timelineSettings={currentData.timelineSettings}
             onNavigate={(location, entityName) => onNavigate?.(location, entityName)}
             onRepairUnresolvedRow={setRepairRowId}
+            onExtendImportPriorPhase={onExtendImportPriorPhase}
           />
           {repairDialog}
         </div>

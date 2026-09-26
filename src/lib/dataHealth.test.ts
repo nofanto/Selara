@@ -870,3 +870,51 @@ describe('a filed second implementation has no stale dropped-row warning (#52)',
     expect(issue).toBeUndefined();
   });
 });
+
+describe('computeDataHealth — importer prior phases that leave an application out of inventory years (contract 22)', () => {
+  /**
+   * FR-018a: a workspace imported before the continuous rule still holds the importer's
+   * original one-year prior phase. Detection is a warning with an Extend action, never a
+   * silent change and never an export block — the pre-export gate takes errors only.
+   */
+  const oldPrior = {
+    id: 'rpti-import-seg-prior-1', deliverableId: 'deliv-1',
+    startDate: '2026-01-01', endDate: '2026-12-31', status: 'appstatus-in-production',
+  };
+  const gapId = 'rpti-import-prior-phase-gap:rpti-import-seg-prior-1';
+  const gapInput = (segments = [oldPrior]) => baseInput({
+    assets: [asset], assetCategories: [cat], deliverables: [deliverable], deliverableSegments: segments,
+  });
+
+  it('raises one warning per gap, naming the application and the years it is missing from', () => {
+    const issues = computeDataHealth(gapInput());
+    const issue = findIssue(issues, gapId);
+    expect(issue).toBeDefined();
+    expect(issue?.severity).toBe('warning');
+    expect(issue?.reports).toEqual(['lkpti']);
+    expect(issue?.message).toContain(deliverable.name);
+    for (const year of [2027, 2028, 2029, 2030, 2031, 2032]) expect(issue?.message).toContain(String(year));
+    expect(issues.filter(i => checkOf(i.id) === 'rpti-import-prior-phase-gap')).toHaveLength(1);
+  });
+
+  it('carries the Extend action for exactly that segment', () => {
+    const issue = findIssue(computeDataHealth(gapInput()), gapId);
+    expect(issue?.action).toEqual({ kind: 'extend-import-prior-phase', segmentId: oldPrior.id });
+  });
+
+  it('is never an error, so the error-only pre-export gate cannot pick it up', () => {
+    // ReportsView builds rptiPreExportIssues from computeDataHealth filtered to
+    // severity 'error'. The warning must not join it, before or after extending.
+    const errors = computeDataHealth(gapInput()).filter(i => i.severity === 'error');
+    expect(errors.map(i => i.id)).not.toContain(gapId);
+  });
+
+  it('stays quiet when the phase is not the importer shape', () => {
+    // The new importer rule ends at 2032-12-31 — a workspace imported after FR-017
+    // never matches, so it is never warned at.
+    const extended = { ...oldPrior, endDate: '2032-12-31' };
+    const renamed = { ...oldPrior, id: 'handmade-prior-1' };
+    expect(findIssue(computeDataHealth(gapInput([extended])), gapId)).toBeUndefined();
+    expect(findIssue(computeDataHealth(gapInput([renamed])), `rpti-import-prior-phase-gap:${renamed.id}`)).toBeUndefined();
+  });
+});

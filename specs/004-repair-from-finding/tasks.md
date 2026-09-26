@@ -226,34 +226,43 @@ expectation changed**, before anything new calls it.
 
 ### Tests for User Story 3 (write first; see each fail) ⚠️
 
-- [ ] T035 [P] [US3] Failing tests for **contract 19** in `src/lib/rptiImport.test.ts`:
+- [x] T035 [P] [US3] Failing tests for **contract 19** in `src/lib/rptiImport.test.ts`:
   - both synthetic prior paths produce `continuousPriorLivePhase` output: the entry the importer creates itself (FR-019a infrastructure, `rptiImport.ts:370-375`), and a matched entry without history (`:402-410`);
   - FR-018b's same-import case still adds none.
-- [ ] T036 [US3] Failing tests for US3 acceptance scenarios 1-2 in `src/lib/rptiImport.test.ts`:
+  - Done: Red `/tmp/selara-004-t035-red.log`: both prior paths' `endDate` was still `2026-12-31`, not `2032-12-31`, 2 failed; the FR-018b guard passed. Green `/tmp/selara-004-t035-green.log`: 73/73 importer tests.
+- [x] T036 [US3] Failing tests for US3 acceptance scenarios 1-2 in `src/lib/rptiImport.test.ts`:
   - an application upgrade filed for Q2 that receives a synthetic prior phase is in the LKPTI as at 31 December of every year from the year before the filed year to the horizon;
   - the RPTI for the filed year still types it `upgrade`, and the prior phase files no row of its own.
-- [ ] T037 [P] [US3] Failing tests for **contracts 20-21** in `src/lib/unresolvedRowRepair.test.ts`. `priorPhaseGaps`:
+  - Done: Red `/tmp/selara-004-t036-red.log`: `2027: expected [] to include 'd-existing'`; green `/tmp/selara-004-t036-green.log`: 2 passed, the LKPTI holds the entry 2026-2032 and the filed year still has one `upgrade` row.
+- [x] T037 [P] [US3] Failing tests for **contracts 20-21** in `src/lib/unresolvedRowRepair.test.ts`. `priorPhaseGaps`:
   - finds the exact old shape on an application and lists the missing years;
   - returns nothing for infrastructure;
   - returns nothing when any **one** of id prefix, start date, end date, status or `initiativeId` differs (one case each);
   - returns nothing when another live segment already covers every year;
   - **FR-018, no automatic change:** `priorPhaseGaps`, `computeDataHealth` and the load-time lift (`liftReportRowAttributes` in `src/lib/attributeLift.ts`, which `App.tsx` wraps at every boundary that admits data) run over a **frozen** old-shape workspace without throwing, and return the old segment byte-identical. *(Added after `/speckit-analyze` G1.)*
-- [ ] T038 [US3] Failing tests for **contracts 22-23**:
+  - Done: Red `/tmp/selara-004-t037-red.log`: `priorPhaseGaps is not a function`, 10 failed, the existing 9 passed. Green `/tmp/selara-004-t037-green.log`: 22/22; the frozen run leaves the old segment byte-identical.
+- [x] T038 [US3] Failing tests for **contracts 22-23**:
   - `src/lib/dataHealth.test.ts`: one **warning** per gap, `rpti-import-prior-phase-gap:<segmentId>`, with the `extend-import-prior-phase` action. It is not an error, and it does not enter the pre-export gate.
   - `src/lib/unresolvedRowRepair.test.ts`: `extendImportPriorPhase` changes only that segment's `endDate`, to `openEndedDate(Y+1)`. Afterwards `priorPhaseGaps` has no entry for it, and the LKPTI includes the Deliverable in each formerly missing year.
-- [ ] T039 [P] [US3] Failing E2E in `e2e/unresolved-row-repair.spec.ts`, using a seeded old-shape fixture:
+  - Done: Red `/tmp/selara-004-t038-red.log`: the warning was absent and `extendImportPriorPhase is not a function`. Green `/tmp/selara-004-t038-green.log`: 105/105 across the two files; the warning stays severity `warning` (error-only gate ignores it).
+- [x] T039 [P] [US3] Failing E2E in `e2e/unresolved-row-repair.spec.ts`, using a seeded old-shape fixture:
   - **before any action**, after the workspace loads and Data Health renders, the stored segment still has its original `endDate`. Read it back from IndexedDB, not from the UI (FR-018);
   - Data Health shows the non-blocking warning, naming the missing years;
   - **Extend** clears it;
   - RPTI export is not blocked before or after;
   - Undo restores the warning.
+  - Done: Red `/tmp/selara-004-t039-red.log`: no `data-health-group-rpti-import-phase-gap`, 1 failed. Green `/tmp/selara-004-t039-green.log`: 6/6; the IndexedDB `endDate` is `2026-12-31` before any action, `2032-12-31` after Extend, and back after Undo.
 
 ### Implementation for User Story 3
 
-- [ ] T040 [US3] In `src/lib/rptiImport.ts`, build both synthetic prior phases with `continuousPriorLivePhase`. T035 and T036 green. Contract 19's unchanged-output check: `sampleReturns.test.ts` and `roundTrip.test.ts` still show 13 rows in the same type order with zero losses, compared against T002.
-- [ ] T041 [US3] Implement `priorPhaseGaps` and `extendImportPriorPhase` in `src/lib/unresolvedRowRepair.ts` (research R10). T037 and T038's library half green.
-- [ ] T042 [US3] Raise the warning with its action in `src/lib/dataHealth.ts`. Render the action as **Extend** in `DataHealthReportView.tsx`, and add `onExtendImportPriorPhase` in `src/App.tsx` (one `handleUpdate`). T038 and T039 green.
-- [ ] T043 [US3] **Falsification.** Revert T040, T041 and T042 in turn, and confirm T035-T039 fail for the right reason. Log to `/tmp/selara-004-us3-falsify.log`.
+- [x] T040 [US3] In `src/lib/rptiImport.ts`, build both synthetic prior phases with `continuousPriorLivePhase`. T035 and T036 green. Contract 19's unchanged-output check: `sampleReturns.test.ts` and `roundTrip.test.ts` still show 13 rows in the same type order with zero losses, compared against T002.
+  - Done: Green `/tmp/selara-004-t035-green.log`, `/tmp/selara-004-t036-green.log`; `rpti.ts`/`roundTrip`/`sampleReturns`/importer **194/194** with the **one** intended expectation edit (`rptiImport.test.ts:147` one-year `endDate` → `openEndedDate(2027)`); RPTI 2027 still 13 rows in the same type order.
+- [x] T041 [US3] Implement `priorPhaseGaps` and `extendImportPriorPhase` in `src/lib/unresolvedRowRepair.ts` (research R10). T037 and T038's library half green.
+  - Done: Green `/tmp/selara-004-t037-green.log`, `/tmp/selara-004-t038-green.log`: the exact importer shape is detected per property, and Extend writes only `endDate = openEndedDate(Y+1)`.
+- [x] T042 [US3] Raise the warning with its action in `src/lib/dataHealth.ts`. Render the action as **Extend** in `DataHealthReportView.tsx`, and add `onExtendImportPriorPhase` in `src/App.tsx` (one `handleUpdate`). T038 and T039 green.
+  - Done: Green `/tmp/selara-004-t038-green.log`, `/tmp/selara-004-t039-green.log`: warning `rpti-import-prior-phase-gap:<segmentId>` with `extend-import-prior-phase` action, **Extend** rendered, one undoable `handleUpdate`.
+- [x] T043 [US3] **Falsification.** Revert T040, T041 and T042 in turn, and confirm T035-T039 fail for the right reason. Log to `/tmp/selara-004-us3-falsify.log`.
+  - Done: Falsification `/tmp/selara-004-us3-falsify.log`: reverting T040 failed T035/T036 (4 failed); reverting T041 failed T037/T038 (7 failed); reverting T042 failed the Data Health warning (2 failed) and the US3 E2E.
 
 **Checkpoint**: one prior-phase rule everywhere, and no silent change to existing data.
 
