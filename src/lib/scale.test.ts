@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { projectRptiReturn, reconcileRptiReturn } from './rpti';
 import { generateLkptiDetails } from './lkpti';
 import { SEEDED_DELIVERABLE_STATUSES } from './deliverableStatusDefaults';
+import { rankRepairCandidates } from './unresolvedRowRepair';
 
 /**
  * Quickstart level 12, and [#36](https://github.com/nofanto/Selara/issues/36)'s standing
@@ -48,5 +49,14 @@ describe('generating returns at portfolio scale (#36, quickstart level 12)', () 
     expect(lkpti).toHaveLength(N);
     expect(findings, 'a healthy workspace must produce no reconciliation noise').toEqual([]);
     expect(ms, `both returns + reconciliation took ${ms.toFixed(0)}ms for ${N} applications`).toBeLessThan(2000);
+
+    const rankStart = performance.now();
+    const ranked = rankRepairCandidates({ id: 'unresolved', initiativeId: 'i0', targetType: 'deliverable',
+      targetId: 'rpti-import-unresolved-0', developmentType: 'upgrade', categoryCode: '06' },
+      'App 0', ws);
+    const rankMs = performance.now() - rankStart;
+    expect(ranked).toHaveLength(N);
+    expect(ranked[0]).toMatchObject({ tier: 'same-name', deliverable: { id: 'd0' } });
+    expect(rankMs, `ranking ${N} applications took ${rankMs.toFixed(0)}ms`).toBeLessThan(2000);
   });
 });

@@ -1,5 +1,5 @@
 import type { Asset, AssetCategory, Deliverable, DeliverableSegment, DeliverableStatus, Initiative, RptiCategoryCode, RptiDetail, RptiDeveloper, RptiQuarter, RptiRelatedParty } from '../types';
-import { continuousPriorLivePhase, INFRASTRUCTURE_CODES, openEndedDate, periodForQuarter, RPTI_CATEGORY_LABELS, UNRESOLVED_IMPORT_TARGET_PREFIX, isLiveStatusId } from './rpti';
+import { continuousPriorLivePhase, filedAttributesFor, hasLiveHistoryBefore, INFRASTRUCTURE_CODES, openEndedDate, periodForQuarter, RPTI_CATEGORY_LABELS, UNRESOLVED_IMPORT_TARGET_PREFIX, isLiveStatusId } from './rpti';
 import { IN_PRODUCTION_STATUS } from './deliverableStatusDefaults';
 
 /**
@@ -23,6 +23,54 @@ export function isRepairableUnresolvedRow(row: RptiDetail): boolean {
  */
 export function repairOptions(row: RptiDetail): Array<'existing' | 'create'> {
   return INFRASTRUCTURE_CODES.has(row.categoryCode ?? '') ? ['existing'] : ['existing', 'create'];
+}
+
+export type RepairCandidateTier = 'same-name' | 'similar' | 'other';
+export interface RepairCandidate { deliverable: Deliverable; tier: RepairCandidateTier }
+
+const normaliseName = (name: string) => name.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim().replace(/\s+/g, ' ');
+
+/** Ranks same-kind inventory entries for a human choice; the result carries no selection. */
+export function rankRepairCandidates(
+  row: RptiDetail,
+  name: string,
+  state: Pick<UnresolvedRowRepairState, 'deliverables' | 'assets' | 'assetCategories'>,
+): RepairCandidate[] {
+  const infrastructure = INFRASTRUCTURE_CODES.has(row.categoryCode ?? '');
+  const wanted = normaliseName(name);
+  const wantedWords = new Set(wanted.split(' ').filter(Boolean));
+  const tierOrder: Record<RepairCandidateTier, number> = { 'same-name': 0, similar: 1, other: 2 };
+  return state.deliverables
+    .filter(deliverable => ((deliverable.type ?? 'application') === 'infrastructure') === infrastructure
+      && (infrastructure || (deliverable.type ?? 'application') === 'application'))
+    .map(deliverable => {
+      const candidateName = normaliseName(deliverable.name);
+      const candidateWords = new Set(candidateName.split(' ').filter(Boolean));
+      const shared = [...wantedWords].filter(word => candidateWords.has(word)).length;
+      const sameCategory = filedAttributesFor(deliverable, state.assets, state.assetCategories).categoryCode === row.categoryCode;
+      const tier: RepairCandidateTier = candidateName === wanted ? 'same-name'
+        : wantedWords.size > 0 && candidateWords.size > 0 && sameCategory
+          && shared >= Math.max(wantedWords.size, candidateWords.size) / 2 ? 'similar' : 'other';
+      return { deliverable, tier };
+    })
+    .sort((left, right) => tierOrder[left.tier] - tierOrder[right.tier]
+      || left.deliverable.name.localeCompare(right.deliverable.name)
+      || left.deliverable.id.localeCompare(right.deliverable.id));
+}
+
+type AttributeField = 'categoryCode' | 'developer' | 'ppjtiRelatedParty' | 'dcCity' | 'dcCountry' | 'drCity' | 'drCountry';
+export interface AttributeDifference { field: AttributeField; filed: RptiDetail[AttributeField]; current: RptiDetail[AttributeField] }
+const ATTRIBUTE_FIELDS: AttributeField[] = ['categoryCode', 'developer', 'ppjtiRelatedParty', 'dcCity', 'dcCountry', 'drCity', 'drCountry'];
+
+/** Compares evidence with the values projection would file for an inventory entry. */
+export function attributeDifferences(
+  row: RptiDetail,
+  chosen: Deliverable,
+  state: Pick<UnresolvedRowRepairState, 'assets' | 'assetCategories'>,
+): AttributeDifference[] {
+  const current = filedAttributesFor(chosen, state.assets, state.assetCategories);
+  return ATTRIBUTE_FIELDS.filter(field => row[field] !== current[field])
+    .map(field => ({ field, filed: row[field], current: current[field] }));
 }
 
 const RELATED_PARTY_VALUES: RptiRelatedParty[] = ['yes', 'no', 'n/a'];
@@ -107,7 +155,7 @@ export interface UnresolvedRowRepairState {
   rptiDetails: RptiDetail[];
 }
 
-/** Applies option B as a pure, all-or-nothing source-side change; the filed row is never edited. */
+/** Applies either repair as a pure, all-or-nothing source-side change; the filed row is never edited. */
 export function applyUnresolvedRowRepair<S extends UnresolvedRowRepairState>(
   state: S,
   request: UnresolvedRowRepairRequest,
@@ -120,7 +168,62 @@ export function applyUnresolvedRowRepair<S extends UnresolvedRowRepairState>(
       && isLiveStatusId(segment.status, state.deliverableStatuses))) {
     return { ok: false, reason: 'This initiative already has a live implementation. Refresh the finding before repairing it.' };
   }
-  if (request.option !== 'create') return { ok: false, reason: 'Repairing an existing entry is not available yet.' };
+  if (request.option === 'existing') {
+    const chosen = state.deliverables.find(item => item.id === request.deliverableId);
+    const infrastructure = INFRASTRUCTURE_CODES.has(row.categoryCode ?? '');
+    if (!chosen || (chosen.type ?? 'application') !== (infrastructure ? 'infrastructure' : 'application')) {
+      return { ok: false, reason: 'Choose an existing entry of the same kind as the filed row.' };
+    }
+    const values = request.confirmed;
+    if (!values.name.trim() || !Number.isInteger(values.filedYear)
+        || values.quarter !== row.plannedImplementationQuarter || !Number.isFinite(values.capex)
+        || !Number.isFinite(values.opex)) {
+      return { ok: false, reason: 'Check the required name, filed period and budget values.' };
+    }
+    const differences = attributeDifferences(row, chosen, state);
+    if (differences.some(difference => !['update', 'keep'].includes(request.choices[difference.field]))) {
+      return { ok: false, reason: 'Choose update or keep for every attribute difference.' };
+    }
+    if (differences.some(difference => difference.field === 'ppjtiRelatedParty'
+        && request.choices[difference.field] === 'update'
+        && row.ppjtiRelatedParty !== undefined && !RELATED_PARTY_VALUES.includes(row.ppjtiRelatedParty))) {
+      return { ok: false, reason: 'The related party must be yes, no or n/a.' };
+    }
+    if (row.developer === 'PPJTI' && differences.some(difference => difference.field === 'developer'
+        && request.choices.developer === 'update')
+        && (!values.providerName.trim() || values.providerName.trim().toUpperCase() === 'PPJTI')) {
+      return { ok: false, reason: 'Enter the provider’s name; PPJTI is a classification, not a provider name.' };
+    }
+    let updatedChosen = chosen;
+    for (const difference of differences) {
+      if (request.choices[difference.field] !== 'update') continue;
+      updatedChosen = { ...updatedChosen,
+        [difference.field]: difference.field === 'developer' && row.developer === 'PPJTI'
+          ? values.providerName.trim() : row[difference.field] };
+    }
+    const { startDate, endDate } = periodForQuarter(values.quarter, values.filedYear);
+    const needsPrior = !hasLiveHistoryBefore(chosen.id, startDate, state.deliverableSegments, state.deliverableStatuses);
+    const implementationId = `rpti-repair-seg-${row.id}`;
+    const priorId = `rpti-repair-seg-prior-${row.id}`;
+    if (state.deliverableSegments.some(segment => segment.id === implementationId || (needsPrior && segment.id === priorId))) {
+      return { ok: false, reason: 'This filed row already has a repair segment.' };
+    }
+    const live = state.deliverableStatuses.find(status => status.isLiveStatus) ?? IN_PRODUCTION_STATUS;
+    const implementation: DeliverableSegment = {
+      id: implementationId, deliverableId: chosen.id, startDate, endDate, status: live.id,
+      initiativeId: initiative.id, capexAmount: values.capex, opexAmount: values.opex, rptiRemarks: values.remarks,
+    };
+    return { ok: true, state: {
+      ...state,
+      deliverables: state.deliverables.map(item => item.id === chosen.id ? updatedChosen : item),
+      deliverableSegments: [...state.deliverableSegments,
+        ...(needsPrior ? [continuousPriorLivePhase(chosen.id, values.filedYear, live.id, priorId)] : []),
+        implementation],
+      deliverableStatuses: state.deliverableStatuses.some(status => status.isLiveStatus)
+        ? state.deliverableStatuses : [...state.deliverableStatuses, IN_PRODUCTION_STATUS],
+      initiatives: state.initiatives.map(item => item.id === initiative.id ? { ...item, assetId: chosen.assetId } : item),
+    } };
+  }
   if (!repairOptions(row).includes('create')) return { ok: false, reason: 'This row requires an existing inventory entry.' };
   const values = request.confirmed;
   // B creates an application, so the code must be a known, non-infrastructure one.

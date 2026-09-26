@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { RptiDetail } from '../types';
-import { applyUnresolvedRowRepair, extendImportPriorPhase, priorPhaseGaps, unresolvedRowRepairDraft } from './unresolvedRowRepair';
+import { applyUnresolvedRowRepair, attributeDifferences, extendImportPriorPhase, priorPhaseGaps, rankRepairCandidates, unresolvedRowRepairDraft } from './unresolvedRowRepair';
 import { projectRptiReturn, reconcileRptiReturn, openEndedDate } from './rpti';
 import { computeDataHealth } from './dataHealth';
 import { liftReportRowAttributes } from './attributeLift';
@@ -156,6 +156,125 @@ describe('applyUnresolvedRowRepair option B (contracts 13–18)', () => {
     // An emptied number box reaches apply as NaN; filing 0 instead is the #51 corruption.
     expect(applyUnresolvedRowRepair(base, { ...request, confirmed: { ...confirmed, capex: Number.NaN } }).ok).toBe(false);
     expect(applyUnresolvedRowRepair(base, { ...request, confirmed: { ...confirmed, opex: Number.NaN } }).ok).toBe(false);
+  });
+});
+
+// ── US2: a human chooses an existing entry and each filed attribute ──
+
+const existing = { id: 'chosen', assetId: 'asset-12', name: 'Legacy Teller Application', type: 'application' as const,
+  developer: 'inhouse', ppjtiRelatedParty: 'n/a' as const, dcCity: 'Jakarta', dcCountry: 'Indonesia',
+  drCity: 'Surabaya', drCountry: 'Indonesia' };
+const existingState = {
+  ...base,
+  assets: [...base.assets, { id: 'asset-12', name: 'Applications', categoryId: 'cat-12' }],
+  assetCategories: [...base.assetCategories, { id: 'cat-12', name: 'Applications', categoryCode: '12' as const }],
+  deliverables: [existing],
+};
+const existingRequest = { rowId: row.id, option: 'existing' as const, deliverableId: existing.id,
+  confirmed, choices: {} };
+
+describe('rankRepairCandidates (contracts 9–10)', () => {
+  it('uses row kind, normalised same names, similar names in the same category, then deterministic others, without a selection', () => {
+    const candidates = [
+      { ...existing, id: 'same-b', name: 'LEGACY, TELLER application!' },
+      { ...existing, id: 'same-a', name: 'Legacy Teller Application' },
+      { ...existing, id: 'similar', name: 'Legacy Teller Platform' },
+      { ...existing, id: 'wrong-category', name: 'Legacy Teller Platform', categoryCode: '06' as const },
+      { ...existing, id: 'long-generic', name: 'Legacy Application Extensive Online Banking' },
+      { ...existing, id: 'other', name: 'Payments' },
+      { ...existing, id: 'infra', name: 'Legacy Teller Application', type: 'infrastructure' as const },
+    ];
+    const ranked = rankRepairCandidates(row, 'Legacy Teller Application', { ...existingState, deliverables: candidates });
+    expect(ranked.map(candidate => [candidate.deliverable.id, candidate.tier])).toEqual([
+      ['same-a', 'same-name'], ['same-b', 'same-name'], ['similar', 'similar'],
+      ['long-generic', 'other'], ['wrong-category', 'other'], ['other', 'other'],
+    ]);
+    expect(ranked.every(candidate => !('selected' in candidate) && !('bestMatch' in candidate))).toBe(true);
+    expect(rankRepairCandidates({ ...row, categoryCode: '51' }, 'Legacy Teller Application',
+      { ...existingState, deliverables: candidates }).map(candidate => candidate.deliverable.id)).toEqual(['infra']);
+    expect(rankRepairCandidates(row, 'Anything', { ...existingState, deliverables: [] })).toEqual([]);
+  });
+
+  it('suggests a first row’s B-created application for a second row of the same name', () => {
+    const created = applyUnresolvedRowRepair(base, request);
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+    const second = { ...row, id: 'row-2', initiativeId: 'init-2', targetId: 'rpti-import-unresolved-2' };
+    const ranked = rankRepairCandidates(second, confirmed.name, created.state);
+    expect(ranked[0]).toMatchObject({ tier: 'same-name', deliverable: { id: 'rpti-repair-deliv-row-1' } });
+  });
+});
+
+describe('attributeDifferences (contract 12)', () => {
+  it('compares what projection files, so a named provider and inherited category can match', () => {
+    expect(attributeDifferences({ ...row, developer: 'PPJTI', ppjtiRelatedParty: 'yes' },
+      { ...existing, developer: 'Vendor X', ppjtiRelatedParty: 'yes' }, existingState)).toEqual([]);
+    expect(attributeDifferences(row, existing, existingState)).toEqual([]);
+    expect(attributeDifferences(row, { ...existing, dcCity: 'Bandung' }, existingState)).toEqual([
+      { field: 'dcCity', filed: 'Jakarta', current: 'Bandung' },
+    ]);
+  });
+});
+
+describe('applyUnresolvedRowRepair option A (contracts 13–18)', () => {
+  it('writes only the implementation, needed prior phase, initiative asset and chosen overrides', () => {
+    const input = freeze(structuredClone({ ...existingState,
+      deliverables: [{ ...existing, dcCity: 'Bandung', drCity: 'Bogor' }],
+    }));
+    const result = applyUnresolvedRowRepair(input, { ...existingRequest, choices: { dcCity: 'update', drCity: 'keep' } });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.state.assets).toEqual(input.assets);
+    expect(result.state.assetCategories).toEqual(input.assetCategories);
+    expect(result.state.rptiDetails).toEqual(input.rptiDetails);
+    expect(result.state.deliverables).toEqual([{ ...input.deliverables[0], dcCity: 'Jakarta' }]);
+    expect(result.state.initiatives).toEqual([{ ...input.initiatives[0], assetId: 'asset-12' }]);
+    expect(result.state.deliverableSegments).toEqual([
+      { id: 'rpti-repair-seg-prior-row-1', deliverableId: 'chosen', startDate: '2026-01-01',
+        endDate: openEndedDate(2027), status: 'custom-live' },
+      { id: 'rpti-repair-seg-row-1', deliverableId: 'chosen', startDate: '2027-07-01',
+        endDate: '2027-09-30', status: 'custom-live', initiativeId: 'init-1',
+        capexAmount: 2900, opexAmount: 640, rptiRemarks: 'Filed remark' },
+    ]);
+    for (const key of ['lkptiDetails', 'programmes', 'milestones', 'strategies', 'dependencies', 'decisions', 'resources', 'timelineSettings'] as const) {
+      expect(result.state[key]).toEqual(input[key]);
+    }
+    expect(reconcileRptiReturn({ ...result.state, storedDetails: result.state.rptiDetails })).toEqual([]);
+    expect(projectRptiReturn(result.state, 2027)[0]).toMatchObject({ developmentType: 'upgrade',
+      plannedImplementationQuarter: 'Q3', dcCity: 'Jakarta', drCity: 'Bogor' });
+    expect(applyUnresolvedRowRepair(result.state, existingRequest).ok).toBe(false);
+  });
+
+  it('does not add prior history when the chosen entry already has it', () => {
+    const prior = { id: 'old-live', deliverableId: 'chosen', startDate: '2025-01-01',
+      endDate: '2026-12-31', status: 'custom-live' };
+    const result = applyUnresolvedRowRepair({ ...existingState, deliverableSegments: [prior] }, existingRequest);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.state.deliverableSegments).toEqual([prior, expect.objectContaining({ id: 'rpti-repair-seg-row-1' })]);
+  });
+
+  it('refuses a missing or wrong-kind entry and any unanswered field difference', () => {
+    expect(applyUnresolvedRowRepair(existingState, { ...existingRequest, deliverableId: 'missing' }).ok).toBe(false);
+    expect(applyUnresolvedRowRepair({ ...existingState, deliverables: [{ ...existing, type: 'infrastructure' }] }, existingRequest).ok).toBe(false);
+    expect(applyUnresolvedRowRepair({ ...existingState, deliverables: [{ ...existing, dcCity: 'Bandung' }] }, existingRequest).ok).toBe(false);
+    expect(applyUnresolvedRowRepair(existingState, { ...existingRequest, confirmed: { ...confirmed, capex: Number.NaN } }).ok).toBe(false);
+  });
+
+  it('requires a real provider name only when a PPJTI developer difference is updated', () => {
+    const ppjtiState = { ...existingState, rptiDetails: [{ ...row, developer: 'PPJTI' as const, ppjtiRelatedParty: 'n/a' as const }] };
+    const updated = (providerName: string) => applyUnresolvedRowRepair(ppjtiState,
+      { ...existingRequest, confirmed: { ...confirmed, developer: 'PPJTI' as const, providerName }, choices: { developer: 'update' } });
+    expect(updated('').ok).toBe(false);
+    expect(updated('PPJTI').ok).toBe(false);
+    const named = updated('Vendor X');
+    expect(named.ok).toBe(true);
+    if (named.ok) {
+      expect(named.state.deliverables[0].developer).toBe('Vendor X');
+      expect(projectRptiReturn(named.state, 2027)[0].developer).toBe('PPJTI');
+    }
+    const kept = applyUnresolvedRowRepair(ppjtiState, { ...existingRequest, choices: { developer: 'keep' } });
+    expect(kept.ok).toBe(true);
+    if (kept.ok) expect(projectRptiReturn(kept.state, 2027)[0].developer).toBe('inhouse');
   });
 });
 

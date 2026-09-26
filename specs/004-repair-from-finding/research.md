@@ -156,6 +156,12 @@ entries match that exactly.
 - **Normalise** names: lowercase, strip punctuation, collapse whitespace.
 - **Tier 1:** the normalised name is equal.
 - **Tier 2:** at least half the words are shared, and the category is the same.
+  *"Half" is of the **larger** word count, decided 2026-09-26 when the implementer asked (the first
+  version named no denominator). It is symmetric, so a pair ranks the same whichever name is longer,
+  and it stops a short generic name such as "Mobile App" from being similar to every longer name that
+  contains it. "Legacy Teller Application" and "Teller Application" share 2 of 3, so still qualify.
+  Rejected: the filed name's count (asymmetric, and over-inclusive for short filed names); the
+  candidate's count (asymmetric the other way).*
 - **Tier 3:** everything else, alphabetical.
 - Ties break by name, then id, so the order is deterministic.
 

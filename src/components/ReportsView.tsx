@@ -212,6 +212,8 @@ export function ReportsView({ assets, initiatives, milestones, dependencies, cur
   const repairRow = rptiDetails.find(row => row.id === repairRowId && isRepairableUnresolvedRow(row));
   const repairDialog = repairRow && onRepairUnresolvedRow && initiatives.some(item => item.id === repairRow.initiativeId) ? (
     <UnresolvedRowRepairDialog key={repairRow.id} row={repairRow} initiatives={initiatives}
+      assets={assets} assetCategories={assetCategories} deliverables={deliverables}
+      deliverableSegments={deliverableSegments} deliverableStatuses={deliverableStatuses}
       onCancel={() => setRepairRowId(null)}
       onConfirm={async request => {
         const result = await onRepairUnresolvedRow(request);
