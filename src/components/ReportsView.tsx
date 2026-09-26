@@ -265,7 +265,8 @@ export function ReportsView({ assets, initiatives, milestones, dependencies, cur
     {
       slug: 'lkpti',
       icon: <ListChecks size={28} className="text-fuchsia-500" />,
-      title: 'LKPTI Report',
+      // LKPTI has many appendix reports; this card is only the Application List (3.2.6).
+      title: 'LKPTI - Application List Report',
       description: 'Indonesian OJK LKPTI Application List (Format 3.2.6) — an inventory of currently live applications.',
     },
     {
@@ -570,14 +571,14 @@ export function ReportsView({ assets, initiatives, milestones, dependencies, cur
     );
   }
 
-  // ── LKPTI Report ─────────────────────────────────────────────
+  // ── LKPTI - Application List Report ───────────────────────────
   if (selectedReport === 'lkpti') {
     return (
       <div data-testid="report-view-lkpti" className="h-full overflow-y-auto p-6 bg-slate-50">
         <div className="max-w-6xl mx-auto">
           <BackButton onBack={() => setSelectedReport(null)} />
           <div className="mb-6">
-            <h1 className="text-xl font-bold text-slate-800">LKPTI Report</h1>
+            <h1 className="text-xl font-bold text-slate-800">LKPTI - Application List Report</h1>
             <p className="text-sm text-slate-500 mt-1">
               Indonesian OJK LKPTI Application List (Format 3.2.6) — an inventory of currently live applications.
             </p>

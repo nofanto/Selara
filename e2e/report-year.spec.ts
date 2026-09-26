@@ -31,6 +31,14 @@ test.describe('Report year', () => {
     await expect(page.getByTestId('lkpti-report-view')).toContainText('2026');
   });
 
+  test('names the LKPTI card and its page as the Application List report', async ({ page }) => {
+    // LKPTI has many appendix reports; this one is the Application List (Format 3.2.6).
+    const card = page.getByTestId('report-card-lkpti');
+    await expect(card).toContainText('LKPTI - Application List Report');
+    await card.click();
+    await expect(page.getByRole('heading', { level: 1, name: 'LKPTI - Application List Report', exact: true })).toBeVisible();
+  });
+
   test('states the selected year inside each downloaded workbook', async ({ page }) => {
     await seedReportRecords(page, reportFixture, [
       'assets', 'assetCategories', 'programmes', 'initiatives', 'deliverables',
