@@ -414,3 +414,99 @@ describe('extendImportPriorPhase (contract 23)', () => {
     expect(extendImportPriorPhase(input, 'rpti-import-seg-prior-99')).toEqual(input);
   });
 });
+
+// T049 / Q22 option B: recorded post-live history bounds both the warning and its repair.
+describe('retirement ends the inventory-gap check (T049)', () => {
+  const retiredState = (startDate: string) => {
+    const state = gapState();
+    return {
+      ...state,
+      deliverableStatuses: [...state.deliverableStatuses,
+        { id: 'retired', name: 'Retired', color: 'bg-gray-500' }],
+      deliverableSegments: [...state.deliverableSegments,
+        { id: 'retirement', deliverableId: 'deliv-app', startDate,
+          endDate: '2040-12-31', status: 'retired' }],
+    };
+  };
+
+  it('has no gap when 2027 is covered and retirement begins in mid-2028', () => {
+    const state = retiredState('2028-07-01');
+    state.deliverableSegments.push({ id: 'inventory-2027', deliverableId: 'deliv-app',
+      startDate: '2027-01-01', endDate: '2027-12-31', status: 'appstatus-in-production' });
+    expect(priorPhaseGaps(freeze(state))).toEqual([]);
+  });
+
+  it('keeps exactly the missing 2027-2029 year-ends before a 2030 retirement', () => {
+    expect(priorPhaseGaps(freeze(retiredState('2030-01-01')))).toEqual([
+      { segmentId: oldShapePrior.id, deliverableId: 'deliv-app', segmentYear: 2026,
+        missingYears: [2027, 2028, 2029] },
+    ]);
+  });
+
+  it.each([
+    ['2030-01-01', '2029-12-31'],
+    ['2030-07-01', '2030-06-30'],
+    ['2028-03-01', '2028-02-29'],
+    ['2034-01-01', '2032-12-31'],
+  ])('extends only to %s minus one day or the horizon (%s)', (retirement, expectedEnd) => {
+    const state = freeze(retiredState(retirement));
+    const next = extendImportPriorPhase(state, oldShapePrior.id);
+    expect(next.deliverableSegments.find(segment => segment.id === oldShapePrior.id)?.endDate)
+      .toBe(expectedEnd);
+    expect(next).toEqual({ ...state, deliverableSegments: state.deliverableSegments.map(segment =>
+      segment.id === oldShapePrior.id ? { ...segment, endDate: expectedEnd } : segment) });
+    expect(priorPhaseGaps(next)).toEqual([]);
+    expect(generateLkptiDetails({ ...next, asAtDate: retirement }).map(row => row.targetId))
+      .not.toContain('deliv-app');
+  });
+
+  it('takes the earliest later post-live phase on this Deliverable, independent of array order', () => {
+    const state = retiredState('2031-01-01');
+    state.deliverableSegments.push(
+      { id: 'sunset', deliverableId: 'deliv-app', startDate: '2029-12-31',
+        endDate: '2030-12-31', status: 'sunset' },
+      { id: 'other-retirement', deliverableId: 'deliv-infra', startDate: '2027-01-01',
+        endDate: '2032-12-31', status: 'retired' },
+      { id: 'old-retirement', deliverableId: 'deliv-app', startDate: '2026-12-31',
+        endDate: '2026-12-31', status: 'retired' },
+    );
+    state.deliverableStatuses.push({ id: 'sunset', name: 'Sunset', color: 'bg-amber-500' });
+    expect(priorPhaseGaps(state)[0].missingYears).toEqual([2027, 2028]);
+    expect(extendImportPriorPhase(state, oldShapePrior.id).deliverableSegments[0].endDate)
+      .toBe('2029-12-30');
+  });
+
+  it.each(['Planned', 'Funded'])('does not treat a later %s phase as retirement', name => {
+    const state = gapState();
+    const id = `custom-${name.toLowerCase()}`;
+    state.deliverableStatuses = [...state.deliverableStatuses,
+      { id, name, color: 'bg-slate-500', isPreLaunchStatus: true }];
+    state.deliverableSegments.push({ id: 'later-pre-launch', deliverableId: 'deliv-app',
+      startDate: '2028-01-01', endDate: '2030-12-31', status: id });
+    expect(priorPhaseGaps(state)[0].missingYears).toEqual([2027, 2028, 2029, 2030, 2031, 2032]);
+    expect(extendImportPriorPhase(state, oldShapePrior.id).deliverableSegments[0].endDate)
+      .toBe(openEndedDate(2027));
+  });
+
+  it('still warns through the horizon when a live phase simply ends without post-live history', () => {
+    const state = gapState();
+    state.deliverableSegments.push({ id: 'ended-live', deliverableId: 'deliv-app',
+      startDate: '2027-01-01', endDate: '2027-12-31', status: 'appstatus-in-production' });
+    expect(priorPhaseGaps(state)[0].missingYears).toEqual([2028, 2029, 2030, 2031, 2032]);
+    expect(extendImportPriorPhase(state, oldShapePrior.id).deliverableSegments[0].endDate)
+      .toBe(openEndedDate(2027));
+  });
+
+  it('describes the missing years and retirement limit accurately in Data Health', () => {
+    const issues = computeDataHealth({
+      ...retiredState('2030-01-01'), initiatives: [], lkptiDetails: [], rptiDetails: [],
+      milestones: [], dependencies: [], decisions: [], resources: [], programmes: [], strategies: [],
+      timelineSettings: { defaultCurrency: 'IDR' },
+    });
+    const warning = issues.find(issue => issue.id === `rpti-import-prior-phase-gap:${oldShapePrior.id}`)!;
+    expect(warning.severity).toBe('warning');
+    expect(warning.message).toContain('2027, 2028, 2029');
+    expect(warning.message).not.toMatch(/2030|2031|2032/);
+    expect(warning.message).toContain('before any recorded retirement');
+  });
+});

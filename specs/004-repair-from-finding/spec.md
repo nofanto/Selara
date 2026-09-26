@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-25
 
-**Status**: Draft
+**Status**: Implemented (2026-09-26)
 
 **Input**: User description: "Semi-automatic repair of an unresolved imported RPTI row, started from the finding (#51)." The full brief, with its context list, decisions and scope, is recorded in this feature's history. The decisions it carries are **Q22** in `requirement-specs/report-rows-as-projections.md`, and this spec implements them rather than reopening them.
 
@@ -134,7 +134,7 @@ An upgrade to an application with no live history of its own, such as an applica
 
 - **FR-017**: The RPTI importer's synthetic prior live phase MUST follow the same rule as FR-010: continuous from 1 January of the year before the filed year through the planning horizon. It MUST still be added only when the target has no live history before the filed quarter.
 - **FR-018**: Synthetic prior phases already in existing workspaces, created under the one-year rule, MUST NOT be changed automatically *(product owner, 2026-09-25)*.
-- **FR-018a**: Where such a phase still has exactly the importer's original one-year shape, and that shape actually leaves its entry out of an inventory year it would be in under FR-017, Data Health MUST show a **non-blocking** warning. The warning names the entry and the years it is missing from, and offers to extend the phase to the new rule. The extension happens only when the preparer confirms it from the warning. A phase the preparer has edited is not the importer's shape, so it raises no warning.
+- **FR-018a**: Where such a phase still has exactly the importer's original one-year shape, and that shape actually leaves its entry out of an inventory year it would be in under FR-017, Data Health MUST show a **non-blocking** warning. The warning names the entry and the years it is missing from, and offers to extend the phase to the new rule. The extension happens only when the preparer confirms it from the warning. A phase the preparer has edited is not the importer's shape, so it raises no warning. **Amended 2026-09-26 (product owner, Q22 option B):** for a prior phase covering year Y, only missing year-ends Y+1 through Y+6 before the earliest later post-live segment on that Deliverable count; post-live means neither live nor pre-launch, starting after Y-12-31. If no missing year remains, show no warning. Extend stops at the earlier of the shared horizon and the day before that post-live segment; with no such segment, behaviour is unchanged.
 
 **Records**
 

@@ -54,6 +54,41 @@ describe('the published sample returns', () => {
       capexAmount: draft.capex.value, opexAmount: draft.opex.value,
     });
   });
+  it('SC-004: pins year-end inventories before and after the Legacy Teller B repair', () => {
+    const inv = deriveWorkspaceFromLkptiImport(parseLkptiImportWorkbook(load('sample-lkpti-2026.xlsx')).rows, 2026);
+    const out = deriveWorkspaceFromRptiImport(parseRptiImportWorkbook(load('sample-rpti-2027.xlsx')).rows, 2027, {
+      deliverables: inv.deliverables, assets: inv.assets, assetCategories: inv.assetCategories,
+      deliverableSegments: inv.deliverableSegments, deliverableStatuses: inv.deliverableStatuses,
+    });
+    const workspace = {
+      assets: [...inv.assets, ...out.assets], assetCategories: [...inv.assetCategories, ...out.assetCategories],
+      deliverables: [...inv.deliverables.map(d => out.updatedDeliverables.find(u => u.id === d.id) ?? d), ...out.deliverables],
+      deliverableSegments: [...inv.deliverableSegments, ...out.deliverableSegments],
+      deliverableStatuses: mergeDeliverableStatuses(inv.deliverableStatuses, out.deliverableStatuses),
+      initiatives: out.initiatives, rptiDetails: out.rptiDetails,
+    };
+    const filed = out.rptiDetails.find(r => r.targetId.startsWith('rpti-import-unresolved-'))!;
+    const draft = unresolvedRowRepairDraft(filed, workspace);
+    const years = [2026, 2027, 2028, 2029, 2030, 2031, 2032];
+    const counts = (state: typeof workspace) => years.map(year =>
+      generateLkptiDetails({ ...state, asAtDate: `${year}-12-31` }).length);
+    const importedCounts = counts(workspace);
+    const repaired = applyUnresolvedRowRepair(workspace, { rowId: filed.id, option: 'create', confirmed: {
+      name: draft.name.value, filedYear: draft.filedYear.value, quarter: draft.quarter.value,
+      categoryCode: draft.categoryCode.value, developer: draft.developer.value,
+      providerName: draft.providerName.value, ppjtiRelatedParty: draft.ppjtiRelatedParty.value,
+      dcCity: draft.dcCity.value, dcCountry: draft.dcCountry.value,
+      drCity: draft.drCity.value, drCountry: draft.drCountry.value,
+      remarks: draft.remarks.value, capex: draft.capex.value, opex: draft.opex.value,
+    } });
+    expect(repaired.ok).toBe(true);
+    if (!repaired.ok) return;
+    const repairedCounts = counts(repaired.state);
+    process.stdout.write(`SC-004 LKPTI 31 December: ${JSON.stringify({ years, importOnly: importedCounts, afterRepair: repairedCounts })}\n`);
+    expect(importedCounts).toEqual([13, 16, 16, 16, 16, 16, 3]);
+    expect(repairedCounts).toEqual([14, 17, 17, 17, 17, 17, 4]);
+  });
+
   it('LKPTI parses with nothing skipped', () => {
     const { rows, skipped } = parseLkptiImportWorkbook(load('sample-lkpti-2026.xlsx'));
     expect(skipped).toEqual([]);

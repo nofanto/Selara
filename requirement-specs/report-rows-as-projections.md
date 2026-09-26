@@ -436,6 +436,62 @@ a legacy Asset target. Restoring any one of them still leaves the anchored segme
 one of those findings gets the restore-or-re-import repair (third Codex review). Restoring a saved
 version brings back the original segment id; a test pins that the finding then clears.
 
+**Implemented 2026-09-26:** [spec 004 — Repair from Finding](../specs/004-repair-from-finding/spec.md) implements these decisions; its tasks record the automated evidence and the remaining product-owner timing check.
+
+**SC-004 measured inventory counts (2026-09-26).** Importing both published sample returns,
+then applying B to Legacy Teller with every pre-filled value unchanged, gives:
+
+| LKPTI as at 31 December | Q21 / T002 baseline | Import only | After Legacy Teller B repair |
+|---|---|---|---|
+| 2026 | 13 | 13 | 14 |
+| 2027 | 16 | 16 | 17 |
+| 2028 | 16 | 16 | 17 |
+| 2029 | 16 | 16 | 17 |
+| 2030 | 16 | 16 | 17 |
+| 2031 | 16 | 16 | 17 |
+| 2032 | 3 | 3 | 4 |
+
+Import-only counts are identical to the baseline in every year. The sample's only synthetic
+importer prior phase belongs to Primary Data Center Jakarta, which is infrastructure and never
+appears in the LKPTI. Extending it therefore changes no sample inventory count. The original
+13 applications have inventory phases ending in 2031; the three new applications imported from
+the 2027 plan run through 2032, explaining the baseline's fall from 16 to 3 in that final year.
+B adds exactly Legacy Teller in each year: its continuous prior live phase runs from 2026-01-01
+through 2032-12-31. Thus the confirmed 2026 change is measured as **13 → 14**, 2027-2031 each
+change **16 → 17**, and 2032 changes **3 → 4**. Its overlapping Q3 2027 implementation does not
+create a second inventory entry.
+
+The new pinned test in `src/lib/sampleReturns.test.ts` prints both series. Measurements are in
+`/tmp/selara-004-t044-measure.log`; falsification is in `/tmp/selara-004-t044-falsify.log`.
+Restoring the importer's old one-year prior phase (T040 reversal) left both series unchanged, as
+measured; importer-specific tests T035/T036 cover that rule. Disabling B's writes (T019) returned
+the baseline series after repair and failed the pinned post-repair assertion. Restoring both
+implementations passed. No existing test expectation was changed during Polish.
+
+**Decided — retirement ends the inventory-gap check (option B)** *(product owner,
+2026-09-26; raised in coordinator review of US3, implemented by spec 004 T049)*. The review
+found that the warning still fired for a retired application and Extend would list it again to
+the horizon. An explicit post-live phase ends the application's inventory life, so absence after
+that date is correct.
+
+For an importer prior phase in its exact original one-year shape (year Y), take R as the earliest
+start date after Y-12-31 of a segment on the same Deliverable whose status is neither live nor
+pre-launch (`isLiveStatusId` and `isPreLaunchStatusId` are both false, for example Sunset,
+Out of Support or Retired). Only missing years in Y+1 through Y+6 whose 31 December is strictly
+before R count. If none remain, show no warning. Extend ends the prior phase at the earlier of
+`openEndedDate(Y+1)` and the day before R, never overlapping recorded retirement. With no such
+post-live phase, the rule is unchanged: a live phase merely ending is indistinguishable from the
+importer's artifact and still warrants the warning. Extension still requires the preparer's
+explicit action; detection never changes stored data.
+
+Rejected:
+- **A — keep the original behaviour:** permanent warning noise, and Extend would list a retired
+  application in the LKPTI, producing a wrong filing.
+- **C — suppress the entire warning whenever any later post-live phase exists:** hides genuinely
+  missing years before retirement, which is the original inventory-gap defect.
+- **D — a dismissible warning:** needs a new stored field (and #42's field policy) and relies on a
+  fresh judgement each time.
+
 ### Q19 — the legacy remarks lift follows the field; the legacy cost lift does not (2026-09-23)
 
 **Raised by the implementer during Phase 4**, not by the task list, which is the reason it is

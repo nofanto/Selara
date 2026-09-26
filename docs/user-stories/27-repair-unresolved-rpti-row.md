@@ -28,11 +28,15 @@ The stored row remains read-only evidence. The repair changes planning entities 
 
 ### AC3 — Preserve inventory continuity
 
-- [ ] A synthetic prior live phase made during RPTI import keeps an application in each year-end LKPTI inventory through the shared planning horizon, while the imported RPTI remains an upgrade and the prior phase files no row of its own.
-- [ ] A legacy one-year importer phase that causes a missing inventory year raises a non-blocking Data Health warning. It extends only on confirmation; a phase the preparer edited is left alone.
+- [x] A synthetic prior live phase made during RPTI import keeps an application in each year-end LKPTI inventory through the shared planning horizon, while the imported RPTI remains an upgrade and the prior phase files no row of its own.
+- [x] A legacy one-year importer phase that causes a missing inventory year raises a non-blocking Data Health warning. It extends only on confirmation; a phase the preparer edited is left alone. A recorded retirement limits the warning to missing year-ends before it, and Extend stops before that retirement (Q22 option B, 2026-09-26).
 
 ## Boundaries
 
 - [x] Repair is offered only for an unanchored `rpti-import-unresolved-*` row, never for a deleted Deliverable's row.
 - [x] Confirmation rechecks that the row and initiative are still eligible, and applying twice cannot duplicate the implementation.
 - [x] Ordinary Deliverable creation continues to create no lifecycle segment.
+
+## Verification (2026-09-26)
+
+Spec 004's completed task records contain the rule, workflow and falsification evidence. The sample's year-end LKPTI counts are pinned before and after repair and explained in Q22. The product owner's manual B/A timing check (SC-006) remains to be performed using the [quickstart](../../specs/004-repair-from-finding/quickstart.md#manual-check-product-owner).
