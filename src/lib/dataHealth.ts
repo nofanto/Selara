@@ -456,7 +456,7 @@ export function computeDataHealth(input: DataHealthInput): HealthIssue[] {
     issues.push({
       id: `rpti-import-prior-phase-gap:${gap.segmentId}`, severity: 'warning',
       entityType: 'DeliverableSegment', entityId: gap.segmentId, entityName: label,
-      message: `The imported prior live phase for "${label}" ends in ${gap.segmentYear}, so the application is missing from the LKPTI inventory as at 31 December ${gap.missingYears.join(', ')}. Extend the phase to keep it listed to the planning horizon; nothing changes until you confirm.`,
+      message: `The imported prior live phase for "${label}" ends in ${gap.segmentYear}, so the application is missing from the LKPTI inventory as at 31 December ${gap.missingYears.join(', ')}. Extend the phase to keep it listed up to the planning horizon, stopping before any recorded retirement; nothing changes until you confirm.`,
       location: DATA_TAB,
       action: { kind: 'extend-import-prior-phase', segmentId: gap.segmentId },
     });

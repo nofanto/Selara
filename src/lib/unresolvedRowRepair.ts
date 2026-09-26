@@ -1,5 +1,5 @@
 import type { Asset, AssetCategory, Deliverable, DeliverableSegment, DeliverableStatus, Initiative, RptiCategoryCode, RptiDetail, RptiDeveloper, RptiQuarter, RptiRelatedParty } from '../types';
-import { continuousPriorLivePhase, filedAttributesFor, hasLiveHistoryBefore, INFRASTRUCTURE_CODES, openEndedDate, periodForQuarter, RPTI_CATEGORY_LABELS, UNRESOLVED_IMPORT_TARGET_PREFIX, isLiveStatusId } from './rpti';
+import { continuousPriorLivePhase, filedAttributesFor, hasLiveHistoryBefore, INFRASTRUCTURE_CODES, openEndedDate, periodForQuarter, RPTI_CATEGORY_LABELS, UNRESOLVED_IMPORT_TARGET_PREFIX, isLiveStatusId, isPreLaunchStatusId } from './rpti';
 import { IN_PRODUCTION_STATUS } from './deliverableStatusDefaults';
 
 /**
@@ -308,12 +308,28 @@ function originalPriorSegmentYear(segment: DeliverableSegment): number | null {
   return segment.endDate === `${year}-12-31` ? year : null;
 }
 
+/** Q22 option B: the earliest post-live phase after the original prior year's end. */
+function priorPhaseRetirement(
+  segment: DeliverableSegment,
+  state: Pick<PriorPhaseGapState, 'deliverableSegments' | 'deliverableStatuses'>,
+): string | undefined {
+  let retirement: string | undefined;
+  for (const other of state.deliverableSegments) {
+    if (other.deliverableId !== segment.deliverableId || other.startDate <= segment.endDate) continue;
+    if (isLiveStatusId(other.status, state.deliverableStatuses)
+      || isPreLaunchStatusId(other.status, state.deliverableStatuses)) continue;
+    if (!retirement || other.startDate < retirement) retirement = other.startDate;
+  }
+  return retirement;
+}
+
 /**
  * The years an imported prior phase leaves its application out of, as an inventory. Contract 20:
  * only a segment still in the importer's exact original shape counts — id prefix, both dates, the
  * importer's live status and no initiative link, on an application. A phase the preparer edited is
  * their decision, not a gap (FR-018/FR-018a, Q22, research R10). The years are Y+1…Y+6, the
- * 31 Decembers the continuous phase would have covered from the filing year Y+1.
+ * 31 Decembers the continuous phase would have covered from the filing year Y+1, before any
+ * recorded post-live phase ends the inventory life (Q22 option B).
  */
 export function priorPhaseGaps(state: PriorPhaseGapState): PriorPhaseGap[] {
   const { deliverables, deliverableSegments, deliverableStatuses } = state;
@@ -328,9 +344,11 @@ export function priorPhaseGaps(state: PriorPhaseGapState): PriorPhaseGap[] {
     const deliverable = deliverableById.get(segment.deliverableId);
     // LKPTI is Daftar Aplikasi — it never lists infrastructure, so there is no inventory gap.
     if (!deliverable || (deliverable.type ?? 'application') !== 'application') continue;
+    const retirement = priorPhaseRetirement(segment, state);
     const missingYears: number[] = [];
     for (let year = segmentYear + 1; year <= segmentYear + 6; year++) {
       const asAt = `${year}-12-31`;
+      if (retirement && asAt >= retirement) break;
       const live = deliverableSegments.some(other =>
         other.deliverableId === deliverable.id
         && isLiveStatusId(other.status, deliverableStatuses)
@@ -348,21 +366,29 @@ export function priorPhaseGaps(state: PriorPhaseGapState): PriorPhaseGap[] {
 
 /**
  * The preparer-confirmed extension (FR-018a). One segment's `endDate` moves to the horizon the
- * continuous rule would have given it — `openEndedDate(segmentYear + 1)` — and nothing else
- * changes, so the caller applies it in one undoable handleUpdate. Only a segment still in the
+ * continuous rule would have given it — `openEndedDate(segmentYear + 1)` — or the day before
+ * recorded retirement, whichever is earlier (Q22 option B). Nothing else changes, so the caller
+ * applies it in one undoable handleUpdate. Only a segment still in the
  * importer's original shape is extended: an edited phase is the preparer's decision. A missing or
  * already-edited segment is left exactly as it was.
  */
-export function extendImportPriorPhase<S extends { deliverableSegments: DeliverableSegment[] }>(
+export function extendImportPriorPhase<S extends Pick<PriorPhaseGapState, 'deliverableSegments' | 'deliverableStatuses'>>(
   state: S,
   segmentId: string,
 ): S {
   const segment = state.deliverableSegments.find(item => item.id === segmentId);
   const segmentYear = segment ? originalPriorSegmentYear(segment) : null;
   if (!segment || segmentYear === null) return state;
+  let endDate = openEndedDate(segmentYear + 1);
+  const retirement = priorPhaseRetirement(segment, state);
+  if (retirement && retirement <= endDate) {
+    const previousDay = new Date(`${retirement}T00:00:00Z`);
+    previousDay.setUTCDate(previousDay.getUTCDate() - 1);
+    endDate = previousDay.toISOString().slice(0, 10);
+  }
   return {
     ...state,
     deliverableSegments: state.deliverableSegments.map(item =>
-      item.id === segmentId ? { ...item, endDate: openEndedDate(segmentYear + 1) } : item),
+      item.id === segmentId ? { ...item, endDate } : item),
   };
 }

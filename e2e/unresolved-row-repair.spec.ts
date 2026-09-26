@@ -307,7 +307,13 @@ test.describe('US3: an importer prior phase that leaves an application out of in
         req.onerror = () => resolve(false);
       });
     }, null, { timeout: 20000 });
+    // Seed from a static page on the same origin, where the app is not running. saveAppData
+    // clears and rewrites every store, so a late save by the app (still settling its template
+    // load) could otherwise wipe the fixture after it was seeded: measured 1 in 20 runs, the
+    // segment then read back as undefined. Leaving the app page also aborts any in-flight save.
+    await page.goto('/features/adding-applications.png');
     await seedReportRecords(page, oldShapeFixture, [...TEMPLATE_STORES, ...Object.keys(oldShapeFixture)]);
+    await page.goto('/');
     await expect(page.getByTestId('nav-reports')).toBeVisible({ timeout: 20000 });
   });
 
