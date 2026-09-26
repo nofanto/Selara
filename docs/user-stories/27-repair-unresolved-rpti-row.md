@@ -21,10 +21,10 @@ The stored row remains read-only evidence. The repair changes planning entities 
 
 ### AC2 — Resolve to an existing entry
 
-- [ ] An unresolved row offers “It's this existing entry.” Suggestions rank likely same-kind matches first, support search, and never select one automatically. Infrastructure rows offer only this option.
-- [ ] If the selected entry lacks live history before the filed quarter, the form shows the prior live phase it will add. The implementation still files as an upgrade.
-- [ ] The form compares what the selected entry would file with the stored row for category, developer, related party and locations. For each difference, the preparer chooses whether to update the entry or keep its current value; updating an entry also affects LKPTI.
-- [ ] Confirming creates the filed implementation, moves the initiative to the selected entry's asset, and clears the finding. Every update or keep choice is reflected in the regenerated return.
+- [x] An unresolved row offers “It's this existing entry.” Suggestions rank likely same-kind matches first, support search, and never select one automatically. Infrastructure rows offer only this option.
+- [x] If the selected entry lacks live history before the filed quarter, the form shows the prior live phase it will add. The implementation still files as an upgrade.
+- [x] The form compares what the selected entry would file with the stored row for category, developer, related party and locations. For each difference, the preparer chooses whether to update the entry or keep its current value; updating an entry also affects LKPTI.
+- [x] Confirming creates the filed implementation, moves the initiative to the selected entry's asset, and clears the finding. Every update or keep choice is reflected in the regenerated return.
 
 ### AC3 — Preserve inventory continuity
 

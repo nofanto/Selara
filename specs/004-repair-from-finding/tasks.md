@@ -172,27 +172,32 @@ expectation changed**, before anything new calls it.
 
 ### Tests for User Story 2 (write first; see each fail) ⚠️
 
-- [ ] T025 [P] [US2] Failing tests for **contracts 9-10** in `src/lib/unresolvedRowRepair.test.ts`. `rankRepairCandidates`:
+- [x] T025 [P] [US2] Failing tests for **contracts 9-10** in `src/lib/unresolvedRowRepair.test.ts`. `rankRepairCandidates`:
+  - Done: Red `/tmp/selara-004-t025-red.log` (2 missing-helper failures); green `/tmp/selara-004-t025-green.log` (2 passed). Measured kind filtering, normalised tiers, deterministic order, no selection, B-created match and empty pool.
   - the pool is only the row's kind;
   - `same-name` (normalised: case, punctuation and spacing), then `similar` (at least half the words shared, same category), then `other`;
   - deterministic order within a tier;
   - the result type carries no selected or best-match field;
   - **two rows, one application (spec edge case):** after a B repair of the first row creates "X", ranking for a second unresolved row whose draft name is "X" puts that Deliverable in `same-name`, first;
   - **empty pool:** an empty inventory returns `[]`, and the dialog's empty state says so (T033).
-- [ ] T026 [P] [US2] Failing **contract 11** case in `src/lib/scale.test.ts`: ranking over 300 applications stays within the file's existing budget (SC-005).
-- [ ] T027 [US2] Failing tests for **contract 12** in `src/lib/unresolvedRowRepair.test.ts`. `attributeDifferences`:
+- [x] T026 [P] [US2] Failing **contract 11** case in `src/lib/scale.test.ts`: ranking over 300 applications stays within the file's existing budget (SC-005).
+  - Done: Red `/tmp/selara-004-t026-red.log` (missing helper); green `/tmp/selara-004-t026-green.log` (1 passed). Measured 300-candidate ranking under 2 seconds; reversal `/tmp/selara-004-t026-falsify.log` caught an empty ranking.
+- [x] T027 [US2] Failing tests for **contract 12** in `src/lib/unresolvedRowRepair.test.ts`. `attributeDifferences`:
+  - Done: Red `/tmp/selara-004-t027-red.log` (missing helper); green `/tmp/selara-004-t027-green.log` (1 passed). Measured filed-value comparison, including named PPJTI and inherited category.
   - a named provider against a filed `PPJTI` → no difference;
   - an inherited category equal to the filed one → no difference;
   - differing DC city → one difference, `{ field: 'dcCity', filed, current }`;
   - all equal → `[]`.
-- [ ] T028 [US2] Failing tests for **option A** in `src/lib/unresolvedRowRepair.test.ts`, with frozen input:
+- [x] T028 [US2] Failing tests for **option A** in `src/lib/unresolvedRowRepair.test.ts`, with frozen input:
+  - Done: Red `/tmp/selara-004-t028-red.log` (3 option-A failures); green `/tmp/selara-004-t028-green.log` (29 passed). Measured frozen-state writes, prior phase, choices, regeneration and provider preconditions.
   - **Fields written:** exactly the data-model "option A" set.
   - **Prior phase:** added iff `hasLiveHistoryBefore` is false for the chosen entry (FR-011).
   - **Per-field choices:** "update" writes the override field, and "keep" writes nothing.
   - **Post-condition:** with every difference set to update, the row equals the filed row in every column; with a keep, that column files the entry's value.
   - **Preconditions:** `ok: false` for an entry of the wrong kind, an unanswered difference, or a chosen entry that no longer exists.
   - **PPJTI under A (FR-006):** a filed `PPJTI` against an `inhouse` entry is a developer difference. "Update" with an empty provider name, or with `PPJTI`, returns `ok: false`. "Update" with a name writes that name, and the row files `PPJTI`. "Keep" needs no name and files `inhouse`.
-- [ ] T029 [P] [US2] Failing E2E in `e2e/unresolved-row-repair.spec.ts`, using a seeded fixture with a renamed inventory entry:
+- [x] T029 [P] [US2] Failing E2E in `e2e/unresolved-row-repair.spec.ts`, using a seeded fixture with a renamed inventory entry:
+  - Done: Red `/tmp/selara-004-t029-red.log` (3 missing-option failures); green `/tmp/selara-004-t029-green.log` (3 passed). Measured suggestions, search, explicit choice, filed category update/keep and infrastructure-only A.
   - the entry is listed as suggested and **not** selected;
   - search finds a non-suggested entry;
   - a differing category shows filed against current, with the LKPTI note;
@@ -202,17 +207,22 @@ expectation changed**, before anything new calls it.
 
 ### Implementation for User Story 2
 
-- [ ] T030 [US2] Implement `rankRepairCandidates` in `src/lib/unresolvedRowRepair.ts` (research R8). T025 and T026 green.
-- [ ] T031 [US2] Implement `attributeDifferences` via `filedAttributesFor` (research R7). T027 green.
-- [ ] T032 [US2] Extend `applyUnresolvedRowRepair` with option A. T028 green, and T015/T016 still green.
-- [ ] T033 [US2] Extend `src/components/UnresolvedRowRepairDialog.tsx` for A:
+- [x] T030 [US2] Implement `rankRepairCandidates` in `src/lib/unresolvedRowRepair.ts` (research R8). T025 and T026 green.
+  - Done: Implemented in `unresolvedRowRepair.ts`; red/green `/tmp/selara-004-t025-{red,green}.log` and `/tmp/selara-004-t026-{red,green}.log`. Ranking obeys larger-word-count threshold and 300-entry budget.
+- [x] T031 [US2] Implement `attributeDifferences` via `filedAttributesFor` (research R7). T027 green.
+  - Done: Implemented via `filedAttributesFor`; red/green `/tmp/selara-004-t027-{red,green}.log`. Differences match projected filing attributes.
+- [x] T032 [US2] Extend `applyUnresolvedRowRepair` with option A. T028 green, and T015/T016 still green.
+  - Done: Implemented option A; red/green `/tmp/selara-004-t028-{red,green}.log`. Exactly the chosen entry, needed segments, status and initiative asset change.
+- [x] T033 [US2] Extend `src/components/UnresolvedRowRepairDialog.tsx` for A:
+  - Done: Extended the dialog; red/green `/tmp/selara-004-t029-{red,green}.log`. Browser measured explicit candidate and per-field choice, category filing and infrastructure restriction.
   - the searchable candidate list, with a "Suggested" group and nothing pre-selected;
   - a prior-history notice when one will be added;
   - one filed-vs-current row per difference, with a required update/keep choice and an "also changes the LKPTI" note on update;
   - a required provider-name field when "update" is chosen for a filed `PPJTI` developer (FR-006).
 
   T029 green.
-- [ ] T034 [US2] **Falsification.** Revert T030, T031 and T032 in turn, and confirm T025-T029 fail for the right reason. Log to `/tmp/selara-004-us2-falsify.log`.
+- [x] T034 [US2] **Falsification.** Revert T030, T031 and T032 in turn, and confirm T025-T029 fail for the right reason. Log to `/tmp/selara-004-us2-falsify.log`.
+  - Done: Falsification `/tmp/selara-004-us2-falsify.log` and `/tmp/selara-004-t0{26,29,30,31,32}-falsify.log`. Disabling ranking, differences or apply caused the corresponding new tests to fail; all source was restored.
 
 **Checkpoint**: both resolutions work, including ambiguous infrastructure.
 

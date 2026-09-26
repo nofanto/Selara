@@ -129,6 +129,110 @@ test.describe('repair unresolved RPTI row from its finding', () => {
   });
 });
 
+test.describe('US2: repair onto an existing inventory entry', () => {
+  test.beforeEach(async ({ page }) => {
+    await onboard(page);
+    await page.evaluate(() => localStorage.setItem('scenia-e2e', 'true'));
+    await seedReportRecords(page, {
+      assetCategories: [
+        { id: 'repair-cat-12', name: 'Applications', categoryCode: '12' },
+        { id: 'repair-cat-06', name: 'Other applications', categoryCode: '06' },
+      ],
+      assets: [
+        { id: 'repair-asset-suggested', name: 'Renamed teller', categoryId: 'repair-cat-12' },
+        { id: 'repair-asset-other', name: 'Payments Hub', categoryId: 'repair-cat-06' },
+      ],
+      deliverables: [
+        { id: 'repair-suggested', assetId: 'repair-asset-suggested', name: 'Legacy Teller Platform',
+          type: 'application', developer: 'inhouse', dcCity: 'Bandung', dcCountry: 'Indonesia',
+          drCity: 'Surabaya', drCountry: 'Indonesia' },
+        { id: 'repair-other', assetId: 'repair-asset-other', name: 'Payments Hub',
+          type: 'application', developer: 'inhouse', dcCity: 'Jakarta', dcCountry: 'Indonesia',
+          drCity: 'Surabaya', drCountry: 'Indonesia' },
+      ],
+    });
+    await page.getByTestId('nav-reports').click();
+    if (!await page.getByTestId('data-health-report-view').isVisible()) {
+      if (await page.getByTestId('report-back-btn').isVisible()) await page.getByTestId('report-back-btn').click();
+      await page.getByTestId('report-card-data-health').click();
+    }
+  });
+
+  test('suggests a renamed entry without selecting it, finds another by search, and updates its filed category', async ({ page }) => {
+    await repair(page).click();
+    await page.getByTestId('repair-option-existing').click();
+    await expect(page.getByTestId('repair-candidate-repair-suggested')).toContainText('Legacy Teller Platform');
+    await expect(page.getByTestId('repair-suggested')).toContainText('Suggested');
+    await expect(page.getByTestId('repair-confirm')).toBeDisabled();
+    await page.getByTestId('repair-candidate-search').fill('Payments Hub');
+    await expect(page.getByTestId('repair-candidate-repair-suggested')).toHaveCount(0);
+    await page.getByTestId('repair-candidate-repair-other').click();
+    await expect(page.getByTestId('repair-difference-categoryCode')).toContainText('12');
+    await expect(page.getByTestId('repair-difference-categoryCode')).toContainText('06');
+    await expect(page.getByTestId('repair-difference-categoryCode')).toContainText('LKPTI');
+    await page.getByTestId('repair-choice-categoryCode-update').click();
+    await page.getByTestId('repair-confirm').click();
+    await expect(finding(page)).toHaveCount(0);
+    const deliverables = await readStore(page, 'deliverables');
+    expect(deliverables.find(item => item.id === 'repair-other')?.categoryCode).toBe('12');
+    const segments = await readStore(page, 'deliverableSegments');
+    expect(segments).toContainEqual(expect.objectContaining({ id: 'rpti-repair-seg-rpti-import-row-14',
+      deliverableId: 'repair-other' }));
+    await page.getByTestId('report-back-btn').click();
+    await page.getByTestId('report-card-rpti').click();
+    await page.getByTestId('rpti-generate-report-btn').click();
+    await expect(page.getByTestId('rpti-detail-table').locator('tr').filter({ hasText: 'Payments Hub' }))
+      .toContainText('12 —');
+  });
+
+  test('keeping a differing category leaves the entry unchanged', async ({ page }) => {
+    await repair(page).click();
+    await page.getByTestId('repair-option-existing').click();
+    await page.getByTestId('repair-candidate-search').fill('Payments Hub');
+    await page.getByTestId('repair-candidate-repair-other').click();
+    await page.getByTestId('repair-choice-categoryCode-keep').click();
+    await page.getByTestId('repair-confirm').click();
+    await expect(finding(page)).toHaveCount(0);
+    const deliverables = await readStore(page, 'deliverables');
+    expect(deliverables.find(item => item.id === 'repair-other')?.categoryCode).toBeUndefined();
+    await page.getByTestId('report-back-btn').click();
+    await page.getByTestId('report-card-rpti').click();
+    await page.getByTestId('rpti-generate-report-btn').click();
+    await expect(page.getByTestId('rpti-detail-table').locator('tr').filter({ hasText: 'Payments Hub' }))
+      .toContainText('06 —');
+  });
+});
+
+test('US2: infrastructure unresolved row offers only an existing entry', async ({ page }) => {
+  await onboard(page);
+  await page.evaluate(() => localStorage.setItem('scenia-e2e', 'true'));
+  const original = (await readStore(page, 'rptiDetails')).find(item => item.id === 'rpti-import-row-14');
+  const originalInitiative = (await readStore(page, 'initiatives')).find(item => item.id === original?.initiativeId);
+  expect(original).toBeTruthy();
+  expect(originalInitiative).toBeTruthy();
+  await seedReportRecords(page, {
+    rptiDetails: [{ ...original, id: 'infra-unresolved', initiativeId: 'infra-init',
+      targetId: 'rpti-import-unresolved-infra', categoryCode: '51' }],
+    initiatives: [{ ...originalInitiative, id: 'infra-init', name: 'Primary Data Center — Q3 2027' }],
+    assetCategories: [{ id: 'infra-category', name: 'Infrastructure', categoryCode: '51' }],
+    assets: [{ id: 'infra-asset-a', name: 'Primary Data Center', categoryId: 'infra-category' },
+      { id: 'infra-asset-b', name: 'Primary Data Center', categoryId: 'infra-category' }],
+    deliverables: [{ id: 'infra-a', assetId: 'infra-asset-a', name: 'Primary Data Center', type: 'infrastructure' },
+      { id: 'infra-b', assetId: 'infra-asset-b', name: 'Primary Data Center', type: 'infrastructure' }],
+  });
+  await page.getByTestId('nav-reports').click();
+  if (!await page.getByTestId('data-health-report-view').isVisible()) {
+    if (await page.getByTestId('report-back-btn').isVisible()) await page.getByTestId('report-back-btn').click();
+    await page.getByTestId('report-card-data-health').click();
+  }
+  await page.getByTestId('repair-unresolved-row-infra-unresolved').click();
+  await expect(page.getByTestId('repair-option-create')).toHaveCount(0);
+  await page.getByTestId('repair-option-existing').click();
+  await expect(page.getByTestId('repair-candidate-infra-a')).toBeVisible();
+  await expect(page.getByTestId('repair-candidate-infra-b')).toBeVisible();
+  await expect(page.getByTestId('repair-confirm')).toBeDisabled();
+});
+
 test.describe('US3: an importer prior phase that leaves an application out of inventory years', () => {
   const OLD_PRIOR_ID = 'rpti-import-seg-prior-1';
   const GAP_ID = `rpti-import-prior-phase-gap:${OLD_PRIOR_ID}`;
