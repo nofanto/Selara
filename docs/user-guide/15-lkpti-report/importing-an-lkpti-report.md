@@ -27,7 +27,7 @@ Nothing about Programmes, Strategies, Initiatives, Resources, Dependencies, Mile
 There is no **Generate** button in Data Manager any more, and the LKPTI tab there is read-only: it
 shows the rows your import produced, for reference.
 
-You produce the filing from **Reports → LKPTI Report**, where you state the year it covers. The
+You produce the filing from **Reports → LKPTI - Application List Report**, where you state the year it covers. The
 result is built fresh from your applications each time, so nothing you imported can be overwritten
 by generating — the values now live on the applications themselves, not on the rows.
 

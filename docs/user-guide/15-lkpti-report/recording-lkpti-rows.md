@@ -1,6 +1,6 @@
 # Recording LKPTI Report Rows
 
-LKPTI Format 3.2.6 is the application inventory as at the end of a filing year. Open **Reports → LKPTI Report**, enter the year, and click **Generate LKPTI**.
+LKPTI Format 3.2.6 is the application inventory as at the end of a filing year. Open **Reports → LKPTI - Application List Report**, enter the year, and click **Generate LKPTI**.
 
 A Deliverable qualifies when its live lifecycle segment spans **31 December** of the selected year. Planned applications, applications not yet live, and applications whose live segment has already ended are excluded.
 
