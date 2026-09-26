@@ -12,10 +12,11 @@ interface RptiReportViewProps {
   deliverableStatuses: DeliverableStatus[];
   defaultCurrency?: string;
   reportYear?: number;
-  blockingIssues?: string[];
+  blockingIssues?: Array<{ message: string; rowId?: string }>;
+  onRepairUnresolvedRow?: (rowId: string) => void;
 }
 
-export function RptiReportView({ rptiDetails, initiatives, deliverables, assets, deliverableSegments, deliverableStatuses, defaultCurrency = 'USD', reportYear, blockingIssues = [] }: RptiReportViewProps) {
+export function RptiReportView({ rptiDetails, initiatives, deliverables, assets, deliverableSegments, deliverableStatuses, defaultCurrency = 'USD', reportYear, blockingIssues = [], onRepairUnresolvedRow }: RptiReportViewProps) {
   const targetName = (detail: RptiDetail): string => {
     if (detail.targetType === 'deliverable') return deliverables.find(a => a.id === detail.targetId)?.name ?? '—';
     return assets.find(a => a.id === detail.targetId)?.name ?? '—';
@@ -43,7 +44,16 @@ export function RptiReportView({ rptiDetails, initiatives, deliverables, assets,
       {blockingIssues.length > 0 && (
         <div data-testid="rpti-pre-export-gate" role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
           <p className="font-medium">Resolve these issues before exporting the RPTI filing:</p>
-          <ul className="mt-1 list-disc pl-5">{blockingIssues.map(issue => <li key={issue}>{issue}</li>)}</ul>
+          <ul className="mt-1 list-disc pl-5">{blockingIssues.map((issue, index) => (
+            <li key={`${issue.rowId ?? index}-${issue.message}`}>
+              {issue.message}
+              {issue.rowId && onRepairUnresolvedRow && (
+                <button type="button" data-testid={`repair-unresolved-row-${issue.rowId}`}
+                  onClick={() => onRepairUnresolvedRow(issue.rowId!)}
+                  className="ml-2 rounded border border-red-300 bg-white px-2 py-0.5 font-medium">Repair</button>
+              )}
+            </li>
+          ))}</ul>
         </div>
       )}
 

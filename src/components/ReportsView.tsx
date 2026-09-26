@@ -13,6 +13,8 @@ import { DataHealthReportView } from './DataHealthReportView';
 import { projectRptiReturn, reconcileRptiReturn } from '../lib/rpti';
 import { generateLkptiDetails } from '../lib/lkpti';
 import { computeDataHealth } from '../lib/dataHealth';
+import { isRepairableUnresolvedRow, type UnresolvedRowRepairRequest, type UnresolvedRowRepairState } from '../lib/unresolvedRowRepair';
+import { UnresolvedRowRepairDialog } from './UnresolvedRowRepairDialog';
 
 interface ReportsViewProps {
   assets: Asset[];
@@ -31,6 +33,8 @@ interface ReportsViewProps {
   lkptiDetails?: LkptiDetail[];
   onSaveAsset?: (asset: Asset) => void;
   onNavigate?: (location: HealthIssueLocation, entityName: string) => void;
+  onRepairUnresolvedRow?: (request: UnresolvedRowRepairRequest) => Promise<{ ok: true; state: UnresolvedRowRepairState } | { ok: false; reason: string }>;
+  onExtendImportPriorPhase?: (segmentId: string) => void;
   /**
    * Open directly on a given report instead of the card grid. Needed because
    * `selectedReport` is local state with no other way in, and onboarding has to
@@ -103,7 +107,7 @@ function depSentence(dep: Dependency, src: Initiative, tgt: Initiative, perspect
   return `${src.name} and ${tgt.name} are related.`;
 }
 
-export function ReportsView({ assets, initiatives, milestones, dependencies, currentData, programmes, strategies, assetCategories, resources = [], deliverables = [], deliverableSegments = [], deliverableStatuses = [], rptiDetails = [], lkptiDetails = [], onSaveAsset, onNavigate, initialReport }: ReportsViewProps) {
+export function ReportsView({ assets, initiatives, milestones, dependencies, currentData, programmes, strategies, assetCategories, resources = [], deliverables = [], deliverableSegments = [], deliverableStatuses = [], rptiDetails = [], lkptiDetails = [], onSaveAsset, onNavigate, onRepairUnresolvedRow, onExtendImportPriorPhase, initialReport }: ReportsViewProps) {
   const [selectedReport, setSelectedReport] = useState<ReportSlug | null>(initialReport ?? null);
   // Offered, not assumed: the year the preparer stated at onboarding pre-fills the box
   // they still have to see and confirm (FR-009, contract 1). An empty default is correct
@@ -114,6 +118,7 @@ export function ReportsView({ assets, initiatives, milestones, dependencies, cur
     currentData.timelineSettings.onboardingLkptiYear ? String(currentData.timelineSettings.onboardingLkptiYear) : '');
   const [generatedRptiDetails, setGeneratedRptiDetails] = useState<RptiDetail[] | null>(null);
   const [generatedLkptiDetails, setGeneratedLkptiDetails] = useState<LkptiDetail[] | null>(null);
+  const [repairRowId, setRepairRowId] = useState<string | null>(null);
   /*
    * One piece of state, not two. The panel is open precisely when its asset still
    * exists, so deriving that from `assets` rather than mirroring it into a second
@@ -197,10 +202,28 @@ export function ReportsView({ assets, initiatives, milestones, dependencies, cur
           // call is the source-side `initiative-rpti-*` diagnostics.
           programmes, strategies, rptiDetails: [], lkptiDetails,
           timelineSettings: currentData.timelineSettings,
-        }).filter(issue => issue.severity === 'error' && (issue.entityType === 'RptiDetail' || issue.id.startsWith('initiative-rpti-'))).map(issue => issue.message),
-        ...rptiReconciliationFindings.map(finding => finding.message),
+        }).filter(issue => issue.severity === 'error' && (issue.entityType === 'RptiDetail' || issue.id.startsWith('initiative-rpti-'))).map(issue => ({ message: issue.message })),
+        ...rptiReconciliationFindings.map(finding => ({ message: finding.message,
+          ...(finding.reason === 'missing-target' && rptiDetails.some(row => row.id === finding.rowId && isRepairableUnresolvedRow(row))
+            ? { rowId: finding.rowId } : {}) })),
       ]
     : [];
+
+  const repairRow = rptiDetails.find(row => row.id === repairRowId && isRepairableUnresolvedRow(row));
+  const repairDialog = repairRow && onRepairUnresolvedRow && initiatives.some(item => item.id === repairRow.initiativeId) ? (
+    <UnresolvedRowRepairDialog key={repairRow.id} row={repairRow} initiatives={initiatives}
+      assets={assets} assetCategories={assetCategories} deliverables={deliverables}
+      deliverableSegments={deliverableSegments} deliverableStatuses={deliverableStatuses}
+      onCancel={() => setRepairRowId(null)}
+      onConfirm={async request => {
+        const result = await onRepairUnresolvedRow(request);
+        if (result.ok) {
+          if (generatedRptiDetails && rptiYear) setGeneratedRptiDetails(projectRptiReturn(result.state, rptiYear));
+          setRepairRowId(null);
+        }
+        return result;
+      }} />
+  ) : null;
 
   const cards: { slug: ReportSlug; icon: React.ReactNode; title: string; description: string }[] = [
     {
@@ -242,7 +265,8 @@ export function ReportsView({ assets, initiatives, milestones, dependencies, cur
     {
       slug: 'lkpti',
       icon: <ListChecks size={28} className="text-fuchsia-500" />,
-      title: 'LKPTI Report',
+      // LKPTI has many appendix reports; this card is only the Application List (3.2.6).
+      title: 'LKPTI - Application List Report',
       description: 'Indonesian OJK LKPTI Application List (Format 3.2.6) — an inventory of currently live applications.',
     },
     {
@@ -539,20 +563,22 @@ export function ReportsView({ assets, initiatives, milestones, dependencies, cur
             defaultCurrency={currentData.timelineSettings.defaultCurrency || 'USD'}
             reportYear={generatedRptiDetails ? rptiYear : undefined}
             blockingIssues={rptiPreExportIssues}
+            onRepairUnresolvedRow={setRepairRowId}
           />
+          {repairDialog}
         </div>
       </div>
     );
   }
 
-  // ── LKPTI Report ─────────────────────────────────────────────
+  // ── LKPTI - Application List Report ───────────────────────────
   if (selectedReport === 'lkpti') {
     return (
       <div data-testid="report-view-lkpti" className="h-full overflow-y-auto p-6 bg-slate-50">
         <div className="max-w-6xl mx-auto">
           <BackButton onBack={() => setSelectedReport(null)} />
           <div className="mb-6">
-            <h1 className="text-xl font-bold text-slate-800">LKPTI Report</h1>
+            <h1 className="text-xl font-bold text-slate-800">LKPTI - Application List Report</h1>
             <p className="text-sm text-slate-500 mt-1">
               Indonesian OJK LKPTI Application List (Format 3.2.6) — an inventory of currently live applications.
             </p>
@@ -619,7 +645,10 @@ export function ReportsView({ assets, initiatives, milestones, dependencies, cur
             lkptiDetails={lkptiDetails}
             timelineSettings={currentData.timelineSettings}
             onNavigate={(location, entityName) => onNavigate?.(location, entityName)}
+            onRepairUnresolvedRow={setRepairRowId}
+            onExtendImportPriorPhase={onExtendImportPriorPhase}
           />
+          {repairDialog}
         </div>
       </div>
     );

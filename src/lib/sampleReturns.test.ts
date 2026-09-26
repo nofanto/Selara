@@ -3,7 +3,8 @@ import * as XLSX from 'xlsx';
 import { readFileSync } from 'node:fs';
 import { parseLkptiImportWorkbook, deriveWorkspaceFromLkptiImport } from './lkptiImport';
 import { parseRptiImportWorkbook, deriveWorkspaceFromRptiImport } from './rptiImport';
-import { projectRptiReturn, reconcileRptiReturn } from './rpti';
+import { projectRptiReturn, reconcileRptiReturn, resolveCost } from './rpti';
+import { applyUnresolvedRowRepair, unresolvedRowRepairDraft } from './unresolvedRowRepair';
 import { generateLkptiDetails } from './lkpti';
 import { mergeDeliverableStatuses } from './deliverableStatusDefaults';
 import { computeDataHealth } from './dataHealth';
@@ -17,6 +18,77 @@ const load = (n: string) => XLSX.read(readFileSync(new URL(`../../docs/sample-da
  * `node scripts/generate-sample-returns.mjs`.
  */
 describe('the published sample returns', () => {
+  it('SC-001: option B reproduces the Legacy Teller filing with no re-keyed values', () => {
+    const inv = deriveWorkspaceFromLkptiImport(parseLkptiImportWorkbook(load('sample-lkpti-2026.xlsx')).rows, 2026);
+    const out = deriveWorkspaceFromRptiImport(parseRptiImportWorkbook(load('sample-rpti-2027.xlsx')).rows, 2027, {
+      deliverables: inv.deliverables, assets: inv.assets, assetCategories: inv.assetCategories,
+      deliverableSegments: inv.deliverableSegments, deliverableStatuses: inv.deliverableStatuses,
+    });
+    const workspace = {
+      assets: [...inv.assets, ...out.assets], assetCategories: [...inv.assetCategories, ...out.assetCategories],
+      deliverables: [...inv.deliverables.map(d => out.updatedDeliverables.find(u => u.id === d.id) ?? d), ...out.deliverables],
+      deliverableSegments: [...inv.deliverableSegments, ...out.deliverableSegments],
+      deliverableStatuses: mergeDeliverableStatuses(inv.deliverableStatuses, out.deliverableStatuses),
+      initiatives: out.initiatives, rptiDetails: out.rptiDetails,
+    };
+    const filed = out.rptiDetails.find(r => r.targetId.startsWith('rpti-import-unresolved-'))!;
+    const draft = unresolvedRowRepairDraft(filed, workspace);
+    expect(draft.capex.value).toBeGreaterThan(0);
+    const repaired = applyUnresolvedRowRepair(workspace, { rowId: filed.id, option: 'create', confirmed: {
+      name: draft.name.value, filedYear: draft.filedYear.value, quarter: draft.quarter.value,
+      categoryCode: draft.categoryCode.value, developer: draft.developer.value,
+      providerName: draft.providerName.value, ppjtiRelatedParty: draft.ppjtiRelatedParty.value,
+      dcCity: draft.dcCity.value, dcCountry: draft.dcCountry.value,
+      drCity: draft.drCity.value, drCountry: draft.drCountry.value,
+      remarks: draft.remarks.value, capex: draft.capex.value, opex: draft.opex.value,
+    } });
+    expect(repaired.ok).toBe(true);
+    if (!repaired.ok) return;
+    expect(reconcileRptiReturn({ ...repaired.state, storedDetails: repaired.state.rptiDetails })).toEqual([]);
+    const generated = projectRptiReturn(repaired.state, 2027).filter(r => r.initiativeId === filed.initiativeId);
+    expect(generated).toHaveLength(1);
+    const fields = ['developmentType', 'plannedImplementationQuarter', 'categoryCode', 'developer',
+      'ppjtiRelatedParty', 'dcCity', 'dcCountry', 'drCity', 'drCountry', 'remarks'] as const;
+    for (const field of fields) expect(generated[0][field], field).toEqual(filed[field]);
+    expect(resolveCost(generated[0], repaired.state.deliverableSegments)).toEqual({
+      capexAmount: draft.capex.value, opexAmount: draft.opex.value,
+    });
+  });
+  it('SC-004: pins year-end inventories before and after the Legacy Teller B repair', () => {
+    const inv = deriveWorkspaceFromLkptiImport(parseLkptiImportWorkbook(load('sample-lkpti-2026.xlsx')).rows, 2026);
+    const out = deriveWorkspaceFromRptiImport(parseRptiImportWorkbook(load('sample-rpti-2027.xlsx')).rows, 2027, {
+      deliverables: inv.deliverables, assets: inv.assets, assetCategories: inv.assetCategories,
+      deliverableSegments: inv.deliverableSegments, deliverableStatuses: inv.deliverableStatuses,
+    });
+    const workspace = {
+      assets: [...inv.assets, ...out.assets], assetCategories: [...inv.assetCategories, ...out.assetCategories],
+      deliverables: [...inv.deliverables.map(d => out.updatedDeliverables.find(u => u.id === d.id) ?? d), ...out.deliverables],
+      deliverableSegments: [...inv.deliverableSegments, ...out.deliverableSegments],
+      deliverableStatuses: mergeDeliverableStatuses(inv.deliverableStatuses, out.deliverableStatuses),
+      initiatives: out.initiatives, rptiDetails: out.rptiDetails,
+    };
+    const filed = out.rptiDetails.find(r => r.targetId.startsWith('rpti-import-unresolved-'))!;
+    const draft = unresolvedRowRepairDraft(filed, workspace);
+    const years = [2026, 2027, 2028, 2029, 2030, 2031, 2032];
+    const counts = (state: typeof workspace) => years.map(year =>
+      generateLkptiDetails({ ...state, asAtDate: `${year}-12-31` }).length);
+    const importedCounts = counts(workspace);
+    const repaired = applyUnresolvedRowRepair(workspace, { rowId: filed.id, option: 'create', confirmed: {
+      name: draft.name.value, filedYear: draft.filedYear.value, quarter: draft.quarter.value,
+      categoryCode: draft.categoryCode.value, developer: draft.developer.value,
+      providerName: draft.providerName.value, ppjtiRelatedParty: draft.ppjtiRelatedParty.value,
+      dcCity: draft.dcCity.value, dcCountry: draft.dcCountry.value,
+      drCity: draft.drCity.value, drCountry: draft.drCountry.value,
+      remarks: draft.remarks.value, capex: draft.capex.value, opex: draft.opex.value,
+    } });
+    expect(repaired.ok).toBe(true);
+    if (!repaired.ok) return;
+    const repairedCounts = counts(repaired.state);
+    process.stdout.write(`SC-004 LKPTI 31 December: ${JSON.stringify({ years, importOnly: importedCounts, afterRepair: repairedCounts })}\n`);
+    expect(importedCounts).toEqual([13, 16, 16, 16, 16, 16, 3]);
+    expect(repairedCounts).toEqual([14, 17, 17, 17, 17, 17, 4]);
+  });
+
   it('LKPTI parses with nothing skipped', () => {
     const { rows, skipped } = parseLkptiImportWorkbook(load('sample-lkpti-2026.xlsx'));
     expect(skipped).toEqual([]);
@@ -86,6 +158,22 @@ describe('the published sample returns', () => {
     expect(named, 'the one underivable row must raise exactly one finding').toHaveLength(1);
     expect(named[0].message, 'the finding must name the repair, not just the symptom')
       .toMatch(/Deliverable|application/i);
+    expect(named[0].message).toMatch(/^Use Repair on this finding/);
+    // #51 (Q22): the manual repair must not silently file different values, so the
+    // message states what this return filed — measured values, not the unit fixture's.
+    const filedInitiative = out.initiatives.find(i => i.id === unresolvedRow.initiativeId)!;
+    expect(unresolvedRow.developmentType).toBe('upgrade'); // guard: the sample's unresolved row
+    expect(named[0].message).not.toMatch(/no longer exists/i);
+    expect(named[0].message).toMatch(/new instead of upgrade/);
+    expect(named[0].message).toContain(`filed quarter, ${unresolvedRow.plannedImplementationQuarter}`);
+    expect(named[0].message).toContain(filedInitiative.capex.toLocaleString());
+    expect(named[0].message).toContain(filedInitiative.opex.toLocaleString());
+    expect(named[0].message).toContain(`"${unresolvedRow.remarks}"`);
+    // A bare new Deliverable files its category default and blank DC/DR, with no finding.
+    expect(named[0].message).toContain(`Category Code Override ${unresolvedRow.categoryCode}`);
+    expect(named[0].message).toContain(`DC City Override ${unresolvedRow.dcCity}, DC Country Override ${unresolvedRow.dcCountry}`);
+    expect(named[0].message).toContain(`DR City Override ${unresolvedRow.drCity}, DR Country Override ${unresolvedRow.drCountry}`);
+    expect(filedInitiative.capex).toBeGreaterThan(0); // guard: a 0 budget would make the cost check vacuous
 
     // Guard against a gate that simply shouts at everything: the twelve rows that
     // *can* be derived must stay silent, or the preparer learns to ignore it.

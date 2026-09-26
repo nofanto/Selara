@@ -1,6 +1,6 @@
 import { demoInitiatives, demoDeliverables, demoDeliverableSegments, demoDeliverableStatuses, demoAssets, demoAssetCategories } from '../demoData';
 import { describe, expect, it } from 'vitest';
-import { projectRptiReturn, reconcileRptiReturn, ProjectRptiInput, periodForQuarter, deriveQuarterFromDate, resolveCost } from './rpti';
+import { projectRptiReturn, reconcileRptiReturn, ProjectRptiInput, periodForQuarter, deriveQuarterFromDate, resolveCost, hasLiveHistoryBefore, continuousPriorLivePhase, openEndedDate, filedAttributesFor } from './rpti';
 import type { AssetCategory, Asset, Deliverable, DeliverableSegment, DeliverableStatus, Initiative, RptiDetail } from '../types';
 
 const statuses: DeliverableStatus[] = [
@@ -55,6 +55,61 @@ function makeContext(overrides: Partial<ProjectRptiInput> = {}): ProjectRptiInpu
     ...overrides,
   };
 }
+
+describe('hasLiveHistoryBefore', () => {
+  it('requires an earlier live start on the same Deliverable', () => {
+    const segments = [
+      makeSegment({ id: 'planned', startDate: '2025-01-01', status: 'appstatus-planned' }),
+      makeSegment({ id: 'other', deliverableId: 'deliv-2', startDate: '2025-01-01' }),
+      makeSegment({ id: 'same-day', startDate: '2026-04-01' }),
+    ];
+    expect(hasLiveHistoryBefore('deliv-1', '2026-04-01', segments, statuses)).toBe(false);
+    expect(hasLiveHistoryBefore('deliv-1', '2026-04-01', [...segments, makeSegment({ id: 'earlier-live', startDate: '2026-03-31' })], statuses)).toBe(true);
+  });
+});
+
+describe('continuousPriorLivePhase', () => {
+  it('is unlinked and lasts through the shared planning horizon', () => {
+    const phase = continuousPriorLivePhase('d', 2027, 'live', 'id');
+    expect(phase).toEqual({ id: 'id', deliverableId: 'd', startDate: '2026-01-01', endDate: openEndedDate(2027), status: 'live' });
+    expect(phase).not.toHaveProperty('initiativeId');
+  });
+});
+
+describe('filedAttributesFor', () => {
+  const category = makeAssetCategory({ categoryCode: '07', dcCity: 'Singapore', dcCountry: 'Singapore', drCity: 'Batam', drCountry: 'Indonesia' });
+  const assets = [makeAsset()];
+  const categories = [category];
+  it('derives named provider, inhouse, inherited defaults and overrides', () => {
+    expect(filedAttributesFor(makeDeliverable({ developer: 'Vendor X', ppjtiRelatedParty: 'yes' }), assets, categories)).toMatchObject({
+      categoryCode: '07', developer: 'PPJTI', ppjtiRelatedParty: 'yes', dcCity: 'Singapore', drCity: 'Batam',
+    });
+    expect(filedAttributesFor(makeDeliverable({ developer: 'inhouse', ppjtiRelatedParty: 'yes' }), assets, categories)).toMatchObject({
+      categoryCode: '07', developer: 'inhouse', ppjtiRelatedParty: 'n/a', dcCity: 'Singapore', drCity: 'Batam',
+    });
+    expect(filedAttributesFor(makeDeliverable(), assets, categories)).toMatchObject({
+      categoryCode: '07', ppjtiRelatedParty: 'n/a', dcCity: 'Singapore', dcCountry: 'Singapore', drCity: 'Batam', drCountry: 'Indonesia',
+    });
+    expect(filedAttributesFor(makeDeliverable({ categoryCode: '04', dcCity: 'Jakarta', drCountry: 'Malaysia' }), assets, categories)).toMatchObject({
+      categoryCode: '04', dcCity: 'Jakarta', dcCountry: 'Singapore', drCity: 'Batam', drCountry: 'Malaysia',
+    });
+  });
+
+  it('matches every projected Deliverable in the existing demo fixture', () => {
+    const input = { initiatives: demoInitiatives, deliverables: demoDeliverables,
+      deliverableSegments: demoDeliverableSegments, deliverableStatuses: demoDeliverableStatuses,
+      assets: demoAssets, assetCategories: demoAssetCategories };
+    const year = new Date().getFullYear();
+    const keys = ['categoryCode', 'developer', 'ppjtiRelatedParty', 'dcCity', 'dcCountry', 'drCity', 'drCountry'] as const;
+    const rows = [year - 1, year, year + 1, year + 2].flatMap(y => projectRptiReturn(input, y));
+    expect(rows.length).toBeGreaterThan(0); // guard: an empty projection would make the loop vacuous
+    for (const row of rows) {
+      const deliverable = demoDeliverables.find(d => d.id === row.targetId)!;
+      const attributes = filedAttributesFor(deliverable, demoAssets, demoAssetCategories);
+      expect(Object.fromEntries(keys.map(key => [key, row[key]]))).toEqual(Object.fromEntries(keys.map(key => [key, attributes[key]])));
+    }
+  });
+});
 
 describe('projectRptiReturn', () => {
   it('files the shipped demo only in each go-live year', () => {
@@ -735,14 +790,17 @@ describe('reconcileRptiReturn — stored rows are reconciliation evidence, never
     ]);
   });
 
-  it('names an anchored stored row whose implementation no longer exists and gives a segment repair (T038)', () => {
+  it('names an anchored stored row whose implementation no longer exists and gives a repair that can clear it (T038)', () => {
     const findings = reconcileRptiReturn(ctx([
       storedRow({ deliverableSegmentId: 'deleted-implementation' }),
     ], [segment()]));
 
     expect(findings).toMatchObject([{ rowId: 'row-1' }]);
-    expect(findings[0].message).toMatch(/segment panel/i);
-    expect(findings[0].message).toMatch(/timeline/i);
+    // #51 review: a recreated segment is a different implementation and, by this very
+    // rule, can never clear the finding, so the repair is a restore or a re-import.
+    expect(findings[0].message).toMatch(/History tab/);
+    expect(findings[0].message).toMatch(/re-import the filing/i);
+    expect(findings[0].message).not.toMatch(/segment panel/i);
   });
 
   it('matches only by implementation identity when stored contents differ from projection (T039)', () => {
@@ -844,6 +902,149 @@ describe('reconcileRptiReturn — stored rows are reconciliation evidence, never
 
     repaired.deliverableSegments = [segment()];
     expect(reconcileRptiReturn(repaired)).toEqual([]);
+  });
+
+  // #51 interim fix (Q22). Following the old message cleared the gate while the
+  // return then filed `new`, 0/0 and an empty Keterangan instead of what was filed.
+  describe('the manual repair must say which filed values it does not carry over (#51)', () => {
+    const unresolved = storedRow({
+      id: 'rpti-import-row-1', targetId: 'rpti-import-unresolved-1', developmentType: 'upgrade',
+      plannedImplementationQuarter: 'Q3', remarks: 'Not present in the 2026 LKPTI',
+    });
+    const importedInitiative = makeInitiative({
+      name: 'Core Banking GL — Q3 2027', capex: 2_900_000_000, opex: 640_000_000,
+    });
+    const messageFor = (row: RptiDetail) => {
+      const input = ctx([row], []);
+      input.initiatives = [importedInitiative];
+      const findings = reconcileRptiReturn(input);
+      expect(findings).toHaveLength(1); // guard: otherwise every assertion below is vacuous
+      expect(findings[0].reason).toBe('missing-target');
+      return findings[0].message;
+    };
+
+    it('does not claim an unresolved import\'s application once existed', () => {
+      const message = messageFor(unresolved);
+      expect(message).toMatch(/^Use Repair on this finding/);
+      expect(message).not.toMatch(/no longer exists/i);
+      // An ambiguous match is unresolved too (several entries, not none).
+      expect(message).toMatch(/could not match to exactly one entry in your inventory/i);
+    });
+
+    it('does not call an infrastructure row an application (Codex review)', () => {
+      // Ambiguous infrastructure matches stay unresolved (FR-019a creates only on no match).
+      const message = messageFor({ ...unresolved, categoryCode: '51' });
+      expect(message).not.toMatch(/application/i);
+    });
+
+    it('does not present a possibly edited budget as the filed figures (Codex review)', () => {
+      // The stored row holds no cost (FR-026), so the budget is the best available
+      // source, but it may have been edited since import (Q22).
+      expect(messageFor(unresolved)).toMatch(/current budget.*check it against the filed return/i);
+    });
+
+    it('states each filed value the manual repair would otherwise lose', () => {
+      const message = messageFor(unresolved);
+      expect(message).toMatch(/earlier live segment/i);
+      expect(message).toMatch(/as new instead of upgrade/i);
+      expect(message).toMatch(/Q3/);
+      expect(message).toContain((2_900_000_000).toLocaleString());
+      expect(message).toContain((640_000_000).toLocaleString());
+      expect(message).toContain('"Not present in the 2026 LKPTI"');
+    });
+
+    it('keeps "no longer exists" for a deleted application, and warns about the same values', () => {
+      const message = messageFor(storedRow({ targetId: 'deliv-gone', developmentType: 'upgrade', remarks: 'kept' }));
+      expect(message).toMatch(/no longer exists/i);
+      expect(message).toMatch(/as new instead of upgrade/i);
+      // A reassigned existing segment keeps its values, so only a new one files 0 (Codex review).
+      expect(message).toMatch(/a new segment's CapEx and OpEx file as 0/);
+      expect(message).toMatch(/a new segment's Keterangan files empty unless entered as "kept"/);
+    });
+
+    it('ends as one sentence whether or not the filed remark ends in a full stop', () => {
+      for (const row of [unresolved, { ...unresolved, remarks: 'ends with a stop.' }, { ...unresolved, remarks: undefined }]) {
+        const message = messageFor(row);
+        expect(message).toMatch(/[^.;]\.$/);
+        expect(message).not.toContain('.".');
+      }
+    });
+
+    it('states the filed Deliverable attributes a bare new Deliverable would file differently (Codex review)', () => {
+      // Measured on the sample: a bare repair filed category 01, no developer and empty
+      // DC/DR where the row filed 12, inhouse, Jakarta and Surabaya, with no finding at all.
+      const message = messageFor({ ...unresolved, categoryCode: '12', developer: 'inhouse',
+        dcCity: 'Jakarta', dcCountry: 'Indonesia', drCity: 'Surabaya', drCountry: 'Indonesia' });
+      expect(message).toContain('Category Code Override 12');
+      expect(message).toContain('Developer inhouse');
+      // The Deliverables tab has four separate fields, not combined ones (Codex review).
+      expect(message).toContain('DC City Override Jakarta, DC Country Override Indonesia');
+      expect(message).toContain('DR City Override Surabaya, DR Country Override Indonesia');
+      expect(message).not.toMatch(/Provider Related Party/);
+    });
+
+    it('asks for the provider name and related party for a row filed as PPJTI', () => {
+      const message = messageFor({ ...unresolved, developer: 'PPJTI', ppjtiRelatedParty: 'yes' });
+      expect(message).toMatch(/Developer the provider's name \(filed as PPJTI\)/);
+      expect(message).toContain('Provider Related Party yes');
+    });
+
+    it('states a filed related party of n/a for a PPJTI row, which a blank Deliverable would not file (Codex review)', () => {
+      expect(messageFor({ ...unresolved, developer: 'PPJTI', ppjtiRelatedParty: 'n/a' })).toContain('Provider Related Party n/a');
+    });
+
+    it('sends every anchored row whose implementation is gone to restore or re-import, whatever else is missing (Codex review)', () => {
+      const gone = { deliverableSegmentId: 'seg-gone' };
+      const cases: [string, RptiDetail, string][] = [
+        ['initiative gone, target kept', storedRow({ ...gone, initiativeId: 'init-gone' }), 'missing-initiative'],
+        ['initiative and target gone', storedRow({ ...gone, initiativeId: 'init-gone', targetId: 'deliv-gone' }), 'missing-initiative'],
+        ['legacy asset target', storedRow({ ...gone, targetType: 'asset', targetId: 'asset-1' }), 'asset-target'],
+      ];
+      for (const [name, row, reason] of cases) {
+        const findings = reconcileRptiReturn(ctx([row], []));
+        expect(findings, name).toHaveLength(1);
+        expect(findings[0].reason, name).toBe(reason);
+        expect(findings[0].message, name).toMatch(/History tab/);
+        expect(findings[0].message, name).toMatch(/re-import the filing/i);
+      }
+    });
+
+    it('clears once the anchored implementation is restored, which is what the advice promises', () => {
+      const row = storedRow({ targetId: 'deliv-gone', deliverableSegmentId: 'seg-live-2027' });
+      const deleted = ctx([row], []);
+      deleted.deliverables = [];
+      expect(reconcileRptiReturn(deleted)[0]?.message).toMatch(/History tab/); // guard: the dead-anchor case
+      const restored = ctx([row], [segment({ deliverableId: 'deliv-gone' })]);
+      restored.deliverables = [makeDeliverable({ id: 'deliv-gone' })];
+      expect(reconcileRptiReturn(restored)).toEqual([]);
+    });
+
+    it('does not send an anchored row with a deleted implementation to a repair that cannot clear it', () => {
+      // Its Deliverable was deleted, which removed the anchored segment too. T038 forbids
+      // falling back to another implementation, so a recreated one never matches.
+      const input = ctx([storedRow({ targetId: 'deliv-gone', deliverableSegmentId: 'seg-gone', developmentType: 'upgrade' })], []);
+      const [finding] = reconcileRptiReturn(input);
+      expect(finding.reason).toBe('missing-target');
+      expect(finding.message).toMatch(/History tab/);
+      expect(finding.message).toMatch(/re-import the filing/i);
+      expect(finding.message).not.toMatch(/create or open the Deliverable's live lifecycle segment/);
+    });
+
+    it('keeps the segment-panel repair when the anchored segment still exists but is not live', () => {
+      // That one can be repaired in place: give the same segment a live status again.
+      const findings = reconcileRptiReturn(ctx([storedRow({ deliverableSegmentId: 'seg-live-2027' })],
+        [segment({ status: 'appstatus-planned' })]));
+      expect(findings).toHaveLength(1);
+      expect(findings[0].reason).toBe('unanchored');
+      expect(findings[0].message).toMatch(/segment panel/i);
+      expect(findings[0].message).not.toMatch(/History tab/);
+    });
+
+    it('does not warn about the development type for a row filed as new', () => {
+      const message = messageFor(storedRow({ targetId: 'deliv-gone', developmentType: 'new' }));
+      expect(message).not.toMatch(/instead of upgrade/i);
+      expect(message).not.toMatch(/Keterangan/);
+    });
   });
 
   it('keeps a missing-initiative finding until its replacement also has the named segment', () => {

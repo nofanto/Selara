@@ -4,7 +4,7 @@ import {
   Initiative, Programme, RptiCategoryCode, RptiDetail, RptiDeveloper, RptiDevelopmentType,
   RptiQuarter, RptiRelatedParty,
 } from '../types';
-import { RPTI_CATEGORY_LABELS, periodForQuarter, isLiveStatusId, openEndedDate } from './rpti';
+import { RPTI_CATEGORY_LABELS, periodForQuarter, hasLiveHistoryBefore, openEndedDate, continuousPriorLivePhase, UNRESOLVED_IMPORT_TARGET_PREFIX, INFRASTRUCTURE_CODES } from './rpti';
 import { IN_PRODUCTION_STATUS, SEEDED_DELIVERABLE_STATUSES } from './deliverableStatusDefaults';
 
 /**
@@ -24,13 +24,6 @@ export const RPTI_IMPORT_HEADERS = [
   'Pengembang', 'PPJTI Pihak Terkait', 'Lokasi Data Center', 'Lokasi Disaster Recovery Center',
   'Waktu Rencana Implementasi', 'Estimasi Biaya CapEx', 'Estimasi Biaya OpEx', 'Keterangan',
 ];
-
-/**
- * The five codes that describe infrastructure rather than an application.
- * RPTI carries both; LKPTI (Daftar Aplikasi) carries only applications, which is
- * why `generateLkptiDetails` filters by type and `projectRptiReturn` must not.
- */
-const INFRASTRUCTURE_CODES = new Set<string>(['51', '52', '53', '54', '99']);
 
 export interface RptiImportRow {
   rowNumber: number;
@@ -327,7 +320,7 @@ export function deriveWorkspaceFromRptiImport(
         // an id that will not resolve — computeDataHealth's existing rpti-target
         // check reports it, so no new rule and no import-results store is needed.
         unresolved.push({ rowNumber: row.rowNumber, name: row.name, categoryCode: row.categoryCode });
-        targetId = `rpti-import-unresolved-${n}`;
+        targetId = `${UNRESOLVED_IMPORT_TARGET_PREFIX}${n}`;
         // The report row's target is deliberately left unresolvable (that is what
         // data health reports), but the initiative must not also dangle — one
         // finding per problem, not three.
@@ -368,11 +361,8 @@ export function deriveWorkspaceFromRptiImport(
       // upgrade with no inventory history (infrastructure cannot be in LKPTI)
       // also needs a prior live phase to preserve its filed development type.
       if (row.developmentType === 'upgrade') {
-        deliverableSegments.push({
-          id: `rpti-import-seg-prior-${n}`, deliverableId: targetId,
-          startDate: `${reportYear - 1}-01-01`, endDate: `${reportYear - 1}-12-31`,
-          status: RPTI_IMPORT_LIVE_STATUS_ID,
-        });
+        deliverableSegments.push(continuousPriorLivePhase(
+          targetId, reportYear, RPTI_IMPORT_LIVE_STATUS_ID, `rpti-import-seg-prior-${n}`));
       }
       anchorSegmentId = `rpti-import-seg-${n}`;
       deliverableSegments.push({
@@ -391,23 +381,19 @@ export function deriveWorkspaceFromRptiImport(
       // this import, and is compared with this implementation's date (contract 2b),
       // not the report-year boundary. The filed quarter itself is always a live
       // start, for both new and upgrade rows.
-      const targetAlreadyLiveBeforeImplementation = [
-        ...(existing.deliverableSegments ?? []),
-        ...deliverableSegments,
-      ].some(seg =>
-        seg.deliverableId === targetId
-        && seg.startDate < qStart
-        && isLiveStatusId(seg.status, existing.deliverableStatuses ?? []),
+      const targetAlreadyLiveBeforeImplementation = hasLiveHistoryBefore(
+        targetId, qStart, [...(existing.deliverableSegments ?? []), ...deliverableSegments],
+        existing.deliverableStatuses ?? [],
       );
       if (row.developmentType === 'upgrade' && !targetAlreadyLiveBeforeImplementation) {
-        deliverableSegments.push({
-          id: `rpti-import-seg-prior-${n}`, deliverableId: targetId,
-          // Ends in the prior year, not on 1 January of this one: it records that
-          // the thing already ran before the plan, so it must not also count as
-          // part of the plan's own report-year activity.
-          startDate: `${reportYear - 1}-01-01`, endDate: `${reportYear - 1}-12-31`,
-          status: RPTI_IMPORT_LIVE_STATUS_ID,
-        });
+        // One rule with the #51 repair (Q22, research R5): live from the year before the
+        // filed year through the shared horizon, so the entry stays in the inventory for
+        // every year of the plan. The original one-year shape deliberately ended in the
+        // prior year, not on 1 January of this one, so it did not also count as part of the
+        // plan's own report-year activity; the phase now overlaps the filed implementation,
+        // and is unlinked, so it still files no row of its own in the plan's report year.
+        deliverableSegments.push(continuousPriorLivePhase(
+          targetId, reportYear, RPTI_IMPORT_LIVE_STATUS_ID, `rpti-import-seg-prior-${n}`));
       }
       anchorSegmentId = `rpti-import-seg-${n}`;
       deliverableSegments.push({

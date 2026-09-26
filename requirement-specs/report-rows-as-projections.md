@@ -171,7 +171,9 @@ internal consistency.
 
 ---
 
-### Q13 — repairing an unresolved imported row is a three-screen manual job (raised 2026-09-19)
+### Q13 — repairing an unresolved imported row is a three-screen manual job (raised 2026-09-19) — **REVISED by Q22 (2026-09-25)**
+
+The text below is kept as written. Since then, spec 003 removed the Initiative's Deliverable selection, so the journey is two steps rather than three. More importantly, it moved the filed values onto the segment, which turned the manual repair into one that silently files wrong values. Q22 records what was measured and what was decided.
 
 **Deferred to its own Spec Kit feature — filed as [#51](https://github.com/nofanto/Selara/issues/51).**
 Raised by the product owner after repairing the sample's unresolved row by hand.
@@ -280,6 +282,215 @@ remarks. Worth weighing when that work is scheduled.
 ---
 
 ## Decided
+
+### Q22 — an unresolved row is repaired semi-automatically, from the finding (2026-09-25)
+
+**Why this is more than friction — measured on `main` at 7da8edd.** On the published samples, the
+repair the error message describes (create the Deliverable, then a live segment linking it to the
+initiative) **clears the export gate while the return then states three wrong values**:
+
+| | Filed in the return | After the documented repair |
+|---|---|---|
+| Blocks export? | — | no |
+| Development type | `upgrade` | `new` |
+| CapEx / OpEx | 2.9bn / 640m | 0 / 0 |
+| Keterangan | *"Not present in the 2026 LKPTI — needs a target."* | empty |
+
+The only signal is a non-blocking budget-divergence warning. It comes from three earlier decisions
+working together:
+- spec 003 moved filed cost and Keterangan onto the segment, and the repair creates a bare one;
+- `new` versus `upgrade` is decided from the application's live history, and a freshly created
+  application has none;
+- the gate matches rows by identity, not contents (Q12), so it does not notice.
+
+This breaks **spec 002's FR-025**: *"Nothing MUST require the preparer to re-key a value the return
+already supplied."* The message is also wrong on its own terms. It says the row *"points at a
+Deliverable that no longer exists"*, but for an unresolved import the Deliverable never existed.
+
+**An unresolved row is always an upgrade.** Rows filed as `new` always create their application
+(`rptiImport.ts`). An upgrade is left unresolved when it matches **no** entry or **several**. Only
+applications can match none, because unmatched infrastructure is created automatically (FR-019a).
+Either kind can match several: two same-named applications, or two same-named infrastructure
+entries. Either way Q13's option *"this is a new application"* contradicts the filed return, which
+says `upgrade`. *(Corrected 2026-09-25 after Codex review: the first version said "always an upgrade
+to an application", which missed ambiguous infrastructure.)*
+
+**Decided (product owner): a semi-automatic repair, started from the finding.** The finding — in
+Data Health and in the pre-export gate — offers two resolutions. Each opens a form **pre-filled from
+what the return filed**, which the preparer checks and confirms. Making the judgement still needs a
+person; *recording* it no longer means re-typing what the return said.
+
+- **A — "It's this existing entry."** The inventory lists it under another name, or lists several
+  entries of that name. The preparer picks one; the filed implementation is created on it. This is
+  the only option for ambiguous infrastructure: entries of that name exist, so B would create a
+  duplicate.
+- **B — "The bank runs it, but the inventory doesn't list it."** The application is created much as
+  unmatched infrastructure already is (FR-019a), including a prior live phase so that it stays an
+  upgrade.
+
+Either way, confirming creates the **live segment for the filed implementation**: linked to the
+initiative, starting in the filed quarter, carrying the filed CapEx, OpEx and Keterangan. The
+initiative moves to that application's asset. Until now it sat under an unrelated one — the first
+asset in the inventory.
+
+**Where each pre-filled value comes from** *(confirmed by the product owner)*.
+- **From the stored row, which remains read-only evidence (Q12):** category, developer and
+  related party, DC/DR locations, planned quarter, Keterangan. A PPJTI row states `PPJTI`, not the
+  provider's name, so the form asks for the name.
+- **From the imported initiative's name:** the application's name. The stored row does not hold one,
+  and the importer's list of unresolved rows is not kept after import. The importer names the
+  initiative `<application> — Q3 2027` (Q21), so the form offers that name without the quarter
+  suffix, for the preparer to check, since the initiative may have been renamed. *(Corrected
+  2026-09-25 after Codex review: the first version listed the name under the stored row.)*
+- **From the initiative's budget:** CapEx and OpEx. The stored row no longer holds cost (Q7), and
+  FR-026 says the system need not keep a separate copy of what was imported. The importer seeded
+  the initiative's budget from the filed row, but the preparer may have edited it since, which is
+  exactly why the form shows it for confirmation rather than using it silently.
+
+**Unchanged by this.** The stored row stays as it is (Q12's source-side principle, and the rejected
+identity-remap editor stays rejected). Creating a deliverable directly in the Data Manager stays
+exactly as it is.
+
+**A, when the chosen entry has no live history before the filed quarter** *(product owner,
+2026-09-25)*. The row would file as `new`, contradicting the return. The repair adds the same
+continuous prior live phase as B, and the form shows it before confirming. Choosing the entry
+states that the bank already runs it; an upgrade needs that history.
+
+**A, when the chosen entry's attributes differ from the filed row** *(product owner, 2026-09-25)*.
+Category, developer, related party and DC/DR are the Deliverable's (ADR-0013): the return files
+the Deliverable's values, and the same values feed the LKPTI. The form lists each field that
+differs, filed next to current, and the preparer decides per field whether to update the
+Deliverable, which also changes the LKPTI, or keep it. Nothing changes silently in either
+direction. Rejected: always keeping the Deliverable's values, which misfiles silently; always
+taking the filed values, which rewrites the inventory silently.
+
+**Near matches (A)** *(confirmed by the product owner)*. Likely candidates are suggested for the preparer to choose from, and never
+chosen automatically. That is FR-019's reason for holding the row back in the first place: the two
+returns name things differently. The published sample has no near match.
+
+**Rejected — a default live segment whenever a deliverable is created, starting in the quarter it
+is added.** Proposed by the product owner as a lighter-weight alternative, then withdrawn after
+measurement. "The quarter it was added" is when someone typed it in, not when it goes live.
+Measured on the samples:
+- In the #51 repair it still leaves the gate blocked, because the segment names no initiative.
+- Once linked, it files the row in **2026** instead of 2027, typed `new`, with no cost or Keterangan,
+  and lists the application in the 2026 inventory.
+- In ordinary planning, a genuine first build going live in 2027 files as **`upgrade`**, because
+  the default segment counts as earlier live history, and it appears in an inventory before it exists.
+
+This is the same class of problem the project has already removed twice, with invented import
+history (FR-018b) and an invented `Planned` status: the application stating as fact something
+nobody told it.
+
+**Rejected — Q13's "this is a new application" option.** It contradicts the filed development type.
+
+**B's prior live phase is continuous (product owner).** An application "the bank runs" gets live
+history that runs continuously up to the shared five-year horizon (`openEndedDate`). The same rule
+applies to the importer's synthetic prior phase, so the repair and the importer create the same shape.
+This **closes Q21's open consequence 2**. That case is an upgrade with no live history of its own,
+which drops out of the inventory in its upgrade year unless it was filed for Q4. Fixing it only for
+repairs would have left two rules for one situation.
+
+**Existing workspaces keep their old prior phases, with a warning** *(product owner, 2026-09-25;
+spec 004 FR-018)*. Prior phases the importer created under the one-year rule are never changed
+automatically. Where one still has the importer's exact original shape and leaves its entry out of
+an inventory year, Data Health shows a non-blocking warning that names the missing years and offers
+the extension, applied only when the preparer confirms. Rejected: extending them silently when the
+workspace next opens, which changes stored data without anyone deciding to, the thing this feature
+removes elsewhere. Also rejected: leaving them with no signal, which keeps a known inventory gap
+invisible.
+
+**After a B repair, the regenerated inventory includes the application from the year before the
+filed year** *(product owner, 2026-09-25; spec 004 plan)*. B means the bank ran it, and the prior live
+phase starts on 1 January of the year before the filed year. So a regenerated 2026 LKPTI lists
+Legacy Teller: 14 rows against the 13 filed. The dialog says so before confirming. Rejected: starting
+the prior phase in the filed year. That keeps the old inventory unchanged, but a Q1 filing would then
+have no live history *before* its implementation and would file `new`.
+
+**The error message is corrected now, separately (product owner).** It no longer says the
+Deliverable "no longer exists". It also warns that the manual repair files a new application with
+zero cost unless the preparer enters the filed values. This is a separate, small change and does
+not wait for the feature: the current message leads preparers into the silent corruption measured
+above.
+
+Codex review then measured a second silent misfiling on the sample. A bare new Deliverable files
+category **01**, no developer and empty DC/DR, where the row filed 12, `inhouse`, Jakarta and
+Surabaya. It raises no finding and no Data Health error. So the message also lists the filed
+Deliverable attributes, using the Deliverables tab's labels. That includes a PPJTI row's related
+party even when it is `n/a`, because a blank Deliverable regenerates it as empty.
+
+**A row anchored to a deleted implementation is repaired by restore or re-import** *(product owner,
+2026-09-25)*. Codex review found that a stored row anchored to a segment that no longer exists can
+never clear: recreating the Deliverable or the segment makes a new implementation, and contract
+14 / T038 forbid an anchored row from falling back to another one. The product owner first chose
+a fallback when the anchor is gone. That choice was withdrawn once it came out that the fallback
+is the case T038 was written against. Suppose an initiative filed Q2 on X and Q4 on Y, and X is
+deleted: the fallback would find Y's Q4 as the only match and silently drop the Q2 row, which is
+the #52 defect. Narrowing the fallback by quarter would match on contents, which Q13 rules out.
+**Decided:** keep the rule. For these rows, the message and Data Health's `rpti-segment` issue say
+to restore a saved version from before the deletion (History tab), or to re-import the filing.
+The old advice ("create or open the segment", "restore that work on the timeline") could never
+clear the finding. An anchored segment that still exists but is not live keeps the segment-panel
+repair, which works. The rule applies whatever else is missing: the Initiative, the Deliverable or
+a legacy Asset target. Restoring any one of them still leaves the anchored segment gone, so every
+one of those findings gets the restore-or-re-import repair (third Codex review). Restoring a saved
+version brings back the original segment id; a test pins that the finding then clears.
+
+**Implemented 2026-09-26:** [spec 004 — Repair from Finding](../specs/004-repair-from-finding/spec.md) implements these decisions; its tasks record the automated evidence and the remaining product-owner timing check.
+
+**SC-004 measured inventory counts (2026-09-26).** Importing both published sample returns,
+then applying B to Legacy Teller with every pre-filled value unchanged, gives:
+
+| LKPTI as at 31 December | Q21 / T002 baseline | Import only | After Legacy Teller B repair |
+|---|---|---|---|
+| 2026 | 13 | 13 | 14 |
+| 2027 | 16 | 16 | 17 |
+| 2028 | 16 | 16 | 17 |
+| 2029 | 16 | 16 | 17 |
+| 2030 | 16 | 16 | 17 |
+| 2031 | 16 | 16 | 17 |
+| 2032 | 3 | 3 | 4 |
+
+Import-only counts are identical to the baseline in every year. The sample's only synthetic
+importer prior phase belongs to Primary Data Center Jakarta, which is infrastructure and never
+appears in the LKPTI. Extending it therefore changes no sample inventory count. The original
+13 applications have inventory phases ending in 2031; the three new applications imported from
+the 2027 plan run through 2032, explaining the baseline's fall from 16 to 3 in that final year.
+B adds exactly Legacy Teller in each year: its continuous prior live phase runs from 2026-01-01
+through 2032-12-31. Thus the confirmed 2026 change is measured as **13 → 14**, 2027-2031 each
+change **16 → 17**, and 2032 changes **3 → 4**. Its overlapping Q3 2027 implementation does not
+create a second inventory entry.
+
+The new pinned test in `src/lib/sampleReturns.test.ts` prints both series. Measurements are in
+`/tmp/selara-004-t044-measure.log`; falsification is in `/tmp/selara-004-t044-falsify.log`.
+Restoring the importer's old one-year prior phase (T040 reversal) left both series unchanged, as
+measured; importer-specific tests T035/T036 cover that rule. Disabling B's writes (T019) returned
+the baseline series after repair and failed the pinned post-repair assertion. Restoring both
+implementations passed. No existing test expectation was changed during Polish.
+
+**Decided — retirement ends the inventory-gap check (option B)** *(product owner,
+2026-09-26; raised in coordinator review of US3, implemented by spec 004 T049)*. The review
+found that the warning still fired for a retired application and Extend would list it again to
+the horizon. An explicit post-live phase ends the application's inventory life, so absence after
+that date is correct.
+
+For an importer prior phase in its exact original one-year shape (year Y), take R as the earliest
+start date after Y-12-31 of a segment on the same Deliverable whose status is neither live nor
+pre-launch (`isLiveStatusId` and `isPreLaunchStatusId` are both false, for example Sunset,
+Out of Support or Retired). Only missing years in Y+1 through Y+6 whose 31 December is strictly
+before R count. If none remain, show no warning. Extend ends the prior phase at the earlier of
+`openEndedDate(Y+1)` and the day before R, never overlapping recorded retirement. With no such
+post-live phase, the rule is unchanged: a live phase merely ending is indistinguishable from the
+importer's artifact and still warrants the warning. Extension still requires the preparer's
+explicit action; detection never changes stored data.
+
+Rejected:
+- **A — keep the original behaviour:** permanent warning noise, and Extend would list a retired
+  application in the LKPTI, producing a wrong filing.
+- **C — suppress the entire warning whenever any later post-live phase exists:** hides genuinely
+  missing years before retirement, which is the original inventory-gap defect.
+- **D — a dismissible warning:** needs a new stored field (and #42's field policy) and relies on a
+  fresh judgement each time.
 
 ### Q19 — the legacy remarks lift follows the field; the legacy cost lift does not (2026-09-23)
 
@@ -399,7 +610,7 @@ stay until 2031.
    **13, 16, 16, 16, 16, 16, 3** after. The regenerated 2027 RPTI stays at **13 rows**, with
    development types in the same order: `upgrade, upgrade, upgrade, upgrade, new, upgrade, new, new,
    new, new, new, new, upgrade`; round-trip losses remain **zero**.
-2. **OPEN — an upgrade to an application with no live history of its own** — a hand-built workspace, not
+2. **DECIDED by Q22 (2026-09-25): prior live history is continuous to the shared horizon** — was OPEN: **an upgrade to an application with no live history of its own** — a hand-built workspace, not
    the LKPTI + RPTI onboarding flow — **drops out of the inventory in the year it is upgraded**,
    unless the quarter is Q4. Measured: Q1–Q3 upgrades are in the 2026 LKPTI through the synthetic
    prior phase and absent from 2027 on; a Q4 upgrade is present in 2027 only. It is the Q4-only

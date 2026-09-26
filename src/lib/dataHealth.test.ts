@@ -167,6 +167,9 @@ describe('computeDataHealth — hard checks (dangling references)', () => {
     expect(findIssue(issues, `rpti-initiative:${r.id}`)?.severity).toBe('error');
     expect(findIssue(issues, `rpti-target:${r.id}`)?.severity).toBe('error');
     expect(findIssue(issues, `rpti-segment:${r.id}`)?.severity).toBe('error');
+    // A recreated segment cannot stand in for the anchored one (T038), so the repair is a
+    // restore or a re-import, not "restore that work on the timeline" (#51 review).
+    expect(findIssue(issues, `rpti-segment:${r.id}`)?.message).toMatch(/History tab.*re-import the filing/is);
   });
 
   it('blocks a legacy asset-target RPTI row and names the source-side repair', () => {
@@ -654,6 +657,28 @@ describe('computeDataHealth — unresolved RPTI import references (#38)', () => 
     });
   });
 
+  it('offers repair only on the unresolved row target issue', () => {
+    const anchored = { ...unresolvedRow, id: 'anchored', deliverableSegmentId: 'missing-segment' };
+    const deleted = { ...unresolvedRow, id: 'deleted', targetId: 'deleted-deliverable' };
+    const issues = computeDataHealth(baseInput({ initiatives: [initiative], rptiDetails: [unresolvedRow, anchored, deleted] }));
+    expect(findIssue(issues, `rpti-target:${unresolvedRow.id}`)?.action).toEqual({
+      kind: 'repair-unresolved-rpti-row', rowId: unresolvedRow.id,
+    });
+    // Guards: both issues must exist, or the two toBeUndefined checks below pass vacuously.
+    expect(findIssue(issues, `rpti-target:${anchored.id}`)).toBeDefined();
+    expect(findIssue(issues, `rpti-target:${deleted.id}`)).toBeDefined();
+    expect(findIssue(issues, `rpti-target:${anchored.id}`)?.action).toBeUndefined();
+    expect(findIssue(issues, `rpti-target:${deleted.id}`)?.action).toBeUndefined();
+    expect(issues.filter(issue => issue.id !== `rpti-target:${unresolvedRow.id}`).every(issue => issue.action === undefined)).toBe(true);
+  });
+
+  it('offers no repair when the initiative is gone too, since the repair has nothing to start from', () => {
+    // Coordinator review of US1: the button rendered, but the dialog could not open.
+    const issues = computeDataHealth(baseInput({ initiatives: [], rptiDetails: [unresolvedRow] }));
+    expect(findIssue(issues, `rpti-target:${unresolvedRow.id}`)).toBeDefined(); // guard
+    expect(findIssue(issues, `rpti-target:${unresolvedRow.id}`)?.action).toBeUndefined();
+  });
+
   it('names the row so the user can find it, rather than reporting an opaque id', () => {
     const issues = computeDataHealth(baseInput({ initiatives: [initiative], rptiDetails: [unresolvedRow] }));
     expect(findIssue(issues, `rpti-target:${unresolvedRow.id}`)?.entityName).toBe('Core Banking GL');
@@ -843,5 +868,53 @@ describe('a filed second implementation has no stale dropped-row warning (#52)',
     const issue = findIssue(computeDataHealth(twoGoLivesIn('2027-04-01', '2027-10-01')),
       'initiative-rpti-multi-implementation:init-1');
     expect(issue).toBeUndefined();
+  });
+});
+
+describe('computeDataHealth — importer prior phases that leave an application out of inventory years (contract 22)', () => {
+  /**
+   * FR-018a: a workspace imported before the continuous rule still holds the importer's
+   * original one-year prior phase. Detection is a warning with an Extend action, never a
+   * silent change and never an export block — the pre-export gate takes errors only.
+   */
+  const oldPrior = {
+    id: 'rpti-import-seg-prior-1', deliverableId: 'deliv-1',
+    startDate: '2026-01-01', endDate: '2026-12-31', status: 'appstatus-in-production',
+  };
+  const gapId = 'rpti-import-prior-phase-gap:rpti-import-seg-prior-1';
+  const gapInput = (segments = [oldPrior]) => baseInput({
+    assets: [asset], assetCategories: [cat], deliverables: [deliverable], deliverableSegments: segments,
+  });
+
+  it('raises one warning per gap, naming the application and the years it is missing from', () => {
+    const issues = computeDataHealth(gapInput());
+    const issue = findIssue(issues, gapId);
+    expect(issue).toBeDefined();
+    expect(issue?.severity).toBe('warning');
+    expect(issue?.reports).toEqual(['lkpti']);
+    expect(issue?.message).toContain(deliverable.name);
+    for (const year of [2027, 2028, 2029, 2030, 2031, 2032]) expect(issue?.message).toContain(String(year));
+    expect(issues.filter(i => checkOf(i.id) === 'rpti-import-prior-phase-gap')).toHaveLength(1);
+  });
+
+  it('carries the Extend action for exactly that segment', () => {
+    const issue = findIssue(computeDataHealth(gapInput()), gapId);
+    expect(issue?.action).toEqual({ kind: 'extend-import-prior-phase', segmentId: oldPrior.id });
+  });
+
+  it('is never an error, so the error-only pre-export gate cannot pick it up', () => {
+    // ReportsView builds rptiPreExportIssues from computeDataHealth filtered to
+    // severity 'error'. The warning must not join it, before or after extending.
+    const errors = computeDataHealth(gapInput()).filter(i => i.severity === 'error');
+    expect(errors.map(i => i.id)).not.toContain(gapId);
+  });
+
+  it('stays quiet when the phase is not the importer shape', () => {
+    // The new importer rule ends at 2032-12-31 — a workspace imported after FR-017
+    // never matches, so it is never warned at.
+    const extended = { ...oldPrior, endDate: '2032-12-31' };
+    const renamed = { ...oldPrior, id: 'handmade-prior-1' };
+    expect(findIssue(computeDataHealth(gapInput([extended])), gapId)).toBeUndefined();
+    expect(findIssue(computeDataHealth(gapInput([renamed])), `rpti-import-prior-phase-gap:${renamed.id}`)).toBeUndefined();
   });
 });
