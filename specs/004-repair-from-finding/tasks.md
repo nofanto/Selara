@@ -302,6 +302,8 @@ expectation changed**, before anything new calls it.
 
 - [x] T048a **Coordinator review, 2026-09-26: a flaky US3 E2E fixed at its cause.** The US3 set-up seeded its fixture while the app could still save its auto-loaded template, and `saveAppData` clears and rewrites every store, so a late app save occasionally wiped the fixture: the old segment then read back as `undefined` (measured **1 failure in 20** with retries off, `/tmp/selara-004-flaky-before.log`). The set-up now seeds from a static same-origin page, where the app is not running, then opens the app: **40/40** with retries off (`/tmp/selara-004-flaky-after.log`). Final coordinator run: unit 640/640, Playwright 698 passed with no flaky tests, 4 skipped; eslint 0 errors; tsc 1 (baseline).
 
+- [x] T048b **SC-006 accepted by the product owner, 2026-09-26.** The manual timing check (B under one minute, A under two) was found acceptable; individual times were not recorded.
+
 ---
 
 ## Dependencies & Execution Order
