@@ -62,5 +62,5 @@ npx tsc --noEmit > /tmp/selara-004-tsc.log 2>&1; grep -c "error TS" /tmp/selara-
 Import `docs/sample-data/sample-lkpti-2026.xlsx` and `sample-rpti-2027.xlsx`, then repair Legacy
 Teller from Data Health. **SC-006:** time it. From opening the finding to the finding disappearing
 should take under one minute for B. For A, on a renamed-entry workspace with one field difference,
-it should take under two minutes. On the Visualiser, "Legacy Teller Application" sits under its own asset, with
+it should take under two minutes. *Accepted by the product owner, 2026-09-26: the timings were acceptable (individual times not recorded).* On the Visualiser, "Legacy Teller Application" sits under its own asset, with
 a live bar from 2026 to 2032 and the Q3 2027 implementation bar linked to its initiative.
