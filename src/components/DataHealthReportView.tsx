@@ -8,6 +8,7 @@ import { AlertTriangle, AlertCircle, ChevronRight } from 'lucide-react';
 interface DataHealthReportViewProps extends DataHealthInput {
   onNavigate: (location: HealthIssueLocation, entityName: string) => void;
   onRepairUnresolvedRow?: (rowId: string) => void;
+  onExtendImportPriorPhase?: (segmentId: string) => void;
 }
 
 const SEVERITY_STYLES: Record<HealthSeverity, { badge: string; icon: React.ReactNode; label: string }> = {
@@ -89,6 +90,7 @@ function summarise(check: string): string {
     'deliverable-no-developer': 'Deliverables with no developer set',
     'deliverable-no-location': 'Deliverables missing a DC or DR location',
     'deliverable-no-description': 'Deliverables with no description',
+    'rpti-import-prior-phase-gap': 'Imported prior phases that leave applications out of inventory years',
     'initiative-no-owner': 'Initiatives with no owner assigned',
     'workspace-currency-not-idr': 'Workspace currency is not IDR',
     'asset-category': 'Assets pointing at a missing Asset Category',
@@ -112,7 +114,7 @@ function summarise(check: string): string {
 }
 
 export function DataHealthReportView(props: DataHealthReportViewProps) {
-  const { onNavigate, onRepairUnresolvedRow, ...healthInput } = props;
+  const { onNavigate, onRepairUnresolvedRow, onExtendImportPriorPhase, ...healthInput } = props;
   const [severityFilter, setSeverityFilter] = useState<HealthSeverity | 'all'>('all');
   const [phaseFilter, setPhaseFilter] = useState<HealthPhase | 'all'>('all');
   const [reportFilter, setReportFilter] = useState<HealthReport | 'all' | 'none'>('all');
@@ -271,25 +273,37 @@ export function DataHealthReportView(props: DataHealthReportViewProps) {
 
                 {isOpen && (
                   <ul data-testid={`data-health-group-items-${group.check}`} className="bg-slate-50/60 border-t border-slate-100 divide-y divide-slate-100">
-                    {group.issues.map(issue => (
-                      <li key={issue.id}>
-                        <button
-                          data-testid={`data-health-issue-${issue.id}`}
-                          onClick={() => onNavigate(issue.location, issue.entityType === 'Workspace' ? '' : issue.entityName)}
-                          className="w-full text-left pl-14 pr-4 py-2 flex items-start gap-3 hover:bg-white transition-colors"
-                        >
-                          <span className="text-sm text-slate-600 flex-1">{issue.message}</span>
-                          <span className="text-xs text-slate-400 flex-shrink-0">{issue.entityType}</span>
-                        </button>
-                        {issue.action?.kind === 'repair-unresolved-rpti-row' && onRepairUnresolvedRow && (
-                          <button type="button" data-testid={`repair-unresolved-row-${issue.action.rowId}`}
-                            onClick={() => onRepairUnresolvedRow(issue.action!.rowId)}
-                            className="ml-14 mb-2 rounded-lg border border-indigo-300 bg-white px-3 py-1 text-sm font-medium text-indigo-700 hover:bg-indigo-50">
-                            Repair
+                    {group.issues.map(issue => {
+                      // Hoisted so the narrowing survives into the button callbacks: the union
+                      // now has two action kinds, and TS cannot narrow `issue.action` inside them.
+                      const action = issue.action;
+                      return (
+                        <li key={issue.id}>
+                          <button
+                            data-testid={`data-health-issue-${issue.id}`}
+                            onClick={() => onNavigate(issue.location, issue.entityType === 'Workspace' ? '' : issue.entityName)}
+                            className="w-full text-left pl-14 pr-4 py-2 flex items-start gap-3 hover:bg-white transition-colors"
+                          >
+                            <span className="text-sm text-slate-600 flex-1">{issue.message}</span>
+                            <span className="text-xs text-slate-400 flex-shrink-0">{issue.entityType}</span>
                           </button>
-                        )}
-                      </li>
-                    ))}
+                          {action?.kind === 'repair-unresolved-rpti-row' && onRepairUnresolvedRow && (
+                            <button type="button" data-testid={`repair-unresolved-row-${action.rowId}`}
+                              onClick={() => onRepairUnresolvedRow(action.rowId)}
+                              className="ml-14 mb-2 rounded-lg border border-indigo-300 bg-white px-3 py-1 text-sm font-medium text-indigo-700 hover:bg-indigo-50">
+                              Repair
+                            </button>
+                          )}
+                          {action?.kind === 'extend-import-prior-phase' && onExtendImportPriorPhase && (
+                            <button type="button" data-testid={`extend-import-prior-phase-${action.segmentId}`}
+                              onClick={() => onExtendImportPriorPhase(action.segmentId)}
+                              className="ml-14 mb-2 rounded-lg border border-amber-300 bg-white px-3 py-1 text-sm font-medium text-amber-700 hover:bg-amber-50">
+                              Extend
+                            </button>
+                          )}
+                        </li>
+                      );
+                    })}
                   </ul>
                 )}
               </li>

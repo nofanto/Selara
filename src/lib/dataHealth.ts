@@ -3,7 +3,7 @@ import {
   Initiative, Milestone, Dependency, Decision, Resource, Programme, Strategy,
   RptiDetail, LkptiDetail, TimelineSettings,
 } from '../types';
-import { isRepairableUnresolvedRow } from './unresolvedRowRepair';
+import { isRepairableUnresolvedRow, priorPhaseGaps } from './unresolvedRowRepair';
 import { deletedAnchorRepair, isLiveStatusId, isPreLaunchStatusId, reconcileRptiReturn, resolveAssetCategory } from './rpti';
 
 // Tabs of src/components/DataManager.tsx's own `Tab` union — defined here (the pure
@@ -50,7 +50,9 @@ export interface HealthIssue {
    * with no special case for issues that hit both.
    */
   reports: HealthReport[];
-  action?: { kind: 'repair-unresolved-rpti-row'; rowId: string };
+  action?:
+    | { kind: 'repair-unresolved-rpti-row'; rowId: string }
+    | { kind: 'extend-import-prior-phase'; segmentId: string };
 }
 
 export interface DataHealthInput {
@@ -444,6 +446,22 @@ export function computeDataHealth(input: DataHealthInput): HealthIssue[] {
     }
   }
 
+  // An importer prior phase in its original one-year shape leaves its application out of later
+  // inventory years. A non-blocking warning offers the extension; nothing changes until the
+  // preparer confirms it (FR-018/FR-018a, Q22). A phase the preparer edited, or one fully covered
+  // by the application's own inventory history, raises nothing.
+  for (const gap of priorPhaseGaps({ deliverables, deliverableSegments, deliverableStatuses })) {
+    const deliverable = deliverableById.get(gap.deliverableId);
+    const label = deliverable?.name ?? gap.deliverableId;
+    issues.push({
+      id: `rpti-import-prior-phase-gap:${gap.segmentId}`, severity: 'warning',
+      entityType: 'DeliverableSegment', entityId: gap.segmentId, entityName: label,
+      message: `The imported prior live phase for "${label}" ends in ${gap.segmentYear}, so the application is missing from the LKPTI inventory as at 31 December ${gap.missingYears.join(', ')}. Extend the phase to keep it listed to the planning horizon; nothing changes until you confirm.`,
+      location: DATA_TAB,
+      action: { kind: 'extend-import-prior-phase', segmentId: gap.segmentId },
+    });
+  }
+
   const LKPTI_MANUAL_ONLY_FIELDS: { key: keyof LkptiDetail; label: string }[] = [
     { key: 'platform', label: 'Platform' },
     { key: 'database', label: 'Database' },
@@ -690,6 +708,7 @@ const REPORTS_BY_CHECK: Record<string, HealthReport[]> = {
   'lkpti-duplicate-name': ['lkpti'],
   'deliverable-no-live-segment': ['lkpti'],
   'deliverable-no-description': ['lkpti'],
+  'rpti-import-prior-phase-gap': ['lkpti'],
 
   // Fields both returns carry, so a gap shows up in whichever is filed next.
   'deliverable-no-segments': ['rpti', 'lkpti'],

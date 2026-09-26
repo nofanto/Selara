@@ -1,5 +1,5 @@
 import type { Asset, AssetCategory, Deliverable, DeliverableSegment, DeliverableStatus, Initiative, RptiCategoryCode, RptiDetail, RptiDeveloper, RptiQuarter, RptiRelatedParty } from '../types';
-import { continuousPriorLivePhase, INFRASTRUCTURE_CODES, periodForQuarter, RPTI_CATEGORY_LABELS, UNRESOLVED_IMPORT_TARGET_PREFIX, isLiveStatusId } from './rpti';
+import { continuousPriorLivePhase, INFRASTRUCTURE_CODES, openEndedDate, periodForQuarter, RPTI_CATEGORY_LABELS, UNRESOLVED_IMPORT_TARGET_PREFIX, isLiveStatusId } from './rpti';
 import { IN_PRODUCTION_STATUS } from './deliverableStatusDefaults';
 
 /**
@@ -173,4 +173,93 @@ export function applyUnresolvedRowRepair<S extends UnresolvedRowRepairState>(
       ? state.deliverableStatuses : [...state.deliverableStatuses, IN_PRODUCTION_STATUS],
     initiatives: state.initiatives.map(item => item.id === initiative.id ? { ...item, assetId } : item),
   } };
+}
+
+/**
+ * A synthetic prior phase an importer created before FR-017, still in its original one-year
+ * shape, that leaves its application out of an LKPTI inventory year. `segmentYear` is the year
+ * the phase covers; the import that created it was for the year after, so the horizon it should
+ * have run to under the continuous rule is `openEndedDate(segmentYear + 1)`.
+ */
+export interface PriorPhaseGap {
+  segmentId: string;
+  deliverableId: string;
+  segmentYear: number;
+  missingYears: number[];
+}
+
+export interface PriorPhaseGapState {
+  deliverables: Deliverable[];
+  deliverableSegments: DeliverableSegment[];
+  deliverableStatuses: DeliverableStatus[];
+}
+
+/** The importer's original prior-phase id prefix (research R10). */
+const IMPORT_PRIOR_SEGMENT_PREFIX = 'rpti-import-seg-prior-';
+
+/** The year covered by the importer's exact one-year shape, or null if the segment is not it. */
+function originalPriorSegmentYear(segment: DeliverableSegment): number | null {
+  const match = /^(\d{4})-01-01$/.exec(segment.startDate);
+  if (!match) return null;
+  const year = Number(match[1]);
+  return segment.endDate === `${year}-12-31` ? year : null;
+}
+
+/**
+ * The years an imported prior phase leaves its application out of, as an inventory. Contract 20:
+ * only a segment still in the importer's exact original shape counts — id prefix, both dates, the
+ * importer's live status and no initiative link, on an application. A phase the preparer edited is
+ * their decision, not a gap (FR-018/FR-018a, Q22, research R10). The years are Y+1…Y+6, the
+ * 31 Decembers the continuous phase would have covered from the filing year Y+1.
+ */
+export function priorPhaseGaps(state: PriorPhaseGapState): PriorPhaseGap[] {
+  const { deliverables, deliverableSegments, deliverableStatuses } = state;
+  const deliverableById = new Map(deliverables.map(deliverable => [deliverable.id, deliverable]));
+  const gaps: PriorPhaseGap[] = [];
+  for (const segment of deliverableSegments) {
+    if (!segment.id.startsWith(IMPORT_PRIOR_SEGMENT_PREFIX)) continue;
+    const segmentYear = originalPriorSegmentYear(segment);
+    if (segmentYear === null) continue;
+    if (segment.status !== IN_PRODUCTION_STATUS.id) continue;
+    if (segment.initiativeId) continue;
+    const deliverable = deliverableById.get(segment.deliverableId);
+    // LKPTI is Daftar Aplikasi — it never lists infrastructure, so there is no inventory gap.
+    if (!deliverable || (deliverable.type ?? 'application') !== 'application') continue;
+    const missingYears: number[] = [];
+    for (let year = segmentYear + 1; year <= segmentYear + 6; year++) {
+      const asAt = `${year}-12-31`;
+      const live = deliverableSegments.some(other =>
+        other.deliverableId === deliverable.id
+        && isLiveStatusId(other.status, deliverableStatuses)
+        && other.startDate <= asAt && other.endDate >= asAt);
+      if (!live) missingYears.push(year);
+    }
+    // Omitted when nothing is missing, so a phase already covered by the application's own
+    // inventory history raises no warning (contract 20).
+    if (missingYears.length > 0) {
+      gaps.push({ segmentId: segment.id, deliverableId: segment.deliverableId, segmentYear, missingYears });
+    }
+  }
+  return gaps;
+}
+
+/**
+ * The preparer-confirmed extension (FR-018a). One segment's `endDate` moves to the horizon the
+ * continuous rule would have given it — `openEndedDate(segmentYear + 1)` — and nothing else
+ * changes, so the caller applies it in one undoable handleUpdate. Only a segment still in the
+ * importer's original shape is extended: an edited phase is the preparer's decision. A missing or
+ * already-edited segment is left exactly as it was.
+ */
+export function extendImportPriorPhase<S extends { deliverableSegments: DeliverableSegment[] }>(
+  state: S,
+  segmentId: string,
+): S {
+  const segment = state.deliverableSegments.find(item => item.id === segmentId);
+  const segmentYear = segment ? originalPriorSegmentYear(segment) : null;
+  if (!segment || segmentYear === null) return state;
+  return {
+    ...state,
+    deliverableSegments: state.deliverableSegments.map(item =>
+      item.id === segmentId ? { ...item, endDate: openEndedDate(segmentYear + 1) } : item),
+  };
 }
