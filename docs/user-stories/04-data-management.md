@@ -157,3 +157,22 @@
 - The export reflects the active zoom level, grouping, display settings, and scroll position at the time of export
 - The export completes without a browser `alert()` dialog or page reload
 
+
+---
+
+## US-DA-13: Confirm Before a Shared File Replaces the Workspace
+
+**As an** IT planner,
+**I want** Open shared to tell me what it will replace and let me back out,
+**so that** one mis-click or the wrong file cannot silently discard my work ([#62](https://github.com/nofanto/Selara/issues/62)).
+
+**Acceptance Criteria:**
+- AC1: When the workspace has any content (any record, RPTI/LKPTI row, decision, or History snapshot), choosing a file under **Open shared** shows a confirmation before anything changes. It names the file and lists, for each kind of record, the current and the incoming count, including History snapshots and decisions.
+- AC2: **Cancel**, or closing the confirmation, leaves the workspace unchanged, including after a reload.
+- AC3: Confirming replaces the workspace with the file's contents, as before.
+- AC4: A single **Undo** reverses the replacement, restoring the previous records, decisions and History snapshots, and the restored workspace survives a reload. Like every undo, it is held in memory and does not survive a reload itself; the confirmation is the safeguard that does.
+- AC5: On an empty workspace the file opens without a confirmation, because nothing would be lost.
+- AC6: A file that cannot be read or fails validation shows the existing error and never reaches the confirmation. The workspace is unchanged.
+- AC7: Undoing **Import → Overwrite All Data** also restores the History snapshots it replaced. It previously restored the records but kept the file's snapshots, because undo did not capture History.
+
+**Out of scope:** whether Open shared should become a preview rather than a replacement, and making every replacement path behave the same way. Both belong to R1-05 and open question D4 in `requirement-specs/first-release-roadmap.md`.

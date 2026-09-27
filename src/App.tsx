@@ -38,7 +38,8 @@ import { validateImportSchema } from './lib/importValidation';
 import { importSharedWorkspace } from './lib/share';
 import { getTemplateData, TemplateId } from './lib/workspaceTemplates';
 import { rptiCatalogueAssetCategories } from './lib/rptiCatalogue';
-import { buildRestoredWorkspace, isWorkspaceEmpty } from './lib/workspaceState';
+import { buildRestoredWorkspace, isWorkspaceEmpty, summariseReplacement } from './lib/workspaceState';
+import { ConfirmModal } from './components/ConfirmModal';
 import { HealthIssueLocation, DataManagerTab } from './lib/dataHealth';
 import { SYNC_CHANNEL_NAME, generateTabId, isRemoteSaveMessage, notifyDataSaved } from './lib/tabSync';
 import { mergeDeliverableStatuses } from './lib/deliverableStatusDefaults';
@@ -175,6 +176,8 @@ export default function App() {
   const [versions, setVersions] = useState<Version[]>([]);
 
   const [undoStack, setUndoStack] = useState<AppState[]>([]);
+  // A shared file chosen while the workspace holds data waits here for confirmation (#62).
+  const [pendingSharedImport, setPendingSharedImport] = useState<{ fileName: string; data: AppState } | null>(null);
   const [initialReport, setInitialReport] = useState<'data-health' | undefined>(undefined);
   const [importSummary, setImportSummary] = useState<{
     lkptiYear: number; rptiYear?: number; lkptiRows: number; rptiRows: number;
@@ -210,6 +213,8 @@ export default function App() {
   });
 
   const getCurrentStateRef = useRef(getCurrentState);
+  const versionsRef = useRef(versions);
+  versionsRef.current = versions;
 
   // Load data on mount
   useEffect(() => {
@@ -439,73 +444,6 @@ export default function App() {
     }
   }, []);
 
-  const handleViewerImport = useCallback(async (file: File) => {
-    try {
-      const imported = await importFromExcel(file);
-      const hasData = Object.values(imported).some(arr => Array.isArray(arr) && arr.length > 0);
-      if (!hasData) {
-        setDbSaveError('No valid data found in the Excel file.');
-        return;
-      }
-
-      const schemaIssues = validateImportSchema(imported as Record<string, unknown[]>);
-      const errorIssues = schemaIssues.filter(issue => issue.severity === 'error');
-      if (errorIssues.length > 0) {
-        const preview = errorIssues.slice(0, 3).map(issue => `${issue.entity}: ${issue.issue}`).join('; ');
-        const moreText = errorIssues.length > 3 ? ` (and ${errorIssues.length - 3} more)` : '';
-        setDbSaveError(`Viewer import failed validation: ${preview}${moreText}`);
-        return;
-      }
-
-      const blank = getTemplateData('viewer', false);
-      const importedData: AppState = {
-        assetCategories: imported.assetCategories ?? blank.assetCategories,
-        assets: imported.assets ?? blank.assets,
-        initiatives: imported.initiatives ?? blank.initiatives,
-        milestones: imported.milestones ?? blank.milestones,
-        deliverableSegments: imported.deliverableSegments ?? blank.deliverableSegments,
-        programmes: imported.programmes ?? blank.programmes,
-        strategies: imported.strategies ?? blank.strategies,
-        dependencies: imported.dependencies ?? blank.dependencies,
-        resources: imported.resources ?? blank.resources,
-        deliverables: imported.deliverables ?? blank.deliverables,
-        deliverableStatuses: imported.deliverableStatuses ?? blank.deliverableStatuses,
-        decisions: (imported as any).decisions ?? blank.decisions,
-        rptiDetails: (imported as any).rptiDetails ?? blank.rptiDetails,
-        lkptiDetails: (imported as any).lkptiDetails ?? blank.lkptiDetails,
-        timelineSettings: { ...blank.timelineSettings, ...(imported.timelineSettings ?? {}) },
-        versions: imported.versions ?? [],
-      };
-      // Exported workbooks cannot be migrated while they remain on someone else's
-      // disk; importing one is the boundary where its old row shape becomes reachable.
-      const data = liftWorkspaceReportAttributes(importedData);
-      await saveAppData(data);
-      setAssets(data.assets);
-      setDeliverables(data.deliverables);
-      setDeliverableSegments(data.deliverableSegments);
-      setInitiatives(data.initiatives);
-      setMilestones(data.milestones);
-      setProgrammes(data.programmes);
-      setStrategies(data.strategies);
-      setDependencies(data.dependencies);
-      setAssetCategories(data.assetCategories);
-      setTimelineSettings(sanitizeTimelineSettings(data.timelineSettings));
-      setResources(data.resources);
-      setDeliverableStatuses(data.deliverableStatuses);
-      // Establishes a new workspace, so resetting the decision log is correct:
-      // its records reference entity IDs that no longer exist (ADR-0011).
-      setDecisions(data.decisions || []);
-      setRptiDetails(data.rptiDetails || []);
-      setLkptiDetails(data.lkptiDetails || []);
-      setVersions(data.versions || []);
-      setShowTemplatePicker(false);
-      setTemplatePickerIsReset(false);
-    } catch (error) {
-      console.error('Viewer import failed:', error instanceof Error ? `${error.name}: ${error.message}` : error);
-      setDbSaveError('Failed to import the file. Please check it is a valid Selara Excel export.');
-    }
-  }, []);
-
   /**
    * Onboarding from filed returns (specs/001-rpti-import-onboarding).
    *
@@ -619,7 +557,10 @@ export default function App() {
   const handleUpdate = useCallback(async (data: AppState, skipHistory = false) => {
     if (!skipHistory) {
       setUndoStack(prev => {
-        const newStack = [...prev, getCurrentStateRef.current()];
+        // An update that replaces History records the History it replaced, so Undo
+        // restores it (#62). Ordinary edits leave History alone and must not rewind it.
+        const snapshot = getCurrentStateRef.current();
+        const newStack = [...prev, data.versions ? { ...snapshot, versions: versionsRef.current } : snapshot];
         if (newStack.length > 10) return newStack.slice(newStack.length - 10);
         return newStack;
       });
@@ -652,6 +593,70 @@ export default function App() {
       setDbSaveError('Failed to save changes. Your data may not persist after a reload. If this keeps happening, try refreshing the page.');
     }
   }, []);
+
+  // Through handleUpdate, so one Undo reverses the whole replacement, History included.
+  const applySharedImport = useCallback(async (data: AppState) => {
+    await handleUpdate(data);
+    setShowTemplatePicker(false);
+    setTemplatePickerIsReset(false);
+  }, [handleUpdate]);
+
+  const handleViewerImport = useCallback(async (file: File) => {
+    try {
+      const imported = await importFromExcel(file);
+      const hasData = Object.values(imported).some(arr => Array.isArray(arr) && arr.length > 0);
+      if (!hasData) {
+        setDbSaveError('No valid data found in the Excel file.');
+        return;
+      }
+
+      const schemaIssues = validateImportSchema(imported as Record<string, unknown[]>);
+      const errorIssues = schemaIssues.filter(issue => issue.severity === 'error');
+      if (errorIssues.length > 0) {
+        const preview = errorIssues.slice(0, 3).map(issue => `${issue.entity}: ${issue.issue}`).join('; ');
+        const moreText = errorIssues.length > 3 ? ` (and ${errorIssues.length - 3} more)` : '';
+        setDbSaveError(`Viewer import failed validation: ${preview}${moreText}`);
+        return;
+      }
+
+      const blank = getTemplateData('viewer', false);
+      const importedData: AppState = {
+        assetCategories: imported.assetCategories ?? blank.assetCategories,
+        assets: imported.assets ?? blank.assets,
+        initiatives: imported.initiatives ?? blank.initiatives,
+        milestones: imported.milestones ?? blank.milestones,
+        deliverableSegments: imported.deliverableSegments ?? blank.deliverableSegments,
+        programmes: imported.programmes ?? blank.programmes,
+        strategies: imported.strategies ?? blank.strategies,
+        dependencies: imported.dependencies ?? blank.dependencies,
+        resources: imported.resources ?? blank.resources,
+        deliverables: imported.deliverables ?? blank.deliverables,
+        deliverableStatuses: imported.deliverableStatuses ?? blank.deliverableStatuses,
+        // Establishes a new workspace, so resetting the decision log is correct:
+        // its records reference entity IDs that no longer exist (ADR-0011).
+        decisions: (imported as any).decisions ?? blank.decisions,
+        rptiDetails: (imported as any).rptiDetails ?? blank.rptiDetails,
+        lkptiDetails: (imported as any).lkptiDetails ?? blank.lkptiDetails,
+        timelineSettings: { ...blank.timelineSettings, ...(imported.timelineSettings ?? {}) },
+        versions: imported.versions ?? [],
+      };
+      // Exported workbooks cannot be migrated while they remain on someone else's
+      // disk; importing one is the boundary where its old row shape becomes reachable.
+      const data = liftWorkspaceReportAttributes(importedData);
+
+      // Nothing to lose on an empty workspace; otherwise say what will be replaced
+      // and let the planner back out (#62).
+      const current = { ...getCurrentStateRef.current(), versions: versionsRef.current };
+      if (summariseReplacement(current, data).losesData) {
+        setPendingSharedImport({ fileName: file.name, data });
+      } else {
+        await applySharedImport(data);
+      }
+    } catch (error) {
+      console.error('Viewer import failed:', error instanceof Error ? `${error.name}: ${error.message}` : error);
+      setDbSaveError('Failed to import the file. Please check it is a valid Selara Excel export.');
+    }
+  }, [applySharedImport]);
 
   const handleRepairUnresolvedRow = useCallback(async (request: UnresolvedRowRepairRequest) => {
     const result = applyUnresolvedRowRepair(getCurrentStateRef.current(), request);
@@ -723,8 +728,9 @@ export default function App() {
     if (undoStack.length === 0) return;
     // Capture previous state BEFORE any state mutations
     const previousState = undoStack[undoStack.length - 1];
-    // Capture current state for redo stack BEFORE mutating
-    const currentState = getCurrentState();
+    // Capture current state for redo stack BEFORE mutating — with History when the
+    // entry carries it, so redo can put back what this undo takes away.
+    const currentState = previousState.versions ? { ...getCurrentState(), versions } : getCurrentState();
 
     // Build new stacks with captured state
     const newUndoStack = undoStack.slice(0, -1);
@@ -736,14 +742,14 @@ export default function App() {
     setUndoStack(newUndoStack);
 
     handleUpdate(previousState, true);
-  }, [undoStack, redoStack, handleUpdate]);
+  }, [undoStack, redoStack, versions, handleUpdate]);
 
   const handleRedo = useCallback(() => {
     if (redoStack.length === 0) return;
     // Capture next state BEFORE any state mutations
     const nextState = redoStack[redoStack.length - 1];
     // Capture current state for undo stack BEFORE mutating
-    const currentState = getCurrentState();
+    const currentState = nextState.versions ? { ...getCurrentState(), versions } : getCurrentState();
 
     // Build new stacks with captured state
     const newRedoStack = redoStack.slice(0, -1);
@@ -755,7 +761,7 @@ export default function App() {
     setRedoStack(newRedoStack);
 
     handleUpdate(nextState, true);
-  }, [undoStack, redoStack, handleUpdate]);
+  }, [undoStack, redoStack, versions, handleUpdate]);
 
   // Keep refs pointing to latest callbacks so the keyboard listener never needs to re-register
   undoRef.current = handleUndo;
@@ -1890,6 +1896,40 @@ export default function App() {
             </p>
           )}
         </div>
+      )}
+
+      {pendingSharedImport && (
+        <ConfirmModal
+          isOpen
+          title="Replace your workspace?"
+          message={`Opening "${pendingSharedImport.fileName}" replaces everything in this browser. You can undo straight afterwards, but not after a reload, so export a backup first if you might need the current workspace.`}
+          confirmLabel="Replace workspace"
+          onCancel={() => setPendingSharedImport(null)}
+          onConfirm={() => {
+            const { data } = pendingSharedImport;
+            setPendingSharedImport(null);
+            applySharedImport(data);
+          }}
+        >
+          <table className="mt-3 w-full text-sm" data-testid="replacement-counts">
+            <thead>
+              <tr className="text-xs text-slate-400">
+                <th className="text-left font-medium pb-1"></th>
+                <th className="text-right font-medium pb-1">Current</th>
+                <th className="text-right font-medium pb-1">Incoming</th>
+              </tr>
+            </thead>
+            <tbody className="text-slate-700">
+              {summariseReplacement({ ...getCurrentState(), versions }, pendingSharedImport.data).rows.map(row => (
+                <tr key={row.key} data-testid={`replacement-count-${row.key}`}>
+                  <td className="py-0.5">{row.label}</td>
+                  <td className="py-0.5 text-right tabular-nums" data-testid="replacement-current">{row.current}</td>
+                  <td className="py-0.5 text-right tabular-nums" data-testid="replacement-incoming">{row.incoming}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </ConfirmModal>
       )}
 
       {showTemplatePicker && !showLandingPage && (

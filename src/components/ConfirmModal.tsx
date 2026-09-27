@@ -8,6 +8,8 @@ interface ConfirmModalProps {
   confirmLabel?: string;
   cancelLabel?: string;
   variant?: 'danger' | 'warning';
+  /** Detail shown below the message, e.g. what a replacement would destroy. */
+  children?: React.ReactNode;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -19,6 +21,7 @@ export function ConfirmModal({
   confirmLabel = 'Confirm',
   cancelLabel = 'Cancel',
   variant = 'danger',
+  children,
   onConfirm,
   onCancel,
 }: ConfirmModalProps) {
@@ -42,6 +45,7 @@ export function ConfirmModal({
           <div className="flex-1 min-w-0">
             <h3 className="text-base font-semibold text-slate-800">{title}</h3>
             <p className="mt-1 text-sm text-slate-500">{message}</p>
+            {children}
           </div>
           <button
             onClick={onCancel}
