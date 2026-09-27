@@ -13,10 +13,10 @@ Restoration is destructive: any changes made since the selected version was save
 ## How to restore a version
 
 1. Open the **History** tab in the header navigation.
-2. Locate the version you want to restore in the list.
-3. Click **Restore** on that version's row.
+2. Select the version you want to restore in the list. Its details open on the right.
+3. Under **Restore Version**, click **Restore to Current**.
 4. Read the confirmation modal, which names the version and warns that the current state will be overwritten.
-5. Click **Confirm Restore**.
+5. Click **Restore**.
 
 The app loads the saved state, the History tab closes automatically, and you are returned to the timeline with the restored data.
 
@@ -24,7 +24,7 @@ The app loads the saved state, the History tab closes automatically, and you are
 
 The restoration writes the saved snapshot back into IndexedDB as the active state. The version history list itself is unchanged — the version you restored from remains available for future comparisons or restores. The decision log is likewise left as it was.
 
-If you realise the restore was a mistake, save the restored state as a new named version immediately so you have a recovery point, then make whatever corrections are needed.
+If you realise the restore was a mistake, use **Undo** (Cmd/Ctrl+Z) straight away: a restore is one change on the undo history, which holds your last 10 changes. For a durable recovery point, save a version before restoring.
 
 ---
 

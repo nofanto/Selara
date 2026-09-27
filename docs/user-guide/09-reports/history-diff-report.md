@@ -1,26 +1,30 @@
 # History Diff Report
 
-![History diff report showing inline differences between two saved portfolio versions](../../public/features/history-diff-report.png)
+![History diff report comparing a saved version with the current portfolio](../../public/features/history-diff-report.png)
 
-The History Diff report lets you compare two saved versions of your portfolio side by side. Use it to understand what changed between planning cycles, audit edits made during a review, or produce a change summary for stakeholders.
+The History Diff report compares a saved version of your portfolio with its **current** state. Use it to see what has changed since a baseline: after a planning cycle, before a review, or to produce a change summary for stakeholders.
 
-## Before You Start
+## Before you start
 
-The diff report requires at least one saved version. If no versions have been saved yet, the report displays an empty state with a prompt to save your first version. See [Saving a Version](../10-version-history/saving-a-version.md) for instructions.
+The report needs at least one saved version. If none exists it shows **No saved versions**. See [Saving a Version](../10-version-history/saving-a-version.md).
 
-## Selecting Versions to Compare
+## Running the comparison
 
-Once at least one version exists, a version selector appears at the top of the report. Choose the two versions you want to compare — a baseline (older) version and a comparison (newer) version. The report generates an inline diff immediately after both versions are selected.
+1. Go to **Reports → Version History**. The report is headed **History Differences**.
+2. Choose a saved version from the selector.
+3. Click **Run Difference Report**.
 
-## Reading the Diff
+The comparison is always between the version you chose and your current portfolio. Comparing two saved versions with each other is not supported. To compare against an older state, save a version at that point, then compare from it.
 
-Changes are displayed inline. Added content is highlighted to indicate it did not exist in the baseline version. Removed content is marked to show it was present in the baseline but absent in the comparison. Unchanged content appears without highlighting.
+The same comparison is available from the **History** tab: select a version, then click **Run Difference Report**. Both entry points show the same content.
 
-Work through the diff section by section to build a complete picture of what changed between the two snapshots: assets, programmes, strategies, initiatives (including budgets and asset moves), dependencies, milestones, deliverables and their lifecycle segments, deliverable statuses, resources, asset categories, decisions, and RPTI report rows.
+## Reading the result
 
-## Error States
+The report groups every change as **Added**, **Removed** or **Changed**, and offers a **Summary** view (grouped by asset, most significant first) and an **All changes** view (the full audit trail by entity type). It opens with the **Decisions in this span** recorded against the comparison. See [Comparing Versions](../10-version-history/comparing-versions.md) for a full description of both views.
 
-If the report cannot load the selected versions, an error message is displayed. This can occur if a version was deleted or if the underlying data is corrupt. If you see an error, return to the version selector, choose a different version, and try again. If the problem persists, check the Version History section to confirm the version still exists.
+## Error states
+
+If a saved version cannot be loaded, for example because its record was removed outside the app, an error message is shown in place of the report. Choose a different version, or check in the **History** tab that the version still exists.
 
 ---
 

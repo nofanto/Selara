@@ -6,8 +6,7 @@ Exporting to Excel produces a structured `.xlsx` file containing your full portf
 
 ## How to export
 
-1. Open the **Data Manager** panel.
-2. Click **Export Excel**.
+1. Click **Export** on the right of the header.
 
 The file downloads automatically. No configuration or confirmation step is required.
 
@@ -28,6 +27,7 @@ The exported workbook contains one sheet per data type:
 | **DeliverableSegments** | All deliverable lifecycle segments |
 | **DeliverableStatuses** | All named status labels for segments |
 | **Resources** | All people and roles in the resources roster |
+| **LkptiDetails** | A raw backup copy of every stored LKPTI report row — separate from the formatted Format 3.2.6 report export |
 | **RptiDetails** | A raw backup copy of every RPTI report row (see [Recording an RPTI Row](../14-rpti-report/recording-an-rpti-row.md)) — separate from the formatted "Format 3.1" report export |
 | **Decisions** | Every record in your [portfolio decision log](../13-decisions/recording-a-decision.md), including its MADR fields, status, and any links |
 | **Versions** | Metadata for all saved history snapshots |

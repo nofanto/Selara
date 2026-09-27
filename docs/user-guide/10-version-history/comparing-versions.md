@@ -7,9 +7,9 @@ The diff report lets you see exactly what changed between a saved baseline and y
 ## Opening the diff report
 
 1. Navigate to the **Reports** view.
-2. Select **History Differences** from the report list.
+2. Select the **Version History** card. The report is headed **History Differences**.
 3. If no versions have been saved, the panel shows an empty state with a prompt to save your first version. Follow the link to [Saving a Version](saving-a-version.md).
-4. If one or more versions exist, a version selector appears. Choose the saved version you want to compare against your current state.
+4. If one or more versions exist, a version selector appears. Choose the saved version you want to compare against your current state, then click **Run Difference Report**.
 
 ## Reading the diff report
 
@@ -50,7 +50,7 @@ Assets · Programmes · Strategies · Initiatives · Relationships · Milestones
 
 Nothing is filtered here — including the cosmetic changes the summary sets aside. Use this view when you need to account for changes to asset, programme, strategy, initiative, relationship, milestone, deliverable, segment, status, resource, category, RPTI, and LKPTI fields. This includes regulatory classification and DC/DR location changes, ownership and assignment changes, and placeholder status. Item IDs identify records; timeline-only layout changes (segment row and height, relationship arrow offset) are omitted.
 
-The **History Differences** report and the **Difference Report** reached from the Version Manager render the same content — they are two entry points to one comparison, so neither shows anything the other hides.
+The **History Differences** report and the **Run Difference Report** button in the **History** tab (select a version, then look under **Compare with Current**) render the same content — they are two entry points to one comparison, so neither shows anything the other hides.
 
 ## Limitations
 

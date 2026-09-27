@@ -1,14 +1,14 @@
 # Recording a Decision
 
-The **History** tab holds a portfolio decision log — a running record of *why* a call was made about an initiative, programme, or asset. It sits alongside version snapshots in the same tab, interleaved into one chronological stream, but stays a separate kind of record: a snapshot captures *what* the portfolio looked like, a decision captures *why* it changed and from Notes on an initiative — the decision log is specifically for capturing the reasoning and alternatives behind a choice, in a structured format.
+The **History** tab holds a portfolio decision log — a running record of *why* a call was made about an initiative, programme, or asset. It sits alongside version snapshots in the same tab, interleaved into one chronological stream, but stays a separate kind of record: a snapshot captures *what* the portfolio looked like, a decision captures *why* it changed. It is also different from an initiative's Description, which is free text: the decision log records the reasoning and the alternatives behind a choice, in a structured format.
 
-## Opening the Decisions View
+## Finding the decision log
 
-Click **Decisions** in the top navigation bar, next to Reports. The view has two panes: a list of existing decisions on the left, and the details of the selected decision on the right.
+Click **History** in the header. The left column lists snapshots and decisions in one chronological stream; choose **Decisions only** above it to see just the decisions. Select an entry to see its details on the right.
 
 ## Creating a Decision
 
-1. Click **+ New Decision** above the list.
+1. Click **New Decision** at the top of the left column.
 2. Enter a **Title** — this is required.
 3. Optionally set a **Status**: Proposed, Accepted, Deprecated, or Superseded. New decisions default to Proposed.
 4. Fill in as many of the remaining fields as are useful:

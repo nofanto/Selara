@@ -72,7 +72,7 @@ If you want to start fresh, switch to a different template, or change whether yo
 
 ![Template picker with data-loss warning](../../public/features/template-picker-reset-warning.png)
 
-4. Choose a template and select **With demo data** or **Without demo data** — or pick **Blank** to start empty.
+4. Choose how to begin again: **Start from your filed returns**, **Start blank**, or **Explore with demo data**.
 
 > **Note:** This action permanently replaces all your current data. There is no undo once you confirm a template selection.
 

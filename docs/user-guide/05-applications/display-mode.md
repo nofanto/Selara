@@ -28,5 +28,5 @@ The selected display mode persists across page reloads. You do not need to reset
 
 ---
 
-- Previous: [Managing Segments](managing-segments.md)
+- Previous: [Seeing What an Initiative Delivers](initiative-links.md)
 - Next: [Colour Modes](../06-display-settings/colour-modes.md)

@@ -1,24 +1,28 @@
 # Capacity Report
 
-![Capacity report showing allocation per resource across the timeline period](../../public/features/capacity-report.png)
+![Capacity report listing each resource with the initiatives assigned to them](../../public/features/capacity-report.png)
 
-The Capacity report shows how each resource is allocated across the portfolio's timeline period. Use it to identify over-allocated resources, find available capacity, and validate resourcing decisions before committing a plan.
+The Capacity report shows how many initiatives each person is assigned to, and which ones. Use it to spot people who are spread across too much work, or who have nothing assigned, before you commit a plan.
 
-## What the Report Shows
+## Opening the report
 
-Each row in the report represents one resource. Columns represent time periods across the timeline. Each cell shows the allocation level for that resource in that period, derived from the resource assignments currently recorded in the portfolio.
+Go to **Reports → Capacity & Resources**.
 
-The report reflects live data — any change to a resource assignment in the Resources section is immediately visible here.
+## What the report shows
 
-## Reading Allocation Levels
+Each person in the [Resource Roster](../08-resources/resource-roster.md) gets one row, with their role in brackets, and a count of the initiatives they are assigned to. Below it, the report lists those initiatives with their start and end months.
 
-Allocation is displayed as a percentage or capacity unit depending on how your resources are configured. A resource showing full allocation across all periods has no remaining capacity for additional initiatives. A resource with gaps has availability that can be assigned.
+A person counts as assigned to an initiative when they are its **Owner** or one of its **Assigned Resources**. Initiatives they own carry an **Owner** tag. Placeholder initiatives are left out, because they stand in for work that hasn't been scoped yet.
 
-## Using the Report for Planning
+Someone with no assignments shows **No initiatives assigned**. If the roster is empty, the report says so and points you to **Data Manager → Resources**.
 
-Before assigning a resource to a new initiative, open the Capacity report to check whether that resource has headroom in the periods the initiative spans. If the resource is already at capacity, consider whether an existing assignment can be moved or whether an alternative resource is available.
+## What it doesn't show
 
-To update an assignment, close the report and make the change in the Resources section. Return to the report to confirm the allocation reflects the adjustment.
+The report counts assignments; it doesn't measure effort or allocation over time. Two people each assigned to three initiatives look the same, however large those initiatives are. To judge whether the periods overlap, read the dates listed under each person, or look at the initiatives on the timeline.
+
+## Changing an assignment
+
+Assignments are made on the initiative, not in the report. Open the initiative's panel from the timeline, change its **Owner** or **Assigned Resources**, and click **Save Changes**. See [Assigning Resources](../08-resources/assigning-resources.md). The report reflects the change as soon as you return to it.
 
 ---
 

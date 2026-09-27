@@ -4,7 +4,7 @@
 
 ## Editing a cell
 
-Double-click any cell to open it for editing. Text fields, number fields, dropdowns, and checkboxes are all supported.
+Every cell is editable in place: click it and type, pick from its dropdown, or tick its checkbox. There is no separate edit mode.
 
 Edits are saved immediately when you click away or press Enter — there is no Save button. Changes are reflected on the timeline in real time.
 
@@ -20,10 +20,7 @@ Note: deleting an asset also removes all initiatives associated with it (cascadi
 
 ## Resetting data
 
-- **Reset — use demo data**: replaces all data with the built-in demo dataset. Useful for exploring features or recovering a clean starting point.
-- **Reset — delete all data**: clears all tables completely.
-
-Both actions show a confirmation modal before proceeding.
+To start again, use **Clear data and start again** at the bottom of any tab. It reopens the template picker, where you can start from your filed returns, start blank, or explore with demo data. See [First Launch](../01-getting-started/first-launch.md#resetting-or-switching-templates).
 
 ---
 

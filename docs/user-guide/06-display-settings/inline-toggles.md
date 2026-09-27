@@ -2,14 +2,14 @@
 
 ![](../../public/features/inline-toggles.png)
 
-Four icon toggle buttons in the header control what detail is shown on the timeline canvas. Each button shows whether it is active or inactive. On mobile, these toggles are available in the settings sheet.
+Five icon toggle buttons in the header control what detail is shown on the timeline canvas. (The **Critical Path** toggle beside them is covered in [Critical Path](../04-dependencies/critical-path.md).) Each button shows whether it is active or inactive. On mobile, these toggles are available in the settings sheet.
 
 ## Conflict Detection
 
 - Shows or hides red conflict markers when two initiatives on the same asset overlap in time.
 - Toggle off to reduce visual noise when conflicts are expected or intentional.
 
-## Dependency Lines
+## Relationship Lines
 
 - Shows or hides all dependency arrows on the timeline.
 - Toggle off for a cleaner view when arrows are obscuring bars.
@@ -18,6 +18,11 @@ Four icon toggle buttons in the header control what detail is shown on the timel
 
 - Shows or hides initiative description text on bars and on mobile card rows.
 - Toggle on to see notes without opening the edit panel.
+
+## Show Resources
+
+- Shows the names of the resources assigned to each initiative on its bar.
+- See [Assigning Resources](../08-resources/assigning-resources.md).
 
 ## Budget
 

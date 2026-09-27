@@ -8,7 +8,7 @@ The **Paste CSV** button in any table tab lets you bulk-import or update rows by
 
 1. Click **Paste CSV** in the tab you want to update.
 2. Paste your CSV text into the input area. Headers are optional — if included, column names are matched automatically.
-3. Click **Import**.
+3. Click **Import Rows**.
 
 ## Merge behaviour
 

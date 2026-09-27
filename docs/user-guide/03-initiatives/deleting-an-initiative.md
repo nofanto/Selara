@@ -12,7 +12,7 @@ Deletion is permanent and removes the initiative from the timeline and from Inde
 
 **Tip:** If you want to keep the initiative but hide it, consider changing its status to "Cancelled" rather than deleting it.
 
-**Undo:** If you deleted by mistake, use Undo (Cmd/Ctrl+Z). The undo history holds 50 operations.
+**Undo:** If you deleted by mistake, use Undo (Cmd/Ctrl+Z). The undo history holds 10 operations.
 
 ---
 
