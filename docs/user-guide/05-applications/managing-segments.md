@@ -5,7 +5,7 @@
 ## Selecting and editing
 
 - **Single-click** a segment bar to select it. A highlight ring appears around the selected bar.
-- **Double-click** to open the **Edit Lifecycle Segment** panel directly. From here you can change the deliverable, status, linked initiative, or dates. Click **Save Changes** to apply.
+- **Double-click**, or click **✎** in the toolbar of a selected segment, to open the **Edit Lifecycle Segment** panel. From here you can change the deliverable, status, linked initiative, or dates. Click **Save Changes** to apply.
 
 ## Moving and resizing
 
@@ -28,9 +28,9 @@ Dragging a segment horizontally may trigger automatic row reassignment if it wou
 2. Click the **trash icon**.
 3. Confirm in the modal that appears.
 
-The segment is removed immediately and cannot be recovered after confirmation.
+The segment is removed immediately. If you deleted it by mistake, use **Undo** (Cmd/Ctrl+Z).
 
 ---
 
 - Previous: [Lifecycle Segments](lifecycle-segments.md)
-- Next: [Display Mode](display-mode.md)
+- Next: [Seeing What an Initiative Delivers](initiative-links.md)

@@ -25,3 +25,8 @@ If a highlighted bar is inside a collapsed category, the category opens while th
 ### Where the highlight works
 
 The highlight needs both ends on screen, so it works when the timeline is **grouped by asset** with [display mode](display-mode.md) set to **Both**, which is the default. Grouped by programme or strategy, or showing only initiatives or only deliverables, selecting a bar works as usual without highlighting. The deliverable count still works in every view.
+
+---
+
+- Previous: [Managing Segments](managing-segments.md)
+- Next: [Display Mode](display-mode.md)

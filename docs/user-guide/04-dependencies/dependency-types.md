@@ -34,7 +34,7 @@ You can change a dependency's type at any time by clicking the arrow and editing
 
 ## Hiding Dependency Arrows
 
-The dependency visibility can be toggled on and off via the Relationships toggle in the header. This affects all dependency arrows across the timeline without removing them.
+The dependency visibility can be toggled on and off via the **Relationship Lines** toggle in the header. This affects all dependency arrows across the timeline without removing them.
 
 ---
 

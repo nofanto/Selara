@@ -8,10 +8,10 @@ The Reports section provides eight analytical views of your portfolio data. Each
 
 Open the Reports section from the main navigation. You will see a selection screen with eight cards:
 
-- **History** — compare differences between saved portfolio versions
-- **Budget** — break down spend by programme, strategy, and asset category
+- **Version History** — compare a saved version with your current portfolio
+- **Budget Report** — break down spend by programme, strategy, and asset category
 - **Initiatives & Dependencies** — view every initiative alongside its dependency relationships
-- **Capacity** — see resource allocation across the timeline period
+- **Capacity & Resources** — see how many initiatives each person is assigned to, and which
 - **Maturity Heatmap** — view all IT assets coloured by their maturity level, grouped by capability
 - **RPTI Report** — Indonesian OJK IT Development Plan Report (Format 3.1), tracking planned application and infrastructure development
 - **LKPTI - Application List Report** — Indonesian OJK LKPTI Application List (Format 3.2.6), one of the LKPTI's appendix reports, an inventory of currently live applications
@@ -21,9 +21,9 @@ Click any card to open that report. Use the back button to return to the selecti
 
 ## When to Use Reports
 
-Use reports when you need a read-only, shareable summary of portfolio state — for example, before a steering committee review, after a planning cycle closes, or when investigating a resourcing conflict.
+Use reports when you need a shareable summary of portfolio state — for example, before a steering committee review, after a planning cycle closes, or when investigating a resourcing conflict.
 
-Reports always reflect the current live data in your portfolio. To compare against a previous state, use the History report after saving a version.
+Reports always reflect the current live data in your portfolio. They are read-only, apart from the **Repair** and **Extend** actions some Data Health findings offer. To compare against a previous state, use the Version History report after saving a version.
 
 ---
 

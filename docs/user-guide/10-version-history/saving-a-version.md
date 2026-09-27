@@ -14,11 +14,11 @@ Save a version before:
 
 ## How to save a version
 
-1. Open the **History** tab from the toolbar or the main menu.
+1. Open the **History** tab in the header.
 2. Click **Save Current State**.
 3. Enter a name (required). Names should be short and descriptive, for example `Q2 Baseline` or `Pre-board 2026-03`.
 4. Optionally add a description to record the context or reason for the snapshot.
-5. Click **Save**.
+5. Click **Save Version**.
 
 The new version appears at the top of the version history list with the timestamp at which it was saved.
 
@@ -28,7 +28,7 @@ A saved version is a deep clone of the full portfolio state, including all initi
 
 ## Managing versions
 
-Each version entry in the list shows its name, optional description, and creation timestamp. To remove a version you no longer need, click the **delete** icon on its row and confirm the deletion in the modal. Deleted versions are removed from IndexedDB and cannot be recovered.
+Each version entry in the list shows its name, optional description, and creation timestamp. To remove a version you no longer need, select it, click the **delete** icon in its details, and confirm the deletion in the modal. Deleted versions are removed from IndexedDB and cannot be recovered.
 
 ## Recording why, at the same time
 

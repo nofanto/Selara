@@ -6,21 +6,16 @@ Importing an `.xlsx` file lets you load portfolio data prepared outside Selara â
 
 ## Supported file format
 
-Upload a `.xlsx` file. The importer reads the following sheets by name: **Initiatives**, **Assets**, **AssetCategories**, **Programmes**, **Strategies**, **Milestones**, **Dependencies**, **Deliverables**, **DeliverableSegments**, **DeliverableStatuses**, **Resources**, **RptiDetails**, **Decisions**, **TimelineSettings**, **Versions**. Sheets with unrecognised names are ignored. Column headers must match the expected field names; the schema warnings panel reports any mismatches (see below).
+Upload a `.xlsx` file. The importer reads the following sheets by name: **Initiatives**, **Assets**, **AssetCategories**, **Programmes**, **Strategies**, **Milestones**, **Dependencies**, **Deliverables**, **DeliverableSegments**, **DeliverableStatuses**, **Resources**, **RptiDetails**, **LkptiDetails**, **Decisions**, **TimelineSettings**, **Versions**. Sheets with unrecognised names are ignored. Column headers must match the expected field names; the schema warnings panel reports any mismatches (see below).
 
 ## Uploading a file
 
-**Via the Viewer template (first run):**
+**To open a colleague's file as your workspace:** click **Open shared** on the right of the header and select the `.xlsx` file. It **replaces your current workspace at once**, with no preview, no confirmation and no undo. Export your own work first if you want to keep it.
 
-1. On the welcome screen, choose **Viewer**.
-2. Click **Upload file** and select your `.xlsx` file.
-3. The file loads directly into the app and the template picker closes.
+**To merge into or overwrite your workspace with a preview:**
 
-**Via the Data Manager (existing workspace):**
-
-1. Open the **Data Manager** panel.
-2. Click **Import Excel**.
-3. Select your `.xlsx` file. The **Import Preview** modal opens.
+1. Click **Import** on the right of the header.
+2. Select your `.xlsx` file. The **Import Preview** modal opens.
 
 ## Reviewing the preview
 The preview shows the parsed data before anything is written to your portfolio, with a row count per sheet found â€” Initiatives, Assets, Deliverables, Deliverable Segments, Deliverable Statuses, Resources, Categories, RPTI Details, and more. Check the row counts and sample values to confirm the file was read correctly.

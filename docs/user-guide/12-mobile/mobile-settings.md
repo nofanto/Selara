@@ -15,7 +15,7 @@ The tab bar at the bottom of the screen switches between the two views available
 - **Visualiser** — Card View of your portfolio
 - **Reports** — initiative and resource reports
 
-The active tab is indicated by a border highlight. The Data Manager, Decisions, and Guide views are desktop-only — open Selara on a wider screen to reach them.
+The active tab is indicated by a border highlight. The Data Manager, History, and Guide views are desktop-only — open Selara on a wider screen to reach them.
 
 ## Card View bucket mode
 
@@ -31,7 +31,7 @@ The selected mode is saved to the device and persists across sessions.
 
 ## Date range filter
 
-Set a start date and months window to limit which initiatives appear in Card View. Only initiatives whose start date falls within the range are shown. This setting works alongside the bucket mode — you can filter to a specific period and then group the results by quarter or programme.
+Set a start date and months window to limit which initiatives appear in Card View. An initiative is shown when any part of its date range overlaps that window. This setting works alongside the bucket mode — you can filter to a specific period and then group the results by quarter or programme.
 
 ## Display toggles
 
@@ -40,7 +40,7 @@ Four toggles control what additional information appears in initiative rows with
 | Toggle | What it shows |
 |---|---|
 | Descriptions | Initiative description text below the initiative name |
-| Budget | Formatted budget amount (NZD) |
+| Budget | CapEx and OpEx in the workspace's default currency |
 | Relationships | Names of related initiatives and their dependency type |
 | Conflicts | Conflict badges in asset card headers |
 

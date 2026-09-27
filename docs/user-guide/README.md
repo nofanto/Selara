@@ -96,9 +96,9 @@ Follow these three pages to get up and running quickly:
 | [Overview](09-reports/overview.md) | The eight available reports and how to navigate them |
 | [Initiatives & Dependencies Report](09-reports/initiatives-dependencies-report.md) | Written dependency summary grouped by asset |
 | [Budget Report](09-reports/budget-report.md) | Spend breakdown by programme, strategy, and category |
-| [Capacity Report](09-reports/capacity-report.md) | Resource allocation across the timeline |
+| [Capacity Report](09-reports/capacity-report.md) | How many initiatives each person is assigned to, and which |
 | [Maturity Heatmap Report](09-reports/maturity-heatmap-report.md) | IT assets coloured by maturity level, grouped by capability |
-| [History Diff Report](09-reports/history-diff-report.md) | Comparing two saved versions to see what changed |
+| [History Diff Report](09-reports/history-diff-report.md) | Comparing a saved version with the current portfolio |
 | [Data Health Report](09-reports/data-health-report.md) | Dangling references, report-generation gaps, and values that would be rejected at filing time |
 
 ### 10 Version History

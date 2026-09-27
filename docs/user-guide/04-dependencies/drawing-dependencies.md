@@ -24,8 +24,8 @@ You can also draw from a milestone diamond to an initiative bar. See [Milestone 
 
 You can link a deliverable's lifecycle segment to an initiative to show that the initiative depends on (or is related to) a specific lifecycle phase.
 
-1. Click a segment bar to select it — a small **⤵** handle appears in the top-right corner.
-2. Drag from the handle and release over an initiative bar.
+1. Click a segment bar to select it — a small toolbar appears in its top-right corner, with **✎** (edit) and a **⛓** link handle.
+2. Drag from the **⛓** handle and release over an initiative bar.
 
 The arrow is drawn using the same colour coding as other dependencies (blue for **Requires**, red for **Blocks**, grey for **Related**). Clicking the arrow opens the Edit Relationship panel showing the deliverable name and status as the source.
 

@@ -1,6 +1,6 @@
 # Indonesian Bank Technology Catalogue
 
-The RPTI catalogue gives you a pre-built list of standard Indonesian-bank technology asset types, organised into OJK's 18 RPTI application areas (`01`–`12`, `49`, `51`–`54`). Rather than typing asset names from scratch, you can browse the areas in the visualiser and add the ones relevant to your bank's portfolio in a single click.
+The RPTI catalogue gives you a pre-built list of standard Indonesian-bank technology asset types, organised into OJK's 18 RPTI application areas (`01`–`12`, `49`, `51`–`54`, `99`). Rather than typing asset names from scratch, you can browse the areas in the visualiser and add the ones relevant to your bank's portfolio in a single click.
 
 ## How it works
 
@@ -12,7 +12,7 @@ Each area is backed by a real asset category carrying the matching OJK `RptiCate
 
 ## Demo data
 
-When you first load Selara, a representative selection of catalogue assets from 11 of the 18 areas is already pre-populated with example initiatives, lifecycle segments, and milestones. This gives you a working Indonesian-bank portfolio out of the box so you can explore the visualiser straight away.
+If you start with **Explore with demo data**, a representative selection of catalogue assets from 11 of the 18 areas is already pre-populated with example initiatives, lifecycle segments, and milestones. This gives you a working Indonesian-bank portfolio out of the box so you can explore the visualiser straight away.
 
 Areas not included in the demo (`02` Third-party funds, `03` Credit/financing, `07` Treasury, `08` Trade finance, `49` Other applications, `53` Data communication network, `99` Other infrastructure) still appear as collapsed area rows ready to be populated.
 

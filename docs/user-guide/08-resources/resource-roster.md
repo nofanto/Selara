@@ -13,7 +13,7 @@ The table shows two columns: **Name** and **Role**.
 
 ## Adding a Resource
 
-Click **+ Add Resource** above the table. A new empty row appears at the bottom of the list. Type the person's name, press **Tab** to move to the Role field, enter their role, then press **Enter** or click away to save.
+Click **Add Row** below the table. A new empty row appears at the bottom of the list. Type the person's name, press **Tab** to move to the Role field, enter their role, then press **Enter** or click away to save.
 
 ## Editing a Resource
 
