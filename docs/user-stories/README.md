@@ -11,7 +11,7 @@ the Playwright E2E test suite (`e2e/`) and `PLAYWRIGHT_TODO.md`.
 | [01-timeline-visualiser.md](01-timeline-visualiser.md) | Timeline Visualiser | US-TV-01 → US-TV-11 |
 | [02-initiative-management.md](02-initiative-management.md) | Initiative Management | US-IM-01 → US-IM-07 |
 | [03-dependency-mapping.md](03-dependency-mapping.md) | Dependency Mapping | US-DM-01 → US-DM-08 |
-| [04-data-management.md](04-data-management.md) | Data Management | US-DA-01 → US-DA-08 |
+| [04-data-management.md](04-data-management.md) | Data Management | US-DA-01 → US-DA-13 |
 | [05-version-history.md](05-version-history.md) | Version History & Snapshots | US-VH-01 → US-VH-04 |
 | [06-reports.md](06-reports.md) | Reports | US-RP-01 → US-RP-05 |
 | [07-resources-capacity.md](07-resources-capacity.md) | Resources & Capacity Planning | US-RC-01 → US-RC-03 |

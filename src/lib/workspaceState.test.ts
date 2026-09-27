@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildRestoredWorkspace, isWorkspaceEmpty } from './workspaceState';
+import { buildRestoredWorkspace, isWorkspaceEmpty, summariseReplacement } from './workspaceState';
 import type { Decision, Version } from '../types';
 
 describe('isWorkspaceEmpty', () => {
@@ -120,5 +120,56 @@ describe('buildRestoredWorkspace', () => {
     expect(restored.deliverableStatuses).toEqual([]);
     expect(restored.rptiDetails).toEqual([]);
     expect(restored.lkptiDetails).toEqual([]);
+  });
+});
+
+describe('summariseReplacement', () => {
+  const empty = {
+    assets: [], deliverables: [], deliverableSegments: [], initiatives: [], milestones: [], programmes: [],
+    strategies: [], dependencies: [], assetCategories: [], resources: [], deliverableStatuses: [],
+    decisions: [], rptiDetails: [], lkptiDetails: [], versions: [],
+  };
+  const n = (count: number) => Array.from({ length: count }, (_, i) => ({ id: `x-${i}` }));
+
+  it('pairs current and incoming counts for each kind of record', () => {
+    const summary = summariseReplacement(
+      { ...empty, deliverables: n(42), initiatives: n(31) },
+      { ...empty, deliverables: n(17), initiatives: n(12) },
+    );
+
+    expect(summary.rows).toEqual([
+      { key: 'deliverables', label: 'Deliverables', current: 42, incoming: 17 },
+      { key: 'initiatives', label: 'Initiatives', current: 31, incoming: 12 },
+    ]);
+  });
+
+  it('omits kinds that are empty on both sides', () => {
+    const summary = summariseReplacement({ ...empty, assets: n(1) }, empty);
+
+    expect(summary.rows.map(r => r.key)).toEqual(['assets']);
+  });
+
+  // The whole point of #62: these are what a replacement destroys, even though
+  // isWorkspaceEmpty() rightly ignores History when deciding whether to onboard.
+  it.each(['versions', 'decisions', 'rptiDetails', 'lkptiDetails'] as const)(
+    'counts %s as something the replacement would lose',
+    (key) => {
+      const summary = summariseReplacement({ ...empty, [key]: n(2) }, empty);
+
+      expect(summary.losesData).toBe(true);
+      expect(summary.rows).toEqual([expect.objectContaining({ key, current: 2, incoming: 0 })]);
+    },
+  );
+
+  it('loses nothing when the current workspace is empty, whatever arrives', () => {
+    const summary = summariseReplacement(empty, { ...empty, assets: n(3), versions: n(1) });
+
+    expect(summary.losesData).toBe(false);
+  });
+
+  it('treats a missing optional list as empty', () => {
+    const { versions: _v, deliverables: _d, ...legacy } = empty;
+
+    expect(summariseReplacement(legacy, legacy)).toEqual({ rows: [], losesData: false });
   });
 });

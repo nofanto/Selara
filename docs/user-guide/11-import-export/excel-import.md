@@ -10,7 +10,7 @@ Upload a `.xlsx` file. The importer reads the following sheets by name: **Initia
 
 ## Uploading a file
 
-**To open a colleague's file as your workspace:** click **Open shared** on the right of the header and select the `.xlsx` file. It **replaces your current workspace at once**, with no preview, no confirmation and no undo. Export your own work first if you want to keep it.
+**To open a colleague's file as your workspace:** click **Open shared** on the right of the header and select the `.xlsx` file. It **replaces your whole workspace**, including History snapshots and decisions. If your workspace has any data, Selara first asks you to confirm and shows, for each kind of record, how many you have now and how many the file brings. **Cancel** changes nothing. After replacing, a single **Undo** brings your previous workspace back, but only until you reload the page, so export your own work first if you want to keep it.
 
 **To merge into or overwrite your workspace with a preview:**
 
