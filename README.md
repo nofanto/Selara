@@ -6,6 +6,8 @@ Selara is a powerful, interactive visualiser designed for IT strategic planning.
 
 Selara is a fork of [Scenia](https://github.com/waylonkenning/scenia) by Waylon Kenning.
 
+The proposed [first-release roadmap](requirement-specs/first-release-roadmap.md) focuses on self-service use by individual IT planners at Indonesian commercial banks, with phased scope, acceptance evidence, and open design decisions.
+
 **[⭐ Star on GitHub](https://github.com/nofanto/Selara)**
 
 ## 🚀 Key Features
