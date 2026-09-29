@@ -71,7 +71,7 @@ test.describe('US-04: Export includes all entity types', () => {
     await expect(modal).toBeVisible({ timeout: 5000 });
 
     // Resources count should be visible in the preview
-    await expect(modal.getByText(/Resources/)).toBeVisible();
+    await expect(modal.getByText(/\d+ Resources/)).toBeVisible();
 
     // Dismiss
     await page.getByRole('button', { name: 'Cancel' }).click();

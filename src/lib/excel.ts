@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx';
+import { decodeFormat1ForImport, FIELD_INVENTORY } from './workspaceBackup';
 import { Decision, Asset, Deliverable, DeliverableSegment, DeliverableStatus, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource, Version, RptiDetail, LkptiDetail } from '../types';
 
 interface AppData {
@@ -43,6 +44,73 @@ const sanitizeTimelineSettings = (raw: unknown): TimelineSettings | undefined =>
     monthsToShow,
   } as TimelineSettings;
 };
+
+/**
+ * Display fallback for a saved version whose settings are missing or invalid —
+ * ordinary Import only (contracts/workbook.md, "Legacy repairs"). startDate is a
+ * viewport position, never an implementation or go-live date.
+ */
+export const SNAPSHOT_DISPLAY_FALLBACK: Pick<TimelineSettings,
+  'startDate' | 'monthsToShow' | 'budgetVisualisation' | 'descriptionDisplay' | 'emptyRowDisplay' | 'snapToPeriod' | 'conflictDetection' | 'showRelationships'> = {
+  startDate: '2000-01-01',
+  monthsToShow: 12,
+  budgetVisualisation: 'label',
+  descriptionDisplay: 'off',
+  emptyRowDisplay: 'show',
+  snapToPeriod: 'month',
+  conflictDetection: 'off',
+  showRelationships: 'off',
+};
+
+/** Settings that carry business meaning: kept when valid, disclosed when not, never borrowed or derived. */
+const BUSINESS_SETTINGS = ['onboardingLkptiYear', 'onboardingRptiYear', 'defaultCurrency', 'clusterName'] as const;
+
+const settingValid = (field: string, value: unknown): boolean => {
+  const spec = (FIELD_INVENTORY.TimelineSettings as Record<string, { kind: string; values?: readonly unknown[] }>)[field];
+  if (!spec) return true;
+  const kindOk = spec.kind === 'string' ? typeof value === 'string'
+    : spec.kind === 'number' ? typeof value === 'number' && Number.isFinite(value)
+      : spec.kind === 'boolean' ? typeof value === 'boolean'
+        : spec.kind === 'stringArray' ? Array.isArray(value) && value.every(v => typeof v === 'string')
+          : typeof value === 'object' && value !== null && !Array.isArray(value)
+            && Object.values(value).every(inner => typeof inner === 'object' && inner !== null && Object.values(inner).every(w => typeof w === 'string'));
+  if (!kindOk) return false;
+  if (field === 'startDate') return sanitizeTimelineSettings({ startDate: value, monthsToShow: 12 }) !== undefined;
+  return !spec.values || spec.values.includes(value);
+};
+
+/**
+ * A saved version's settings as ordinary Import restores them. Valid settings pass
+ * through unchanged. Otherwise each missing/invalid required display field gets
+ * the documented fallback, invalid optional display fields are omitted, valid
+ * business settings survive, and every repair and gap is described — business
+ * settings are never filled in from the destination workspace or the fallback.
+ */
+export function repairSnapshotSettings(raw: unknown, versionLabel: string): { settings: TimelineSettings; notice?: string } {
+  const source = raw && typeof raw === 'object' ? { ...(raw as Record<string, unknown>) } : {};
+  const repairedDisplay = (Object.keys(SNAPSHOT_DISPLAY_FALLBACK) as (keyof typeof SNAPSHOT_DISPLAY_FALLBACK)[])
+    .filter(field => !settingValid(field, source[field]));
+  if (repairedDisplay.length === 0) return { settings: source as unknown as TimelineSettings };
+
+  const settings: Record<string, unknown> = { ...source };
+  for (const field of repairedDisplay) settings[field] = SNAPSHOT_DISPLAY_FALLBACK[field];
+  const droppedDisplay: string[] = [];
+  const droppedBusiness: string[] = [];
+  for (const [field, value] of Object.entries(source)) {
+    if (field in SNAPSHOT_DISPLAY_FALLBACK || value === undefined || settingValid(field, value)) continue;
+    delete settings[field];
+    ((BUSINESS_SETTINGS as readonly string[]).includes(field) ? droppedBusiness : droppedDisplay).push(`${field} (${JSON.stringify(value)})`);
+  }
+  const absentBusiness = BUSINESS_SETTINGS.filter(field => source[field] === undefined);
+
+  const parts = [
+    `${versionLabel}: its timeline display settings were missing or invalid (${repairedDisplay.join(', ')}), so Selara's display defaults were used. The 2000-01-01 start date only positions the timeline; it is not a business date.`,
+  ];
+  if (droppedDisplay.length) parts.push(`Invalid display settings left out: ${droppedDisplay.join(', ')}.`);
+  if (droppedBusiness.length) parts.push(`Invalid business settings left out, not replaced: ${droppedBusiness.join(', ')}.`);
+  if (absentBusiness.length) parts.push(`Business settings not in the file and left unset: ${absentBusiness.join(', ')}.`);
+  return { settings: settings as unknown as TimelineSettings, notice: parts.join(' ') };
+}
 
 const normalizeResourceIds = (value: unknown): string[] | undefined => {
   if (typeof value === 'string') {
@@ -201,13 +269,24 @@ export const exportToExcel = (data: AppData) => {
  * round trip is unit-testable against `buildWorkbook` without a File or a
  * FileReader.
  */
-export const parseWorkbook = (wb: XLSX.WorkBook): Partial<AppData> => {
+export const parseWorkbook = (wb: XLSX.WorkBook): Partial<AppData> => parseWorkbookWithDiagnostics(wb).data;
+
+/**
+ * Ordinary Import's reader, with what it had to repair or could not read. Reads
+ * both older exports and format 1 backups (whose cells it decodes first), and is
+ * the only place snapshot display settings are repaired — Restore Backup never
+ * repairs (contracts/workbook.md).
+ */
+export const parseWorkbookWithDiagnostics = (wb: XLSX.WorkBook): { data: Partial<AppData>; notices: string[] } => {
         const result: Partial<AppData> = {
           versions: []
         };
+        const notices: string[] = [];
+        const format1 = decodeFormat1ForImport(wb);
 
         // Helper to safely get sheet data
         const getSheetData = <T>(name: string): T[] => {
+          if (format1) return (format1.sheets.get(name) ?? []) as T[];
           const ws = wb.Sheets[name];
           if (!ws) return [];
           return XLSX.utils.sheet_to_json(ws);
@@ -289,11 +368,16 @@ export const parseWorkbook = (wb: XLSX.WorkBook): Partial<AppData> => {
 
         const settingsSplit = split<TimelineSettings>(raw.timelineSettings);
         result.timelineSettings = sanitizeTimelineSettings(settingsSplit.current[0]);
+        if (!result.timelineSettings) {
+          notices.push('The file has no usable current timeline settings, so your current timeline settings are kept.');
+        }
 
         // Reconstruct versions
         if (raw.versions.length > 0) {
           result.versions = raw.versions.map((v: any) => {
             const vid = v.id;
+            const repaired = repairSnapshotSettings(settingsSplit.byVersion[vid]?.[0], `Saved version "${v.name ?? vid}"`);
+            if (repaired.notice) notices.push(repaired.notice);
             return {
               id: vid,
               name: v.name,
@@ -313,7 +397,10 @@ export const parseWorkbook = (wb: XLSX.WorkBook): Partial<AppData> => {
                 resources: resSplit.byVersion[vid] || [],
                 rptiDetails: rptiDetailSplit.byVersion[vid] || [],
                 lkptiDetails: appInvDetailSplit.byVersion[vid] || [],
-                timelineSettings: sanitizeTimelineSettings(settingsSplit.byVersion[vid]?.[0]) || {},
+                timelineSettings: repaired.settings,
+                // Format 1 carries each snapshot's archival decision copy (ADR-0011:
+                // kept, never read on restore); older files don't.
+                ...(Array.isArray(v.archivedDecisions) ? { decisions: v.archivedDecisions as Decision[] } : {}),
               }
             };
           });
@@ -335,24 +422,26 @@ export const parseWorkbook = (wb: XLSX.WorkBook): Partial<AppData> => {
           result.decisions = getSheetData<Decision>('Decisions');
         }
 
-        return result;
+        return { data: result, notices };
 };
 
-export const importFromExcel = async (file: File): Promise<Partial<AppData>> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
+export const readWorkbookFile = (file: File): Promise<XLSX.WorkBook> => new Promise((resolve, reject) => {
+  const reader = new FileReader();
 
-    reader.onload = (e) => {
-      try {
-        const data = new Uint8Array(e.target?.result as ArrayBuffer);
-        resolve(parseWorkbook(XLSX.read(data, { type: 'array' })));
-      } catch (error) {
-        reject(error);
-      }
-    };
+  reader.onload = (e) => {
+    try {
+      const data = new Uint8Array(e.target?.result as ArrayBuffer);
+      resolve(XLSX.read(data, { type: 'array' }));
+    } catch (error) {
+      reject(error);
+    }
+  };
 
-    reader.onerror = (error) => reject(error);
-    reader.readAsArrayBuffer(file);
-  });
-};
+  reader.onerror = (error) => reject(error);
+  reader.readAsArrayBuffer(file);
+});
+
+export const importFromExcelWithDiagnostics = async (file: File) => parseWorkbookWithDiagnostics(await readWorkbookFile(file));
+
+export const importFromExcel = async (file: File): Promise<Partial<AppData>> => (await importFromExcelWithDiagnostics(file)).data;
 

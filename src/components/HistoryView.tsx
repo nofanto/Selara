@@ -5,7 +5,6 @@ import {
   DeliverableStatus, RptiDetail, LkptiDetail,
 } from '../types';
 import { History, Save, Trash2, Plus, ArrowRight, FileText, AlertCircle, ClipboardList } from 'lucide-react';
-import { saveVersion, deleteVersion } from '../lib/db';
 import { buildHistoryStream } from '../lib/historyStream';
 import { ConfirmModal } from './ConfirmModal';
 import { VersionComparisonReport } from './VersionDiffReport';
@@ -31,8 +30,15 @@ type CurrentData = {
 
 interface HistoryViewProps {
   versions: Version[];
-  onUpdateVersions: (versions: Version[]) => void;
-  onRestore: (version: Version) => void;
+  /**
+   * History writes go through the app, which queues them with every other
+   * workspace write, tells other tabs, and resolves false — having shown why —
+   * when the write failed, so nothing here claims a version that isn't stored.
+   */
+  onSaveVersion: (version: Version) => Promise<boolean>;
+  onDeleteVersion: (id: string) => Promise<boolean>;
+  /** Opens the restore preview; the app writes only after confirmation (R07). */
+  onRequestRestore: (version: Version) => void;
   currentData: CurrentData;
   decisions: Decision[];
   initiatives: Initiative[];
@@ -55,7 +61,7 @@ interface HistoryViewProps {
  * as a visible gap rather than an absence nobody notices.
  */
 export function HistoryView({
-  versions, onUpdateVersions, onRestore, currentData, decisions,
+  versions, onSaveVersion, onDeleteVersion, onRequestRestore, currentData, decisions,
   initiatives, programmes, assets,
   onAddDecision, onUpdateDecision, onDeleteDecision,
   selectedDecisionId, onSelectDecisionId,
@@ -126,8 +132,7 @@ export function HistoryView({
       }),
     };
 
-    await saveVersion(version);
-    onUpdateVersions([...versions, version]);
+    if (!(await onSaveVersion(version))) return;
 
     // Capture-at-save (AC2). Only on explicit opt-in *with* a title, so an
     // abandoned form leaves no half-written record, and it never gates the save
@@ -166,8 +171,7 @@ export function HistoryView({
       message,
       onConfirm: async () => {
         setPendingConfirm(null);
-        await deleteVersion(v.id);
-        onUpdateVersions(versions.filter(x => x.id !== v.id));
+        if (!(await onDeleteVersion(v.id))) return;
         if (selectedVersionId === v.id) setSelectedVersionId(null);
         if (comparisonVersionId === v.id) setComparisonVersionId(null);
       },
@@ -382,11 +386,7 @@ export function HistoryView({
                     Overwrites current work — the decision log is kept
                   </p>
                   <button
-                    onClick={() => setPendingConfirm({
-                      title: 'Restore Version',
-                      message: `Restore "${selectedVersion.name}"? This will overwrite all your current work. Your decision log is not rolled back.`,
-                      onConfirm: () => { setPendingConfirm(null); onRestore(selectedVersion); },
-                    })}
+                    onClick={() => onRequestRestore(selectedVersion)}
                     className="w-full py-2 bg-white border border-emerald-200 text-emerald-600 rounded-lg hover:bg-emerald-50 text-xs font-bold"
                   >
                     Restore to Current
@@ -449,7 +449,7 @@ export function HistoryView({
         isOpen={pendingConfirm !== null}
         title={pendingConfirm?.title || ''}
         message={pendingConfirm?.message || ''}
-        confirmLabel={pendingConfirm?.title === 'Delete Version' ? 'Delete' : 'Restore'}
+        confirmLabel="Delete"
         onConfirm={() => pendingConfirm?.onConfirm()}
         onCancel={() => setPendingConfirm(null)}
       />

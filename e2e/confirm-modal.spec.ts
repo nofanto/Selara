@@ -55,6 +55,8 @@ test.describe('In-app ConfirmModal — no browser dialogs', () => {
     await page.getByTestId('clear-and-start-again-btn').click();
     await expect(page.getByTestId('template-picker-modal')).toBeVisible();
     await page.getByTestId('template-start-blank-btn').click();
+    // Replacing an existing workspace is previewed first (R04, specs/005-workspace-recovery).
+    await page.getByTestId('confirm-modal-confirm').click();
     await expect(page.getByTestId('template-picker-modal')).not.toBeVisible();
 
     const rows = page.locator('table tbody tr');
@@ -66,6 +68,8 @@ test.describe('In-app ConfirmModal — no browser dialogs', () => {
     await page.getByTestId('clear-and-start-again-btn').click();
     await expect(page.getByTestId('template-picker-modal')).toBeVisible();
     await page.getByTestId('template-start-demo-btn').click();
+    // Replacing an existing workspace is previewed first (R04, specs/005-workspace-recovery).
+    await page.getByTestId('confirm-modal-confirm').click();
     await expect(page.getByTestId('template-picker-modal')).not.toBeVisible();
 
     const rows = page.locator('table tbody tr');

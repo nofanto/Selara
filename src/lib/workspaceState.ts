@@ -1,4 +1,5 @@
 import type { Decision, Version } from '../types';
+import { workspaceFingerprint } from './workspaceBackup';
 
 type WorkspaceContent = {
   assets: unknown[];
@@ -112,4 +113,50 @@ export function buildRestoredWorkspace(version: Version, currentDecisions: Decis
     lkptiDetails: version.data.lkptiDetails ?? [],
     decisions: currentDecisions,
   };
+}
+
+interface EffectsSide {
+  versions?: unknown[];
+  decisions?: unknown[];
+  timelineSettings?: unknown;
+}
+
+/**
+ * What a replacement does to History, the decision log and settings, in words
+ * shown before it is confirmed (contracts/replacement-routes.md). Every line is
+ * stated even when nothing changes: "kept" must be said, not inferred from an
+ * absent warning, and a settings change must show even when no counts move.
+ *
+ * `next.versions` undefined means the route leaves History alone.
+ */
+export function describeReplacementEffects(
+  current: { versions: unknown[]; decisions: unknown[]; timelineSettings: unknown },
+  next: EffectsSide,
+): string[] {
+  const effects: string[] = [];
+  const n = current.versions.length;
+  if (next.versions === undefined) {
+    effects.push(`History: your ${n} saved version(s) are kept.`);
+  } else if (next.versions.length === 0) {
+    effects.push(n > 0 ? `History: all ${n} saved version(s) are removed.` : 'History: none saved before or after.');
+  } else if (n === 0) {
+    effects.push(`History: ${next.versions.length} saved version(s) are added from the incoming workspace.`);
+  } else {
+    effects.push(`History: your ${n} saved version(s) are replaced by ${next.versions.length} from the incoming workspace.`);
+  }
+
+  const before = current.decisions.length;
+  const after = next.decisions ?? [];
+  if (workspaceFingerprint({ decisions: current.decisions }) === workspaceFingerprint({ decisions: after })) {
+    effects.push(before === 0 ? 'Decision log: empty before and after.' : `Decision log: kept (${before} decision(s)).`);
+  } else if (after.length === 0) {
+    effects.push(`Decision log: cleared — ${before} decision(s) removed.`);
+  } else {
+    effects.push(`Decision log: replaced — ${before} decision(s) now, ${after.length} after.`);
+  }
+
+  effects.push(workspaceFingerprint({ s: current.timelineSettings }) === workspaceFingerprint({ s: next.timelineSettings })
+    ? 'Timeline settings: unchanged.'
+    : "Timeline settings: replaced by the incoming workspace's settings.");
+  return effects;
 }

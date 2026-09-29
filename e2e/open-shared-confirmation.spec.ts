@@ -101,6 +101,8 @@ test.describe('Open shared asks before replacing the workspace (US-DA-13)', () =
     await page.getByTestId('nav-data-manager').click();
     await page.getByTestId('clear-and-start-again-btn').click();
     await page.getByTestId('template-start-blank-btn').click();
+    // Replacing an existing workspace is previewed first (R04, specs/005-workspace-recovery).
+    await page.getByTestId('confirm-modal-confirm').click();
     await page.getByTestId('nav-visualiser').click();
     await expect(assetRows(page)).toHaveCount(0);
 

@@ -1,6 +1,9 @@
 import React, { useRef, useState } from 'react';
 import { Upload, FileSpreadsheet, FileText, AlertCircle, Check, TriangleAlert, ImageDown, Share, FolderOpen } from 'lucide-react';
-import { exportToExcel, importFromExcel } from '../lib/excel';
+import { exportToExcel, importFromExcelWithDiagnostics } from '../lib/excel';
+import { describeReplacementEffects, summariseReplacement } from '../lib/workspaceState';
+import type { PreparedReplacement, ReplaceOutcome } from '../lib/replacement';
+import { ReplacementSummary } from './ReplacementSummary';
 import { SchemaIssue, validateImportSchema } from '../lib/importValidation';
 import { exportToPDF, exportToPNG } from '../lib/pdf';
 import { shareWorkspace } from '../lib/share';
@@ -9,6 +12,8 @@ import { shareWorkspace } from '../lib/share';
 // own Google Cloud Function and Firestore, inherited from Scenia. Disabled
 // until Selara has its own backend to point at — flip this once one exists.
 const SHARING_ENABLED = false;
+
+type WorkspaceWrite = Parameters<DataControlsProps['onImport']>[0];
 import { Asset, Deliverable, DeliverableSegment, DeliverableStatus, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource, Version, Decision, RptiDetail, LkptiDetail } from '../types';
 
 interface DataControlsProps {
@@ -47,7 +52,13 @@ interface DataControlsProps {
     decisions?: Decision[];
     rptiDetails?: RptiDetail[];
     lkptiDetails?: LkptiDetail[];
-  }) => void;
+  }) => Promise<boolean>;
+  /** Waits for pending saves and reads the stored base an Overwrite is reviewed against (FR-015). */
+  onPrepareReplacement: () => Promise<PreparedReplacement>;
+  /** Writes an Overwrite only if the stored base is unchanged; success is reported only after it is saved. */
+  onCommitReplacement: (next: WorkspaceWrite, prepared: PreparedReplacement, options: { undoable: boolean; busyLabel?: string }) => Promise<ReplaceOutcome>;
+  /** Changes whenever the workspace changes here or in another tab; an older preview is stale. */
+  persistedRevision: number;
   onError?: (message: string | null) => void;
   /**
    * Open a colleague's exported file read-only. Lives here rather than on the
@@ -58,12 +69,19 @@ interface DataControlsProps {
   timelineId?: string; // ID of the element to capture for PDF
 }
 
-export function DataControls({ data, onImport, onError, onViewerImport, timelineId }: DataControlsProps) {
+export function DataControls({
+  data, onImport, onPrepareReplacement, onCommitReplacement, persistedRevision, onError, onViewerImport, timelineId,
+}: DataControlsProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const viewerInputRef = useRef<HTMLInputElement>(null);
   const [importPreviewData, setImportPreviewData] = useState<Partial<typeof data> | null>(null);
   const [showImportModal, setShowImportModal] = useState(false);
   const [importSchemaIssues, setImportSchemaIssues] = useState<SchemaIssue[]>([]);
+  const [importNotices, setImportNotices] = useState<string[]>([]);
+  const [importPrepared, setImportPrepared] = useState<PreparedReplacement | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [importSaving, setImportSaving] = useState(false);
+  const [importRefreshing, setImportRefreshing] = useState(false);
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [isSharing, setIsSharing] = useState(false);
   const [showShareSuccessModal, setShowShareSuccessModal] = useState(false);
@@ -131,7 +149,7 @@ export function DataControls({ data, onImport, onError, onViewerImport, timeline
     if (!file) return;
 
     try {
-      const importedData = await importFromExcel(file);
+      const { data: importedData, notices } = await importFromExcelWithDiagnostics(file);
 
       // Basic validation/merging logic
       const hasData = Object.values(importedData).some(arr => Array.isArray(arr) && arr.length > 0);
@@ -148,7 +166,20 @@ export function DataControls({ data, onImport, onError, onViewerImport, timeline
           return;
         }
 
+        // The Overwrite preview is measured against the stored workspace after
+        // pending saves land; a failed save blocks it with the work kept on screen.
+        let prepared: PreparedReplacement;
+        try {
+          prepared = await onPrepareReplacement();
+        } catch (error) {
+          showNotification('error', error instanceof Error ? error.message : 'The workspace could not be read.');
+          if (fileInputRef.current) fileInputRef.current.value = '';
+          return;
+        }
         setImportSchemaIssues(schemaIssues);
+        setImportNotices(notices);
+        setImportPrepared(prepared);
+        setImportError(null);
         setImportPreviewData(importedData as Partial<typeof data>);
         setShowImportModal(true);
       } else {
@@ -165,39 +196,70 @@ export function DataControls({ data, onImport, onError, onViewerImport, timeline
     }
   };
 
-  const handleOverwriteImport = () => {
-    if (!importPreviewData) return;
-    onImport({
-      assets: importPreviewData.assets || [],
-      deliverables: importPreviewData.deliverables || [],
-      deliverableSegments: importPreviewData.deliverableSegments || [],
-      deliverableStatuses: importPreviewData.deliverableStatuses || [],
-      initiatives: importPreviewData.initiatives || [],
-      milestones: importPreviewData.milestones || [],
-      programmes: importPreviewData.programmes || [],
-      strategies: importPreviewData.strategies || [],
-      dependencies: importPreviewData.dependencies || [],
-      assetCategories: importPreviewData.assetCategories || [],
-      timelineSettings: importPreviewData.timelineSettings || data.timelineSettings,
-      resources: importPreviewData.resources || [],
-      versions: importPreviewData.versions || [],
-      // A file exported before the Decisions sheet existed carries no decisions at
-      // all, which arrives here as `undefined` rather than []. Defaulting that to []
-      // is exactly the bug in #22: it silently destroys the workspace's decision log
-      // on an overwrite. `undefined` means "this file cannot speak about decisions",
-      // so the existing log is kept; [] means "this file says there are none".
-      decisions: importPreviewData.decisions ?? data.decisions ?? [],
-      rptiDetails: importPreviewData.rptiDetails || [],
-      lkptiDetails: importPreviewData.lkptiDetails || [],
-    });
+  const closeImportPreview = () => {
     setShowImportModal(false);
     setImportPreviewData(null);
     setImportSchemaIssues([]);
+    setImportNotices([]);
+    setImportPrepared(null);
+    setImportError(null);
+  };
+
+  /** What Overwrite writes, measured against the reviewed base (R02). */
+  const overwriteData = (preview: Partial<typeof data>, prepared: PreparedReplacement): WorkspaceWrite => ({
+    assets: preview.assets || [],
+    deliverables: preview.deliverables || [],
+    deliverableSegments: preview.deliverableSegments || [],
+    deliverableStatuses: preview.deliverableStatuses || [],
+    initiatives: preview.initiatives || [],
+    milestones: preview.milestones || [],
+    programmes: preview.programmes || [],
+    strategies: preview.strategies || [],
+    dependencies: preview.dependencies || [],
+    assetCategories: preview.assetCategories || [],
+    timelineSettings: preview.timelineSettings || data.timelineSettings,
+    resources: preview.resources || [],
+    versions: preview.versions || [],
+    // A file exported before the Decisions sheet existed carries no decisions at
+    // all, which arrives here as `undefined` rather than []. Defaulting that to []
+    // is exactly the bug in #22: it silently destroys the workspace's decision log
+    // on an overwrite. `undefined` means "this file cannot speak about decisions",
+    // so the existing log is kept; [] means "this file says there are none".
+    decisions: preview.decisions ?? prepared.current.decisions,
+    rptiDetails: preview.rptiDetails || [],
+    lkptiDetails: preview.lkptiDetails || [],
+  });
+
+  const handleOverwriteImport = async () => {
+    if (!importPreviewData || !importPrepared || importSaving) return;
+    setImportSaving(true);
+    setImportError(null);
+    const outcome = await onCommitReplacement(overwriteData(importPreviewData, importPrepared), importPrepared, { undoable: true, busyLabel: 'Overwriting…' });
+    setImportSaving(false);
+    if (!outcome.ok) {
+      setImportError(outcome.message);
+      // A changed store stays stale until the preview is refreshed.
+      if (outcome.stale) setImportPrepared(prev => prev && { ...prev, revision: -1 });
+      return;
+    }
+    closeImportPreview();
     showNotification('success', 'Data overwritten successfully.');
   };
 
-  const handleMergeImport = () => {
-    if (!importPreviewData) return;
+  const refreshImportPreview = async () => {
+    setImportRefreshing(true);
+    try {
+      setImportPrepared(await onPrepareReplacement());
+      setImportError(null);
+    } catch (error) {
+      setImportError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setImportRefreshing(false);
+    }
+  };
+
+  const handleMergeImport = async () => {
+    if (!importPreviewData || importSaving) return;
 
     // Helper to merge arrays by ID
     const mergeArrays = <T extends { id: string }>(existing: T[], imported: T[] = []) => {
@@ -213,7 +275,8 @@ export function DataControls({ data, onImport, onError, onViewerImport, timeline
       return merged;
     };
 
-    onImport({
+    setImportSaving(true);
+    const saved = await onImport({
       assets: mergeArrays(data.assets, importPreviewData.assets),
       deliverables: mergeArrays(data.deliverables || [], importPreviewData.deliverables),
       deliverableSegments: mergeArrays(data.deliverableSegments || [], importPreviewData.deliverableSegments),
@@ -231,10 +294,11 @@ export function DataControls({ data, onImport, onError, onViewerImport, timeline
       rptiDetails: mergeArrays(data.rptiDetails || [], importPreviewData.rptiDetails),
       lkptiDetails: mergeArrays(data.lkptiDetails || [], importPreviewData.lkptiDetails),
     });
-    setShowImportModal(false);
-    setImportPreviewData(null);
-    setImportSchemaIssues([]);
-    showNotification('success', 'Data merged successfully.');
+    setImportSaving(false);
+    closeImportPreview();
+    // Success only once the merge is stored (FR-014).
+    if (saved) showNotification('success', 'Data merged successfully.');
+    else showNotification('error', 'The merge could not be saved. It is shown on screen but may not survive a reload.');
   };
 
   return (
@@ -419,7 +483,7 @@ export function DataControls({ data, onImport, onError, onViewerImport, timeline
 
       {showImportModal && importPreviewData && (
         <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-[100] import-preview-modal">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 mx-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 mx-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center gap-3 mb-4 text-blue-600">
               <AlertCircle size={24} />
               <h2 className="text-xl font-semibold text-slate-900">Import Preview</h2>
@@ -465,10 +529,31 @@ export function DataControls({ data, onImport, onError, onViewerImport, timeline
               </div>
             )}
 
+            {importPrepared && (
+              <div className="mb-4 border-t border-slate-100 pt-3" data-testid="import-overwrite-effects">
+                <p className="text-sm font-semibold text-slate-800">If you overwrite</p>
+                {(() => {
+                  const next = overwriteData(importPreviewData, importPrepared);
+                  return (
+                    <ReplacementSummary
+                      rows={summariseReplacement(importPrepared.current, next).rows}
+                      effects={describeReplacementEffects(importPrepared.current, next)}
+                      notices={importNotices}
+                      stale={importPrepared.revision !== persistedRevision}
+                      onRefresh={refreshImportPreview}
+                      refreshing={importRefreshing}
+                      error={importError}
+                    />
+                  );
+                })()}
+              </div>
+            )}
+
             <div className="space-y-3">
               <button
                 onClick={handleMergeImport}
-                className="w-full flex items-center justify-center gap-2 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+                disabled={importSaving}
+                className="w-full flex items-center justify-center gap-2 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
                 title="Update exiting items and add new ones. Safest option."
               >
                 <Check size={18} />
@@ -477,14 +562,16 @@ export function DataControls({ data, onImport, onError, onViewerImport, timeline
 
               <button
                 onClick={handleOverwriteImport}
-                className="w-full py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg font-medium transition-colors"
+                disabled={importSaving || importRefreshing || !importPrepared || importPrepared.revision !== persistedRevision}
+                className="w-full py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 title="Completely wipe current data and replace with Excel subset."
               >
-                Overwrite All Data
+                {importSaving ? 'Saving…' : 'Overwrite All Data'}
               </button>
 
               <button
-                onClick={() => { setShowImportModal(false); setImportPreviewData(null); setImportSchemaIssues([]); }}
+                onClick={closeImportPreview}
+                disabled={importSaving}
                 className="w-full py-2.5 text-slate-500 hover:bg-slate-100 rounded-lg font-medium transition-colors"
               >
                 Cancel

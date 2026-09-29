@@ -1,6 +1,9 @@
 import { useRef, useState } from 'react';
 import { TemplateId } from '../lib/workspaceTemplates';
-import { FileSpreadsheet, Loader2, AlertCircle } from 'lucide-react';
+import { FileSpreadsheet, Loader2, AlertCircle, ArchiveRestore, HardDriveDownload } from 'lucide-react';
+import type { PortableWorkspace } from '../lib/workspaceBackup';
+import { useBackupDownload } from '../lib/backupDownload';
+import { BackupStatusNote, LastBackupStarted } from './BackupStatus';
 
 export interface OnboardingImportRequest {
   lkptiFile: File;
@@ -13,6 +16,17 @@ interface TemplatePickerModalProps {
   onSelect: (templateId: TemplateId, withDemoData: boolean) => void;
   /** Import the filed returns. Rejects with a message the user should see. */
   onImportReturns: (request: OnboardingImportRequest) => Promise<void>;
+  /**
+   * Restore a Selara backup instead of starting anew. Offered here because a
+   * fresh browser profile — the case a backup exists for — opens on this picker.
+   * Rejects with a message the user should see.
+   */
+  onRestoreBackup?: (file: File) => Promise<void>;
+  /**
+   * Offered when this browser holds History or decisions: a workspace with no
+   * current records still opens on this picker, which covers the header's Backup.
+   */
+  backup?: { onPrepareBackup: () => Promise<PortableWorkspace>; versions: number; decisions: number };
   isReset?: boolean;
 }
 
@@ -28,8 +42,12 @@ const yearIsValid = (v: string) => /^\d{4}$/.test(v) && Number(v) >= 2000 && Num
  * normal pairing, so asking once would be wrong most of the time. Neither layout
  * carries a year, so neither can be inferred.
  */
-export function TemplatePickerModal({ onSelect, onImportReturns, isReset = false }: TemplatePickerModalProps) {
+export function TemplatePickerModal({ onSelect, onImportReturns, onRestoreBackup, backup, isReset = false }: TemplatePickerModalProps) {
   const lkptiInputRef = useRef<HTMLInputElement>(null);
+  const restoreInputRef = useRef<HTMLInputElement>(null);
+  const [restoreError, setRestoreError] = useState<string | null>(null);
+  const [restoring, setRestoring] = useState(false);
+  const backupDownload = useBackupDownload(backup?.onPrepareBackup ?? (async () => { throw new Error('Backup is not available here.'); }));
   const rptiInputRef = useRef<HTMLInputElement>(null);
   const [lkptiFile, setLkptiFile] = useState<File | null>(null);
   const [rptiFile, setRptiFile] = useState<File | null>(null);
@@ -56,7 +74,23 @@ export function TemplatePickerModal({ onSelect, onImportReturns, isReset = false
       });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'The import could not be completed.');
+    } finally {
+      // Replacing an existing workspace opens a preview first; if that is
+      // cancelled, the picker must be usable again.
       setBusy(false);
+    }
+  };
+
+  const runRestore = async (file: File) => {
+    if (!onRestoreBackup) return;
+    setRestoring(true);
+    setRestoreError(null);
+    try {
+      await onRestoreBackup(file);
+    } catch (e) {
+      setRestoreError(e instanceof Error ? e.message : 'The backup could not be restored.');
+    } finally {
+      setRestoring(false);
     }
   };
 
@@ -188,6 +222,69 @@ export function TemplatePickerModal({ onSelect, onImportReturns, isReset = false
             </button>
           </div>
         </div>
+
+        {onRestoreBackup && (
+          <div data-testid="onboarding-path-restore" className="mx-6 mb-6 -mt-2 rounded-xl border border-slate-200 bg-slate-50/60 p-4 flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="flex-1">
+              <h3 className="font-semibold text-slate-800 text-sm">{backup ? 'Back up or restore' : 'Restore a backup'}</h3>
+              <p className="text-sm text-slate-500 leading-relaxed">
+                {backup && (
+                  <>
+                    This browser still holds {backup.versions} saved version(s) and {backup.decisions} decision(s).
+                    Starting again removes them — download a backup first if you might need them.{' '}
+                  </>
+                )}
+                Have a Selara backup file? Restore it, History and decisions included. You'll see what it contains before anything is replaced.
+              </p>
+            </div>
+            {backup && (
+              <button
+                type="button"
+                data-testid="template-backup-download"
+                disabled={backupDownload.busy}
+                onClick={backupDownload.run}
+                className="shrink-0 px-4 py-2 text-sm font-medium bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
+              >
+                {backupDownload.busy ? <Loader2 size={14} className="animate-spin" /> : <HardDriveDownload size={14} />}
+                Download backup
+              </button>
+            )}
+            <input
+              ref={restoreInputRef}
+              type="file"
+              accept=".xlsx"
+              data-testid="template-restore-backup-input"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.currentTarget.value = '';
+                if (file) void runRestore(file);
+              }}
+            />
+            <button
+              type="button"
+              data-testid="template-restore-backup-btn"
+              disabled={restoring}
+              onClick={() => restoreInputRef.current?.click()}
+              className="shrink-0 px-4 py-2 text-sm font-medium bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              {restoring ? <Loader2 size={14} className="animate-spin" /> : <ArchiveRestore size={14} />}
+              Choose backup file
+            </button>
+            {backup && (backupDownload.status || backupDownload.lastStarted) && (
+              <div className="basis-full space-y-1">
+                {backupDownload.status && <BackupStatusNote status={backupDownload.status} testId="template-backup-status" />}
+                <LastBackupStarted value={backupDownload.lastStarted} testId="template-backup-last-started" />
+              </div>
+            )}
+            {restoreError && (
+              <p data-testid="template-restore-error" className="basis-full text-sm text-red-700 bg-red-50 border border-red-100 rounded-lg px-3 py-2 flex items-start gap-2">
+                <AlertCircle size={14} className="mt-0.5 shrink-0" />
+                <span>{restoreError}</span>
+              </p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

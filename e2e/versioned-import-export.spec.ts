@@ -26,6 +26,8 @@ test.describe('Versioned Import/Export', () => {
     // 3. Clear all data (reset workspace)
     await page.getByTestId('clear-and-start-again-btn').click();
     await page.getByTestId('template-start-blank-btn').click();
+    // Replacing an existing workspace is previewed first (R04, specs/005-workspace-recovery).
+    await page.getByTestId('confirm-modal-confirm').click();
     
     // Verify it's empty
     await page.getByTestId('nav-history').click();
@@ -134,6 +136,8 @@ test.describe('Decision log survives export/import (#22)', () => {
     //    back from the file rather than from what was already in IndexedDB.
     await page.getByTestId('clear-and-start-again-btn').click();
     await page.getByTestId('template-start-blank-btn').click();
+    // Replacing an existing workspace is previewed first (R04, specs/005-workspace-recovery).
+    await page.getByTestId('confirm-modal-confirm').click();
     await page.getByTestId('nav-history').click();
     await expect(page.getByTestId('history-stream')).toContainText('Nothing recorded yet');
 
