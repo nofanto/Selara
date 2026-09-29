@@ -1,6 +1,6 @@
 # Workbook and replacement contract
 
-**Updated:** 2026-09-29. Implements accepted proposals 2, 4, 5 and 6 (U2/U3/I1/U4). This is a planned contract, not shipped behavior.
+**Updated:** 2026-09-29. Implements accepted proposals 2, 4, 5 and 6 (U2/U3/I1/U4). Implemented in `src/lib/workspaceBackup.ts` and `src/lib/excel.ts`; see [verification](../verification.md).
 
 ## Contents and supported formats
 
@@ -27,13 +27,13 @@ The following 16 data sheets are required for complete restoration, including wh
 | Versions | Unique version IDs, names, timestamps, optional description and archival/presence metadata |
 | Decisions | The live decision log; versionId remains its link to a Version |
 
-New workbooks additionally carry `SelaraBackup` with `formatVersion: 1` and `cellEncoding: selara-json-v1`. Absence of this sheet selects only the recognized legacy layout described below; an existing unknown or malformed marker must never fall back to legacy parsing. New metadata records expected row counts per sheet and per version/current scope, plus presence of optional snapshot collections. Validate these counts against decoded contents. This detects structural omissions; it is not a tamper-proof signature or a promise to detect every external spreadsheet edit.
+New workbooks additionally carry `SelaraBackup` with `formatVersion: 1` and `cellEncoding: selara-json-v1`. *(As implemented:)* `SelaraBackup` is a key/value sheet (`about`, `formatVersion`, `cellEncoding`, `exportedAt`, `currentCounts`). Each `Versions` row carries `id`, `name`, `timestamp`, an optional `description` (absent stays absent), `collections` (the `Version.data` keys present), `rowCounts` (rows per versioned sheet for that version), and, only when the snapshot has one, `archivedDecisions`. Absence of this sheet selects only the recognized legacy layout described below; an existing unknown or malformed marker must never fall back to legacy parsing. New metadata records expected row counts per sheet and per version/current scope, plus presence of optional snapshot collections. Validate these counts against decoded contents. This detects structural omissions; it is not a tamper-proof signature or a promise to detect every external spreadsheet edit.
 
 In versioned sheets, empty envelope `versionId` means current data; a nonempty envelope must identify a Versions row. `Decisions.versionId` is a business link, not this envelope. Archival `Version.data.decisions`, when present, uses a distinct Versions metadata field encoded as a nested value, preserving its own links. Optional snapshot collections keep absent versus explicitly empty using presence metadata. These fields do not create new Versions or a second source for current records.
 
 ## Cell preservation
 
-For format 1, nested objects/arrays use the `__SELARA_JSON_V1__:` prefix plus JSON. Literal strings beginning with that prefix are escaped using the same prefix followed by their JSON string representation; decoding happens once and only for format 1. Preserve empty strings and nonempty text exactly. Reject malformed encoded cells and wrong decoded field types. Legacy text is never interpreted as marked JSON merely because it happens to start with this prefix.
+For format 1, nested objects/arrays use the `__SELARA_JSON_V1__:` prefix plus JSON. Literal strings beginning with that prefix are escaped using the same prefix followed by their JSON string representation; decoding happens once and only for format 1. *(Implemented 2026-09-29, per the design-notes amendment:)* the same escaped form is used for every string SheetJS would alter on a round trip. That covers strings containing `\r`, strings containing Excel's `_xHHHH_` escape syntax, and strings containing `U+FFFE`/`U+FFFF` or lone surrogates. The escaped JSON text writes `_` before `x` as `\u005f`, and non-XML characters as `\uXXXX`, so the encoded text itself survives. Preserve empty strings and nonempty text exactly. Reject malformed encoded cells and wrong decoded field types. Legacy text is never interpreted as marked JSON merely because it happens to start with this prefix.
 
 Resource ID arrays in format 1 use this encoding, avoiding comma splitting. Recognized legacy resource IDs use the existing comma-separated representation with a disclosed limitation: distinctions already lost in an older export cannot be recovered. Supported legacy nested settings must already be represented in the recognized field-specific JSON form or be absent optional fields; malformed representations require ordinary Import diagnostics rather than silent omission.
 

@@ -1,6 +1,6 @@
 # Data model
 
-**Updated:** 2026-09-29. Planned behavior; no schema or code has changed.
+**Updated:** 2026-09-29. Implemented as described, with no schema change (IndexedDB remains v19); see [ADR-0015](../../docs/adr/0015-workspace-backup-and-conditional-replacement.md) and the [verification log](verification.md).
 
 ## Portable records
 

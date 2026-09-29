@@ -16,7 +16,7 @@ This means:
 
 - You can use Selara on a corporate network without any data leaving the browser.
 - There is no vendor lock-in — your data is yours and can be exported to Excel at any time.
-- If you clear your browser storage, your data will be lost. Use [Version History](../10-version-history/saving-a-version.md) or [Excel Export](../11-import-export/excel-export.md) to back up your work.
+- If you clear your browser storage, your data will be lost — **including your saved versions**, which live in the same storage. Download a [backup](../11-import-export/backup-and-restore.md) regularly and keep it outside the browser; it restores everything, History and decisions included, in any browser.
 
 ## Working with multiple tabs
 

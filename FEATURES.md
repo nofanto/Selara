@@ -155,6 +155,9 @@ Internal reference document. Plain-language master list of everything Selara can
 
 ## Import and Export
 
+- **Backup:** download the whole workspace — current records, stored RPTI/LKPTI rows, every saved version, the decision log and settings — as one Excel file. It is written, read back and compared field by field before the download starts; anything that can't be kept exactly fails with the record named. The panel records when a download last *started*, and never claims the file was saved.
+- **Restore Backup:** from the Backup panel or, in a fresh browser, from the welcome screen. Only complete backups are accepted — damaged, inconsistent or newer-format files are refused, and incomplete older exports are sent to Import. A preview shows current against incoming counts and what happens to History, decisions and settings before anything is replaced; Undo brings the previous workspace back.
+- Every whole-workspace replacement — Restore Backup, Import → Overwrite, Open shared, starting again from a template or from filed returns, an incoming share link, History restore — previews its effects first when there is anything to lose. It saves all-or-nothing, reports success only once saved, and refuses to overwrite a change made meanwhile, even in another tab.
 - Export the full dataset as an Excel (.xlsx) file containing all entity types on separate sheets.
 - Import an Excel file to update the dataset — a preview modal shows what records were found before committing.
 - Import supports two modes: Merge (update existing records by ID and add new ones) or Overwrite (replace all data).

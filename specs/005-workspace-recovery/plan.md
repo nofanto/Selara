@@ -1,7 +1,7 @@
 # Implementation Plan: Workspace Backup and Recovery
 
 **Branch**: main (feature directory independent of branch) | **Updated**: 2026-09-29 | **Spec**: [spec.md](spec.md)
-**Status**: Revised documentation only. Implementation requires a separate user instruction.
+**Status**: Implemented 2026-09-29 (implementation authorized the same day). Outcomes are in the [verification log](verification.md).
 
 ## Summary
 

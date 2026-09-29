@@ -16,8 +16,9 @@ The proposed [first-release roadmap](requirement-specs/first-release-roadmap.md)
 - **Asset Organisation:** Group initiatives by IT Asset and categorise assets. Drag and drop asset categories to reorder your view.
 - **Dependency Tracking:** Visualise relationships between initiatives with dynamic SVG-based dependency arrows.
 - **Version History:** Save point-in-time snapshots of your entire plan, compare changes between versions, and restore previous states.
+- **Backup and Restore:** Download the whole workspace — records, stored report rows, History, decisions and settings — as one Excel file that is checked before it downloads, and restore it in any browser, with a preview of what it replaces. See [Backup and Restore](docs/user-guide/11-import-export/backup-and-restore.md).
 - **Conflict Detection:** Automatically identifies overlapping initiatives on the same asset and highlights them.
-- **Real-time Persistence:** All changes are saved instantly to your browser's IndexedDB, ensuring your data remains across sessions.
+- **Real-time Persistence:** All changes are saved instantly to your browser's IndexedDB, ensuring your data remains across sessions. Browser storage is not a backup — clearing it removes History too.
 - **Data Management:** Full CRUD operations for Assets, Initiatives, Milestones, and more, including Excel import/export capabilities.
 - **Deliverable Lifecycles:** Track the applications, infrastructure, documents, and procedures that make up each asset, as coloured lifecycle segments on the timeline.
 - **OJK Regulatory Reporting:** Build the Indonesian OJK **RPTI** (IT Development Plan, Format 3.1) and **LKPTI** (Application List, Format 3.2.6) filings from your portfolio data, and export them to Excel. An existing LKPTI file can be imported to seed a workspace.
@@ -46,7 +47,7 @@ A secondary view that allows for bulk editing of the underlying data in a table 
 Pure, DOM-free functions holding the regulatory generation and validation rules, each covered by Vitest unit tests alongside the source. The reasoning behind each rule lives in [`requirement-specs/`](requirement-specs/), and the decisions that shaped the data model in [`docs/adr/`](docs/adr/README.md).
 
 ### Persistence Layer (`src/lib/db.ts`)
-Manages the connection to IndexedDB, providing a local-first experience that works without a complex backend while still being more robust than `localStorage`.
+Manages the connection to IndexedDB, providing a local-first experience that works without a complex backend while still being more robust than `localStorage`. Every write goes through one queue, and a whole-workspace replacement is written only if the stored workspace still matches what was previewed ([ADR-0015](docs/adr/0015-workspace-backup-and-conditional-replacement.md)).
 
 ## 🚢 Deployment
 

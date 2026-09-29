@@ -10,7 +10,7 @@ Upload a `.xlsx` file. The importer reads the following sheets by name: **Initia
 
 ## Uploading a file
 
-**To open a colleague's file as your workspace:** click **Open shared** on the right of the header and select the `.xlsx` file. It **replaces your whole workspace**, including History snapshots and decisions. If your workspace has any data, Selara first asks you to confirm and shows, for each kind of record, how many you have now and how many the file brings. **Cancel** changes nothing. After replacing, a single **Undo** brings your previous workspace back, but only until you reload the page, so export your own work first if you want to keep it.
+**To open a colleague's file as your workspace:** click **Open shared** on the right of the header and select the `.xlsx` file. It **replaces your whole workspace**, including History snapshots and decisions. If your workspace has any data, Selara first asks you to confirm and shows, for each kind of record, how many you have now and how many the file brings, and what happens to History, decisions and settings. **Cancel** changes nothing. After replacing, a single **Undo** brings your previous workspace back, but only until you reload the page, so [download a backup](backup-and-restore.md) first if you want to keep it.
 
 **To merge into or overwrite your workspace with a preview:**
 
@@ -21,6 +21,8 @@ Upload a `.xlsx` file. The importer reads the following sheets by name: **Initia
 The preview shows the parsed data before anything is written to your portfolio, with a row count per sheet found — Initiatives, Assets, Deliverables, Deliverable Segments, Deliverable Statuses, Resources, Categories, RPTI Details, and more. Check the row counts and sample values to confirm the file was read correctly.
 
 If the file was exported from Selara, the preview will also show the number of **History Snapshots** found. Importing these snapshots allows you to restore the full version history of the portfolio.
+
+Below the counts, **If you overwrite** compares your workspace now with what **Overwrite All Data** would leave, and states what happens to History, the decision log and timeline settings. It also lists anything the file needed repairing — see [Repairs](#repairs-to-older-files) — and, if the file has no usable timeline settings, that yours are kept.
 
 If any required fields are missing or unrecognised column names are found, a **Schema Warnings** panel appears above the preview listing each issue by sheet and column. Address the warnings in your spreadsheet and re-upload, or proceed if the warnings are acceptable (for example, optional fields you intentionally omitted).
 
@@ -75,11 +77,26 @@ Use **Merge Data** when your file contains a partial update or additions to an e
 
 Use **Overwrite All Data** when the file represents the complete intended state of the portfolio.
 
+## Repairs to older files
+
+Import can bring in files that aren't complete backups. When a saved version in the file has missing or invalid timeline display settings, Import fills in display defaults so the version can still be opened, and lists every repair in the preview:
+
+| Setting | Default used |
+|---|---|
+| Start date | 2000-01-01 — only where the timeline starts; not a business date |
+| Months shown | 12 |
+| Budget display | label |
+| Descriptions, conflict detection, relationships | off |
+| Empty rows | show |
+| Snap to period | month |
+
+Valid settings in the file are kept, including the reporting years and currency. Missing or invalid business settings — the onboarding reporting years, the default currency, the cluster name — are listed and left unset. They are never copied from your current workspace or made up. [Restore Backup](backup-and-restore.md) never repairs; it sends such files here.
+
 ## Confirmation and notifications
 
-After selecting a mode, click **Import**. A success notification appears inline when the import completes. If the import fails — for example due to a malformed file — an inline error notification describes the problem. No browser `alert()` dialogs are used.
+The success notification appears only once the import has been saved. If saving fails, Overwrite leaves your workspace as it was and shows why in the preview, so you can try again; a failed Merge says it could not be saved. If your workspace changed while the preview was open — for example in another tab — the preview asks you to refresh before overwriting. No browser `alert()` dialogs are used.
 
 ---
 
-- Previous: [Restoring a Version](../10-version-history/restoring-a-version.md)
+- Previous: [Backup and Restore](backup-and-restore.md)
 - Next: [Excel Export](excel-export.md)

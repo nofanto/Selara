@@ -39,7 +39,7 @@ Use the Data Manager for bulk edits, importing data, and data cleanup. The timel
 
 ## Resetting your workspace
 
-At the bottom of every tab there is a **Clear data and start again** button. Clicking it opens the template picker, where you can start from your filed returns, start blank, or explore with demo data. This permanently replaces all current data.
+At the bottom of every tab there is a **Clear data and start again** button. Clicking it opens the template picker, where you can start from your filed returns, start blank, or explore with demo data. Before anything is replaced, a confirmation shows what you would lose; confirming permanently replaces all current data, including History and the decision log.
 
 See [First Launch](../01-getting-started/first-launch.md#resetting-or-switching-templates) for full details.
 

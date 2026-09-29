@@ -1,7 +1,7 @@
 # Workspace backup and recovery — M1 design notes
 
 **Started:** 2026-09-28
-**Status:** Q1–Q3 accepted on 2026-09-28 (1A, 2A, 3A); all seven analysis-remediation proposals accepted on 2026-09-29. Implementation authorized on 2026-09-29; see the implementation-findings amendment.
+**Status:** Q1–Q3 accepted on 2026-09-28 (1A, 2A, 3A); all seven analysis-remediation proposals accepted on 2026-09-29. Implemented on 2026-09-29; see the implementation-findings amendment, "Implemented" below, [ADR-0015](../docs/adr/0015-workspace-backup-and-conditional-replacement.md) and the [verification log](../specs/005-workspace-recovery/verification.md).
 **Scope:** [First-release roadmap](first-release-roadmap.md), R1-04–06 / D4.
 **Draft specification:** [005-workspace-recovery](../specs/005-workspace-recovery/spec.md).
 
@@ -80,6 +80,21 @@ Implementation was authorized on 2026-09-29. Two points surfaced before code and
 
 1. **Enum and date validation preserves and discloses; it doesn't block.** The workbook contract says to "validate enum values and dates". Real workspaces can hold off-list values that came in through older imports, such as a milestone type `Info`, a hand-typed `categoryCode`, or a `startDate` of `2026/01/01`. **Decided (product owner):** Backup and Restore Backup are strict about *structure*: required fields present, declared JS types (string, number, boolean, string arrays, the nested settings maps), finite numbers, and decodable cells. Off-list enum values and non-ISO dates are backed up and restored exactly as stored and are listed as notices in the backup status and the restore preview. **Rejected:** failing backup generation and rejecting the file on such values. That would mean a planner with one odd value can't back up at all, which inverts the purpose of a recovery path, and it would turn a data-quality finding into a backup gate, contrary to "no acceptance decision … requires all Data Health warnings to be resolved".
 2. **More strings need the escaped cell form than the prefix case.** A round trip of actual XLSX bytes through SheetJS 0.20.3 showed silent loss beyond marker-prefixed text. `\r\n` comes back as `\n`. Literal `_xHHHH_` sequences are decoded as Excel escapes, so `_x0041_` comes back as `A`. `U+FFFE`/`U+FFFF` and lone surrogates become replacement characters. Objects, arrays and `null` are dropped entirely, and cells longer than 32,767 characters can't be written. Format 1 therefore uses the escaped form (`__SELARA_JSON_V1__:` plus a JSON string) for *any* string that wouldn't survive raw, not only for marker-prefixed text. The escaped JSON text itself avoids `_x` sequences and non-XML characters. The decoder is unchanged: one prefix, one `JSON.parse`. Values that still can't fit a cell fail generation with the record and field named, as the contract already requires. The pre-download equality check remains the backstop for any case missed here.
+
+## Implemented — 2026-09-29
+
+What shipped matches the contracts. Where implementation had to choose, it chose as follows.
+
+- **Backup refuses what it can't restore.** Generation runs the same structural checks as Restore. A saved version with incomplete timeline settings therefore fails backup with the version named. Such versions exist only where an older ordinary Import wrote `{}`, which Import now repairs instead. The alternative, a backup that Restore would then refuse, was rejected: it would look like a backup and not be one.
+- **Unknown fields on records are preserved and disclosed**, e.g. a column added to an imported spreadsheet. They round-trip exactly. Unknown *collections* inside a saved version have no sheet to go to, so they fail backup with the version named rather than being dropped.
+- **An older export that doesn't match current record shapes goes to Import, not rejection.** Examples are a missing required field, or a value of an older type. Import already normalises those shapes. Rejection stays for corruption: unreadable cells, duplicate IDs, orphaned snapshot rows, and counts that disagree with the file's own metadata.
+- **Current settings in a backup are the stored ones when complete.** If the stored settings are an older, incomplete shape, the backup uses them as the screen presents them, with defaults filled in, since that is the only form Restore accepts.
+- **Recovery starts where a fresh profile opens.** The template picker offers "Restore a backup". When the browser still holds History or decisions but no current records, it also offers "Download backup". That state opens on the picker too, and the picker covers the header's Backup button.
+- **Backup lives in the header next to search, in every view.** Placing it among the export buttons made the toolbar wrap to a third row at 1280px wide, pushing timeline content under the legend.
+- **Escape cancels a replacement preview.** This is opt-in on `ConfirmModal`, because other callers sit inside panels with their own Escape handling.
+- **Undo and Redo don't wait on a failed ordinary save.** Unlike a preview, they compare against what this tab last stored. Undoing a change whose save failed therefore restores the stored state and clears the failure, rather than being blocked by it.
+
+**Accepted limitation, to revisit if real workspaces hit it:** an Excel cell holds at most 32,767 characters. A value that long fails backup with the record and field named. The most plausible case is one saved version's archived decision copy, written as a single encoded cell. Splitting values across cells would lift the limit, but is not built.
 
 ## Open questions
 

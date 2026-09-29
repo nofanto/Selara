@@ -14,10 +14,12 @@ Selara allows you to share your current IT portfolio plan with colleagues using 
 ## How to Import a Shared Link
 
 When a colleague clicks your shared link, Selara will:
-1.  Open automatically in their browser.
+1.  Open automatically in their browser, with their own workspace loaded.
 2.  Detect the share ID and encryption key in the URL.
-3.  Securely fetch and decrypt the plan.
-4.  Load the data directly into their local workspace.
+3.  Securely fetch and decrypt the plan. A link that can't be fetched or decrypted changes nothing.
+4.  Show what the shared plan would replace — record counts, and what happens to History and decisions — and wait for confirmation. A link without History keeps the saved versions already there; the decision log becomes the shared one.
+
+Incoming links are handled this way even while the Share button is disabled, because an old link can still be opened.
 
 ## Zero-Knowledge Security
 
