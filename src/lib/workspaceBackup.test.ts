@@ -38,6 +38,20 @@ const replaceRows = (wb: XLSX.WorkBook, sheet: string, next: Record<string, unkn
   wb.Sheets[sheet] = XLSX.utils.json_to_sheet(next);
 };
 
+/** Adjust count/presence metadata alongside a content edit, so the counts alone can't catch it. */
+const decoded = (cell: unknown) => JSON.parse(String(cell).slice(ENCODED_PREFIX.length));
+const encoded = (value: unknown) => `${ENCODED_PREFIX}${JSON.stringify(value)}`;
+const editMarkerCounts = (wb: XLSX.WorkBook, edit: (counts: Record<string, number>) => Record<string, number>) => {
+  replaceRows(wb, BACKUP_MARKER_SHEET, rows(wb, BACKUP_MARKER_SHEET).map(r => (r.key === 'currentCounts' ? { ...r, value: encoded(edit(decoded(r.value))) } : r)));
+};
+const editVersionMeta = (wb: XLSX.WorkBook, id: string, edit: (meta: Record<string, unknown>) => Record<string, unknown>) => {
+  replaceRows(wb, 'Versions', rows(wb, 'Versions').map(r => {
+    if (r.id !== id) return r;
+    const next = edit({ collections: decoded(r.collections), rowCounts: decoded(r.rowCounts) });
+    return { ...r, collections: encoded(next.collections), rowCounts: encoded(next.rowCounts) };
+  }));
+};
+
 // ─── Inventory coverage ──────────────────────────────────────────────────────
 
 /**
@@ -360,6 +374,48 @@ describe('readBackupWorkbook acceptance matrix (contracts/workbook.md)', () => {
       replaceRows(wb, 'TimelineSettings', [...settings, settings.find(r => r.versionId === '')!]);
     });
     expect(result.status).toBe('rejected');
+  });
+
+  it('rejects duplicate current settings rows even when the marker count is adjusted to match', () => {
+    const result = tamper(fieldCompleteWorkspace(), wb => {
+      const settings = rows(wb, 'TimelineSettings');
+      replaceRows(wb, 'TimelineSettings', [...settings, { ...settings.find(r => r.versionId === '')!, monthsToShow: 99 }]);
+      editMarkerCounts(wb, counts => ({ ...counts, TimelineSettings: 2 }));
+    });
+    expect(result.status).toBe('rejected');
+    expect(result.status === 'rejected' && result.problems.join(' ')).toMatch(/current state/);
+  });
+
+  it('rejects duplicate snapshot settings rows even when the version row count is adjusted to match', () => {
+    const result = tamper(fieldCompleteWorkspace(), wb => {
+      const settings = rows(wb, 'TimelineSettings');
+      replaceRows(wb, 'TimelineSettings', [...settings, { ...settings.find(r => r.versionId === 'ver-1')!, monthsToShow: 99 }]);
+      editVersionMeta(wb, 'ver-1', meta => ({ ...meta, rowCounts: { ...(meta.rowCounts as object), TimelineSettings: 2 } }));
+    });
+    expect(result.status).toBe('rejected');
+    expect(result.status === 'rejected' && result.problems.join(' ')).toMatch(/ver-1/);
+  });
+
+  it('rejects a version that lists timeline settings but carries none, even with its count set to zero', () => {
+    const result = tamper(fieldCompleteWorkspace(), wb => {
+      replaceRows(wb, 'TimelineSettings', rows(wb, 'TimelineSettings').filter(r => r.versionId !== 'ver-1'));
+      editVersionMeta(wb, 'ver-1', meta => ({ ...meta, rowCounts: { ...(meta.rowCounts as object), TimelineSettings: 0 } }));
+    });
+    expect(result.status).toBe('rejected');
+    expect(result.status === 'rejected' && result.problems.join(' ')).toMatch(/ver-1/);
+  });
+
+  it('directs a version with genuinely absent settings to ordinary Import when its metadata agrees', () => {
+    const result = tamper(fieldCompleteWorkspace(), wb => {
+      replaceRows(wb, 'TimelineSettings', rows(wb, 'TimelineSettings').filter(r => r.versionId !== 'ver-1'));
+      editVersionMeta(wb, 'ver-1', meta => ({
+        ...meta,
+        collections: (meta.collections as string[]).filter(k => k !== 'timelineSettings'),
+        rowCounts: { ...(meta.rowCounts as object), TimelineSettings: 0 },
+      }));
+    });
+    expect(result.status).toBe('incomplete');
+    expect(result.status === 'incomplete' && result.problems.join(' ')).toMatch(/ver-1/);
   });
 
   it('rejects a row assigned to a snapshot that does not exist', () => {
