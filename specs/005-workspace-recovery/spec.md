@@ -1,6 +1,6 @@
 # Feature Specification: Workspace Backup and Recovery
 
-**Feature Branch**: Not created; specification drafted on `main`.
+**Feature Branch**: `nofanto/selara-m1-implementation` (specification first drafted on `main`).
 **Created**: 2026-09-28
 **Status**: Requirements refined on 2026-09-29 following acceptance of all seven analysis proposals; Q1–Q3 remain 1A/2A/3A. Implemented on 2026-09-29 after implementation was authorized; see the [verification log](verification.md).
 **Input**: User description: "lets finish M1, do you think we'll need speckit?"
