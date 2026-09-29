@@ -405,6 +405,14 @@ describe('readBackupWorkbook acceptance matrix (contracts/workbook.md)', () => {
     expect(result.status === 'rejected' && result.problems.join(' ')).toMatch(/ver-1/);
   });
 
+  it('rejects a version that carries a counted settings row but does not list timeline settings', () => {
+    const result = tamper(fieldCompleteWorkspace(), wb => {
+      editVersionMeta(wb, 'ver-1', meta => ({ ...meta, collections: (meta.collections as string[]).filter(k => k !== 'timelineSettings') }));
+    });
+    expect(result.status).toBe('rejected');
+    expect(result.status === 'rejected' && result.problems.join(' ')).toMatch(/ver-1/);
+  });
+
   it('directs a version with genuinely absent settings to ordinary Import when its metadata agrees', () => {
     const result = tamper(fieldCompleteWorkspace(), wb => {
       replaceRows(wb, 'TimelineSettings', rows(wb, 'TimelineSettings').filter(r => r.versionId !== 'ver-1'));
