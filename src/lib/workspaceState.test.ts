@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { buildRestoredWorkspace, isWorkspaceEmpty, summariseReplacement } from './workspaceState';
+import { buildRestoredWorkspace, describeReplacementEffects, isWorkspaceEmpty, summariseReplacement } from './workspaceState';
 import type { Decision, Version } from '../types';
+import * as XLSX from 'xlsx';
+import { createBackup, readBackupWorkbook } from './workspaceBackup';
+import { fieldCompleteWorkspace } from './workspaceBackup.fixture';
 
 describe('isWorkspaceEmpty', () => {
   it('treats a brand new workspace as empty', () => {
@@ -114,6 +117,18 @@ describe('buildRestoredWorkspace', () => {
     expect(restored.assets).toEqual([{ id: 'a-1', name: 'Core Banking', categoryId: 'cat-1' }]);
   });
 
+  // Backup now carries each snapshot's archival decision copy (FR-002); History
+  // restore must go on ignoring it in favour of the live log (FR-010).
+  it('ignores the archival copy that a backup round trip preserved', () => {
+    const restored = readBackupWorkbook(XLSX.read(createBackup(fieldCompleteWorkspace()).bytes, { type: 'array' }));
+    if (restored.status !== 'complete') throw new Error(restored.status);
+    const snapshot = restored.workspace.versions.find(v => v.id === 'ver-1')!;
+    expect(snapshot.data.decisions?.[0].title).toBe('Archived wording');
+
+    const live = [decision('dec-now', 'Decided after the backup was restored')];
+    expect(buildRestoredWorkspace(snapshot, live).decisions).toEqual(live);
+  });
+
   it('defaults the optional entity arrays a pre-v14 snapshot lacks', () => {
     const restored = buildRestoredWorkspace(version(), []);
 
@@ -171,5 +186,40 @@ describe('summariseReplacement', () => {
     const { versions: _v, deliverables: _d, ...legacy } = empty;
 
     expect(summariseReplacement(legacy, legacy)).toEqual({ rows: [], losesData: false });
+  });
+});
+
+describe('describeReplacementEffects (contracts/replacement-routes.md)', () => {
+  const v = (id: string) => ({ id });
+  const d = (id: string) => ({ id, title: id });
+  const settings = { startDate: '2026-01-01', monthsToShow: 12 };
+  const current = { versions: [v('ver-1'), v('ver-2')], decisions: [d('dec-1')], timelineSettings: settings };
+
+  it('says History is kept when the route leaves it alone', () => {
+    expect(describeReplacementEffects(current, { decisions: current.decisions, timelineSettings: settings }))
+      .toContain('History: your 2 saved version(s) are kept.');
+  });
+
+  it('says how many saved versions a new workspace removes', () => {
+    expect(describeReplacementEffects(current, { versions: [], decisions: [], timelineSettings: settings }))
+      .toContain('History: all 2 saved version(s) are removed.');
+  });
+
+  it('says History is replaced, with both counts', () => {
+    expect(describeReplacementEffects(current, { versions: [v('ver-9')], decisions: [], timelineSettings: settings }))
+      .toContain('History: your 2 saved version(s) are replaced by 1 from the incoming workspace.');
+  });
+
+  it('distinguishes a kept, cleared and replaced decision log', () => {
+    expect(describeReplacementEffects(current, { decisions: [d('dec-1')], timelineSettings: settings })).toContain('Decision log: kept (1 decision(s)).');
+    expect(describeReplacementEffects(current, { decisions: [], timelineSettings: settings })).toContain('Decision log: cleared — 1 decision(s) removed.');
+    expect(describeReplacementEffects(current, { decisions: [d('dec-2'), d('dec-3')], timelineSettings: settings }))
+      .toContain('Decision log: replaced — 1 decision(s) now, 2 after.');
+  });
+
+  it('reports a settings change even when no record counts change', () => {
+    expect(describeReplacementEffects(current, { decisions: current.decisions, timelineSettings: settings })).toContain('Timeline settings: unchanged.');
+    expect(describeReplacementEffects(current, { decisions: current.decisions, timelineSettings: { ...settings, monthsToShow: 24 } }))
+      .toContain("Timeline settings: replaced by the incoming workspace's settings.");
   });
 });

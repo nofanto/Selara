@@ -157,6 +157,8 @@ test.describe('Data Manager — reset buttons', () => {
     await page.getByTestId('clear-and-start-again-btn').click();
     await expect(page.getByTestId('template-picker-modal')).toBeVisible();
     await page.getByTestId('template-start-blank-btn').click();
+    // Replacing an existing workspace is previewed first (R04, specs/005-workspace-recovery).
+    await page.getByTestId('confirm-modal-confirm').click();
 
     await expect(page.locator('table tbody tr')).toHaveCount(1);
 
@@ -173,6 +175,9 @@ test.describe('Data Manager — reset buttons', () => {
     await page.getByTestId('clear-and-start-again-btn').click();
     await expect(page.getByTestId('template-picker-modal')).toBeVisible();
     await page.getByTestId('template-start-demo-btn').click();
+    // Replacing an existing workspace is previewed first (R04, specs/005-workspace-recovery).
+    await page.getByTestId('confirm-modal-confirm').click();
+    await expect(page.getByTestId('template-picker-modal')).toHaveCount(0);
 
     const count = await page.locator('table tbody tr').count();
     expect(count).toBe(49); // 22 original + 26 RPTI catalogue + 1 ghost

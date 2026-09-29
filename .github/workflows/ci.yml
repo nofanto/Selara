@@ -41,17 +41,16 @@ jobs:
       # Ratcheted, not merely non-blocking. `continue-on-error` renders a green tick,
       # so a failing typecheck looked identical to a passing one at a glance — and a
       # check nobody can see fail is not a check. This compares the error count against
-      # a known baseline instead: the one pre-existing error passes, a second one fails
-      # the build, and clearing it prompts you to drop the baseline to zero.
+      # a known baseline instead: any error above the baseline fails the build, and
+      # clearing one prompts you to lower it.
       #
-      # The baseline error: src/lib/excel.ts does `sanitizeTimelineSettings(...) || {}`
-      # while Version['data'].timelineSettings is required, so a snapshot whose settings
-      # row is missing gets `{}` typed as TimelineSettings. Fixing that needs a decision
-      # about what such a snapshot should inherit — not a cast — so it is left for its
-      # own change.
+      # At zero since M1 (specs/005-workspace-recovery): the one pre-existing error —
+      # `sanitizeTimelineSettings(...) || {}` for a snapshot with no usable settings in
+      # src/lib/excel.ts — was replaced by the documented display repair in
+      # repairSnapshotSettings, not a cast.
       - name: Typecheck
         env:
-          BASELINE: 1
+          BASELINE: 0
         run: |
           LOG="$RUNNER_TEMP/tsc.log"
           npx tsc --noEmit > "$LOG" 2>&1 || true

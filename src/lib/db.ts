@@ -1,6 +1,6 @@
-import { openDB, DBSchema, IDBPDatabase } from 'idb';
-import { Asset, Deliverable, DeliverableSegment, DeliverableStatus, Decision, RptiDetail, LkptiDetail, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Version, Resource } from '../types';
+import { openDB, DBSchema, IDBPDatabase, IDBPTransaction, StoreNames } from 'idb';
 import { createSerialAsyncRunner } from './serialAsync';
+import { Asset, Deliverable, DeliverableSegment, DeliverableStatus, Decision, RptiDetail, LkptiDetail, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Version, Resource } from '../types';
 
 interface ITMapDB extends DBSchema {
   assets: {
@@ -272,7 +272,17 @@ export const getAppData = async () => {
   };
 };
 
-const saveAppDataImpl = async (data: {
+type WorkspaceStore =
+  | 'assets' | 'deliverables' | 'deliverableSegments' | 'deliverableStatuses' | 'decisions' | 'rptiDetails' | 'lkptiDetails'
+  | 'initiatives' | 'milestones' | 'programmes' | 'strategies' | 'dependencies' | 'assetCategories' | 'resources';
+
+/** Every entity store a workspace occupies (settings and versions are handled beside them). */
+const ENTITY_STORES: readonly WorkspaceStore[] = [
+  'assets', 'deliverables', 'deliverableSegments', 'deliverableStatuses', 'decisions', 'rptiDetails', 'lkptiDetails',
+  'initiatives', 'milestones', 'programmes', 'strategies', 'dependencies', 'assetCategories', 'resources',
+];
+
+export interface WorkspaceData {
   assets: Asset[];
   deliverables: Deliverable[];
   deliverableSegments: DeliverableSegment[];
@@ -289,131 +299,176 @@ const saveAppDataImpl = async (data: {
   decisions?: Decision[];
   rptiDetails?: RptiDetail[];
   lkptiDetails?: LkptiDetail[];
-}) => {
+}
+
+/**
+ * The workspace exactly as stored, History included, read in one transaction.
+ * `timelineSettings` is whatever the store holds — possibly nothing, or an older
+ * shape — because this is the base a replacement is compared against, not what
+ * the screen shows.
+ */
+export interface PersistedWorkspace extends Omit<WorkspaceData, 'timelineSettings' | 'versions' | 'decisions' | 'rptiDetails' | 'lkptiDetails'> {
+  decisions: Decision[];
+  rptiDetails: RptiDetail[];
+  lkptiDetails: LkptiDetail[];
+  timelineSettings: TimelineSettings | undefined;
+  versions: Version[];
+}
+
+type ReadTx = IDBPTransaction<ITMapDB, StoreNames<ITMapDB>[], 'readonly' | 'readwrite'>;
+type WriteTx = IDBPTransaction<ITMapDB, StoreNames<ITMapDB>[], 'readwrite'>;
+
+async function readInTransaction(tx: ReadTx): Promise<PersistedWorkspace> {
+  const [lists, timelineSettings, versions] = await Promise.all([
+    Promise.all(ENTITY_STORES.map(name => tx.objectStore(name).getAll())),
+    tx.objectStore('settings').get('timelineSettings'),
+    tx.objectStore('versions').getAll(),
+  ]);
+  const entities = Object.fromEntries(ENTITY_STORES.map((name, i) => [name, lists[i]]));
+  return { ...entities, timelineSettings, versions } as PersistedWorkspace;
+}
+
+/** A coherent read of every workspace store, settings and History (FR-015/016). */
+export const readPersistedWorkspace = async (): Promise<PersistedWorkspace> => {
   const db = await initDB();
-  const stores: ("assets" | "deliverables" | "deliverableSegments" | "deliverableStatuses" | "decisions" | "rptiDetails" | "lkptiDetails" | "initiatives" | "milestones" | "programmes" | "strategies" | "dependencies" | "assetCategories" | "settings" | "resources" | "versions")[] = [
-    'assets', 'initiatives', 'milestones', 'programmes', 'strategies', 'dependencies', 'assetCategories'
-  ];
-  if (db.objectStoreNames.contains('settings')) {
-    stores.push('settings');
-  }
-  if (db.objectStoreNames.contains('resources')) {
-    stores.push('resources');
-  }
-  if (db.objectStoreNames.contains('deliverables')) {
-    stores.push('deliverables');
-  }
-  if (db.objectStoreNames.contains('deliverableSegments')) {
-    stores.push('deliverableSegments');
-  }
-  if (db.objectStoreNames.contains('deliverableStatuses')) {
-    stores.push('deliverableStatuses');
-  }
-  if (db.objectStoreNames.contains('decisions')) {
-    stores.push('decisions');
-  }
-  if (db.objectStoreNames.contains('rptiDetails')) {
-    stores.push('rptiDetails');
-  }
-  if (db.objectStoreNames.contains('lkptiDetails')) {
-    stores.push('lkptiDetails');
-  }
-  if (data.versions && db.objectStoreNames.contains('versions')) {
-    stores.push('versions');
-  }
-  const tx = db.transaction(stores, 'readwrite');
+  const tx = db.transaction([...ENTITY_STORES, 'settings', 'versions'], 'readonly');
+  const [data] = await Promise.all([readInTransaction(tx as unknown as ReadTx), tx.done]);
+  return data;
+};
 
-  let transactionError: Error | null = null;
-  tx.onerror = () => {
-    transactionError = new Error(tx.error?.message || 'Transaction failed');
-  };
+/** The persisted base a replacement was reviewed against no longer matches the database. */
+export class StaleWorkspaceError extends Error {
+  constructor() {
+    super('The workspace changed after this was reviewed — possibly in another tab — so nothing was replaced.');
+    this.name = 'StaleWorkspaceError';
+  }
+}
 
+/** An earlier save of on-screen changes failed; nothing may build on the stale stored copy. */
+export class PendingSaveError extends Error {
+  constructor(cause: string) {
+    super(`Your latest changes haven't been saved (${cause}). Nothing was changed; your unsaved work is still on screen.`);
+    this.name = 'PendingSaveError';
+  }
+}
+
+/**
+ * Queues the clears and puts for a whole workspace in one transaction, with no
+ * intermediate await: awaiting between them risks the transaction auto-committing
+ * before everything is queued, which would leave stores half-written.
+ */
+function queueWorkspaceWrites(tx: WriteTx, data: WorkspaceData): Promise<unknown>[] {
+  const writes: Promise<unknown>[] = [];
+  for (const name of ENTITY_STORES) {
+    const store = tx.objectStore(name);
+    writes.push(store.clear());
+    for (const item of (data[name] as unknown[] | undefined) ?? []) writes.push(store.put(item as never));
+  }
+  writes.push(tx.objectStore('settings').clear());
+  writes.push(tx.objectStore('settings').put(data.timelineSettings, 'timelineSettings'));
+  if (data.versions) {
+    writes.push(tx.objectStore('versions').clear());
+    for (const version of data.versions) writes.push(tx.objectStore('versions').put(version));
+  }
+  return writes;
+}
+
+/**
+ * Runs one readwrite transaction, turning every way it can fail — a request
+ * error, a quota abort, an explicit abort — into a single rejection, and never
+ * leaving an unobserved `tx.done` rejection behind. IndexedDB rolls back an
+ * aborted transaction as a whole, so failure means no store changed.
+ */
+async function runWorkspaceTransaction(withVersions: boolean, body: (tx: WriteTx) => Promise<void>) {
+  const db = await initDB();
+  const stores: StoreNames<ITMapDB>[] = withVersions ? [...ENTITY_STORES, 'settings', 'versions'] : [...ENTITY_STORES, 'settings'];
+  const tx = db.transaction(stores, 'readwrite') as unknown as WriteTx;
+  const done = tx.done;
+  done.catch(() => undefined);
   try {
-    // Queue all clears and adds in a single batch without intermediate awaits.
-    // Awaiting between operations risks the transaction auto-committing before
-    // all adds are queued, which would leave the stores empty.
-    const allPromises: Promise<unknown>[] = [
-      tx.objectStore('assets').clear(),
-      tx.objectStore('initiatives').clear(),
-      tx.objectStore('milestones').clear(),
-      tx.objectStore('programmes').clear(),
-      tx.objectStore('strategies').clear(),
-      tx.objectStore('dependencies').clear(),
-      tx.objectStore('assetCategories').clear(),
-      ...data.assets.map(item => tx.objectStore('assets').put(item)),
-      ...data.initiatives.map(item => tx.objectStore('initiatives').put(item)),
-      ...data.milestones.map(item => tx.objectStore('milestones').put(item)),
-      ...data.programmes.map(item => tx.objectStore('programmes').put(item)),
-      ...data.strategies.map(item => tx.objectStore('strategies').put(item)),
-      ...data.dependencies.map(item => tx.objectStore('dependencies').put(item)),
-      ...data.assetCategories.map(item => tx.objectStore('assetCategories').put(item)),
-    ];
-    if (db.objectStoreNames.contains('settings')) {
-      allPromises.push(tx.objectStore('settings').clear());
-      allPromises.push(tx.objectStore('settings').put(data.timelineSettings, 'timelineSettings'));
-    }
-    if (db.objectStoreNames.contains('resources')) {
-      allPromises.push(tx.objectStore('resources').clear());
-      (data.resources || []).forEach(item => allPromises.push(tx.objectStore('resources').put(item)));
-    }
-    if (db.objectStoreNames.contains('deliverables')) {
-      allPromises.push(tx.objectStore('deliverables').clear());
-      (data.deliverables || []).forEach(item => allPromises.push(tx.objectStore('deliverables').put(item)));
-    }
-    if (db.objectStoreNames.contains('deliverableSegments')) {
-      allPromises.push(tx.objectStore('deliverableSegments').clear());
-      (data.deliverableSegments || []).forEach(item => allPromises.push(tx.objectStore('deliverableSegments').put(item)));
-    }
-    if (db.objectStoreNames.contains('deliverableStatuses')) {
-      allPromises.push(tx.objectStore('deliverableStatuses').clear());
-      (data.deliverableStatuses || []).forEach(item => allPromises.push(tx.objectStore('deliverableStatuses').put(item)));
-    }
-    if (db.objectStoreNames.contains('decisions')) {
-      allPromises.push(tx.objectStore('decisions').clear());
-      (data.decisions || []).forEach(item => allPromises.push(tx.objectStore('decisions').put(item)));
-    }
-    if (db.objectStoreNames.contains('rptiDetails')) {
-      allPromises.push(tx.objectStore('rptiDetails').clear());
-      (data.rptiDetails || []).forEach(item => allPromises.push(tx.objectStore('rptiDetails').put(item)));
-    }
-    if (db.objectStoreNames.contains('lkptiDetails')) {
-      allPromises.push(tx.objectStore('lkptiDetails').clear());
-      (data.lkptiDetails || []).forEach(item => allPromises.push(tx.objectStore('lkptiDetails').put(item)));
-    }
-    if (data.versions && db.objectStoreNames.contains('versions')) {
-      allPromises.push(tx.objectStore('versions').clear());
-      data.versions.forEach(v => allPromises.push(tx.objectStore('versions').put(v)));
-    }
-
-    await Promise.all(allPromises);
-
-    await tx.done;
-
-    // Check for transaction errors that may not have thrown
-    if (transactionError) {
-      throw transactionError;
-    }
+    await body(tx);
+    await done;
   } catch (error) {
-    // Abort the transaction on any error to prevent partial writes
-    tx.abort();
+    try { tx.abort(); } catch { /* already finished or aborted */ }
+    await done.catch(() => undefined);
+    if (error instanceof StaleWorkspaceError) throw error;
+    const reason = tx.error ?? error;
+    throw reason instanceof Error ? reason : new Error(String(reason));
+  }
+}
+
+// ─── Write coordination ─────────────────────────────────────────────────────
+//
+// Every workspace and History write goes through one queue, so an older queued
+// save can never land after — and quietly undo — a replacement or a History
+// change, and a replacement can wait for everything already on screen to be
+// stored before it reads its base (FR-015/016).
+
+let lastWorkspaceSaveError: Error | null = null;
+
+const runSerially = createSerialAsyncRunner((task: () => Promise<unknown>) => task());
+const enqueueWrite = <T>(task: () => Promise<T>) => runSerially(task) as Promise<T>;
+
+/** Resolves once every write queued so far has finished, whether it succeeded or not. */
+export const settleWrites = (): Promise<void> => enqueueWrite(async () => undefined);
+
+/**
+ * Waits for every queued write. Rejects with PendingSaveError when the most
+ * recent save of on-screen changes failed and nothing has saved since: the
+ * stored workspace is then older than the screen, and a backup or replacement
+ * preview built on it would misrepresent what the planner has.
+ */
+export const drainWrites = async (): Promise<void> => {
+  await settleWrites();
+  if (lastWorkspaceSaveError) throw new PendingSaveError(lastWorkspaceSaveError.message);
+};
+
+export const hasFailedSave = () => lastWorkspaceSaveError !== null;
+
+/** An ordinary, unconditional full-workspace save (optimistic edits). */
+export const saveAppData = (data: WorkspaceData) => enqueueWrite(async () => {
+  try {
+    await runWorkspaceTransaction(!!data.versions, async tx => { await Promise.all(queueWorkspaceWrites(tx, data)); });
+    lastWorkspaceSaveError = null;
+  } catch (error) {
+    lastWorkspaceSaveError = error instanceof Error ? error : new Error(String(error));
     throw error;
   }
-};
+});
 
-export const saveAppData = createSerialAsyncRunner(saveAppDataImpl);
+/**
+ * Replaces the whole workspace, but only if the stored workspace still matches
+ * the fingerprint the planner reviewed. The comparison happens inside the same
+ * transaction as the writes, so a change committed by another tab between the
+ * preview and the confirmation is detected even if its broadcast arrives late:
+ * the transaction aborts with StaleWorkspaceError and the other tab's work survives.
+ */
+export const replaceWorkspace = (
+  data: WorkspaceData,
+  expectedFingerprint: string,
+  fingerprint: (stored: PersistedWorkspace) => string,
+) => enqueueWrite(async () => {
+  // Versions are always in scope: a History change in another tab also makes the preview stale.
+  await runWorkspaceTransaction(true, async tx => {
+    const stored = await readInTransaction(tx as unknown as ReadTx);
+    if (fingerprint(stored) !== expectedFingerprint) throw new StaleWorkspaceError();
+    await Promise.all(queueWorkspaceWrites(tx, data));
+  });
+  lastWorkspaceSaveError = null;
+});
 
-// Versions helper functions
-export const saveVersion = async (version: Version) => {
+// Versions helper functions — queued with workspace writes (see above).
+export const saveVersion = (version: Version) => enqueueWrite(async () => {
   const db = await initDB();
   await db.put('versions', version);
-};
+});
 
 export const getAllVersions = async () => {
   const db = await initDB();
   return db.getAll('versions');
 };
 
-export const deleteVersion = async (id: string) => {
+export const deleteVersion = (id: string) => enqueueWrite(async () => {
   const db = await initDB();
   await db.delete('versions', id);
-};
+});

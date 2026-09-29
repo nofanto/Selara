@@ -8,6 +8,7 @@ import { Timeline } from './components/Timeline';
 import { MobileCardView } from './components/MobileCardView';
 import { useMediaQuery } from './lib/useMediaQuery';
 import { DataControls } from './components/DataControls';
+import { BackupControls } from './components/BackupControls';
 import { ModalErrorBoundary, TestErrorThrower } from './components/ErrorBoundary';
 import { TutorialModal } from './components/TutorialModal';
 import { LandingPage } from './components/LandingPage';
@@ -29,8 +30,14 @@ import {
 } from './demoData';
 import { Asset, Deliverable, DeliverableSegment, DeliverableStatus, Decision, RptiDetail, LkptiDetail, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Resource, Version } from './types';
 import { cn } from './lib/utils';
-import { getAppData, saveAppData, getAllVersions } from './lib/db';
-import { importFromExcel } from './lib/excel';
+import {
+  getAppData, saveAppData, getAllVersions, readPersistedWorkspace, replaceWorkspace, drainWrites, settleWrites, saveVersion,
+  deleteVersion, PendingSaveError, StaleWorkspaceError, type PersistedWorkspace,
+} from './lib/db';
+import { importFromExcelWithDiagnostics, readWorkbookFile, SNAPSHOT_DISPLAY_FALLBACK } from './lib/excel';
+import { readBackupWorkbook, workspaceFingerprint, type PortableWorkspace } from './lib/workspaceBackup';
+import type { PreparedReplacement, ReplaceOutcome, WorkspaceState } from './lib/replacement';
+import { ReplacementSummary } from './components/ReplacementSummary';
 import { parseRptiImportFile, deriveWorkspaceFromRptiImport } from './lib/rptiImport';
 import { parseLkptiImportFile, deriveWorkspaceFromLkptiImport } from './lib/lkptiImport';
 import { applyUnresolvedRowRepair, extendImportPriorPhase, type UnresolvedRowRepairRequest } from './lib/unresolvedRowRepair';
@@ -38,7 +45,7 @@ import { validateImportSchema } from './lib/importValidation';
 import { importSharedWorkspace } from './lib/share';
 import { getTemplateData, TemplateId } from './lib/workspaceTemplates';
 import { rptiCatalogueAssetCategories } from './lib/rptiCatalogue';
-import { buildRestoredWorkspace, isWorkspaceEmpty, summariseReplacement } from './lib/workspaceState';
+import { buildRestoredWorkspace, describeReplacementEffects, isWorkspaceEmpty, summariseReplacement } from './lib/workspaceState';
 import { ConfirmModal } from './components/ConfirmModal';
 import { HealthIssueLocation, DataManagerTab } from './lib/dataHealth';
 import { SYNC_CHANNEL_NAME, generateTabId, isRemoteSaveMessage, notifyDataSaved } from './lib/tabSync';
@@ -110,6 +117,7 @@ function isValidSharedAppState(data: unknown): data is AppState {
     && Array.isArray(record.decisions)
     && Array.isArray(record.rptiDetails)
     && Array.isArray(record.lkptiDetails)
+    && (record.versions === undefined || Array.isArray(record.versions))
     && !!record.timelineSettings
     && typeof record.timelineSettings === 'object';
 }
@@ -126,6 +134,69 @@ function sanitizeTimelineSettings(settings: TimelineSettings): TimelineSettings 
   if ((sanitized.mobileBucketMode as string) === 'dts-phase') delete sanitized.mobileBucketMode;
   return sanitized;
 }
+
+/** Stored settings as the screen shows them: defaults filled in, legacy shapes migrated. */
+function presentSettings(raw: TimelineSettings | undefined): TimelineSettings {
+  const rawSettings = raw || {};
+  // Migration: if we have legacy startYear but no startDate, convert it
+  const migratedSettings = ('startYear' in rawSettings && !('startDate' in rawSettings))
+    ? { startDate: `${(rawSettings as { startYear: number }).startYear}-01-01` }
+    : {};
+  return sanitizeTimelineSettings({ ...defaultTimelineSettings, ...rawSettings, ...migratedSettings });
+}
+
+const presentStored = (stored: PersistedWorkspace): WorkspaceState => ({ ...stored, timelineSettings: presentSettings(stored.timelineSettings) });
+
+/**
+ * The stored workspace as Backup carries it. Complete stored settings go in
+ * exactly as stored; an older, incomplete shape goes in as the screen presents
+ * it — the only form it can be restored in.
+ */
+function toPortable(stored: PersistedWorkspace): PortableWorkspace {
+  const raw = stored.timelineSettings as unknown as Record<string, unknown> | undefined;
+  const complete = !!raw && Object.keys(SNAPSHOT_DISPLAY_FALLBACK).every(field => raw[field] !== undefined);
+  return { ...stored, timelineSettings: complete ? stored.timelineSettings! : presentSettings(stored.timelineSettings) };
+}
+
+/** Why a saved version can't be restored as it stands, checked before anything is written. */
+function snapshotProblem(version: Version): string | null {
+  const data = version?.data as unknown as Record<string, unknown> | undefined;
+  if (!data || typeof data !== 'object') return 'it has no snapshot data.';
+  const required = ['assets', 'initiatives', 'milestones', 'programmes', 'strategies', 'dependencies', 'assetCategories'];
+  const optional = ['deliverables', 'deliverableSegments', 'resources', 'deliverableStatuses', 'rptiDetails', 'lkptiDetails'];
+  const broken = [
+    ...required.filter(key => !Array.isArray(data[key])),
+    ...optional.filter(key => data[key] !== undefined && !Array.isArray(data[key])),
+  ];
+  if (broken.length > 0) return `its ${broken.join(', ')} ${broken.length > 1 ? 'are' : 'is'} damaged or missing.`;
+  if (!data.timelineSettings || typeof data.timelineSettings !== 'object') return 'its timeline settings are missing.';
+  return null;
+}
+
+const describeError = (error: unknown) =>
+  error instanceof Error ? error.message || error.name : String(error);
+
+interface ReplacementRequest {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  /** The workspace to write, built from the reviewed base. `versions` undefined keeps History. */
+  next: (current: WorkspaceState) => AppState;
+  notices: string[];
+  undoable: boolean;
+  successNotice?: string;
+  onCommitted?: () => void;
+  onCancelled?: () => void;
+}
+
+interface OpenReplacement extends ReplacementRequest {
+  prepared: PreparedReplacement;
+  error: string | null;
+  saving: boolean;
+  refreshing: boolean;
+}
+
+type ReplacementRequestResult = { status: 'previewing' | 'committed' } | { status: 'failed'; message: string };
 
 function LoadingFallback() {
   return (
@@ -176,8 +247,27 @@ export default function App() {
   const [versions, setVersions] = useState<Version[]>([]);
 
   const [undoStack, setUndoStack] = useState<AppState[]>([]);
-  // A shared file chosen while the workspace holds data waits here for confirmation (#62).
-  const [pendingSharedImport, setPendingSharedImport] = useState<{ fileName: string; data: AppState } | null>(null);
+  // A whole-workspace replacement waiting for confirmation, with the stored base it was reviewed against.
+  const [openReplacement, setOpenReplacement] = useState<OpenReplacement | null>(null);
+  const confirmingReplacementRef = useRef(false);
+  const [workspaceNotice, setWorkspaceNotice] = useState<string | null>(null);
+  const workspaceNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  // True while a replacement, Undo or Redo is saving: nothing else may write (FR-016).
+  const operationRef = useRef(false);
+  const [busyMessage, setBusyMessage] = useState<string | null>(null);
+  // Bumped whenever the workspace changes here or in another tab; an open preview
+  // prepared at an older revision is stale and must be refreshed (FR-015).
+  const revisionRef = useRef(0);
+  const [persistedRevision, setPersistedRevision] = useState(0);
+  // What this tab last wrote or read — the base Undo/Redo must still find stored.
+  const lastPersistedRef = useRef<PersistedWorkspace | null>(null);
+  const syncRequestRef = useRef(0);
+  const localCommitRef = useRef(0);
+  const [incomingShare, setIncomingShare] = useState<{ id: string; key: string } | null>(() => {
+    const id = new URLSearchParams(window.location.search).get('id');
+    const key = window.location.hash.match(/key=([^&]*)/)?.[1];
+    return id && key ? { id, key } : null;
+  });
   const [initialReport, setInitialReport] = useState<'data-health' | undefined>(undefined);
   const [importSummary, setImportSummary] = useState<{
     lkptiYear: number; rptiYear?: number; lkptiRows: number; rptiRows: number;
@@ -216,72 +306,208 @@ export default function App() {
   const versionsRef = useRef(versions);
   versionsRef.current = versions;
 
+  // ─── Workspace operations (specs/005-workspace-recovery) ─────────────────
+  //
+  // Ordinary edits stay optimistic: the screen changes at once and the save is
+  // queued (db.ts runs every write in order). Whole-workspace replacements do not:
+  // they wait for queued saves, read one coherent stored base, show what will
+  // change, and commit only if the store still matches that base — checked inside
+  // the replacing transaction. The screen, the Undo stack and any success message
+  // change only after that commit.
+
+  const bumpRevision = useCallback(() => {
+    revisionRef.current += 1;
+    setPersistedRevision(revisionRef.current);
+  }, []);
+
+  const notifySaved = useCallback(() => {
+    localCommitRef.current += 1;
+    if (syncChannelRef.current) notifyDataSaved(syncChannelRef.current, tabIdRef.current);
+  }, []);
+
+  const publishState = useCallback((data: AppState) => {
+    setAssets(data.assets);
+    setDeliverables(data.deliverables || []);
+    setDeliverableSegments(data.deliverableSegments || []);
+    setInitiatives(data.initiatives);
+    setMilestones(data.milestones);
+    setProgrammes(data.programmes);
+    setStrategies(data.strategies);
+    setDependencies(data.dependencies);
+    setAssetCategories(data.assetCategories);
+    setTimelineSettings(sanitizeTimelineSettings(data.timelineSettings));
+    setResources(data.resources || []);
+    setDeliverableStatuses(data.deliverableStatuses || []);
+    setDecisions(data.decisions || []);
+    setRptiDetails(data.rptiDetails || []);
+    setLkptiDetails(data.lkptiDetails || []);
+  }, []);
+
+  /** Mirrors what a successful write stored, for the base Undo/Redo checks. */
+  const rememberStored = useCallback((data: AppState, versions?: Version[]) => {
+    lastPersistedRef.current = {
+      assets: data.assets,
+      deliverables: data.deliverables || [],
+      deliverableSegments: data.deliverableSegments || [],
+      initiatives: data.initiatives,
+      milestones: data.milestones,
+      programmes: data.programmes,
+      strategies: data.strategies,
+      dependencies: data.dependencies,
+      assetCategories: data.assetCategories,
+      resources: data.resources || [],
+      deliverableStatuses: data.deliverableStatuses || [],
+      decisions: data.decisions || [],
+      rptiDetails: data.rptiDetails || [],
+      lkptiDetails: data.lkptiDetails || [],
+      timelineSettings: data.timelineSettings,
+      versions: versions ?? lastPersistedRef.current?.versions ?? [],
+    };
+  }, []);
+
+  const showWorkspaceNotice = useCallback((message: string) => {
+    setWorkspaceNotice(message);
+    if (workspaceNoticeTimerRef.current) clearTimeout(workspaceNoticeTimerRef.current);
+    workspaceNoticeTimerRef.current = setTimeout(() => setWorkspaceNotice(null), 8000);
+  }, []);
+
+  /**
+   * Waits for queued saves and reads the stored base a replacement or backup is
+   * built on (FR-015). If the last save of on-screen work failed, it is retried
+   * once; if that fails too, nothing is prepared and the unsaved work stays on
+   * screen — a preview of stale stored data would misstate what is being replaced.
+   */
+  const prepareOperation = useCallback(async (): Promise<PreparedReplacement> => {
+    // Taken first: any change from here on, local or remote, makes this base stale.
+    const revision = revisionRef.current;
+    try {
+      await drainWrites();
+    } catch (error) {
+      if (!(error instanceof PendingSaveError)) throw error;
+      const onScreen = getCurrentStateRef.current();
+      try {
+        await saveAppData(onScreen);
+      } catch {
+        throw error;
+      }
+      rememberStored(onScreen);
+    }
+    const stored = await readPersistedWorkspace();
+    return { stored, current: presentStored(stored), fingerprint: workspaceFingerprint(stored), revision };
+  }, [rememberStored]);
+
+  /**
+   * Writes `next` in place of the reviewed base, atomically and only if the store
+   * still holds that base. Publishes the new workspace, the Undo entry and the
+   * cross-tab notice only once the write has succeeded; on any failure nothing
+   * changes and the caller can retry.
+   */
+  const commitReplacement = useCallback(async (
+    next: AppState,
+    prepared: PreparedReplacement,
+    options: { undoable: boolean; busyLabel?: string },
+  ): Promise<ReplaceOutcome> => {
+    if (operationRef.current) return { ok: false, stale: false, message: 'Another change is still being saved. Try again when it finishes.' };
+    if (prepared.revision !== revisionRef.current) return { ok: false, stale: true, message: new StaleWorkspaceError().message };
+    operationRef.current = true;
+    setBusyMessage(options.busyLabel ?? 'Saving…');
+    try {
+      await replaceWorkspace(next, prepared.fingerprint, workspaceFingerprint);
+    } catch (error) {
+      operationRef.current = false;
+      setBusyMessage(null);
+      if (error instanceof StaleWorkspaceError) return { ok: false, stale: true, message: error.message };
+      console.error('Replacement failed to save:', error instanceof Error ? `${error.name}: ${error.message}` : error);
+      return { ok: false, stale: false, message: `Nothing was replaced: saving failed (${describeError(error)}). Your previous workspace is unchanged, and you can try again.` };
+    }
+    if (options.undoable) {
+      // An entry that replaces History records the History it replaced, so Undo restores it (#62).
+      const snapshot = getCurrentStateRef.current();
+      const entry = next.versions ? { ...snapshot, versions: versionsRef.current } : snapshot;
+      setUndoStack(prev => [...prev, entry].slice(-10));
+      setRedoStack([]);
+    }
+    publishState(next);
+    if (next.versions) setVersions(next.versions);
+    rememberStored(next, next.versions);
+    bumpRevision();
+    notifySaved();
+    setDbSaveError(null);
+    operationRef.current = false;
+    setBusyMessage(null);
+    return { ok: true, stale: false, message: '' };
+  }, [publishState, rememberStored, bumpRevision, notifySaved]);
+
+  /**
+   * Starts a replacement route. With something to lose — or when the route always
+   * previews — it opens the preview; a first-use empty workspace may be replaced
+   * directly, with the same conditional, all-or-nothing commit.
+   */
+  const requestReplacement = useCallback(async (request: ReplacementRequest, alwaysPreview: boolean): Promise<ReplacementRequestResult> => {
+    let prepared: PreparedReplacement;
+    try {
+      prepared = await prepareOperation();
+    } catch (error) {
+      return { status: 'failed', message: describeError(error) };
+    }
+    const next = request.next(prepared.current);
+    if (!alwaysPreview && !summariseReplacement(prepared.current, next).losesData) {
+      const outcome = await commitReplacement(next, prepared, { undoable: request.undoable });
+      if (!outcome.ok) return { status: 'failed', message: outcome.message };
+      request.onCommitted?.();
+      if (request.successNotice) showWorkspaceNotice(request.successNotice);
+      return { status: 'committed' };
+    }
+    setOpenReplacement({ ...request, prepared, error: null, saving: false, refreshing: false });
+    return { status: 'previewing' };
+  }, [prepareOperation, commitReplacement, showWorkspaceNotice]);
+
+  const confirmReplacement = async () => {
+    const pending = openReplacement;
+    if (!pending || pending.saving || confirmingReplacementRef.current) return;
+    confirmingReplacementRef.current = true;
+    setOpenReplacement({ ...pending, saving: true, error: null });
+    try {
+      const outcome = await commitReplacement(pending.next(pending.prepared.current), pending.prepared, { undoable: pending.undoable });
+      if (outcome.ok) {
+        setOpenReplacement(null);
+        pending.onCommitted?.();
+        if (pending.successNotice) showWorkspaceNotice(pending.successNotice);
+        return;
+      }
+      // A stale base stays stale until refreshed, even if no broadcast has arrived yet.
+      setOpenReplacement(prev => prev && {
+        ...prev, saving: false, error: outcome.message,
+        prepared: outcome.stale ? { ...prev.prepared, revision: -1 } : prev.prepared,
+      });
+    } finally {
+      confirmingReplacementRef.current = false;
+    }
+  };
+
+  const refreshReplacement = async () => {
+    if (!openReplacement || openReplacement.refreshing || openReplacement.saving) return;
+    setOpenReplacement(prev => prev && { ...prev, refreshing: true });
+    try {
+      const prepared = await prepareOperation();
+      setOpenReplacement(prev => prev && { ...prev, prepared, refreshing: false, error: null });
+    } catch (error) {
+      setOpenReplacement(prev => prev && { ...prev, refreshing: false, error: describeError(error) });
+    }
+  };
+
+  const cancelReplacement = () => {
+    if (!openReplacement || openReplacement.saving) return;
+    openReplacement.onCancelled?.();
+    setOpenReplacement(null);
+  };
+
   // Load data on mount
   useEffect(() => {
     const loadData = async () => {
       try {
-        // Check for share link in URL
-        const urlParams = new URLSearchParams(window.location.search);
-        const shareId = urlParams.get('id');
-        const hash = window.location.hash;
-        const keyMatch = hash.match(/key=([^&]*)/);
-        const shareKey = keyMatch ? keyMatch[1] : null;
-
-        if (shareId && shareKey) {
-          setIsImportingShare(true);
-          try {
-            const importedData = await importSharedWorkspace(shareId, shareKey);
-            if (!isValidSharedAppState(importedData)) {
-              throw new Error('Shared workspace data is invalid or incomplete.');
-            }
-
-            const shouldImport = window.confirm(
-              'This share link will replace your current local workspace. Do you want to continue?'
-            );
-
-            if (!shouldImport) {
-              window.history.replaceState({}, document.title, window.location.pathname);
-              setIsImportingShare(false);
-              // Continue to normal load path without importing.
-            } else {
-              // A share can have been created before ADR-0013. Lift before the
-              // imported workspace reaches live state, and persist the lifted form
-              // in the same write that accepts the share.
-              const sharedData = liftWorkspaceReportAttributes(importedData as AppState);
-              await saveAppData(sharedData);
-              // Clear the URL params without refreshing
-              window.history.replaceState({}, document.title, window.location.pathname);
-
-              // Re-load the data from DB to ensure it's properly initialized
-              const dbData = await getAppData();
-              setAssets(dbData.assets);
-              setDeliverables(dbData.deliverables || []);
-              setDeliverableSegments((dbData as any).deliverableSegments || []);
-              setInitiatives(dbData.initiatives.map(i => ({ ...i, capex: Number(i.capex) || 0, opex: Number(i.opex) || 0 })));
-              setMilestones(dbData.milestones);
-              setProgrammes(dbData.programmes);
-              setStrategies(dbData.strategies || []);
-              setDependencies(dbData.dependencies || []);
-              setAssetCategories(dbData.assetCategories || []);
-              setResources(dbData.resources || []);
-              setDeliverableStatuses((dbData as any).deliverableStatuses || []);
-              setDecisions((dbData as any).decisions || []);
-              setRptiDetails((dbData as any).rptiDetails || []);
-              setLkptiDetails((dbData as any).lkptiDetails || []);
-              setTimelineSettings(sanitizeTimelineSettings({ ...defaultTimelineSettings, ...(dbData.timelineSettings || {}) }));
-              setVersions(await getAllVersions());
-              setIsImportingShare(false);
-              setIsLoading(false);
-              return;
-            }
-          } catch (error) {
-            console.error('Failed to import shared workspace:', error);
-            setDbSaveError(error instanceof Error ? error.message : 'Failed to import shared workspace.');
-            setIsImportingShare(false);
-            // Continue to normal load if share fails
-          }
-        }
-
+        // A share link in the URL is opened after the workspace loads, so its
+        // preview can show what it would replace (R06) — see handleIncomingShare.
         const dbData = await getAppData();
         const loadedVersions = await getAllVersions();
         setVersions(loadedVersions);
@@ -325,7 +551,9 @@ export default function App() {
             setRptiDetails(defaults.rptiDetails);
             setLkptiDetails(defaults.lkptiDetails);
           } else {
-            // First real run: let the user pick a template
+            // First real run: let the user pick a template. A workspace with no current
+            // records can still hold a decision log; the picker offers to back it up.
+            setDecisions((dbData as any).decisions || []);
             setShowTemplatePicker(true);
           }
         } else {
@@ -375,18 +603,15 @@ export default function App() {
           setDecisions((dbData as any).decisions || []);
           setRptiDetails(lifted.rptiDetails);
           setLkptiDetails((dbData as any).lkptiDetails || []);
-          const rawSettings = dbData.timelineSettings || {};
-          // Migration: if we have legacy startYear but no startDate, convert it
-          const migratedSettings = ('startYear' in rawSettings && !('startDate' in rawSettings))
-            ? { startDate: `${(rawSettings as any).startYear}-01-01` }
-            : {};
-          const mergedSettings = sanitizeTimelineSettings({ ...defaultTimelineSettings, ...rawSettings, ...migratedSettings });
+          const mergedSettings = presentSettings(dbData.timelineSettings as TimelineSettings);
           setTimelineSettings(mergedSettings);
 
           if (!mergedSettings.hasSeenTutorial && !localStorage.getItem('scenia-e2e')) {
             setShowTutorial(true);
           }
         }
+        // The stored base Undo/Redo compares against, after any load-time writes above.
+        lastPersistedRef.current = await readPersistedWorkspace();
       } catch (error) {
         console.error('Failed to load data from DB:', error);
         // Fallback to initial data
@@ -412,37 +637,27 @@ export default function App() {
 
   const handleSelectTemplate = useCallback(async (templateId: TemplateId, withDemoData: boolean) => {
     const data = getTemplateData(templateId, withDemoData);
-    const dataWithEmptyVersions = { ...data, versions: [] };
-    try {
-      await saveAppData(dataWithEmptyVersions);
-    } catch (error) {
-      console.error('Failed to save template data to DB:', error instanceof Error ? `${error.name}: ${error.message}` : error);
-      setDbSaveError('Failed to save the selected template. Your data may not persist after a reload.');
-    }
-    setAssets(data.assets);
-    setDeliverables(data.deliverables);
-    setDeliverableSegments(data.deliverableSegments);
-    setInitiatives(data.initiatives);
-    setMilestones(data.milestones);
-    setProgrammes(data.programmes);
-    setStrategies(data.strategies);
-    setDependencies(data.dependencies);
-    setAssetCategories(data.assetCategories);
-    setTimelineSettings(sanitizeTimelineSettings(data.timelineSettings));
-    setResources(data.resources);
-    setDeliverableStatuses(data.deliverableStatuses);
-    // Establishes a new workspace, so resetting the decision log is correct:
-    // its records reference entity IDs that no longer exist (ADR-0011).
-    setDecisions(data.decisions || []);
-    setRptiDetails(data.rptiDetails || []);
-    setLkptiDetails(data.lkptiDetails || []);
-    setVersions([]);
-    setShowTemplatePicker(false);
-    setTemplatePickerIsReset(false);
-    if (!data.timelineSettings.hasSeenTutorial && !localStorage.getItem('scenia-e2e')) {
-      setShowTutorial(true);
-    }
-  }, []);
+    // Choosing a template is not the confirmation: with anything to lose, the
+    // preview says what goes before anything is written (R04).
+    const result = await requestReplacement({
+      title: 'Replace your workspace?',
+      message: 'Starting again replaces everything in this browser — records, History and the decision log — with the template you chose.',
+      confirmLabel: 'Replace workspace',
+      // Establishes a new workspace, so resetting the decision log is correct:
+      // its records reference entity IDs that no longer exist (ADR-0011).
+      next: () => ({ ...data, versions: [] }),
+      notices: [],
+      undoable: false,
+      onCommitted: () => {
+        setShowTemplatePicker(false);
+        setTemplatePickerIsReset(false);
+        if (!data.timelineSettings.hasSeenTutorial && !localStorage.getItem('scenia-e2e')) {
+          setShowTutorial(true);
+        }
+      },
+    }, false);
+    if (result.status === 'failed') setDbSaveError(`The template was not applied: ${result.message}`);
+  }, [requestReplacement]);
 
   /**
    * Onboarding from filed returns (specs/001-rpti-import-onboarding).
@@ -456,9 +671,9 @@ export default function App() {
    * a plan *for* 2027 is the normal pairing, and neither layout carries a year,
    * so neither can be inferred.
    *
-   * Everything is persisted in one write. There is no staging area: an import
-   * that is refused leaves the workspace untouched, and recovery from an unwanted
-   * result is the existing start-over mechanism.
+   * Everything is persisted in one conditional write. There is no staging area:
+   * an import that is refused, cancelled at its preview, or fails to save leaves
+   * the workspace untouched.
    */
   const handleImportReturns = useCallback(async (request: OnboardingImportRequest) => {
     const lk = await parseLkptiImportFile(request.lkptiFile);
@@ -518,43 +733,48 @@ export default function App() {
       versions: [],
     };
 
-    await saveAppData(data);
-    setAssets(data.assets);
-    setDeliverables(data.deliverables);
-    setDeliverableSegments(data.deliverableSegments);
-    setInitiatives(data.initiatives);
-    setMilestones(data.milestones);
-    setProgrammes(data.programmes);
-    setStrategies(data.strategies);
-    setDependencies(data.dependencies);
-    setAssetCategories(data.assetCategories);
-    setTimelineSettings(sanitizeTimelineSettings(data.timelineSettings));
-    setResources(data.resources);
-    setDeliverableStatuses(data.deliverableStatuses);
-    // Establishes a new workspace, so resetting the decision log is correct:
-    // its records reference entity IDs that no longer exist (ADR-0011).
-    setDecisions(data.decisions || []);
-    setRptiDetails(data.rptiDetails || []);
-    setLkptiDetails(data.lkptiDetails || []);
-    setVersions([]);
+    const skipped = [...lk.skipped, ...rpSkipped];
+    const unresolved = rpDerived?.unresolved.length ?? 0;
+    // Parsed and derived first; replacing an existing workspace is then previewed
+    // with what the returns produced (R05). Establishes a new workspace, so the
+    // decision log and History reset (ADR-0011).
+    const result = await requestReplacement({
+      title: 'Replace your workspace?',
+      message: 'Starting from these filed returns replaces everything in this browser — records, History and the decision log.',
+      confirmLabel: 'Replace workspace',
+      next: () => data,
+      notices: [
+        `LKPTI ${request.lkptiYear}: ${lk.rows.length} row(s)${request.rptiYear ? ` · RPTI ${request.rptiYear}: ${rpRowCount} row(s)` : ' · no RPTI supplied'}.`,
+        skipped.length === 0 ? 'No rows were skipped.' : `${skipped.length} row(s) skipped — e.g. row ${skipped[0].rowNumber}: ${skipped[0].reason}`,
+        ...(unresolved > 0 ? [`${unresolved} planned upgrade(s) reference an application not in the inventory; they will be listed in the data-health review.`] : []),
+      ],
+      undoable: false,
+      onCommitted: () => {
+        setImportSummary({
+          lkptiYear: request.lkptiYear,
+          rptiYear: request.rptiYear,
+          lkptiRows: lk.rows.length,
+          rptiRows: rpRowCount,
+          skipped,
+          unresolved,
+        });
+        setShowTemplatePicker(false);
+        setTemplatePickerIsReset(false);
+        // FR-022: land on the data-health review, so the first thing seen after an
+        // import is what needs attention.
+        setInitialReport('data-health');
+        setView('reports');
+      },
+    }, false);
+    if (result.status === 'failed') throw new Error(`The import was not saved: ${result.message}`);
+  }, [requestReplacement]);
 
-    setImportSummary({
-      lkptiYear: request.lkptiYear,
-      rptiYear: request.rptiYear,
-      lkptiRows: lk.rows.length,
-      rptiRows: rpRowCount,
-      skipped: [...lk.skipped, ...rpSkipped],
-      unresolved: rpDerived?.unresolved.length ?? 0,
-    });
-    setShowTemplatePicker(false);
-    setTemplatePickerIsReset(false);
-    // FR-022: land on the data-health review, so the first thing seen after an
-    // import is what needs attention.
-    setInitialReport('data-health');
-    setView('reports');
-  }, []);
-
-  const handleUpdate = useCallback(async (data: AppState, skipHistory = false) => {
+  const handleUpdate = useCallback(async (data: AppState, skipHistory = false): Promise<boolean> => {
+    // A replacement is saving: an edit now could be overwritten by it, or overwrite it (X06).
+    if (operationRef.current) {
+      setDbSaveError('Wait for the current change to finish saving, then try again.');
+      return false;
+    }
     if (!skipHistory) {
       setUndoStack(prev => {
         // An update that replaces History records the History it replaced, so Undo
@@ -567,43 +787,26 @@ export default function App() {
       setRedoStack([]);
     }
     // Update state immediately for UI responsiveness
-    setAssets(data.assets);
-    setDeliverables(data.deliverables || []);
-    setDeliverableSegments(data.deliverableSegments || []);
-    setInitiatives(data.initiatives);
-    setMilestones(data.milestones);
-    setProgrammes(data.programmes);
-    setStrategies(data.strategies);
-    setDependencies(data.dependencies);
-    setAssetCategories(data.assetCategories);
-    setTimelineSettings(sanitizeTimelineSettings(data.timelineSettings));
-    setResources(data.resources || []);
-    setDeliverableStatuses(data.deliverableStatuses || []);
-    setDecisions((data as any).decisions || []);
-    setRptiDetails((data as any).rptiDetails || []);
-    setLkptiDetails((data as any).lkptiDetails || []);
+    publishState(data);
     if (data.versions) setVersions(data.versions);
+    // Any open replacement preview was prepared against the old state (X03).
+    bumpRevision();
 
     // Persist to DB
     try {
-      await saveAppData(data);
-      if (syncChannelRef.current) notifyDataSaved(syncChannelRef.current, tabIdRef.current);
+      await saveAppData(data).then(() => rememberStored(data, data.versions));
+      notifySaved();
+      return true;
     } catch (error) {
       console.error('Failed to save data to DB:', error instanceof Error ? `${error.name}: ${error.message}` : error);
       setDbSaveError('Failed to save changes. Your data may not persist after a reload. If this keeps happening, try refreshing the page.');
+      return false;
     }
-  }, []);
-
-  // Through handleUpdate, so one Undo reverses the whole replacement, History included.
-  const applySharedImport = useCallback(async (data: AppState) => {
-    await handleUpdate(data);
-    setShowTemplatePicker(false);
-    setTemplatePickerIsReset(false);
-  }, [handleUpdate]);
+  }, [publishState, bumpRevision, rememberStored, notifySaved]);
 
   const handleViewerImport = useCallback(async (file: File) => {
     try {
-      const imported = await importFromExcel(file);
+      const { data: imported, notices } = await importFromExcelWithDiagnostics(file);
       const hasData = Object.values(imported).some(arr => Array.isArray(arr) && arr.length > 0);
       if (!hasData) {
         setDbSaveError('No valid data found in the Excel file.');
@@ -634,9 +837,9 @@ export default function App() {
         deliverableStatuses: imported.deliverableStatuses ?? blank.deliverableStatuses,
         // Establishes a new workspace, so resetting the decision log is correct:
         // its records reference entity IDs that no longer exist (ADR-0011).
-        decisions: (imported as any).decisions ?? blank.decisions,
-        rptiDetails: (imported as any).rptiDetails ?? blank.rptiDetails,
-        lkptiDetails: (imported as any).lkptiDetails ?? blank.lkptiDetails,
+        decisions: imported.decisions ?? blank.decisions,
+        rptiDetails: imported.rptiDetails ?? blank.rptiDetails,
+        lkptiDetails: imported.lkptiDetails ?? blank.lkptiDetails,
         timelineSettings: { ...blank.timelineSettings, ...(imported.timelineSettings ?? {}) },
         versions: imported.versions ?? [],
       };
@@ -645,18 +848,154 @@ export default function App() {
       const data = liftWorkspaceReportAttributes(importedData);
 
       // Nothing to lose on an empty workspace; otherwise say what will be replaced
-      // and let the planner back out (#62).
-      const current = { ...getCurrentStateRef.current(), versions: versionsRef.current };
-      if (summariseReplacement(current, data).losesData) {
-        setPendingSharedImport({ fileName: file.name, data });
-      } else {
-        await applySharedImport(data);
-      }
+      // and let the planner back out (#62). One Undo reverses it, History included.
+      const result = await requestReplacement({
+        title: 'Replace your workspace?',
+        message: `Opening "${file.name}" replaces everything in this browser. You can undo straight afterwards, but not after a reload, so download a backup first if you might need the current workspace.`,
+        confirmLabel: 'Replace workspace',
+        next: () => data,
+        notices: [
+          ...(imported.decisions === undefined ? ['The file has no Decisions sheet, so the decision log starts empty.'] : []),
+          ...notices,
+        ],
+        undoable: true,
+        onCommitted: () => {
+          setShowTemplatePicker(false);
+          setTemplatePickerIsReset(false);
+        },
+      }, false);
+      if (result.status === 'failed') setDbSaveError(`The file was not opened: ${result.message}`);
     } catch (error) {
       console.error('Viewer import failed:', error instanceof Error ? `${error.name}: ${error.message}` : error);
       setDbSaveError('Failed to import the file. Please check it is a valid Selara Excel export.');
     }
-  }, [applySharedImport]);
+  }, [requestReplacement]);
+
+  /**
+   * Restore Backup (R01): only a complete backup is accepted, and it is always
+   * previewed — even into an empty workspace — before anything is written.
+   * Incomplete files are sent to ordinary Import, which alone may repair.
+   * Rejects with a message for the planner; nothing changes on any refusal.
+   */
+  const handleRestoreBackupFile = useCallback(async (file: File) => {
+    let workbook: Awaited<ReturnType<typeof readWorkbookFile>>;
+    try {
+      workbook = await readWorkbookFile(file);
+    } catch {
+      throw new Error(`"${file.name}" can't be read as a spreadsheet, so nothing was restored.`);
+    }
+    const result = readBackupWorkbook(workbook);
+    const listed = (problems: string[]) => `${problems.slice(0, 3).join(' ')}${problems.length > 3 ? ` (and ${problems.length - 3} more)` : ''}`;
+    if (result.status === 'rejected') {
+      throw new Error(`"${file.name}" can't be restored, and nothing was changed. ${listed(result.problems)}`);
+    }
+    if (result.status === 'incomplete') {
+      throw new Error(`"${file.name}" isn't a complete backup, so Restore won't use it. ${listed(result.problems)} To bring in what it does contain, use Import instead: it previews what it can read, and any repairs, before anything changes.`);
+    }
+    const backedUpAt = result.exportedAt && !Number.isNaN(Date.parse(result.exportedAt))
+      ? ` (backed up ${new Date(result.exportedAt).toLocaleString()})` : '';
+    const outcome = await requestReplacement({
+      title: 'Restore backup?',
+      message: `Restoring "${file.name}"${backedUpAt} replaces this workspace — records, History, the decision log and settings — with the backup's contents.`,
+      confirmLabel: 'Restore backup',
+      next: () => ({ ...result.workspace }),
+      notices: result.notices,
+      undoable: true,
+      successNotice: `Backup restored from "${file.name}".`,
+      onCommitted: () => {
+        setShowTemplatePicker(false);
+        setTemplatePickerIsReset(false);
+      },
+    }, true);
+    if (outcome.status === 'failed') throw new Error(`Nothing was restored: ${outcome.message}`);
+  }, [requestReplacement]);
+
+  /** A coherent, saved workspace for Backup, after every pending save has landed (X01/X02). */
+  const handlePrepareBackup = useCallback(async () => toPortable((await prepareOperation()).stored), [prepareOperation]);
+
+  /**
+   * An incoming share link (R06). Outbound sharing stays disabled; this protects
+   * the link a planner might still open. Decrypted and validated first, then
+   * always previewed. A link without History leaves the saved versions alone.
+   */
+  const handleIncomingShare = useCallback(async ({ id, key }: { id: string; key: string }) => {
+    const clearLink = () => window.history.replaceState({}, document.title, window.location.pathname);
+    setIsImportingShare(true);
+    let imported: AppState;
+    try {
+      const payload = await importSharedWorkspace(id, key);
+      if (!isValidSharedAppState(payload)) throw new Error('Shared workspace data is invalid or incomplete.');
+      imported = payload;
+    } catch (error) {
+      console.error('Failed to import shared workspace:', error);
+      setDbSaveError(error instanceof Error ? error.message : 'Failed to import shared workspace.');
+      clearLink();
+      return;
+    } finally {
+      setIsImportingShare(false);
+    }
+    // A share can have been created before ADR-0013. Lift before the imported
+    // workspace reaches live state, and persist the lifted form in the same write.
+    const shared = liftWorkspaceReportAttributes(imported);
+    const result = await requestReplacement({
+      title: 'Open shared link?',
+      message: 'This share link will replace your current local workspace.',
+      confirmLabel: 'Replace workspace',
+      next: () => ({ ...shared, versions: imported.versions }),
+      notices: imported.versions ? [] : ['This link carries no History, so your saved versions stay as they are.'],
+      undoable: true,
+      onCommitted: clearLink,
+      onCancelled: clearLink,
+    }, true);
+    if (result.status === 'failed') {
+      setDbSaveError(`The shared link was not opened: ${result.message}`);
+      clearLink();
+    }
+  }, [requestReplacement]);
+
+  useEffect(() => {
+    if (isLoading || !incomingShare) return;
+    setIncomingShare(null);
+    void handleIncomingShare(incomingShare);
+  }, [isLoading, incomingShare, handleIncomingShare]);
+
+  const handleSaveVersion = useCallback(async (version: Version): Promise<boolean> => {
+    if (operationRef.current) {
+      setDbSaveError('Wait for the current change to finish saving, then try again.');
+      return false;
+    }
+    try {
+      await saveVersion(version);
+    } catch (error) {
+      console.error('Failed to save version:', error);
+      setDbSaveError(`The version could not be saved (${describeError(error)}). Nothing was added to History.`);
+      return false;
+    }
+    setVersions(prev => [...prev, version]);
+    if (lastPersistedRef.current) lastPersistedRef.current = { ...lastPersistedRef.current, versions: [...lastPersistedRef.current.versions, version] };
+    bumpRevision();
+    notifySaved();
+    return true;
+  }, [bumpRevision, notifySaved]);
+
+  const handleDeleteVersion = useCallback(async (id: string): Promise<boolean> => {
+    if (operationRef.current) {
+      setDbSaveError('Wait for the current change to finish saving, then try again.');
+      return false;
+    }
+    try {
+      await deleteVersion(id);
+    } catch (error) {
+      console.error('Failed to delete version:', error);
+      setDbSaveError(`The version could not be deleted (${describeError(error)}). History is unchanged.`);
+      return false;
+    }
+    setVersions(prev => prev.filter(v => v.id !== id));
+    if (lastPersistedRef.current) lastPersistedRef.current = { ...lastPersistedRef.current, versions: lastPersistedRef.current.versions.filter(v => v.id !== id) };
+    bumpRevision();
+    notifySaved();
+    return true;
+  }, [bumpRevision, notifySaved]);
 
   const handleRepairUnresolvedRow = useCallback(async (request: UnresolvedRowRepairRequest) => {
     const result = applyUnresolvedRowRepair(getCurrentStateRef.current(), request);
@@ -674,40 +1013,42 @@ export default function App() {
   // (the source tab already did) and never pushes onto the undo stack — instead it
   // clears both stacks, since their snapshots no longer correspond to the DB's
   // current baseline once a remote change has landed.
+  //
+  // History comes with it, read in the same transaction (X04/X08). A read that a
+  // newer read, or a commit from this tab, has overtaken is not published: it
+  // would put older data on screen over newer. The overtaken case reads again.
+  const applyRemoteSyncRef = useRef<() => Promise<void>>(async () => {});
   const applyRemoteSync = useCallback(async () => {
-    let data: Awaited<ReturnType<typeof getAppData>>;
+    const request = ++syncRequestRef.current;
+    const localCommitsAtStart = localCommitRef.current;
+    let stored: PersistedWorkspace;
     try {
-      data = await getAppData();
+      stored = await readPersistedWorkspace();
     } catch (error) {
       console.error('Failed to reload data for cross-tab sync:', error instanceof Error ? `${error.name}: ${error.message}` : error);
       return;
     }
-    setAssets(data.assets);
-    setDeliverables(data.deliverables || []);
-    setDeliverableSegments(data.deliverableSegments || []);
-    setInitiatives(data.initiatives);
-    setMilestones(data.milestones);
-    setProgrammes(data.programmes);
-    setStrategies(data.strategies);
-    setDependencies(data.dependencies);
-    setAssetCategories(data.assetCategories);
-    setTimelineSettings(sanitizeTimelineSettings(data.timelineSettings));
-    setResources(data.resources || []);
-    setDeliverableStatuses(data.deliverableStatuses || []);
-    setDecisions(data.decisions || []);
-    setRptiDetails(data.rptiDetails || []);
-    setLkptiDetails(data.lkptiDetails || []);
+    if (request !== syncRequestRef.current) return;
+    if (localCommitsAtStart !== localCommitRef.current) {
+      void applyRemoteSyncRef.current();
+      return;
+    }
+    publishState(presentStored(stored));
+    setVersions(stored.versions);
+    lastPersistedRef.current = stored;
+    bumpRevision();
 
     setUndoStack([]);
     setRedoStack([]);
 
     // Close a decision panel left open on a decision the remote change deleted.
-    setSelectedDecisionId(prev => (prev && !(data.decisions || []).some(d => d.id === prev) ? null : prev));
+    setSelectedDecisionId(prev => (prev && !stored.decisions.some(d => d.id === prev) ? null : prev));
 
     setSyncToast('Updated in another tab');
     if (syncToastTimerRef.current) clearTimeout(syncToastTimerRef.current);
     syncToastTimerRef.current = setTimeout(() => setSyncToast(null), 4000);
-  }, []);
+  }, [publishState, bumpRevision]);
+  applyRemoteSyncRef.current = applyRemoteSync;
 
   useEffect(() => {
     const channel = new BroadcastChannel(SYNC_CHANNEL_NAME);
@@ -724,44 +1065,54 @@ export default function App() {
     };
   }, [applyRemoteSync]);
 
-  const handleUndo = useCallback(() => {
-    if (undoStack.length === 0) return;
-    // Capture previous state BEFORE any state mutations
-    const previousState = undoStack[undoStack.length - 1];
-    // Capture current state for redo stack BEFORE mutating — with History when the
-    // entry carries it, so redo can put back what this undo takes away.
-    const currentState = previousState.versions ? { ...getCurrentState(), versions } : getCurrentState();
+  /**
+   * Undo and Redo of any entry, replacements included (R08). A direct action — no
+   * confirmation — but persisted like a replacement: it waits for queued saves,
+   * writes only if the store still holds what this tab last stored (so a change
+   * from another tab is not overwritten), and moves the stacks only after the
+   * write succeeds. A failure leaves both stacks as they were, ready to retry.
+   */
+  const runStackStep = useCallback(async (direction: 'undo' | 'redo') => {
+    const from = direction === 'undo' ? undoStack : redoStack;
+    if (from.length === 0 || operationRef.current) return;
+    const target = from[from.length - 1];
+    // With History when the entry carries it, so the opposite step can put it back.
+    const onScreen = target.versions ? { ...getCurrentStateRef.current(), versions: versionsRef.current } : getCurrentStateRef.current();
+    const label = direction === 'undo' ? 'Undo' : 'Redo';
+    operationRef.current = true;
+    setBusyMessage(direction === 'undo' ? 'Undoing…' : 'Redoing…');
+    try {
+      await settleWrites();
+      const base = lastPersistedRef.current;
+      if (!base) throw new Error('the stored workspace has not been read yet');
+      await replaceWorkspace(target, workspaceFingerprint(base), workspaceFingerprint);
+    } catch (error) {
+      setDbSaveError(error instanceof StaleWorkspaceError
+        ? `${label} was not applied: the workspace changed in another tab. Nothing was changed.`
+        : `${label} failed (${describeError(error)}). Nothing was changed, and you can try again.`);
+      return;
+    } finally {
+      operationRef.current = false;
+      setBusyMessage(null);
+    }
+    const push = (stack: AppState[]) => [...stack, onScreen].slice(-10);
+    if (direction === 'undo') {
+      setUndoStack(prev => prev.slice(0, -1));
+      setRedoStack(push);
+    } else {
+      setRedoStack(prev => prev.slice(0, -1));
+      setUndoStack(push);
+    }
+    publishState(target);
+    if (target.versions) setVersions(target.versions);
+    rememberStored(target, target.versions);
+    bumpRevision();
+    notifySaved();
+    setDbSaveError(null);
+  }, [undoStack, redoStack, publishState, rememberStored, bumpRevision, notifySaved]);
 
-    // Build new stacks with captured state
-    const newUndoStack = undoStack.slice(0, -1);
-    const newRedoStack = undoStack.length > 10
-      ? [...redoStack.slice(-9), currentState]
-      : [...redoStack, currentState];
-
-    setRedoStack(newRedoStack);
-    setUndoStack(newUndoStack);
-
-    handleUpdate(previousState, true);
-  }, [undoStack, redoStack, versions, handleUpdate]);
-
-  const handleRedo = useCallback(() => {
-    if (redoStack.length === 0) return;
-    // Capture next state BEFORE any state mutations
-    const nextState = redoStack[redoStack.length - 1];
-    // Capture current state for undo stack BEFORE mutating
-    const currentState = nextState.versions ? { ...getCurrentState(), versions } : getCurrentState();
-
-    // Build new stacks with captured state
-    const newRedoStack = redoStack.slice(0, -1);
-    const newUndoStack = undoStack.length > 10
-      ? [...undoStack.slice(-9), currentState]
-      : [...undoStack, currentState];
-
-    setUndoStack(newUndoStack);
-    setRedoStack(newRedoStack);
-
-    handleUpdate(nextState, true);
-  }, [undoStack, redoStack, versions, handleUpdate]);
+  const handleUndo = useCallback(() => { void runStackStep('undo'); }, [runStackStep]);
+  const handleRedo = useCallback(() => { void runStackStep('redo'); }, [runStackStep]);
 
   // Keep refs pointing to latest callbacks so the keyboard listener never needs to re-register
   undoRef.current = handleUndo;
@@ -811,17 +1162,35 @@ export default function App() {
     handleUpdate({ assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings: updatedSettings, resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails });
   }, [assets, deliverables, deliverableSegments, initiatives, milestones, programmes, strategies, dependencies, assetCategories, resources, deliverableStatuses, decisions, rptiDetails, lkptiDetails, handleUpdate]);
 
-  const handleRestoreVersion = useCallback((version: import('./types').Version) => {
-    // Restoring rolls back plan data within the same workspace, so the decision
-    // log survives it — see buildRestoredWorkspace and ADR-0011.
-    // A pre-ADR-0013 snapshot can reintroduce legacy row properties after the live
-    // workspace was already migrated. Lift before it becomes live: restore followed
-    // immediately by Generate must file the lifted values, without relying on reload.
-    // handleUpdate persists the cleaned rows in the same write, making the removed
-    // legacy cost properties the durable one-time migration marker (F3/Q7).
-    const data = liftWorkspaceReportAttributes(buildRestoredWorkspace(version, decisions));
-    handleUpdate(data);
-  }, [handleUpdate, decisions]);
+  /**
+   * History restore (R07): rolls plan data back within the same workspace, so
+   * saved versions and the live decision log are kept (ADR-0011). A damaged
+   * snapshot is refused before anything is written.
+   */
+  const handleRequestRestore = useCallback(async (version: Version) => {
+    const problem = snapshotProblem(version);
+    if (problem) {
+      setDbSaveError(`"${version.name}" can't be restored: ${problem} Nothing was changed.`);
+      return;
+    }
+    const result = await requestReplacement({
+      title: 'Restore Version',
+      message: `Restore "${version.name}"? This will overwrite all your current work. Your decision log is not rolled back.`,
+      confirmLabel: 'Restore',
+      // A pre-ADR-0013 snapshot can reintroduce legacy row properties after the live
+      // workspace was already migrated. Lift before it becomes live: restore followed
+      // immediately by Generate must file the lifted values, without relying on reload.
+      // The same write persists the cleaned rows, making the removed legacy cost
+      // properties the durable one-time migration marker (F3/Q7).
+      next: current => liftWorkspaceReportAttributes(buildRestoredWorkspace(version, current.decisions) as AppState),
+      notices: [],
+      undoable: true,
+      // The old modal closed itself and dropped you back on the timeline so you
+      // could see the restored state; the guide documents that.
+      onCommitted: () => setView('visualiser'),
+    }, true);
+    if (result.status === 'failed') setDbSaveError(`The version was not restored: ${result.message}`);
+  }, [requestReplacement]);
 
   const handleSaveDeliverableSegment = useCallback((seg: import('./types').DeliverableSegment) => {
     const exists = deliverableSegments.some(s => s.id === seg.id);
@@ -959,28 +1328,16 @@ export default function App() {
       <div className="h-screen w-full flex items-center justify-center bg-slate-100">
         <div className="flex flex-col items-center gap-2 text-slate-500">
           <Loader2 className="animate-spin" size={32} />
-          <p>{isImportingShare ? 'Restoring shared workspace...' : 'Loading data...'}</p>
+          <p>Loading data...</p>
         </div>
 
-        {isImportingShare && (
-          <div data-testid="restoring-data-modal" className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[200]">
-            <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full mx-4 flex flex-col items-center text-center">
-              <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mb-4">
-                <Loader2 className="animate-spin text-blue-600" size={32} />
-              </div>
-              <h2 className="text-xl font-bold text-slate-900 mb-2">Restoring Data</h2>
-              <p className="text-slate-600">
-                Please wait while we securely decrypt and load the shared workspace...
-              </p>
-            </div>
-          </div>
-        )}
       </div>
     );
   }
 
   return (
     <div className="h-screen w-full bg-slate-100 p-3 md:p-6 flex flex-col">
+      <span hidden data-testid="app-ready" />
       {dbSaveError && (
         <div
           data-testid="db-error-banner"
@@ -990,6 +1347,20 @@ export default function App() {
           <button
             onClick={() => setDbSaveError(null)}
             className="text-red-500 hover:text-red-700 font-bold text-lg leading-none"
+            title="Dismiss"
+          >×</button>
+        </div>
+      )}
+      {workspaceNotice && (
+        <div
+          data-testid="workspace-notice"
+          role="status"
+          className="flex items-center gap-3 mb-3 px-4 py-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-sm text-emerald-800 flex-shrink-0"
+        >
+          <span className="flex-1">{workspaceNotice}</span>
+          <button
+            onClick={() => setWorkspaceNotice(null)}
+            className="text-emerald-600 hover:text-emerald-800 font-bold text-lg leading-none"
             title="Dismiss"
           >×</button>
         </div>
@@ -1115,6 +1486,9 @@ export default function App() {
             className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           />
         </div>
+
+        {/* Workspace backup: in every view, with the workspace-wide controls rather than the view options and exports. */}
+        <BackupControls onPrepareBackup={handlePrepareBackup} onRestoreBackup={handleRestoreBackupFile} />
 
         {view === 'visualiser' && <>
         <div className="w-px h-6 bg-slate-200 shrink-0" />
@@ -1526,6 +1900,9 @@ export default function App() {
         <DataControls
           data={{ assets, deliverables, deliverableSegments, deliverableStatuses, initiatives, milestones, programmes, strategies, dependencies, assetCategories, timelineSettings, resources, versions, decisions, rptiDetails, lkptiDetails }}
           onImport={handleUpdate}
+          onPrepareReplacement={prepareOperation}
+          onCommitReplacement={commitReplacement}
+          persistedRevision={persistedRevision}
           onViewerImport={handleViewerImport}
           onError={setDbSaveError}
           timelineId={view === 'visualiser' ? 'timeline-visualiser' : undefined}
@@ -1792,14 +2169,9 @@ export default function App() {
           <Suspense fallback={<LoadingFallback />}>
             <HistoryView
               versions={versions}
-              onUpdateVersions={setVersions}
-              onRestore={(v) => {
-                handleRestoreVersion(v);
-                // The old modal closed itself and dropped you back on the timeline
-                // so you could see the restored state; the guide documents that.
-                // A tab has to navigate deliberately to keep the same promise.
-                setView('visualiser');
-              }}
+              onSaveVersion={handleSaveVersion}
+              onDeleteVersion={handleDeleteVersion}
+              onRequestRestore={handleRequestRestore}
               decisions={decisions}
               initiatives={initiatives}
               programmes={programmes}
@@ -1898,46 +2270,65 @@ export default function App() {
         </div>
       )}
 
-      {pendingSharedImport && (
-        <ConfirmModal
-          isOpen
-          title="Replace your workspace?"
-          message={`Opening "${pendingSharedImport.fileName}" replaces everything in this browser. You can undo straight afterwards, but not after a reload, so export a backup first if you might need the current workspace.`}
-          confirmLabel="Replace workspace"
-          onCancel={() => setPendingSharedImport(null)}
-          onConfirm={() => {
-            const { data } = pendingSharedImport;
-            setPendingSharedImport(null);
-            applySharedImport(data);
-          }}
-        >
-          <table className="mt-3 w-full text-sm" data-testid="replacement-counts">
-            <thead>
-              <tr className="text-xs text-slate-400">
-                <th className="text-left font-medium pb-1"></th>
-                <th className="text-right font-medium pb-1">Current</th>
-                <th className="text-right font-medium pb-1">Incoming</th>
-              </tr>
-            </thead>
-            <tbody className="text-slate-700">
-              {summariseReplacement({ ...getCurrentState(), versions }, pendingSharedImport.data).rows.map(row => (
-                <tr key={row.key} data-testid={`replacement-count-${row.key}`}>
-                  <td className="py-0.5">{row.label}</td>
-                  <td className="py-0.5 text-right tabular-nums" data-testid="replacement-current">{row.current}</td>
-                  <td className="py-0.5 text-right tabular-nums" data-testid="replacement-incoming">{row.incoming}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </ConfirmModal>
-      )}
-
       {showTemplatePicker && !showLandingPage && (
         <ModalErrorBoundary onDismiss={() => { setShowTemplatePicker(false); setTemplatePickerIsReset(false); }}>
           <Suspense fallback={null}>
-            <TemplatePickerModal onSelect={handleSelectTemplate} onImportReturns={handleImportReturns} isReset={templatePickerIsReset} />
+            <TemplatePickerModal
+              onSelect={handleSelectTemplate}
+              onImportReturns={handleImportReturns}
+              onRestoreBackup={handleRestoreBackupFile}
+              backup={versions.length > 0 || decisions.length > 0
+                ? { onPrepareBackup: handlePrepareBackup, versions: versions.length, decisions: decisions.length }
+                : undefined}
+              isReset={templatePickerIsReset}
+            />
           </Suspense>
         </ModalErrorBoundary>
+      )}
+
+      {/* After the template picker, so a preview opened from it sits on top. */}
+      {openReplacement && (() => {
+        const { current } = openReplacement.prepared;
+        const next = openReplacement.next(current);
+        const stale = openReplacement.prepared.revision !== persistedRevision;
+        return (
+          <ConfirmModal
+            isOpen
+            wide
+            closeOnEscape
+            title={openReplacement.title}
+            message={openReplacement.message}
+            confirmLabel={openReplacement.confirmLabel}
+            busy={openReplacement.saving}
+            confirmDisabled={stale || openReplacement.refreshing}
+            onCancel={cancelReplacement}
+            onConfirm={confirmReplacement}
+          >
+            <ReplacementSummary
+              rows={summariseReplacement(current, { ...next, versions: next.versions ?? current.versions }).rows}
+              effects={describeReplacementEffects(current, next)}
+              notices={openReplacement.notices}
+              stale={stale}
+              onRefresh={refreshReplacement}
+              refreshing={openReplacement.refreshing}
+              error={openReplacement.error}
+            />
+          </ConfirmModal>
+        );
+      })()}
+
+      {(busyMessage || isImportingShare) && (
+        <div
+          data-testid={isImportingShare ? 'restoring-data-modal' : 'operation-busy'}
+          aria-busy="true"
+          aria-live="polite"
+          className="fixed inset-0 z-[250] flex items-center justify-center bg-slate-900/20"
+        >
+          <div className="flex items-center gap-2 rounded-xl bg-white px-4 py-3 text-sm text-slate-700 shadow-lg">
+            <Loader2 className="animate-spin" size={16} />
+            {isImportingShare ? 'Decrypting and loading the shared workspace…' : busyMessage}
+          </div>
+        </div>
       )}
 
       {showTutorial && (

@@ -111,6 +111,7 @@ export const SECTIONS: GuideSection[] = [
   {
     title: 'Import & Export',
     pages: [
+      { title: 'Backup and Restore', path: '11-import-export/backup-and-restore' },
       { title: 'Excel Import',     path: '11-import-export/excel-import' },
       { title: 'Excel Export',     path: '11-import-export/excel-export' },
       { title: 'PDF & SVG Export', path: '11-import-export/pdf-svg-export' },

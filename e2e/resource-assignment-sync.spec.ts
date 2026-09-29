@@ -48,6 +48,8 @@ test.describe('Resource Assignment Sync', () => {
     
     // Click Overwrite All Data in preview
     await page.getByRole('button', { name: 'Overwrite All Data' }).click();
+    // Reported only once the overwrite is stored (FR-006).
+    await expect(page.getByTestId('import-success-notification')).toBeVisible();
 
     // 5. Verify the assignment is back
     const importedBar = page.locator('[data-initiative-id]').first();
