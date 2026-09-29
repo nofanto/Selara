@@ -122,9 +122,14 @@ test.describe('Undo/Redo', () => {
     await page.getByTestId('nav-visualiser').click();
     await page.waitForSelector('[data-testid="asset-row-content"]');
 
-    for (let i = 0; i < 10; i++) {
+    // Each Undo is saved before the next is accepted (R08: disabled during saving),
+    // so wait for the stack to shrink rather than for a fixed delay.
+    const undoCounter = page.getByTestId('undo-counter');
+    await expect(undoCounter).toHaveText('10');
+    for (let remaining = 9; remaining >= 0; remaining--) {
       await page.keyboard.press('Meta+z');
-      await page.waitForTimeout(30);
+      if (remaining > 0) await expect(undoCounter).toHaveText(String(remaining));
+      else await expect(undoCounter).toBeHidden();
     }
 
     await page.getByTestId('nav-data-manager').click();

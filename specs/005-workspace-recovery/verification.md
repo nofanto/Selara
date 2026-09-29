@@ -79,3 +79,21 @@ A review found that `readFormat1` trusted TimelineSettings count/presence metada
   - Repeated with `--retries=0`, it failed 1 of 5, then 2 of 10. After that it passed 20 of 20 and 40 of 40 on this branch, and 20 of 20 and 40 of 40 on `main` (`8bf7e5e`).
   - It is attributed to machine load, not to this work: the cleanup changed only documentation and a trailing blank line. Reported here rather than hidden.
   - The next full run: **743 passed, 4 skipped**, 0 flaky, 0 failed.
+
+## CI failure on PR #69 — 2026-09-29
+
+The first PR run, [36563196084](https://github.com/nofanto/Selara/actions/runs/36563196084) on `fbd4d0c` (CI settings: 2 workers, 1 retry), failed Playwright with **741 passed, 1 failed, 1 flaky, 4 skipped**. Unit tests, build and static checks passed.
+
+- **Failed: `undo-redo.spec.ts` "undo stack is capped at 10".** The first attempt ended on `Rename 9`, the retry on `Rename 8`; the test expected `Rename 5`. That means 4–5 of the 10 undos were lost, not a one-step timing miss.
+  - **Cause:** since M1, Undo/Redo waits for queued saves and writes to IndexedDB before moving the stacks. While that is in progress, further Undo/Redo presses are ignored. This is what `contracts/replacement-routes.md` R08 requires: "Disable during saving".
+  - The test pressed Ctrl+Z ten times with fixed 30 ms gaps. Before M1, Undo was synchronous and every press applied. On a slower runner the save outlasts the gap, and the later presses are correctly ignored. The earlier local off-by-one failures (`Rename 6`) had the same cause.
+  - **Reproduction:** the same test with the 30 ms gap set to 0 failed 6 of 6 on this branch (`Rename 11`–`Rename 14`) and passed 6 of 6 on `main` (`8bf7e5e`). Chromium CPU throttling did not reproduce it: 4 of 4 passed on both sides at 4×, and at 6× the test ran out of time during the edits. IndexedDB work is not slowed by page CPU throttling.
+  - **Fix:** the test only. After each Ctrl+Z it waits for the `undo-counter` to go down, instead of a fixed delay. It still asserts the cap: 15 edits leave 10 undo steps, 10 undos return to `Rename 5`, and Undo ends disabled. Product behavior is unchanged. The fixed test passed 20 of 20 with `--retries=0`.
+- **Flaky: `dependencies.spec.ts` "clicking segment dependency arrow opens DependencyPanel…"**. It found 9 dependency arrows instead of 10 because the drag did not create the dependency, then passed on retry.
+  - This predates M1: with 40 repeats and `--retries=0` it failed 1 of 40 on this branch and 1 of 40 on `main`, with the same `Received: 9`. Not changed here.
+
+After the fix:
+- `npm run test:unit`: 30 files, **718 passed**.
+- `npm run lint`: eslint 0 errors, 6 warnings; tsc 0 errors.
+- `CI=1 npx playwright test`: **743 passed, 4 skipped**, 0 flaky, 0 failed.
+- `npx playwright test` (local, 4 workers): **743 passed, 4 skipped**, 0 flaky, 0 failed.
