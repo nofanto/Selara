@@ -158,6 +158,17 @@ test.describe('Segment UX — selection highlight', () => {
     await seg.click();
     await expect(seg).toHaveCSS('outline-color', 'rgb(30, 41, 59)');
   });
+
+  test('a hovered selected segment stays above the floating legend, so its toolbar stays reachable', async ({ page }) => {
+    // The first segment's toolbar sits under the legend. Hover used to drop the
+    // selected segment below it, so the link handle flickered in and out of reach.
+    const seg = await getFirstSegment(page);
+    await expect(seg).toBeVisible({ timeout: 10000 });
+    await seg.click();
+    await seg.hover();
+    const legendZ = Number(await page.getByTestId('timeline-legend').evaluate(el => getComputedStyle(el).zIndex));
+    await expect.poll(() => seg.evaluate(el => Number(getComputedStyle(el).zIndex))).toBeGreaterThan(legendZ);
+  });
 });
 
 test.describe('Segment UX — floating action toolbar', () => {
