@@ -51,3 +51,31 @@ The first full run with the routes in place gave 734 passed and 9 failed:
 
   Those five specs then passed 142 of 142 runs with `--repeat-each=2 --retries=0`. They are attributed to load: the new recovery suites run several browser contexts at once. Reported here rather than hidden. Nothing in those five tests touches a replacement route.
 - Ordinary interchange (Export, Import, Merge) and disabled outbound Share: covered by the existing suites and by R02 and R06 above.
+
+## Restore-validation follow-ups — 2026-09-29
+
+A review found that `readFormat1` trusted TimelineSettings count/presence metadata (contracts/workbook.md requires exactly one settings row per scope, and rejection of inconsistent metadata). Each case below was covered by a new test in `src/lib/workspaceBackup.test.ts` that tampered with the rows and adjusted the metadata so the counts alone couldn't catch it. Each test was run Red before the fix.
+
+- **`0ad2f6f`**:
+  - Red: 3 tests failed, each `expected 'complete' to be 'rejected'`.
+    - A duplicate current settings row, with the marker's `currentCounts.TimelineSettings` set to 2.
+    - A duplicate `ver-1` settings row, with its `rowCounts.TimelineSettings` set to 2.
+    - `ver-1` listing `timelineSettings` with no row and a count of 0.
+  - A fourth test guards existing behavior and passed before and after: settings that are genuinely absent, and not listed in the metadata, stay `incomplete` and go to ordinary Import.
+  - Fix: more than one settings row in any scope is rejected, whatever the counts say. A Version that lists settings but has no row is rejected.
+  - After the fix: unit 717/717; Playwright 743 passed, 4 skipped.
+- **`10631ea`**:
+  - Red: 1 test failed (`Received "incomplete"`). A `ver-1` settings row with a matching count, but `collections` omits `timelineSettings`.
+  - Fix: now rejected as inconsistent presence metadata. Genuinely absent settings still come back `incomplete`, and Restore Backup never repairs settings.
+
+## Final gates after follow-ups — 2026-09-29
+
+- `npm run test:unit`: 30 files, **718 passed**.
+- `npx playwright test`: **743 passed, 4 skipped** (the disabled Share suites), 0 failed.
+- `npm run lint`: eslint 0 errors, 6 warnings (unchanged). tsc 0 errors.
+- `npm run build`: built. The pre-existing chunk-size warning remains.
+- After the sign-off cleanup, one full `npx playwright test` run gave **742 passed, 1 failed, 4 skipped**.
+  - The failure was `undo-redo.spec.ts` "undo stack is capped at 10": `Rename 6` instead of `Rename 5`. The test is timing-based (15 renames at 50 ms, then 10 undos at 30 ms).
+  - Repeated with `--retries=0`, it failed 1 of 5, then 2 of 10. After that it passed 20 of 20 and 40 of 40 on this branch, and 20 of 20 and 40 of 40 on `main` (`8bf7e5e`).
+  - It is attributed to machine load, not to this work: the cleanup changed only documentation and a trailing blank line. Reported here rather than hidden.
+  - The next full run: **743 passed, 4 skipped**, 0 flaky, 0 failed.
