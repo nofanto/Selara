@@ -97,3 +97,26 @@ After the fix:
 - `npm run lint`: eslint 0 errors, 6 warnings; tsc 0 errors.
 - `CI=1 npx playwright test`: **743 passed, 4 skipped**, 0 flaky, 0 failed.
 - `npx playwright test` (local, 4 workers): **743 passed, 4 skipped**, 0 flaky, 0 failed.
+
+## CI failure on PR #69, second run — 2026-09-29
+
+Run [36569435598](https://github.com/nofanto/Selara/actions/runs/36569435598) on `7574337`: the undo-cap test passed. Playwright still failed, **742 passed, 1 failed, 4 skipped**. The `dependencies.spec.ts` segment-arrow test failed on both attempts (`Received: 9`). That changes the note above ("Not changed here"): the flake predates M1, but it was now blocking CI, so it has been diagnosed and fixed.
+
+- **Is it an M1 regression?** No. Under the same load (`--workers=8 --retries=0`, two rounds of 200 repeats each, alternating), the branch failed **43 of 400** and `main` (`8bf7e5e`) failed **42 of 400**, all with `Received: 9`. Without extra load: 0 of 100 on the branch.
+- **CI artifact:** the uploaded `playwright-report` had no trace or screenshot for this test. Its only snapshot file was an unrelated leftover page.
+- **Cause, from temporary instrumentation (not committed) over 200 loaded runs:**
+  - The drag's mouse-down at the link handle (1241, 400) hit `legend-content` in every failing run, and `segment-action-link` in every passing run.
+  - Positions were identical in passing and failing runs, and the handle always lies inside the floating legend's box.
+  - The selected segment bar had both `z-[50]` and `hover:z-20`. Hover rules come later in the stylesheet, so a hovered selected segment dropped to 20, below the legend's `z-40`.
+  - With the handle under the legend, this loops. Legend on top → bar not hovered → 50 → bar on top → hovered → 20.
+  - Chromium updates hover on its own schedule, so under load mouse-down could arrive in the "legend on top" phase. The drag then never started.
+- **Red:** new test in `initiative-bar-ux.spec.ts`, "a hovered selected segment stays above the floating legend". It failed **5 of 5** (`Expected: > 40`, `Received: 20`).
+- **Fix** (`src/components/Timeline.tsx`): `hover:z-20` now applies only to unselected segments, so a selected segment stays at `z-[50]` while hovered.
+- **Green:** the new test passed 5 of 5. The original dependencies test passed **200 of 200** under the same 8-worker load, down from about 10% failing.
+
+After the fix:
+- `npm run test:unit`: 30 files, **718 passed**.
+- `npm run lint`: eslint 0 errors, 6 warnings; tsc 0 errors.
+- `npm run build`: built.
+- `CI=1 npx playwright test`: **744 passed, 4 skipped**, 0 flaky, 0 failed.
+- `npx playwright test` (local): **744 passed, 4 skipped**, 0 flaky, 0 failed.

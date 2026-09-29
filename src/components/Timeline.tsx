@@ -2286,10 +2286,11 @@ export function Timeline({ assets, deliverables = [], initiatives, milestones, p
                                       setCreatingSegmentParams(null);
                                     }}
                                     className={cn(
-                                      "absolute rounded-md shadow-sm border border-white/20 flex flex-col justify-center px-2 overflow-hidden cursor-pointer hover:z-20 hover:shadow-xl select-none group/seg",
+                                      "absolute rounded-md shadow-sm border border-white/20 flex flex-col justify-center px-2 overflow-hidden cursor-pointer hover:shadow-xl select-none group/seg",
                                       colorClass, "text-white",
                                       linkStateClass(linkStateFor('segment', seg.id)),
-                                      isSegSelected && "outline outline-2 outline-dashed outline-slate-800 z-[50]"
+                                      // hover:z-20 would override z-[50] and drop a selected segment under the legend.
+                                      isSegSelected ? "outline outline-2 outline-dashed outline-slate-800 z-[50]" : "hover:z-20"
                                     )}
                                     style={{ left: `${left}%`, width: `${Math.max(width, 0.5)}%`, height, top }}
                                     // The full picture regardless of what the bar had room for.
