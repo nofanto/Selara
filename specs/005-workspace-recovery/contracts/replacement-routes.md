@@ -1,6 +1,6 @@
 # Replacement routes and acceptance matrix
 
-**Updated:** 2026-09-29. Implements U1/C1, FR-004–006/009–010/014–017 and SC-002/005–006. All cases describe required future behavior.
+**Updated:** 2026-09-29. Implements U1/C1, FR-004–006/009–010/014–017 and SC-002/005–006. Implemented in `src/App.tsx`, `src/lib/db.ts` and the route components; see [verification](../verification.md).
 
 ## Shared contract
 

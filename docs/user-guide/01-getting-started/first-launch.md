@@ -73,8 +73,11 @@ If you want to start fresh, switch to a different template, or change whether yo
 ![Template picker with data-loss warning](../../public/features/template-picker-reset-warning.png)
 
 4. Choose how to begin again: **Start from your filed returns**, **Start blank**, or **Explore with demo data**.
+5. Choosing is not the final step. A confirmation shows what you have now against what the new start brings, and that your saved versions and decision log will be removed. **Cancel** takes you back to the picker with nothing changed.
 
-> **Note:** This action permanently replaces all your current data. There is no undo once you confirm a template selection.
+> **Note:** Confirming permanently replaces all your current data, and there is no undo. [Download a backup](../11-import-export/backup-and-restore.md) first if you might want it back.
+
+The picker also offers **Restore a backup**. Use it in a new browser, or after this browser's data was cleared, to bring a [backup](../11-import-export/backup-and-restore.md) back — History and decisions included.
 
 ## Reopening the tutorial
 

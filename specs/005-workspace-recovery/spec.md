@@ -2,7 +2,7 @@
 
 **Feature Branch**: Not created; specification drafted on `main`.
 **Created**: 2026-09-28
-**Status**: Requirements refined on 2026-09-29 following acceptance of all seven analysis proposals. Q1–Q3 remain 1A/2A/3A. Documentation phase only; implementation has not started.
+**Status**: Requirements refined on 2026-09-29 following acceptance of all seven analysis proposals; Q1–Q3 remain 1A/2A/3A. Implemented on 2026-09-29 after implementation was authorized; see the [verification log](verification.md).
 **Input**: User description: "lets finish M1, do you think we'll need speckit?"
 
 ## User Scenarios & Testing
@@ -118,5 +118,5 @@ As a planner, I receive a truthful failure message and keep my previous workspac
 - Product decisions Q1–Q3 and the 2026-09-29 remediation amendment are accepted in [the design notes](../../requirement-specs/workspace-backup-recovery.md). The accepted options are 1A, 2A and 3A.
 - Filing metadata, new onboarding samples, parser dialect expansion, public hosting and recurring-reminder policy beyond the selected option belong to separate work.
 - Existing reporting rules and ADR-0011 remain in force.
-- The 2026-09-29 instruction authorizes documentation updates only. Implementation remains a separate user instruction.
+- Implementation was authorized on 2026-09-29, after the documentation phase; the implementation-findings amendment in the design notes records what it settled.
 - Application code and tests will follow the repository's requirements-first and Red/Green workflow with Step 0 decisions settled.

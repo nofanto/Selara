@@ -2,7 +2,7 @@
 
 As an individual IT planner, I want a complete portable backup and safe replacement so I can recover after browser data loss without losing History or decision links.
 
-**Status:** Requirements refined on 2026-09-29; documentation only, not implemented.
+**Status:** Implemented 2026-09-29. See the [verification log](../../specs/005-workspace-recovery/verification.md) and [ADR-0015](../adr/0015-workspace-backup-and-conditional-replacement.md).
 
 ## Acceptance criteria
 
@@ -20,6 +20,14 @@ As an individual IT planner, I want a complete portable backup and safe replacem
 - Generation or initiation failure preserves the previous initiation timestamp. If download starts but timestamp persistence fails, the message distinguishes those outcomes. A missing/unreadable stored timestamp does not invent a successful backup.
 - The route matrix covers incoming shared-link startup while outbound sharing stays disabled; existing route-specific decision/History semantics are preserved.
 
-See [design notes](../../requirement-specs/workspace-backup-recovery.md) and [specification](../../specs/005-workspace-recovery/spec.md). Verification evidence will be recorded when complete.
+See [design notes](../../requirement-specs/workspace-backup-recovery.md) and [specification](../../specs/005-workspace-recovery/spec.md).
+
+## Where each criterion is verified
+
+- Preservation through actual XLSX bytes, the field inventory, the workbook matrix, legacy handling and Import-only repairs: `src/lib/workspaceBackup.test.ts`, plus the live-log case in `src/lib/workspaceState.test.ts`.
+- Backup, download-start status and timestamp, and fresh-profile recovery after deleting the source profile (a field-complete workspace, History-only, decisions-only and empty): `e2e/workspace-recovery.spec.ts`.
+- Routes R01–R08 (preview, cancel, invalid input, failed save, retry, reload, History/decision effects, disabled outbound Share, failed Merge): `e2e/workspace-recovery-routes.spec.ts`.
+- Concurrency X01–X08 (the X02 and X07 cases sit in the files above): `e2e/workspace-recovery-concurrency.spec.ts`.
+- Actual outcomes, including flaky runs: [verification log](../../specs/005-workspace-recovery/verification.md).
 
 Authoritative acceptance detail: [fields](../../specs/005-workspace-recovery/contracts/field-inventory.md), [workbook](../../specs/005-workspace-recovery/contracts/workbook.md), [routes](../../specs/005-workspace-recovery/contracts/replacement-routes.md).

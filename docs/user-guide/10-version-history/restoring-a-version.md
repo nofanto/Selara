@@ -15,18 +15,20 @@ Restoration is destructive: any changes made since the selected version was save
 1. Open the **History** tab in the header navigation.
 2. Select the version you want to restore in the list. Its details open on the right.
 3. Under **Restore Version**, click **Restore to Current**.
-4. Read the confirmation modal, which names the version and warns that the current state will be overwritten.
-5. Click **Restore**.
+4. Read the confirmation. It names the version, shows how many of each kind of record you have now and how many the version brings back, and states that your saved versions and your decision log are kept, and whether your timeline settings change.
+5. Click **Restore**, or **Cancel** (or press Escape) to change nothing.
 
-The app loads the saved state, the History tab closes automatically, and you are returned to the timeline with the restored data.
+The app saves the restored state first; only then does the History tab close and return you to the timeline with the restored data. If saving fails, nothing is replaced and you can try again. A version whose saved data is damaged is refused before anything is written.
 
 ## After restoring
 
 The restoration writes the saved snapshot back into IndexedDB as the active state. The version history list itself is unchanged — the version you restored from remains available for future comparisons or restores. The decision log is likewise left as it was.
 
-If you realise the restore was a mistake, use **Undo** (Cmd/Ctrl+Z) straight away: a restore is one change on the undo history, which holds your last 10 changes. For a durable recovery point, save a version before restoring.
+If you realise the restore was a mistake, use **Undo** (Cmd/Ctrl+Z) straight away: a restore is one change on the undo history, which holds your last 10 changes. For a durable recovery point, save a version before restoring — and remember that saved versions stay in this browser; a [backup](../11-import-export/backup-and-restore.md) is what survives losing it.
+
+Restoring a version is not the same as restoring a [backup](../11-import-export/backup-and-restore.md): a version rolls back plan data within this workspace and keeps your decision log, while a backup replaces the whole workspace, History and decision log included.
 
 ---
 
 - Previous: [Comparing Versions](comparing-versions.md)
-- Next: [Excel Import](../11-import-export/excel-import.md)
+- Next: [Backup and Restore](../11-import-export/backup-and-restore.md)

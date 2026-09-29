@@ -1,6 +1,6 @@
 # Validation guide
 
-**Updated:** 2026-09-29. These are planned implementation checks. No test below is claimed to have run or passed; current authorization is documentation only.
+**Updated:** 2026-09-29. Implemented. The checks below were run; actual outcomes, including failures and retries, are in the [verification log](verification.md).
 
 ## Prerequisites
 

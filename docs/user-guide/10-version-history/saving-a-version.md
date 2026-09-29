@@ -26,6 +26,8 @@ The new version appears at the top of the version history list with the timestam
 
 A saved version is a deep clone of the full portfolio state, including all initiatives, assets, programmes, strategies, milestones, and their relationships. The snapshot is persisted to IndexedDB and survives page reloads and browser restarts.
 
+A saved version is **not a backup**: it is stored in this browser alongside everything else, so clearing the browser's data removes it too. To protect your History as well as your current work, download a [backup](../11-import-export/backup-and-restore.md). If a version can't be saved, Selara says so and nothing is added to History.
+
 ## Managing versions
 
 Each version entry in the list shows its name, optional description, and creation timestamp. To remove a version you no longer need, select it, click the **delete** icon in its details, and confirm the deletion in the modal. Deleted versions are removed from IndexedDB and cannot be recovered.

@@ -2,7 +2,7 @@
 
 ![Excel export button in Data Manager](../../public/features/excel-export-data-manager.png)
 
-Exporting to Excel produces a structured `.xlsx` file containing your full portfolio data. Use this to share data with stakeholders who work outside Selara, feed downstream reporting tools, or create an offline backup of the current state.
+Exporting to Excel produces a structured `.xlsx` file containing your full portfolio data. Use this to share data with stakeholders who work outside Selara or feed downstream reporting tools. To keep a copy you can restore, use [Backup](backup-and-restore.md) instead: it writes the same sheets without the losses described below, and checks the file before download.
 
 ## How to export
 
@@ -46,6 +46,8 @@ Its own `versionId` column means something different: the snapshot that a decisi
 against, if any.
 
 This allows you to move your entire project history between browsers or share a complete time-travel enabled portfolio with a colleague.
+
+The ordinary export is not a complete copy, though. It can't keep nested settings (column widths, collapsed groups) or the decision copy saved inside each version, and it lists resource assignments separated by commas. Some text also changes in Excel: Windows line endings, and text that looks like an Excel escape code. For recovery, use [Backup](backup-and-restore.md).
 
 ## Keeping exports current
 
