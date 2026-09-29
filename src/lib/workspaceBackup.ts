@@ -700,6 +700,11 @@ function readFormat1(wb: XLSX.WorkBook, present: Set<string>): BackupReadResult 
       }
     }
     if (!version.collections.has('timelineSettings')) incomplete.push(`Saved version "${version.name}" (${version.id}) has no timeline settings.`);
+    else if (settingsRows.get(version.id)!.length === 0) problems.push(`Saved version ${version.id} lists timeline settings but has no TimelineSettings row.`);
+  }
+  // Exactly one settings row per scope, whatever the counts claim: keeping the first would silently drop the rest.
+  for (const [scopeId, rows] of settingsRows) {
+    if (rows.length > 1) problems.push(`TimelineSettings: ${rows.length} rows for ${scopeId === '' ? 'current state' : `saved version ${scopeId}`}, where only one is allowed.`);
   }
 
   // Record-level structure. Entity problems are corruption; settings problems are repairable by Import.
