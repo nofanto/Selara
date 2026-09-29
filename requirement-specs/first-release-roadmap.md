@@ -89,6 +89,8 @@ Total planning allowance: **31–48 engineering days**, plus pilot elapsed time.
 
 ## M1 — Make losing or replacing work difficult
 
+**Planning update — 2026-09-29:** M1 now has [specification and tasks](../specs/005-workspace-recovery/spec.md) and [accepted design decisions](workspace-backup-recovery.md): 1A/2A/3A plus all seven analysis refinements. #62 is complete; the remaining R1-04–06 work below is not implemented or verified. This dated update supersedes the earlier suggestion to start with #62 while retaining the original roadmap rationale.
+
 **Purpose:** An individual planner can recover without depending on their original browser profile.
 
 - [ ] **R1-04 — Make workspace backup explicit.** Add a clearly named backup action and document exactly what it contains: current entities, stored report evidence, versions, decisions and links, and relevant settings. First assess whether the existing Excel round trip meets the agreed backup contract before choosing another format. Much of it already exists: the workspace export writes every entity for current state and each saved version (tagged by `versionId`), a Versions metadata sheet, and a Decisions sheet that keeps version links (`excel.test.ts` covers decisions). What is missing is a whole-workspace export → import equality test; `roundTrip.test.ts` covers import → regenerate, not backup. The one current typecheck error (`src/lib/excel.ts`, version restoration) is in this path: a snapshot whose timeline settings fail sanitisation is restored with `{}` settings. Fix it here rather than treating it as M6 cleanup. Surface when an export was initiated; do not claim the file was safely stored if the browser cannot verify that.
