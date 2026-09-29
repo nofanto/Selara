@@ -699,8 +699,10 @@ function readFormat1(wb: XLSX.WorkBook, present: Set<string>): BackupReadResult 
         problems.push(`Saved version ${version.id} has ${sheet} rows but doesn't list that collection.`);
       }
     }
-    if (!version.collections.has('timelineSettings')) incomplete.push(`Saved version "${version.name}" (${version.id}) has no timeline settings.`);
-    else if (settingsRows.get(version.id)!.length === 0) problems.push(`Saved version ${version.id} lists timeline settings but has no TimelineSettings row.`);
+    const hasSettingsRows = settingsRows.get(version.id)!.length > 0;
+    if (version.collections.has('timelineSettings') && !hasSettingsRows) problems.push(`Saved version ${version.id} lists timeline settings but has no TimelineSettings row.`);
+    else if (!version.collections.has('timelineSettings') && hasSettingsRows) problems.push(`Saved version ${version.id} has TimelineSettings rows but doesn't list timeline settings.`);
+    else if (!version.collections.has('timelineSettings')) incomplete.push(`Saved version "${version.name}" (${version.id}) has no timeline settings.`);
   }
   // Exactly one settings row per scope, whatever the counts claim: keeping the first would silently drop the rest.
   for (const [scopeId, rows] of settingsRows) {
