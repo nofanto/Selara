@@ -18,6 +18,9 @@ permissions:
 # this workflow and the PR number, so different PRs never share a group. Every other
 # run (a push to main, a manual run) gets a group of its own via the unique run_id,
 # so it can neither cancel nor be cancelled by anything else.
+#
+# A superseded commit's checks therefore show as "cancelled", not failed: it was never
+# judged. Only the PR's latest commit carries a verdict.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || format('run-{0}', github.run_id) }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
