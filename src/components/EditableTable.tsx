@@ -77,12 +77,17 @@ function RowSelect({ value, options, labels, onChange, label, title, className }
   // mousedown's default action is what opens the native dropdown, and React commits
   // this update before it runs, so the dropdown opens with the full list.
   const expand = lazy ? () => setExpanded(true) : undefined;
+  // Collapse again once focus leaves. Otherwise every select a keyboard user tabs
+  // through keeps its full list, and walking a column rebuilds rows × options.
+  // An open native dropdown keeps focus on the select, so this never fires under it.
+  const collapse = expanded ? () => setExpanded(false) : undefined;
   return (
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
       onFocus={expand}
       onMouseDown={expand}
+      onBlur={collapse}
       aria-label={label}
       title={title}
       className={className}

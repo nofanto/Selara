@@ -65,8 +65,16 @@ test.describe('Data Manager at bank scale', () => {
     await select.click();
     expect(await page.evaluate(() => (window as unknown as { optionsAtMousedown: number }).optionsAtMousedown)).toBe(N + 1);
     await expect(select.locator('option')).toHaveCount(N + 1); // placeholder + every asset
+    // Opening the native dropdown must not blur the select, or it would collapse
+    // underneath the open list.
+    await expect(select).toBeFocused();
     await select.selectOption({ label: 'Scale Asset 120' });
     await expect(select).toHaveValue('scale-asset-120');
+
+    // Leaving the cell collapses it again, keeping the new choice.
+    await select.press('Tab');
+    await expect(select.locator('option')).toHaveCount(2);
+    await expect(select.locator('option:checked')).toHaveText('Scale Asset 120');
 
     await expect.poll(async () => (await readStore(page, 'deliverables'))
       .find(d => d.id === 'scale-deliverable-003')?.assetId).toBe('scale-asset-120');
@@ -81,6 +89,30 @@ test.describe('Data Manager at bank scale', () => {
     await select.focus();
     await expect(select.locator('option')).toHaveCount(N + 1);
     await expect(select).toHaveValue('scale-asset-010');
+  });
+
+  // Review of #71: an expanded select that never collapsed let a keyboard user tabbing
+  // down the column rebuild rows × assets options one row at a time.
+  test('a select collapses when focus leaves it, so walking a column stays bounded', async ({ page }) => {
+    await openTab(page, 'initiatives', N);
+    const walked = 12;
+    const allOptions = page.locator('tbody tr[data-real="true"] td[data-key="assetId"] option');
+    for (let i = 0; i < walked; i++) {
+      const select = assetSelect(page, `scale-initiative-${pad(i)}`);
+      await select.focus();
+      await expect(select.locator('option')).toHaveCount(N + 1);
+      // Only the focused select may hold the full list.
+      expect(await allOptions.count()).toBeLessThanOrEqual(2 * (N - 1) + N + 1);
+    }
+
+    await page.getByTestId('search-input').focus();
+    expect(await allOptions.count(), 'nothing is focused in the table, so nothing stays expanded').toBeLessThanOrEqual(2 * N);
+
+    const first = assetSelect(page, 'scale-initiative-000');
+    await expect(first.locator('option')).toHaveCount(2);
+    await expect(first).toHaveValue('scale-asset-000');
+    await expect(first.locator('option:checked')).toHaveText('Scale Asset 000');
+    await expect(first.locator('xpath=ancestor::td[1]')).toHaveAttribute('title', 'Scale Asset 000');
   });
 
   test('a deleted asset shows the placeholder, and small fixed lists stay complete', async ({ page }) => {
