@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { TemplateId } from '../lib/workspaceTemplates';
-import { FileSpreadsheet, Loader2, AlertCircle, ArchiveRestore, HardDriveDownload } from 'lucide-react';
+import { FileSpreadsheet, Loader2, AlertCircle, ArchiveRestore, HardDriveDownload, X } from 'lucide-react';
 import type { PortableWorkspace } from '../lib/workspaceBackup';
 import { useBackupDownload } from '../lib/backupDownload';
 import { BackupStatusNote, LastBackupStarted } from './BackupStatus';
@@ -28,6 +28,11 @@ interface TemplatePickerModalProps {
    */
   backup?: { onPrepareBackup: () => Promise<PortableWorkspace>; versions: number; decisions: number };
   isReset?: boolean;
+  /**
+   * Leaves a reset without choosing, back to the unchanged workspace. Only a
+   * reset can be closed; first-launch onboarding must end in a choice.
+   */
+  onClose?: () => void;
 }
 
 const CURRENT_YEAR = new Date().getFullYear();
@@ -42,7 +47,7 @@ const yearIsValid = (v: string) => /^\d{4}$/.test(v) && Number(v) >= 2000 && Num
  * normal pairing, so asking once would be wrong most of the time. Neither layout
  * carries a year, so neither can be inferred.
  */
-export function TemplatePickerModal({ onSelect, onImportReturns, onRestoreBackup, backup, isReset = false }: TemplatePickerModalProps) {
+export function TemplatePickerModal({ onSelect, onImportReturns, onRestoreBackup, backup, isReset = false, onClose }: TemplatePickerModalProps) {
   const lkptiInputRef = useRef<HTMLInputElement>(null);
   const restoreInputRef = useRef<HTMLInputElement>(null);
   const [restoreError, setRestoreError] = useState<string | null>(null);
@@ -156,15 +161,29 @@ export function TemplatePickerModal({ onSelect, onImportReturns, onRestoreBackup
       data-testid="template-picker-modal"
     >
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl flex flex-col animate-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
-        <div className="p-6 border-b border-slate-100">
-          <h2 className="text-xl font-bold text-slate-900">
-            {isReset ? 'Clear data and start again' : 'Welcome to Selara'}
-          </h2>
-          <p className="text-sm text-slate-500 mt-1">
-            {isReset
-              ? 'Choose how to start again. This will permanently replace all your current data.'
-              : 'Prepare your OJK regulatory returns — RPTI (Format 3.1) and LKPTI (Format 3.2.6).'}
-          </p>
+        <div className="p-6 border-b border-slate-100 flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-bold text-slate-900">
+              {isReset ? 'Clear data and start again' : 'Welcome to Selara'}
+            </h2>
+            <p className="text-sm text-slate-500 mt-1">
+              {isReset
+                ? 'Choose how to start again. This will permanently replace all your current data.'
+                : 'Prepare your OJK regulatory returns — RPTI (Format 3.1) and LKPTI (Format 3.2.6).'}
+            </p>
+          </div>
+          {isReset && onClose && (
+            <button
+              data-testid="template-picker-close"
+              onClick={onClose}
+              disabled={busy || restoring}
+              aria-label="Close"
+              title="Close without changing anything"
+              className="flex-shrink-0 p-1 text-slate-400 hover:text-slate-600 rounded transition-colors disabled:opacity-40"
+            >
+              <X size={16} />
+            </button>
+          )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-6">

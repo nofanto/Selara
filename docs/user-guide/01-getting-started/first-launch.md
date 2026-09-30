@@ -68,7 +68,7 @@ If you want to start fresh, switch to a different template, or change whether yo
 
 ![Clear data and start again button](../../public/features/data-manager-clear-and-start-again.png)
 
-3. The template picker reopens with a warning that your existing data will be replaced.
+3. The template picker reopens with a warning that your existing data will be replaced. Nothing has changed yet: to back out, click **Close** (×) in the top-right corner, and you're returned to your workspace as it was.
 
 ![Template picker with data-loss warning](../../public/features/template-picker-reset-warning.png)
 

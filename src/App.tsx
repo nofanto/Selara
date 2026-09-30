@@ -2281,6 +2281,7 @@ export default function App() {
                 ? { onPrepareBackup: handlePrepareBackup, versions: versions.length, decisions: decisions.length }
                 : undefined}
               isReset={templatePickerIsReset}
+              onClose={() => { setShowTemplatePicker(false); setTemplatePickerIsReset(false); }}
             />
           </Suspense>
         </ModalErrorBoundary>
