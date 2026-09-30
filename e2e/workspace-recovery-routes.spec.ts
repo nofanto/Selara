@@ -220,6 +220,37 @@ test.describe('R04 Reset / template selection', () => {
     await expectStoredUnchanged(page, before);
   });
 
+  test('the reset picker can be closed before choosing; nothing is written, including after reload', async ({ page }) => {
+    const before = await populated(page);
+    await page.getByTestId('nav-data-manager').click();
+    await page.getByTestId('clear-and-start-again-btn').click();
+    const picker = page.getByTestId('template-picker-modal');
+    await expect(picker).toBeVisible();
+
+    await picker.getByRole('button', { name: 'Close' }).click();
+    await expect(picker).toHaveCount(0);
+    await expect(page.getByTestId('data-manager')).toBeVisible();
+    await expectStoredUnchanged(page, before);
+  });
+
+  test('first-launch onboarding stays mandatory: its picker has no Close', async ({ page }) => {
+    await page.goto('/');
+    await page.evaluate(async () => {
+      await new Promise<void>(resolve => {
+        const req = indexedDB.deleteDatabase('it-initiative-visualiser');
+        req.onsuccess = req.onerror = () => resolve();
+        req.onblocked = () => setTimeout(resolve, 200);
+      });
+      localStorage.removeItem('scenia-e2e');
+      localStorage.setItem('scenia_has_seen_landing', 'true');
+    });
+    await page.reload();
+    const picker = page.getByTestId('template-picker-modal');
+    await expect(picker).toBeVisible({ timeout: 20000 });
+    await expect(picker.getByRole('heading', { name: 'Welcome to Selara' })).toBeVisible();
+    await expect(picker.getByRole('button', { name: 'Close' })).toHaveCount(0);
+  });
+
   test('a failed save keeps the workspace and reports it', async ({ page }) => {
     const before = await populated(page);
     await page.getByTestId('nav-data-manager').click();

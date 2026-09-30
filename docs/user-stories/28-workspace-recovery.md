@@ -12,6 +12,7 @@ As an individual IT planner, I want a complete portable backup and safe replacem
 - Cancel, malformed/incomplete backup and failed persistence leave current UI and stored workspace intact. Empty complete backups are supported.
 - Incomplete older workbooks are directed to ordinary Import; missing historical display settings get documented defaults and warnings. An absent Decisions sheet preserves the live log in ordinary Import.
 - Template/reset/onboarding, Open shared, ordinary overwrite and History restore share safe failure handling. Existing Undo of replacement includes History.
+- The **Clear data and start again** picker can be closed before any choice, returning to the unchanged workspace with nothing written, including after a reload. First-launch onboarding stays mandatory, with no Close. *(Added 2026-09-30.)*
 - Recovery succeeds in a fresh profile after source-profile removal, comparing every field in the preservation inventory through the downloaded XLSX file.
 - Pending saves finish before backup/preview; a save failure blocks preparation without discarding unsaved UI. Local or remote changes invalidate a preview and require renewed confirmation. The final save refuses a changed destination atomically.
 - Edits, History mutations and repeated confirmation cannot race a replacement. Failed Undo/Redo leaves its recovery entries available; other tabs refresh History alongside current records.

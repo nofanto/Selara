@@ -155,3 +155,29 @@ After the fix:
 - `npx playwright test` (local): **745 passed, 1 flaky, 4 skipped**.
   - The flaky test was `rpti-data-manager.spec.ts` "filed cost and remarks entered on the segment survive reload…" (T022). It failed once, showing the value missing after the reload, and passed on its retry.
   - This predates v20. With `--repeat-each=40 --retries=0` it failed with the same symptom 2 of 40 with v20, 1 of 40 on `fbc83d9` (before v20) and 3 of 40 on `main` (`8bf7e5e`). Not changed here.
+
+## Reset picker can be closed — 2026-09-30
+
+**Report.** **Data Manager → Clear data and start again** opened the template picker in reset mode with no way to close it, although nothing had changed yet. First-launch onboarding (`isReset=false`) should stay mandatory.
+
+**Red:** 2 tests in the R04 section of `e2e/workspace-recovery-routes.spec.ts`, `--retries=0`.
+- "the reset picker can be closed before choosing; nothing is written, including after reload": **failed**, timing out waiting for `getByRole('button', { name: 'Close' })` inside the picker.
+- "first-launch onboarding stays mandatory: its picker has no Close": passed, as intended. It guards the fix rather than reproducing the bug.
+
+**Fix:**
+- `TemplatePickerModal` takes an optional `onClose`, and renders a Close button (×, accessible name "Close") only when `isReset` is true. It's disabled while an import or restore started from the picker is in progress.
+- `App.tsx` closes the picker and clears reset mode. Nothing is read, written or deleted.
+
+**Green:** all 4 R04 tests with `--repeat-each=3 --retries=0`: **12 of 12**. The close test checks the stored workspace is unchanged, both before and after a reload (`expectStoredUnchanged`).
+
+After the fix:
+- `npm run test:unit`: 30 files, **718 passed**.
+- `npm run lint`: eslint 0 errors, 6 warnings; tsc 0 errors.
+- `npm run build`: built.
+- `CI=1 npx playwright test`: **748 passed, 4 skipped**, 0 flaky, 0 failed.
+- `npx playwright test` (local): **748 passed, 4 skipped**, 0 flaky, 0 failed.
+
+Documentation:
+- User story 15 gains AC8 (reset Close) and AC9 (first launch has no Close).
+- User story 28 gains a matching criterion.
+- `docs/user-guide/01-getting-started/first-launch.md` describes Close in the reset steps.
