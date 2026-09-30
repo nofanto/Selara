@@ -12,6 +12,16 @@ on:
 permissions:
   contents: read
 
+# A newer push to a pull request cancels that PR's older, still-running CI run — its
+# result is superseded, and the Playwright suite would otherwise keep a runner busy
+# for ~13 minutes to report on a commit nobody is looking at. The group is keyed on
+# this workflow and the PR number, so different PRs never share a group. Every other
+# run (a push to main, a manual run) gets a group of its own via the unique run_id,
+# so it can neither cancel nor be cancelled by anything else.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || format('run-{0}', github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   # Fast feedback: the unit tests cover the domain rules CLAUDE.md calls the primary
   # risk (RPTI/LKPTI generation, the decision-log rules, the Excel round trip), so
