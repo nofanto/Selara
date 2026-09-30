@@ -34,6 +34,11 @@ Decisions:
   full list, before the native dropdown opens. The cell looks and behaves the same,
   and it stays a native `<select>`, so keyboard, screen-reader, and form semantics are
   unchanged.
+- **It collapses again when focus leaves.** At most one row holds a full list at a
+  time. Without this, a keyboard user tabbing down a column, or anyone editing many
+  rows in one visit, would rebuild rows × options one row at a time. This came up in
+  review of PR #71. An open native dropdown keeps focus on its select, so collapsing
+  never happens underneath an open list.
 - **Small, fixed lists stay fully rendered.** Enumerations such as Status, Type, RAG,
   Backup Strategy, or Category Code (at most 19 options) don't grow with the workspace.
   They cost rows × a constant, which is linear, so they keep their current behaviour.
@@ -62,6 +67,9 @@ Decisions:
 
 - [x] Opening a row's Asset dropdown, by mouse or by keyboard focus, offers every asset.
 - [x] Choosing a different asset saves it, and it's still chosen after a reload.
+- [x] Moving focus out of a dropdown collapses it back to its current value, keeping
+  the selection and tooltip. Walking focus down 12 rows never leaves more than the
+  focused row fully expanded.
 
 ### AC3: Nothing else changes
 
