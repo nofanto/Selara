@@ -44,12 +44,65 @@ interface EditableTableProps<T> {
   onColumnResize?: (columnKey: string, newWidth: string) => void;
 }
 
-function getCellTitle<T>(row: T & { [key: string]: any }, col: Column<T>): string | undefined {
+// Past this many options a row's <select> renders only the placeholder and its current
+// value until it is focused or pressed. Reference columns grow with the workspace —
+// onboarding creates one asset per application — so rendering every option in every
+// row cost rows × options DOM nodes and froze the Deliverables and Initiatives tabs at
+// a few hundred applications (#36). Fixed enumerations stay under this and render
+// fully, as before.
+const LAZY_OPTIONS_THRESHOLD = 20;
+
+/** Value → label per select column, so per-cell lookups don't scan the option list. */
+type OptionLabels = Map<string, string>;
+
+function buildOptionLabels(options: Option[] | undefined): OptionLabels {
+  const labels: OptionLabels = new Map();
+  // First match wins, as Array.find did.
+  for (const opt of options ?? []) if (!labels.has(String(opt.value))) labels.set(String(opt.value), opt.label);
+  return labels;
+}
+
+function RowSelect({ value, options, labels, onChange, label, title, className }: {
+  value: string;
+  options: Option[];
+  labels: OptionLabels;
+  onChange: (value: string) => void;
+  label: string;
+  title?: string;
+  className: string;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const lazy = !expanded && options.length > LAZY_OPTIONS_THRESHOLD;
+  const currentLabel = labels.get(value);
+  // mousedown's default action is what opens the native dropdown, and React commits
+  // this update before it runs, so the dropdown opens with the full list.
+  const expand = lazy ? () => setExpanded(true) : undefined;
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      onFocus={expand}
+      onMouseDown={expand}
+      aria-label={label}
+      title={title}
+      className={className}
+    >
+      <option value="">Select...</option>
+      {lazy
+        ? currentLabel !== undefined && <option key={value} value={value}>{currentLabel}</option>
+        : options.map(opt => (
+          <option key={opt.value} value={opt.value}>{opt.label}</option>
+        ))}
+    </select>
+  );
+}
+
+function getCellTitle<T>(row: T & { [key: string]: any }, col: Column<T>, labels: OptionLabels | undefined): string | undefined {
   const value = row[col.key as string];
   if (value === null || value === undefined || value === '') return undefined;
 
   if (col.type === 'select' && col.options) {
-    return col.options.find(o => String(o.value) === String(value))?.label ?? String(value);
+    return labels?.get(String(value)) ?? String(value);
   }
   if (col.type === 'color') {
     return COLORS.find(c => c.value === String(value))?.name;
@@ -225,6 +278,11 @@ export function EditableTable<T extends { [key: string]: any }>({
     }
   }, [rows, pendingFocus]);
 
+  const optionLabels = useMemo(
+    () => new Map(columns.filter(col => col.type === 'select').map(col => [col.key, buildOptionLabels(col.options)])),
+    [columns],
+  );
+
   const sortedRows = useMemo(() => {
     let indexedRows = rows.map((row, originalIndex) => ({ row, originalIndex }));
 
@@ -236,8 +294,8 @@ export function EditableTable<T extends { [key: string]: any }>({
           if (val === null || val === undefined) return false;
 
           if (col.type === 'select' && col.options) {
-            const opt = col.options.find(o => String(o.value) === String(val));
-            return opt?.label.toLowerCase().includes(q) || String(val).toLowerCase().includes(q);
+            const label = optionLabels.get(col.key)?.get(String(val));
+            return label?.toLowerCase().includes(q) || String(val).toLowerCase().includes(q);
           }
           return String(val).toLowerCase().includes(q);
         });
@@ -271,7 +329,7 @@ export function EditableTable<T extends { [key: string]: any }>({
         return bString.localeCompare(aString);
       }
     });
-  }, [rows, sortConfig, columns, searchQuery]);
+  }, [rows, sortConfig, columns, searchQuery, optionLabels]);
 
   const handleSort = (key: keyof T) => {
     let direction: 'asc' | 'desc' = 'asc';
@@ -559,22 +617,19 @@ export function EditableTable<T extends { [key: string]: any }>({
               return (
                 <tr key={`${String(row[idField])}-${originalIndex}`} data-real="true" data-id={String(row[idField])} className="hover:bg-slate-50 group">
                   {columns.map((col) => {
-                    const cellTitle = getCellTitle(row, col);
+                    const cellTitle = getCellTitle(row, col, optionLabels.get(col.key));
                     return (
                     <td key={`${String(row[idField])}-${originalIndex}-${String(col.key)}`} data-key={String(col.key)} data-testid={col.cellTestId} title={cellTitle} className="border-b border-r border-slate-100 last:border-r-0 p-0 relative">
                       {col.type === 'select' ? (
-                        <select
+                        <RowSelect
                           value={String(row[col.key] || '')}
-                          onChange={(e) => handleChange(originalIndex, col.key, e.target.value, false)}
-                          aria-label={col.label}
+                          options={col.options ?? []}
+                          labels={optionLabels.get(col.key) ?? new Map()}
+                          onChange={(value) => handleChange(originalIndex, col.key, value, false)}
+                          label={col.label}
                           title={cellTitle}
                           className="w-full h-full px-3 py-2 bg-transparent border-none focus:ring-2 focus:ring-inset focus:ring-blue-500 outline-none appearance-none"
-                        >
-                          <option value="">Select...</option>
-                          {col.options?.map(opt => (
-                            <option key={opt.value} value={opt.value}>{opt.label}</option>
-                          ))}
-                        </select>
+                        />
                       ) : col.type === 'color' ? (
                         <div className="relative flex items-center h-full w-full">
                           <button

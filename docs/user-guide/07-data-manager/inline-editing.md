@@ -6,6 +6,8 @@
 
 Every cell is editable in place: click it and type, pick from its dropdown, or tick its checkbox. There is no separate edit mode.
 
+Dropdowns that point at other records, such as **Asset** on a deliverable, load their full list when you open them. Until then each row holds only its current value, which keeps a workspace with hundreds of applications quick to open.
+
 Edits are saved immediately when you click away or press Enter — there is no Save button. Changes are reflected on the timeline in real time.
 
 ## Adding a row
