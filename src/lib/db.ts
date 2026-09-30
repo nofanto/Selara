@@ -70,7 +70,7 @@ interface ITMapDB extends DBSchema {
 }
 
 const DB_NAME = 'it-initiative-visualiser';
-const DB_VERSION = 19;
+const DB_VERSION = 20;
 
 let dbPromise: Promise<IDBPDatabase<ITMapDB>>;
 
@@ -78,6 +78,15 @@ export const initDB = () => {
   if (!dbPromise) {
     dbPromise = openDB<ITMapDB>(DB_NAME, DB_VERSION, {
       async upgrade(db, oldVersion, _newVersion, tx) {
+        // v20 (ADR-0016): a database can reach a version without every store its
+        // version implies — the steps below only run for versions it had not passed.
+        // The atomic workspace read/write needs them all, so on every upgrade create
+        // whichever are missing. Existing stores and records are left as they are.
+        for (const name of [...ENTITY_STORES, 'versions'] as const) {
+          if (!db.objectStoreNames.contains(name)) db.createObjectStore(name, { keyPath: 'id' });
+        }
+        if (!db.objectStoreNames.contains('settings')) db.createObjectStore('settings');
+
         if (!db.objectStoreNames.contains('assets')) {
           db.createObjectStore('assets', { keyPath: 'id' });
         }

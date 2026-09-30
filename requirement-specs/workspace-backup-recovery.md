@@ -96,6 +96,20 @@ What shipped matches the contracts. Where implementation had to choose, it chose
 
 **Accepted limitation, to revisit if real workspaces hit it:** an Excel cell holds at most 32,767 characters. A value that long fails backup with the record and field named. The most plausible case is one saved version's archived decision copy, written as a single encoded cell. Splitting values across cells would lift the limit, but is not built.
 
+## Amendment — 2026-09-30: missing object stores
+
+A planner's existing database was at v19 but was missing at least one object store. On the M1 branch every load and save failed with `NotFoundError`, and the app showed its fallback workspace. `main` had skipped missing stores; M1's atomic read and write name them all. The profile was cleared before its store list was captured.
+
+**Decided:** bump IndexedDB to v20, with an idempotent upgrade step that creates every missing required store with its correct key path. Every existing store and record is left as it was. The atomic read and write stay strict.
+
+**Rejected:**
+- Restoring `objectStoreNames.contains` checks in the atomic path. That would silently leave, for example, the decision log out of every save, backup and restore.
+- Asking planners to clear their database. That loses the workspace.
+
+**Accepted tradeoff:** v20 is one-way. A v19 build, such as `main` before this merges, can't open a database that v20 has opened.
+
+Recorded in [ADR-0016](../docs/adr/0016-repair-missing-object-stores-at-v20.md) and the [database diagram](../docs/database-diagram.md).
+
 ## Open questions
 
 None from the accepted proposals. A newly discovered domain ambiguity or an Excel limitation that prevents preservation must be raised before dependent implementation; this is not permission to silently narrow the contract.

@@ -47,3 +47,4 @@ An ADR is never edited to reverse its outcome — if circumstances change, write
 | [0013](0013-report-rows-as-projections.md) | Report rows describe the entities they belong to, and a return is generated for a stated year | Accepted |
 | [0014](0014-rpti-rows-belong-to-implementations.md) | RPTI rows belong to implementations | Accepted |
 | [0015](0015-workspace-backup-and-conditional-replacement.md) | Back up to a verified Excel workbook, and replace the workspace only against a reviewed base | Accepted |
+| [0016](0016-repair-missing-object-stores-at-v20.md) | Repair missing object stores in a v20 upgrade, not by skipping them | Accepted |

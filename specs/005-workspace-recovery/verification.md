@@ -120,3 +120,38 @@ After the fix:
 - `npm run build`: built.
 - `CI=1 npx playwright test`: **744 passed, 4 skipped**, 0 flaky, 0 failed.
 - `npx playwright test` (local): **744 passed, 4 skipped**, 0 flaky, 0 failed.
+
+## Missing object stores: IndexedDB v20 repair — 2026-09-30
+
+**Report.** A planner started the M1 branch against their existing browser profile. Two console errors followed:
+- `Failed to load data from DB: NotFoundError: Failed to execute 'transaction' on 'IDBDatabase': One of the specified object stores was not found`, at `readPersistedWorkspace`, `db.ts:334`;
+- the same error from `Failed to save data to DB`, at `App.tsx:801`.
+
+The app showed its fallback workspace, and every save failed. The profile was cleared before its store list could be captured.
+
+**Cause.** The database was at v19 but missing at least one store. `main` had skipped missing stores; M1's atomic read and write name every store. Decision and rationale: [ADR-0016](../../docs/adr/0016-repair-missing-object-stores-at-v20.md).
+
+**Red:** `e2e/db-schema-repair.spec.ts`, 2 tests, `--retries=0`. Both seed a v19 database from a static page on the same origin. It holds the app's own template records, with one initiative renamed so it can't be mistaken for the fallback, plus a saved Version and the orphaned `dtsPhases` store.
+- *Missing `decisions` and `lkptiDetails`:* **failed**. The seeded initiative never appeared, because the load failed and the fallback template was shown.
+  - The first draft of this test checked a template initiative name. That passed on the fallback data, so the seed was made distinguishable and the load-error check moved first.
+- *Complete v19:* **failed**, `Expected: 20, Received: 19`.
+
+**Fix** (`src/lib/db.ts`): `DB_VERSION` 20. `upgrade()` now begins by creating any missing entity store, plus `versions`, with `keyPath: 'id'`, and `settings` out-of-line. Nothing existing is touched.
+
+**Green:** both tests pass. Each asserts:
+- version 20;
+- every key path;
+- every seeded record and the settings unchanged, and `dtsPhases` kept;
+- the seeded workspace and snapshot shown, with no load or save error;
+- an edit saved and still present after a reload.
+
+Repeated with `--repeat-each=5 --retries=0`: **10 of 10**.
+
+After the fix:
+- `npm run test:unit`: 30 files, **718 passed**.
+- `npm run lint`: eslint 0 errors, 6 warnings; tsc 0 errors.
+- `npm run build`: built.
+- `CI=1 npx playwright test`: **746 passed, 4 skipped**, 0 flaky, 0 failed.
+- `npx playwright test` (local): **745 passed, 1 flaky, 4 skipped**.
+  - The flaky test was `rpti-data-manager.spec.ts` "filed cost and remarks entered on the segment survive reload…" (T022). It failed once, showing the value missing after the reload, and passed on its retry.
+  - This predates v20. With `--repeat-each=40 --retries=0` it failed with the same symptom 2 of 40 with v20, 1 of 40 on `fbc83d9` (before v20) and 3 of 40 on `main` (`8bf7e5e`). Not changed here.
