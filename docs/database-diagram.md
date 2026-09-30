@@ -331,6 +331,7 @@ Schema evolution is handled in the `upgrade()` callback of `openDB<ITMapDB>()` i
   - **What it does:** the upgrade now *begins* with an idempotent repair. Every store in the table above except `dtsPhases` is created if missing, with the key path shown (`settings` stays out-of-line). The repair runs on every upgrade, and does nothing when all stores exist.
   - **What it leaves alone:** no store is deleted or recreated, and no record is read or rewritten. Orphaned stores are kept.
   - **One-way:** a browser that has opened v20 can't be opened by a v19 build (`VersionError`).
+  - **Other tabs:** an older tab holding the database shows a "close or reload your other Selara tabs" message on the loading screen (`blocked`). A tab at v20 or later lets go when a newer version upgrades (`blocking`), and asks to be reloaded. Its later reads and writes fail with `DatabaseSupersededError`.
   - See [ADR-0016](adr/0016-repair-missing-object-stores-at-v20.md).
 - **No version bump:** `Deliverable` gained a new optional `description` field, cascading into `LkptiDetail.functionDescription` at generation time — additive field on an existing store, no schema/index change. See [ADR-0008](adr/0008-deliverable-description-field.md).
 - **No version bump:** `DeliverableStatus` gained a new optional `isPreLaunchStatus` field, flipping RPTI generation's status classification from a deny-list to an allow-list — additive field on an existing store, no schema/index change. See [ADR-0009](adr/0009-rpti-status-allow-list.md).

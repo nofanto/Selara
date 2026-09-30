@@ -233,6 +233,46 @@ test.describe('R04 Reset / template selection', () => {
     await expectStoredUnchanged(page, before);
   });
 
+  test('while a replacement preview is open, the picker behind it cannot be reached', async ({ page }) => {
+    await populated(page);
+    await page.getByTestId('nav-data-manager').click();
+    await page.getByTestId('clear-and-start-again-btn').click();
+    const picker = page.getByTestId('template-picker-modal');
+    await page.getByTestId('template-start-blank-btn').click();
+    await expect(replacementModal(page)).toBeVisible();
+
+    const focusedInPicker = () => picker.evaluate(el => el.contains(document.activeElement));
+    await page.getByTestId('template-picker-close').focus();
+    expect(await focusedInPicker()).toBe(false);
+    await page.getByTestId('template-start-blank-btn').focus();
+    expect(await focusedInPicker()).toBe(false);
+    for (let i = 0; i < 12; i++) {
+      await page.keyboard.press('Shift+Tab');
+      expect(await focusedInPicker(), `Shift+Tab ${i + 1}`).toBe(false);
+    }
+
+    // Cancel returns to a picker that works again.
+    await cancel(page);
+    await expect(picker).toBeVisible();
+    await page.getByTestId('template-picker-close').click();
+    await expect(picker).toHaveCount(0);
+  });
+
+  test('the reset picker is a labelled dialog: focus moves into it, and back to the trigger on Close', async ({ page }) => {
+    await populated(page);
+    await page.getByTestId('nav-data-manager').click();
+    const trigger = page.getByTestId('clear-and-start-again-btn');
+    await trigger.focus();
+    await page.keyboard.press('Enter');
+
+    const dialog = page.getByRole('dialog', { name: 'Clear data and start again' });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'Close' })).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(dialog).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+  });
+
   test('first-launch onboarding stays mandatory: its picker has no Close', async ({ page }) => {
     await page.goto('/');
     await page.evaluate(async () => {
@@ -249,6 +289,10 @@ test.describe('R04 Reset / template selection', () => {
     await expect(picker).toBeVisible({ timeout: 20000 });
     await expect(picker.getByRole('heading', { name: 'Welcome to Selara' })).toBeVisible();
     await expect(picker.getByRole('button', { name: 'Close' })).toHaveCount(0);
+    // A labelled dialog that takes focus, as the reset picker does.
+    const dialog = page.getByRole('dialog', { name: 'Welcome to Selara' });
+    await expect(dialog).toBeVisible();
+    expect(await dialog.evaluate(el => el.contains(document.activeElement))).toBe(true);
   });
 
   test('a failed save keeps the workspace and reports it', async ({ page }) => {

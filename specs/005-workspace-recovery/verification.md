@@ -181,3 +181,55 @@ Documentation:
 - User story 15 gains AC8 (reset Close) and AC9 (first launch has no Close).
 - User story 28 gains a matching criterion.
 - `docs/user-guide/01-getting-started/first-launch.md` describes Close in the reset steps.
+
+## Review findings on `d4c7ff7` and `f339f77` — 2026-09-30
+
+Codex reviewed both commits and raised three P2 findings. All three were reproduced with a temporary spec, since deleted, before any fix:
+1. A raw page held a v19 connection; the app in a second tab showed only "Loading data..." after 8 s, and loaded as soon as the connection closed.
+2. With a template preview open over the reset picker, Close was enabled. Five Shift+Tab presses reached it, and Enter closed the picker while the preview stayed open. Cancel then landed on Data Manager instead of the picker.
+3. Opening the reset picker by keyboard left focus on `clear-and-start-again-btn`, behind the overlay. There was no `role="dialog"`, and after Close, focus fell to `BODY`.
+
+No finding involved data loss. Codex found no migration-order, key-path, preserved-record or first-launch issue.
+
+**1. Upgrades across open tabs** (`e2e/db-schema-repair.spec.ts`, "Upgrades across open tabs").
+- **Red:**
+  - With an older tab's v19 connection held, `storage-upgrade-blocked` was not found.
+  - A raw v21 open from another tab returned "still blocked after 5s".
+- **Fix** (`src/lib/db.ts`, `src/App.tsx`):
+  - A `blocked` handler sets the storage state to `'blocked'`, and the loading screen says to close or reload the other Selara tabs. It clears once the open succeeds.
+  - A `blocking` handler closes the connection (running transactions finish) and replaces `dbPromise` with a rejected `DatabaseSupersededError`, so no stale, resolved promise is left. A persistent `storage-superseded` notice offers Reload.
+  - Later saves, including queued ones, reject with that error, and the save banner shows its message.
+- **Green:**
+  - The message appears, then the seeded workspace loads once the connection is released.
+  - The v21 open succeeds, the notice shows, and a later edit shows the error banner.
+
+**2. Picker inert under a preview** (R04, "while a replacement preview is open, the picker behind it cannot be reached").
+- **Red:** focus landed inside the picker (`Expected: false, Received: true`).
+- **Fix:** `TemplatePickerModal` takes `inert`, and App passes `!!openReplacement`. This covers Close and every other picker control, whether the preview came from a template, an import or a restore.
+- **Green:** direct `.focus()` on Close and on **Start blank**, and 12 Shift+Tab presses, never reach the picker. After Cancel, the picker works and Close closes it.
+
+**3. Dialog semantics and focus** (R04, "the reset picker is a labelled dialog…", plus the first-launch test).
+- **Red:** `getByRole('dialog', { name: 'Clear data and start again' })` and `… 'Welcome to Selara'` were not found.
+- **Fix:**
+  - The panel has `role="dialog"`, `aria-modal="true"` and `aria-labelledby`, pointing at the heading.
+  - On mount, focus moves to Close in reset mode, or to the heading (`tabIndex=-1`) on first launch.
+  - Close returns focus to the element that was focused when the picker opened, then calls `onClose`.
+  - A general focus trap for every modal is left to a follow-up.
+- **Green:** the reset picker opens with focus on Close, and Enter on Close returns focus to **Clear data and start again**. The first-launch dialog takes focus.
+
+The new tests, `--repeat-each=5 --retries=0`: **30 of 30**. The related specs (recovery routes, schema repair, template demo toggle, workspace templates): **46 of 46**.
+
+After the fixes:
+- `npm run test:unit`: 30 files, **718 passed**.
+- `npm run lint`: eslint 0 errors, 6 warnings; tsc 0 errors.
+- `npm run build`: built.
+- `CI=1 npx playwright test`: **752 passed, 4 skipped**, 0 flaky, 0 failed.
+- `npx playwright test` (local): **752 passed, 4 skipped**, 0 flaky, 0 failed.
+
+CI on the two reviewed commits was green: run 36719290077 (`d4c7ff7`, 746 passed) and run 36720665528 (`f339f77`, 748 passed), with 0 flaky.
+
+Documentation:
+- ADR-0016's consequences now describe the `blocked` and `blocking` handling.
+- The database diagram's v20 note mentions it.
+- User story 15 (AC8/AC9) and story 28 gain criteria.
+- The user guide (`11-import-export/backup-and-restore.md`) gains "When Selara updates with other tabs open".

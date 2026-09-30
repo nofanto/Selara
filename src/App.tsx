@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useCallback, lazy, Suspense, useRef } from 'react';
+import { useState, useEffect, useCallback, lazy, Suspense, useRef, useSyncExternalStore } from 'react';
 import { Timeline } from './components/Timeline';
 import { MobileCardView } from './components/MobileCardView';
 import { useMediaQuery } from './lib/useMediaQuery';
@@ -32,7 +32,8 @@ import { Asset, Deliverable, DeliverableSegment, DeliverableStatus, Decision, Rp
 import { cn } from './lib/utils';
 import {
   getAppData, saveAppData, getAllVersions, readPersistedWorkspace, replaceWorkspace, drainWrites, settleWrites, saveVersion,
-  deleteVersion, PendingSaveError, StaleWorkspaceError, type PersistedWorkspace,
+  deleteVersion, PendingSaveError, StaleWorkspaceError, DatabaseSupersededError, getStorageState, subscribeStorageState,
+  type PersistedWorkspace,
 } from './lib/db';
 import { importFromExcelWithDiagnostics, readWorkbookFile, SNAPSHOT_DISPLAY_FALLBACK } from './lib/excel';
 import { readBackupWorkbook, workspaceFingerprint, type PortableWorkspace } from './lib/workspaceBackup';
@@ -214,6 +215,8 @@ export default function App() {
   const [view, setView] = useState<'visualiser' | 'data' | 'reports' | 'history' | 'guide'>('visualiser');
   const [dataManagerInitialTab, setDataManagerInitialTab] = useState<DataManagerTab | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
+  // Another tab's upgrade can hold up this tab, or close its database (ADR-0016).
+  const storageState = useSyncExternalStore(subscribeStorageState, getStorageState);
   const [isImportingShare, setIsImportingShare] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
   const [showFeatures, setShowFeatures] = useState(false);
@@ -799,7 +802,9 @@ export default function App() {
       return true;
     } catch (error) {
       console.error('Failed to save data to DB:', error instanceof Error ? `${error.name}: ${error.message}` : error);
-      setDbSaveError('Failed to save changes. Your data may not persist after a reload. If this keeps happening, try refreshing the page.');
+      setDbSaveError(error instanceof DatabaseSupersededError
+        ? error.message
+        : 'Failed to save changes. Your data may not persist after a reload. If this keeps happening, try refreshing the page.');
       return false;
     }
   }, [publishState, bumpRevision, rememberStored, notifySaved]);
@@ -1329,6 +1334,11 @@ export default function App() {
         <div className="flex flex-col items-center gap-2 text-slate-500">
           <Loader2 className="animate-spin" size={32} />
           <p>Loading data...</p>
+          {storageState === 'blocked' && (
+            <p data-testid="storage-upgrade-blocked" role="status" className="max-w-sm text-center text-sm text-slate-600">
+              Selara is updating how it stores your data. Close or reload your other Selara tabs to continue — this page carries on by itself.
+            </p>
+          )}
         </div>
 
       </div>
@@ -1338,6 +1348,19 @@ export default function App() {
   return (
     <div className="h-screen w-full bg-slate-100 p-3 md:p-6 flex flex-col">
       <span hidden data-testid="app-ready" />
+      {storageState === 'superseded' && (
+        <div
+          data-testid="storage-superseded"
+          role="alert"
+          className="flex items-center gap-3 mb-3 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-900 flex-shrink-0"
+        >
+          <span className="flex-1">Selara was updated in another tab. Reload this tab to continue; until then, changes here can't be saved.</span>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-3 py-1 rounded-lg bg-amber-600 text-white text-xs font-medium hover:bg-amber-700"
+          >Reload</button>
+        </div>
+      )}
       {dbSaveError && (
         <div
           data-testid="db-error-banner"
@@ -2282,6 +2305,7 @@ export default function App() {
                 : undefined}
               isReset={templatePickerIsReset}
               onClose={() => { setShowTemplatePicker(false); setTemplatePickerIsReset(false); }}
+              inert={!!openReplacement}
             />
           </Suspense>
         </ModalErrorBoundary>

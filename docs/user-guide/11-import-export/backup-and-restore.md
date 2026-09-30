@@ -51,6 +51,13 @@ A file made by **Export** before backups existed can still be restored if it has
 
 If the workspace changes while a restore preview is open — in this tab or another — the preview says so and **Restore backup** is disabled until you click **Refresh** and review the new numbers. If another tab saves a change in the moment between your confirming and the restore being written, the restore is refused rather than overwriting that change.
 
+## When Selara updates with other tabs open
+
+Occasionally a new Selara version changes how your data is stored in the browser. That has to happen in one tab at a time:
+
+- **"Close or reload your other Selara tabs to continue"** on the loading screen means an older Selara tab is still open. Close it, or reload it, and this page carries on by itself. Nothing is lost while it waits.
+- **"Selara was updated in another tab. Reload this tab to continue"** means a newer Selara opened elsewhere. Click **Reload**. Until you do, this tab can't save, and changes made in it since the message appeared are not stored. Any save you try says so.
+
 ---
 
 - Previous: [Restoring a Version](../10-version-history/restoring-a-version.md)
