@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { TemplateId } from '../lib/workspaceTemplates';
 import { FileSpreadsheet, Loader2, AlertCircle, ArchiveRestore, HardDriveDownload, X } from 'lucide-react';
 import type { PortableWorkspace } from '../lib/workspaceBackup';
@@ -33,6 +33,8 @@ interface TemplatePickerModalProps {
    * reset can be closed; first-launch onboarding must end in a choice.
    */
   onClose?: () => void;
+  /** True while a replacement preview opened from here sits on top: nothing behind it may be focused or used. */
+  inert?: boolean;
 }
 
 const CURRENT_YEAR = new Date().getFullYear();
@@ -47,7 +49,19 @@ const yearIsValid = (v: string) => /^\d{4}$/.test(v) && Number(v) >= 2000 && Num
  * normal pairing, so asking once would be wrong most of the time. Neither layout
  * carries a year, so neither can be inferred.
  */
-export function TemplatePickerModal({ onSelect, onImportReturns, onRestoreBackup, backup, isReset = false, onClose }: TemplatePickerModalProps) {
+export function TemplatePickerModal({ onSelect, onImportReturns, onRestoreBackup, backup, isReset = false, onClose, inert = false }: TemplatePickerModalProps) {
+  const titleId = useId();
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  // Where focus was when the picker opened: the reset trigger, so Close can return there.
+  const [returnFocusTo] = useState(() => document.activeElement as HTMLElement | null);
+  useEffect(() => {
+    (closeRef.current ?? headingRef.current)?.focus();
+  }, []);
+  const close = () => {
+    if (returnFocusTo && returnFocusTo !== document.body && returnFocusTo.isConnected) returnFocusTo.focus();
+    onClose?.();
+  };
   const lkptiInputRef = useRef<HTMLInputElement>(null);
   const restoreInputRef = useRef<HTMLInputElement>(null);
   const [restoreError, setRestoreError] = useState<string | null>(null);
@@ -159,11 +173,17 @@ export function TemplatePickerModal({ onSelect, onImportReturns, onRestoreBackup
     <div
       className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4"
       data-testid="template-picker-modal"
+      inert={inert}
     >
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl flex flex-col animate-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl flex flex-col animate-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto"
+      >
         <div className="p-6 border-b border-slate-100 flex items-start justify-between gap-4">
           <div>
-            <h2 className="text-xl font-bold text-slate-900">
+            <h2 id={titleId} ref={headingRef} tabIndex={-1} className="text-xl font-bold text-slate-900 focus:outline-none">
               {isReset ? 'Clear data and start again' : 'Welcome to Selara'}
             </h2>
             <p className="text-sm text-slate-500 mt-1">
@@ -174,8 +194,9 @@ export function TemplatePickerModal({ onSelect, onImportReturns, onRestoreBackup
           </div>
           {isReset && onClose && (
             <button
+              ref={closeRef}
               data-testid="template-picker-close"
-              onClick={onClose}
+              onClick={close}
               disabled={busy || restoring}
               aria-label="Close"
               title="Close without changing anything"

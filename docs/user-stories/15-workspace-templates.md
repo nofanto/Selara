@@ -25,9 +25,9 @@ So that I start with a relevant portfolio structure without having to configure 
 
 **AC7:** The template picker is NOT shown on subsequent loads when IndexedDB already contains data.
 
-**AC8:** (Added 2026-09-30, M1 / PR #69.) When the picker is opened from **Data Manager → Clear data and start again**, it has a visible **Close** button (accessible name "Close"). Closing it returns to the existing workspace. Nothing is written or deleted, and the workspace is unchanged after a reload. Close is disabled while an import or restore started from the picker is in progress.
+**AC8:** (Added 2026-09-30, M1 / PR #69.) When the picker is opened from **Data Manager → Clear data and start again**, it has a visible **Close** button (accessible name "Close"). Closing it returns to the existing workspace. Nothing is written or deleted, and the workspace is unchanged after a reload. Close is disabled while an import or restore started from the picker is in progress. While a replacement preview opened from the picker is on top, the picker behind it can't be focused or used; after **Cancel** it works again. The picker is a dialog named after its heading. When it opens, focus moves to Close, and Close returns focus to **Clear data and start again**.
 
-**AC9:** (Added 2026-09-30.) On first launch the picker has no Close button. Onboarding must end in a choice, because there is no workspace to return to.
+**AC9:** (Added 2026-09-30.) On first launch the picker has no Close button. Onboarding must end in a choice, because there is no workspace to return to. It is also a dialog named after its heading ("Welcome to Selara"), and focus starts inside it.
 
 ## Scope
 

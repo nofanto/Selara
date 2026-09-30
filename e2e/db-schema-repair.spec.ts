@@ -149,3 +149,58 @@ test.describe('IndexedDB schema repair (ADR-0016)', () => {
     await expectUpgradedAndLoaded(page, seed, []);
   });
 });
+
+test.describe('Upgrades across open tabs (ADR-0016)', () => {
+  test('an older tab holding the database: the new tab says to close it, then loads once it is released', async ({ context, page }) => {
+    test.setTimeout(60000);
+    const seed = await realWorkspace(page);
+    await seedV19(page, seed, []);
+    // An older Selara tab: a v19 connection with no versionchange handling, so it never lets go.
+    const older = await context.newPage();
+    await older.goto(STATIC_PAGE);
+    await older.evaluate(name => new Promise<void>((resolve, reject) => {
+      const req = indexedDB.open(name, 19);
+      req.onsuccess = () => { (window as unknown as { held: IDBDatabase }).held = req.result; resolve(); };
+      req.onerror = () => reject(req.error);
+    }), DB_NAME);
+
+    await page.goto('/');
+    const blocked = page.getByTestId('storage-upgrade-blocked');
+    await expect(blocked).toBeVisible();
+    await expect(blocked).toContainText(/close or reload.*other Selara tabs/i);
+
+    await older.evaluate(() => (window as unknown as { held: IDBDatabase }).held.close());
+    await page.waitForSelector('[data-testid="asset-row-content"]', { timeout: 20000 });
+    await expect(page.getByText('Seeded initiative').first()).toBeVisible();
+    await expect(blocked).toHaveCount(0);
+  });
+
+  test('a newer version opened in another tab: this tab lets go, says to reload, and later saves fail visibly', async ({ context, page }) => {
+    test.setTimeout(60000);
+    await page.goto('/');
+    await page.waitForSelector('[data-testid="asset-row-content"]', { timeout: 20000 });
+
+    // A later Selara release upgrading the database from another tab.
+    const newer = await context.newPage();
+    await newer.goto(STATIC_PAGE);
+    const upgraded = await newer.evaluate(name => new Promise<string>(resolve => {
+      const req = indexedDB.open(name, 21);
+      req.onsuccess = () => { req.result.close(); resolve('opened'); };
+      req.onerror = () => resolve(`error: ${req.error?.name}`);
+      setTimeout(() => resolve('still blocked after 5s'), 5000);
+    }), DB_NAME);
+    expect(upgraded).toBe('opened');
+
+    const superseded = page.getByTestId('storage-superseded');
+    await expect(superseded).toBeVisible();
+    await expect(superseded).toContainText(/updated in another tab.*reload/i);
+
+    // An edit after that is not silently accepted: its save fails where the planner can see it.
+    await page.getByTestId('nav-data-manager').click();
+    await page.getByTestId('data-manager').getByRole('button', { name: /Initiatives/ }).click();
+    const nameCell = page.locator('tbody tr').first().locator('td').first().locator('input[type="text"]');
+    await nameCell.fill('Edited after the upgrade');
+    await nameCell.press('Tab');
+    await expect(page.getByTestId('db-error-banner')).toBeVisible();
+  });
+});

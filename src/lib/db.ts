@@ -72,11 +72,57 @@ interface ITMapDB extends DBSchema {
 const DB_NAME = 'it-initiative-visualiser';
 const DB_VERSION = 20;
 
-let dbPromise: Promise<IDBPDatabase<ITMapDB>>;
+let dbPromise: Promise<IDBPDatabase<ITMapDB>> | undefined;
+
+// ─── Upgrades across tabs (ADR-0016) ─────────────────────────────────────────
+//
+// 'blocked': another tab holds an older version open, so this tab's upgrade waits.
+// 'superseded': another tab opened a newer version, so this tab let go of the
+// database and can no longer read or write it until it is reloaded.
+
+export type StorageState = 'ready' | 'blocked' | 'superseded';
+let storageState: StorageState = 'ready';
+const storageListeners = new Set<() => void>();
+const setStorageState = (next: StorageState) => {
+  storageState = next;
+  storageListeners.forEach(listener => listener());
+};
+export const getStorageState = () => storageState;
+export const subscribeStorageState = (listener: () => void) => {
+  storageListeners.add(listener);
+  return () => { storageListeners.delete(listener); };
+};
+
+export class DatabaseSupersededError extends Error {
+  constructor() {
+    super('Selara was updated in another tab, so this tab can no longer save. Reload it to continue; changes made here since then were not saved.');
+    this.name = 'DatabaseSupersededError';
+  }
+}
+
+/**
+ * Lets a newer version upgrade. Transactions already running finish (close waits
+ * for them); anything after rejects with DatabaseSupersededError, so a queued or
+ * later save fails where the planner can see it instead of hanging or reopening
+ * a connection at a version the database has left behind.
+ */
+function supersede(connection: IDBDatabase) {
+  connection.close();
+  const error = new DatabaseSupersededError();
+  dbPromise = Promise.reject(error);
+  dbPromise.catch(() => undefined);
+  setStorageState('superseded');
+}
 
 export const initDB = () => {
   if (!dbPromise) {
     dbPromise = openDB<ITMapDB>(DB_NAME, DB_VERSION, {
+      blocked() {
+        setStorageState('blocked');
+      },
+      blocking(_currentVersion, _blockedVersion, event) {
+        supersede(event.target as IDBDatabase);
+      },
       async upgrade(db, oldVersion, _newVersion, tx) {
         // v20 (ADR-0016): a database can reach a version without every store its
         // version implies — the steps below only run for versions it had not passed.
@@ -233,6 +279,9 @@ export const initDB = () => {
           }
         }
       },
+    }).then(db => {
+      if (storageState === 'blocked') setStorageState('ready');
+      return db;
     });
   }
   return dbPromise;
