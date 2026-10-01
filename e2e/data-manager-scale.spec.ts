@@ -68,6 +68,13 @@ test.describe('Data Manager at bank scale', () => {
     // Opening the native dropdown must not blur the select, or it would collapse
     // underneath the open list.
     await expect(select).toBeFocused();
+    // Close the picker before choosing. On Linux Chromium it is an interactive popup
+    // that owns the keyboard: a Tab sent while it is open closes it, commits *its*
+    // highlighted item over a programmatic selectOption, and leaves focus on the
+    // select. A user closes it by choosing or with Escape; focus stays put either way.
+    await page.keyboard.press('Escape');
+    await expect(select).toBeFocused();
+    await expect(select.locator('option')).toHaveCount(N + 1);
     await select.selectOption({ label: 'Scale Asset 120' });
     await expect(select).toHaveValue('scale-asset-120');
 

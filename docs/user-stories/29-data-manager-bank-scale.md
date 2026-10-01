@@ -38,7 +38,10 @@ Decisions:
   time. Without this, a keyboard user tabbing down a column, or anyone editing many
   rows in one visit, would rebuild rows × options one row at a time. This came up in
   review of PR #71. An open native dropdown keeps focus on its select, so collapsing
-  never happens underneath an open list.
+  never happens underneath an open list. On Linux Chromium the open picker also owns
+  the keyboard: a Tab closes it, commits the item it has highlighted, and leaves focus
+  on the select, so the dropdown collapses on the next Tab. That is the browser's own
+  behaviour and doesn't depend on this change.
 - **Small, fixed lists stay fully rendered.** Enumerations such as Status, Type, RAG,
   Backup Strategy, or Category Code (at most 19 options) don't grow with the workspace.
   They cost rows × a constant, which is linear, so they keep their current behaviour.
